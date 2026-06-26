@@ -82,16 +82,20 @@ Client → FastAPI Router → Service → Repository → PostgreSQL (SQLAlchemy)
 
 ## 5. Cơ sở dữ liệu
 
-ERD đầy đủ ở [docs/base_sql_erd.sql](docs/base_sql_erd.sql), tổ chức theo version (thêm field/bảng mới ở version sau):
+ERD đầy đủ ở [docs/base_sql_erd.sql](docs/base_sql_erd.sql) — **một file hợp nhất**, sắp theo nhóm domain + thứ tự phụ thuộc FK (chạy tuần tự là tạo xong toàn bộ):
 
-| Version | Nội dung | Bảng |
-|---|---|---|
-| **v1.0** | Lõi nghiệp vụ | `roles`, `users`, `subjects`, `classes`, `student_class`, `teacher_subjects`, `exercises`, `class_assignments`, `student_exercise_attempts` |
-| **v1.1** | Phủ kín module S2–S6 | `documents`, `questions`, `answer_options`, `notifications`, `student_goals`, `learning_recommendations` |
-| **v1.2** | RBAC mịn theo permission | `permissions`, `role_permissions`, `user_permissions` |
-| *(hoãn)* | Cột + trigger | `users.last_login_at`, auto-sync `total_questions`, trigger `updated_at` — làm khi vào module cần |
+| Nhóm | Bảng |
+|---|---|
+| **1. Phân quyền & tài khoản (RBAC)** | `roles`, `users`, `permissions`, `role_permissions`, `user_permissions` |
+| **2. Cơ cấu tổ chức** | `subjects`, `classes`, `student_class`, `teacher_subjects` |
+| **3. Học liệu & bài tập** | `documents`, `exercises`, `questions`, `answer_options` |
+| **4. Giao bài & phân tích hành vi** | `class_assignments`, `student_exercise_attempts` |
+| **5. Tương tác & cá nhân hóa** | `notifications`, `student_goals`, `learning_recommendations` |
+| **6. Index** | RBAC · hành vi (GIN) · học liệu · tương tác |
 
 **Phân tích hành vi** lưu ở `student_exercise_attempts` (`behavior_logs`, `detailed_results` dạng JSONB + GIN index) — trọng tâm dữ liệu của hệ thống.
+
+> **Cố ý hoãn** (làm khi vào module cần, có ghi chú trong file): `users.last_login_at`, trigger tự đồng bộ `exercises.total_questions`, trigger tự cập nhật `updated_at` (hiện xử lý ở tầng ứng dụng).
 
 ---
 
