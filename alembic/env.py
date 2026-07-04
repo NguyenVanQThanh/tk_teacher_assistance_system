@@ -18,8 +18,20 @@ if config.config_file_name is not None:
 # for 'autogenerate' support
 # from myapp import mymodel
 # target_metadata = mymodel.Base.metadata
-target_metadata = None
+import sys
+import os
 
+# Đảm bảo Alembic tìm thấy thư mục gốc của dự án
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+# Import Base và tất cả các class từ file models của bạn
+from models.base import Base
+from models.models import (
+    User, Permission, RolePermission, UserPermission, 
+    Subject, Class, StudentClass, TeacherSubject, Document, Role
+)
+
+# Gán metadata cho Alembic quét (Đoạn này đứng riêng, không có chữ import)
+target_metadata = Base.metadata
 # other values from the config, defined by the needs of env.py,
 # can be acquired:
 # my_important_option = config.get_main_option("my_important_option")
