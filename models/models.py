@@ -1,4 +1,11 @@
-# models/sprint_0.py
+"""
+File Name: models.py
+Description: Database models definition for Sprint 0 tables (User, Role, Permission, Class, Subject, Document, etc.).
+Created At: 2026-07-04
+Created By: Nguyen-Thai-Tam-Khang
+Updated At: 2026-07-07
+Updated By: Nguyen-Thai-Tam-Khang
+"""
 import uuid
 from datetime import datetime
 from sqlalchemy import Column, Integer, String, Text, Date, ForeignKey, DateTime, CheckConstraint, PrimaryKeyConstraint
@@ -7,7 +14,7 @@ from sqlalchemy.sql import func
 from models.base import Base
 
 # =====================================================================
-# 1. QUẢN LÝ TÀI KHOẢN & PHÂN QUYỀN
+# 1. ACCOUNT MANAGEMENT & AUTHORIZATION
 # =====================================================================
 
 class User(Base):
@@ -19,7 +26,7 @@ class User(Base):
     password_hash = Column(String(255), nullable=False)
     full_name = Column(String(100), nullable=False)
     birthday = Column(Date, nullable=True)
-    role_id = Column(UUID(as_uuid=True), ForeignKey('roles.role_id'), nullable=False) # Lưu ý: Bạn cần định nghĩa bảng roles trước nếu có lỗi
+    role_id = Column(UUID(as_uuid=True), ForeignKey('roles.role_id'), nullable=False) # Note: You need to define the roles table first if errors occur
     status = Column(String(20), default='Active')
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
@@ -67,7 +74,7 @@ class UserPermission(Base):
 
 
 # =====================================================================
-# 2. CƠ CẤU TỔ CHỨC
+# 2. ORGANIZATIONAL STRUCTURE
 # =====================================================================
 
 class Subject(Base):
@@ -116,7 +123,7 @@ class TeacherSubject(Base):
 
 
 # =====================================================================
-# 3. HỌC LIỆU & BÀI TẬP
+# 3. LEARNING MATERIALS & ASSIGNMENTS
 # =====================================================================
 
 class Document(Base):

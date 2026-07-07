@@ -1,3 +1,11 @@
+"""
+File Name: env.py
+Description: Alembic migration environment configuration.
+Created At: 2026-07-04
+Created By: Nguyen-Thai-Tam-Khang
+Updated At: 2026-07-07
+Updated By: Nguyen-Thai-Tam-Khang
+"""
 from logging.config import fileConfig
 
 from sqlalchemy import engine_from_config
@@ -21,16 +29,16 @@ if config.config_file_name is not None:
 import sys
 import os
 
-# Đảm bảo Alembic tìm thấy thư mục gốc của dự án
+# Ensure Alembic finds the root directory of the project
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
-# Import Base và tất cả các class từ file models của bạn
+# Import Base and all model classes
 from models.base import Base
 from models.models import (
     User, Permission, RolePermission, UserPermission, 
     Subject, Class, StudentClass, TeacherSubject, Document, Role
 )
 
-# Gán metadata cho Alembic quét (Đoạn này đứng riêng, không có chữ import)
+# Assign metadata for Alembic detection
 target_metadata = Base.metadata
 # other values from the config, defined by the needs of env.py,
 # can be acquired:
