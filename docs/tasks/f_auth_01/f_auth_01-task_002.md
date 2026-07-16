@@ -3,9 +3,10 @@
 > Path: `docs/tasks/f_auth_01/f_auth_01-task_002.md`
 > Slice: `S02` · Type: `REPO` · Size: `S` · SP: `1`
 > Depends on: `F-AUTH-01-TASK-001`
-> Status: `draft`
+> Status: `ready to test`
 > Created At: `2026-07-11`
-> Updated At: `2026-07-11`
+> Updated At: `2026-07-16`
+> Updated By: `Tam Khang`
 
 ---
 
