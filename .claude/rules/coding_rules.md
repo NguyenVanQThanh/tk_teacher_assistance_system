@@ -16,6 +16,7 @@ Updated By: <author_name_or_email>
 
 ## 2. Comments & Documentation
 - **Language**: All comments, docstrings, and in-code documentation MUST be written in **Standard English**.
+- **User-Facing Language**: All text, labels, error messages, or descriptions displayed on the web interface or API responses for users to read MUST be written in **Vietnamese**.
 - **Clarity**: Keep comments concise but descriptive enough to explain the *why* behind complex logic, not just the *what*.
 - **Python**: Use PEP 257 standard for docstrings.
 - **SQL**: Use `--` for inline comments or `/* ... */` for block comments, explaining complex queries or business logic.

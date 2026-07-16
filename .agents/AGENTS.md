@@ -28,3 +28,8 @@ Mỗi file task phải có phần header chứa tối thiểu các trường sau
 ```
 Agent phải cập nhật trường `Updated At` và `Status` mỗi khi có thay đổi trạng thái của task.
 
+## 4. Tác giả & Người cập nhật (Created By / Updated By)
+Trong tất cả các file mã nguồn, file task, file tài liệu, hoặc bất kỳ tài nguyên nào được tạo mới hoặc cập nhật bởi Agent, trường thông tin tác giả (`Created By`) và người cập nhật (`Updated By`) **BẮT BUỘC** phải ghi tên là: `Tam Khang`. Tuyệt đối không sử dụng `AI Agent` hay bất kỳ tên nào khác.
+
+## 5. Ngôn ngữ hiển thị (User-Facing Language)
+Tất cả những nội dung hiển thị trên trang web/giao diện người dùng hoặc phản hồi trực tiếp mà người dùng có thể đọc được (ví dụ: mô tả trường dữ liệu hiển thị, nhãn, thông báo lỗi, thông điệp phản hồi) **BẮT BUỘC** phải được viết bằng **Tiếng Việt**. Các thành phần kỹ thuật khác như mã nguồn, tên biến, tên hàm, chú thích (comments), tài liệu kỹ thuật (docstrings) vẫn viết bằng **Tiếng Anh**.
