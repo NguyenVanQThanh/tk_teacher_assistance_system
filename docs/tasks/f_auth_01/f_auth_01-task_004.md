@@ -3,9 +3,10 @@
 > Path: `docs/tasks/f_auth_01/f_auth_01-task_004.md`
 > Slice: `S04` · Type: `DEPENDENCY` · Size: `M` · SP: `3`
 > Depends on: `F-AUTH-01-TASK-003` và `F-AUTH-01-TASK-010`
-> Status: `draft`
+> Status: `ready to test`
 > Created At: `2026-07-11`
-> Updated At: `2026-07-11`
+> Updated At: `2026-07-16`
+> Updated By: `Tam Khang`
 
 ---
 
