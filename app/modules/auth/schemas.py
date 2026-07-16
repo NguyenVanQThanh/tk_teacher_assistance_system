@@ -2,8 +2,9 @@
 # Description: Pydantic schemas for auth module request and response validation.
 # Created At: 2026-07-11
 # Created By: Thanh Nguyen
-# Updated At: 2026-07-11
-# Updated By: Thanh Nguyen
+# Updated At: 2026-07-16
+# Updated By: Tam Khang
+
 
 from uuid import UUID
 from typing import Optional
@@ -16,13 +17,13 @@ class LoginRequest(BaseModel):
     """
     identifier: str = Field(
         ..., 
-        description="Email or phone number used for login",
+        description="Email hoặc số điện thoại dùng để đăng nhập",
         min_length=1
     )
     password: str = Field(
         ..., 
-        description="User password",
-        min_length=1,
+        description="Mật khẩu người dùng",
+        min_length=6,
         max_length=128
     )
 
@@ -35,16 +36,16 @@ class UserOut(BaseModel):
     user_id: UUID
     full_name: str
     role: str
-    email_masked: Optional[str] = Field(None, description="Masked email address for privacy")
+    email_masked: Optional[str] = Field(None, description="Địa chỉ email đã ẩn để bảo mật")
 
 class LoginResponse(BaseModel):
     """
     Schema for successful login response.
     """
-    access_token: str = Field(..., description="JWT access token")
-    token_type: str = Field("bearer", description="Token type, usually bearer")
-    expires_in: int = Field(..., description="Token lifetime in seconds")
-    user: UserOut = Field(..., description="Authenticated user info")
+    access_token: str = Field(..., description="Mã truy cập JWT")
+    token_type: str = Field("bearer", description="Loại mã truy cập, thường là bearer")
+    expires_in: int = Field(..., description="Thời gian hết hạn của mã truy cập tính bằng giây")
+    user: UserOut = Field(..., description="Thông tin người dùng đã xác thực")
 
 class UserProfileOut(BaseModel):
     """
@@ -55,17 +56,18 @@ class UserProfileOut(BaseModel):
     user_id: UUID
     full_name: str
     role: str
-    email: Optional[str] = Field(None, description="User email address")
-    phone: Optional[str] = Field(None, description="User phone number")
-    status: str = Field(..., description="User account status")
+    email: Optional[str] = Field(None, description="Địa chỉ email của người dùng")
+    phone: Optional[str] = Field(None, description="Số điện thoại của người dùng")
+    status: str = Field(..., description="Trạng thái tài khoản người dùng")
 
 class ChangePasswordRequest(BaseModel):
     """
     Schema for changing password request.
     """
-    old_password: str = Field(..., description="Current password", min_length=1)
+    old_password: str = Field(..., description="Mật khẩu hiện tại", min_length=6)
     new_password: str = Field(
         ..., 
-        description="New password (must be at least 8 characters)",
-        min_length=8
+        description="Mật khẩu mới (phải có ít nhất 6 ký tự)",
+        min_length=6,
+        max_length=128
     )

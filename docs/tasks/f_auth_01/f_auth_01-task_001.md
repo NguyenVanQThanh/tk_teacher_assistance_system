@@ -3,9 +3,10 @@
 > Path: `docs/tasks/f_auth_01/f_auth_01-task_001.md`
 > Slice: `S01` · Type: `SCHEMA` · Size: `S` · SP: `1`
 > Depends on: `F-FND-01`
-> Status: `in progress`
+> Status: `ready to test`
 > Created At: `2026-07-11`
-> Updated At: `2026-07-11`
+> Updated At: `2026-07-16`
+> Updated By: `Tam Khang`
 
 ---
 
