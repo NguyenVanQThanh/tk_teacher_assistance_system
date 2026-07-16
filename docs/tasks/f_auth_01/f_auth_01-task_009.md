@@ -3,9 +3,10 @@
 > Path: `docs/tasks/f_auth_01/f_auth_01-task_009.md`
 > Slice: `S09` · Type: `MIG+SEED` · Size: `M` · SP: `2`
 > Depends on: `F-FND-01`
-> Status: `draft`
+> Status: `in progress`
 > Created At: `2026-07-11`
-> Updated At: `2026-07-11`
+> Updated At: `2026-07-16`
+> Updated By: `Tam Khang`
 
 ---
 

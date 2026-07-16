@@ -1,10 +1,10 @@
 """
 File Name: seed.py
-Description: Script to seed the initial database with sample roles.
+Description: Script to seed the initial database with roles, permissions, and role-permission mappings.
 Created At: 2026-07-05
 Created By: Thanh Nguyen
-Updated At: 2026-07-05
-Updated By: Thanh Nguyen
+Updated At: 2026-07-16
+Updated By: Tam Khang
 """
 
 import os
@@ -15,7 +15,7 @@ from sqlalchemy.orm import sessionmaker
 from dotenv import load_dotenv
 
 from models.base import Base
-from models.models import Role, Permission
+from models.models import Role, Permission, RolePermission
 
 # Load environment variables
 load_dotenv()
@@ -38,21 +38,81 @@ SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 def seed_data():
     session = SessionLocal()
     try:
-        # 1. Check if data already exists to avoid duplication
-        if session.query(Role).first() is not None:
-            print("Database already contains sample data!")
-            return
+        print("Initializing database seed data...")
 
-        print("Initializing sample data...")
+        # 1. Seed Roles (Idempotent: check if they exist first)
+        roles_to_seed = [
+            {"name": "Admin", "description": "System Administrator"},
+            {"name": "Teacher", "description": "Teacher"},
+            {"name": "Student", "description": "Student"}
+        ]
+        
+        roles_db = {}
+        for role_data in roles_to_seed:
+            role = session.query(Role).filter(Role.name == role_data["name"]).first()
+            if not role:
+                role = Role(name=role_data["name"], description=role_data["description"])
+                session.add(role)
+                session.flush()  # to populate role_id
+                print(f"Created role: {role.name}")
+            roles_db[role_data["name"]] = role
 
-        # 2. Create sample Roles
-        admin_role = Role(name="Admin", description="System Administrator")
-        teacher_role = Role(name="Teacher", description="Teacher")
-        student_role = Role(name="Student", description="Student")
+        # 2. Seed Permissions (Idempotent: check if they exist first)
+        permissions_to_seed = [
+            {"permission_code": "AUTH_ME_VIEW", "name": "View My Profile", "description": "Allow user to view their own profile information"},
+            {"permission_code": "AUTH_PASSWORD_CHANGE", "name": "Change My Password", "description": "Allow user to change their password"},
+            {"permission_code": "AUTH_PERM_MANAGE", "name": "Manage System Permissions", "description": "Allow administrator to manage roles and user permissions"}
+        ]
 
-        session.add_all([admin_role, teacher_role, student_role])
+        perms_db = {}
+        for perm_data in permissions_to_seed:
+            perm = session.query(Permission).filter(Permission.permission_code == perm_data["permission_code"]).first()
+            if not perm:
+                perm = Permission(
+                    permission_code=perm_data["permission_code"],
+                    name=perm_data["name"],
+                    description=perm_data["description"]
+                )
+                session.add(perm)
+                session.flush()  # to populate permission_id
+                print(f"Created permission: {perm.permission_code}")
+            perms_db[perm_data["permission_code"]] = perm
+
         session.commit()
-        print("Successfully seeded sample data into Roles table!")
+
+        # 3. Seed RolePermission mapping (Idempotent: check if exists first)
+        mappings = {
+            "Admin": ["AUTH_ME_VIEW", "AUTH_PASSWORD_CHANGE", "AUTH_PERM_MANAGE"],
+            "Teacher": ["AUTH_ME_VIEW", "AUTH_PASSWORD_CHANGE"],
+            "Student": ["AUTH_ME_VIEW", "AUTH_PASSWORD_CHANGE"]
+        }
+
+        role_perm_count = 0
+        for role_name, perm_codes in mappings.items():
+            role = roles_db.get(role_name)
+            if not role:
+                continue
+            for code in perm_codes:
+                perm = perms_db.get(code)
+                if not perm:
+                    continue
+                # Check if mapping already exists
+                exists = session.query(RolePermission).filter(
+                    RolePermission.role_id == role.role_id,
+                    RolePermission.permission_id == perm.permission_id
+                ).first()
+                if not exists:
+                    role_perm = RolePermission(role_id=role.role_id, permission_id=perm.permission_id)
+                    session.add(role_perm)
+                    role_perm_count += 1
+
+        if role_perm_count > 0:
+            session.commit()
+            print(f"Successfully mapped {role_perm_count} role-permission relationships!")
+        else:
+            print("All role-permission relationships are already mapped.")
+
+        print("Database seed process completed successfully!")
 
     except Exception as e:
         session.rollback()
