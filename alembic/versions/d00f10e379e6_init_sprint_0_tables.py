@@ -3,7 +3,7 @@ File Name: d00f10e379e6_init_sprint_0_tables.py
 Description: Initial migration for Sprint 0 tables including users, roles, permissions, subjects, classes, and documents.
 Created At: 2026-07-04
 Created By: Nguyen-Thai-Tam-Khang
-Updated At: 2026-07-07
+Updated At: 2026-07-17
 Updated By: Nguyen-Thai-Tam-Khang
 
 Revision ID: d00f10e379e6

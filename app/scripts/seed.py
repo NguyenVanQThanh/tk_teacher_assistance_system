@@ -1,11 +1,9 @@
-"""
-File Name: seed.py
-Description: Script to seed the initial database with roles, permissions, and role-permission mappings.
-Created At: 2026-07-05
-Created By: Thanh Nguyen
-Updated At: 2026-07-16
-Updated By: Tam Khang
-"""
+# File Name: seed.py
+# Description: Script to seed the initial database with roles, permissions, and role-permission mappings.
+# Created At: 2026-07-17
+# Created By: Tam Khang
+# Updated At: 2026-07-17
+# Updated By: Tam Khang
 
 import os
 import uuid
@@ -40,11 +38,11 @@ def seed_data():
     try:
         print("Initializing database seed data...")
 
-        # 1. Seed Roles (Idempotent: check if they exist first)
+        # 1. Seed Roles (Idempotent: check if they exist first, update if descriptions change)
         roles_to_seed = [
-            {"name": "Admin", "description": "System Administrator"},
-            {"name": "Teacher", "description": "Teacher"},
-            {"name": "Student", "description": "Student"}
+            {"name": "Admin", "description": "Quản trị viên hệ thống"},
+            {"name": "Teacher", "description": "Giáo viên"},
+            {"name": "Student", "description": "Học sinh"}
         ]
         
         roles_db = {}
@@ -55,13 +53,17 @@ def seed_data():
                 session.add(role)
                 session.flush()  # to populate role_id
                 print(f"Created role: {role.name}")
+            else:
+                if role.description != role_data["description"]:
+                    role.description = role_data["description"]
+                    print(f"Updated description for role: {role.name}")
             roles_db[role_data["name"]] = role
 
-        # 2. Seed Permissions (Idempotent: check if they exist first)
+        # 2. Seed Permissions (Idempotent: check if they exist first, update if name/description change)
         permissions_to_seed = [
-            {"permission_code": "AUTH_ME_VIEW", "name": "View My Profile", "description": "Allow user to view their own profile information"},
-            {"permission_code": "AUTH_PASSWORD_CHANGE", "name": "Change My Password", "description": "Allow user to change their password"},
-            {"permission_code": "AUTH_PERM_MANAGE", "name": "Manage System Permissions", "description": "Allow administrator to manage roles and user permissions"}
+            {"permission_code": "AUTH_ME_VIEW", "name": "Xem thông tin cá nhân", "description": "Cho phép người dùng xem thông tin cá nhân của chính mình"},
+            {"permission_code": "AUTH_PASSWORD_CHANGE", "name": "Thay đổi mật khẩu", "description": "Cho phép người dùng thay đổi mật khẩu của mình"},
+            {"permission_code": "AUTH_PERM_MANAGE", "name": "Quản lý quyền hệ thống", "description": "Cho phép quản trị viên quản lý vai trò và quyền của người dùng"}
         ]
 
         perms_db = {}
@@ -76,6 +78,16 @@ def seed_data():
                 session.add(perm)
                 session.flush()  # to populate permission_id
                 print(f"Created permission: {perm.permission_code}")
+            else:
+                updated = False
+                if perm.name != perm_data["name"]:
+                    perm.name = perm_data["name"]
+                    updated = True
+                if perm.description != perm_data["description"]:
+                    perm.description = perm_data["description"]
+                    updated = True
+                if updated:
+                    print(f"Updated permission: {perm.permission_code}")
             perms_db[perm_data["permission_code"]] = perm
 
         session.commit()
