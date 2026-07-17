@@ -3,9 +3,10 @@
 > Path: `docs/tasks/f_auth_01/f_auth_01-task_008.md`
 > Slice: `S08` · Type: `TEST` · Size: `M` · SP: `2`
 > Depends on: `F-AUTH-01-TASK-005`, `F-AUTH-01-TASK-006` và `F-AUTH-01-TASK-007`
-> Status: `draft`
+> Status: `ready to test`
 > Created At: `2026-07-11`
-> Updated At: `2026-07-11`
+> Updated At: `2026-07-17`
+> Updated By: `Tam Khang`
 
 ---
 
@@ -28,7 +29,7 @@ Xây dựng bộ kiểm thử tự động (Unit, Integration và E2E tests) cho
 ## 4. Requirements & Acceptance Criteria
 - **AC-01 (Unit Tests):** Đảm bảo test được logic băm mật khẩu, so khớp mật khẩu và mã hóa/giải mã JWT.
 - **AC-02 (Integration Tests - Edge Cases):**
-  - **EC-01:** Login với identifier không tồn tại -> `ERR-AUTH-INVALID_CREDENTIALS` (401).
+  - **EC-01:** Login với số điện thoại (`phone`) không tồn tại -> `ERR-AUTH-INVALID_CREDENTIALS` (401).
   - **EC-02:** Đúng password nhưng user bị Blocked -> `ERR-AUTH-ACCOUNT_BLOCKED` (403).
   - **EC-03:** Token hết hạn -> `ERR-AUTH-INVALID_TOKEN` (401).
   - **EC-04:** Chữ ký token sai hoặc bị sửa đổi -> `ERR-AUTH-INVALID_TOKEN` (401).
