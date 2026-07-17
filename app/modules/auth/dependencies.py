@@ -1,0 +1,110 @@
+# File Name: dependencies.py
+# Description: FastAPI dependencies for user authentication and permission verification.
+# Created At: 2026-07-17
+# Created By: Tam Khang
+# Updated At: 2026-07-17
+# Updated By: Tam Khang
+
+from fastapi import Depends, HTTPException, status
+from fastapi.security import OAuth2PasswordBearer
+from sqlalchemy.orm import Session
+from jose import jwt, JWTError
+from uuid import UUID
+
+from app.core.security import SECRET_KEY, ALGORITHM
+from app.core.database import get_db
+from models.models import User
+from app.modules.auth.services.permission_service import PermissionService
+
+# Configure OAuth2PasswordBearer, auto_error=False to allow custom error envelopes for missing tokens
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="api/v1/auth/login", auto_error=False)
+
+def get_current_user(token: str = Depends(oauth2_scheme), db: Session = Depends(get_db)) -> User:
+    """
+    Dependency to authenticate and return the current active user from the JWT token.
+    Raises standardized HTTPExceptions for missing, invalid, or expired tokens, and blocked or inactive accounts.
+    """
+    if not token:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail={
+                "code": "ERR-AUTH-MISSING_TOKEN",
+                "message": "Yêu cầu cung cấp mã xác thực."
+            }
+        )
+    try:
+        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        user_id = payload.get("sub")
+        if user_id is None:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail={
+                    "code": "ERR-AUTH-INVALID_TOKEN",
+                    "message": "Mã xác thực không hợp lệ."
+                }
+            )
+    except JWTError:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail={
+                "code": "ERR-AUTH-INVALID_TOKEN",
+                "message": "Mã xác thực không hợp lệ hoặc đã hết hạn."
+            }
+        )
+    
+    try:
+        user_uuid = UUID(user_id)
+    except ValueError:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail={
+                "code": "ERR-AUTH-INVALID_TOKEN",
+                "message": "Mã xác thực không hợp lệ."
+            }
+        )
+        
+    user = db.query(User).filter(User.user_id == user_uuid).first()
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail={
+                "code": "ERR-AUTH-INVALID_TOKEN",
+                "message": "Người dùng không tồn tại trong hệ thống."
+            }
+        )
+        
+    if user.status == "Blocked":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail={
+                "code": "ERR-AUTH-ACCOUNT_BLOCKED",
+                "message": "Tài khoản của bạn đã bị khóa."
+            }
+        )
+    elif user.status == "Inactive":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail={
+                "code": "ERR-AUTH-ACCOUNT_INACTIVE",
+                "message": "Tài khoản chưa được kích hoạt."
+            }
+        )
+        
+    return user
+
+def require_perm(permission_code: str):
+    """
+    Enforces that the current authenticated user has the specified permission_code in their effective permissions.
+    Returns a callable dependency.
+    """
+    def dependency(user: User = Depends(get_current_user), db: Session = Depends(get_db)) -> None:
+        effective_perms = PermissionService.get_effective_permissions(db, user.user_id, user.role_id)
+        if permission_code not in effective_perms:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail={
+                    "code": "ERR-AUTH-FORBIDDEN",
+                    "message": "Bạn không có quyền truy cập chức năng này."
+                }
+            )
+    return dependency

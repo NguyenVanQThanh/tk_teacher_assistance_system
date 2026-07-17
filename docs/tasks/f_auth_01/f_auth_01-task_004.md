@@ -5,7 +5,7 @@
 > Depends on: `F-AUTH-01-TASK-003` và `F-AUTH-01-TASK-010`
 > Status: `ready to test`
 > Created At: `2026-07-11`
-> Updated At: `2026-07-16`
+> Updated At: `2026-07-17`
 > Updated By: `Tam Khang`
 
 ---
