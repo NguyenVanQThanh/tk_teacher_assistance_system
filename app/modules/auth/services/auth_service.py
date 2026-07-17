@@ -2,7 +2,7 @@
 # Description: Service layer implementing login, password verification, and JWT token issuance.
 # Created At: 2026-07-16
 # Created By: Tam Khang
-# Updated At: 2026-07-16
+# Updated At: 2026-07-17
 # Updated By: Tam Khang
 
 import logging
@@ -38,6 +38,24 @@ class AuthService:
             return f"{masked_name}@{domain}"
         except Exception:
             return email
+
+    @staticmethod
+    def mask_phone(phone: Optional[str]) -> Optional[str]:
+        """
+        Mask phone number for privacy (e.g., 0912345678 -> 0******678).
+        Keeps the first digit and the last 3 digits, masking the rest.
+        """
+        if not phone:
+            return None
+        try:
+            if len(phone) <= 4:
+                return phone[:1] + "*" * (len(phone) - 1)
+            prefix = phone[0]
+            suffix = phone[-3:]
+            masked_middle = "*" * (len(phone) - 4)
+            return f"{prefix}{masked_middle}{suffix}"
+        except Exception:
+            return phone
 
     @staticmethod
     def authenticate_user(db: Session, identifier: str, password_plain: str) -> User:
@@ -113,15 +131,17 @@ class AuthService:
             expires_delta=expires_delta
         )
 
-        # 3. Mask user email for privacy in response
+        # 3. Mask user email and phone for privacy in response
         email_masked = AuthService.mask_email(user.email)
+        phone_masked = AuthService.mask_phone(user.phone)
 
         # 4. Construct user response info
         user_out = UserOut(
             user_id=user.user_id,
             full_name=user.full_name,
             role=role_name,
-            email_masked=email_masked
+            email_masked=email_masked,
+            phone_masked=phone_masked
         )
 
         # 5. Log success event
