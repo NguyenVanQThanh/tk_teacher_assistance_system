@@ -2,7 +2,7 @@
 # Description: Pydantic schemas for auth module request and response validation.
 # Created At: 2026-07-11
 # Created By: Thanh Nguyen
-# Updated At: 2026-07-16
+# Updated At: 2026-07-17
 # Updated By: Tam Khang
 
 
@@ -13,17 +13,19 @@ from pydantic import BaseModel, Field, ConfigDict
 class LoginRequest(BaseModel):
     """
     Schema for login request.
-    Accepts email or phone as identifier.
+    Accepts phone as login credential.
     """
-    identifier: str = Field(
+    phone: str = Field(
         ..., 
-        description="Email hoặc số điện thoại dùng để đăng nhập",
-        min_length=1
+        description="Số điện thoại dùng để đăng nhập",
+        pattern=r"^0\d{9}$",
+        min_length=10,
+        max_length=10
     )
     password: str = Field(
         ..., 
         description="Mật khẩu người dùng",
-        min_length=6,
+        min_length=1,
         max_length=128
     )
 
@@ -37,6 +39,7 @@ class UserOut(BaseModel):
     full_name: str
     role: str
     email_masked: Optional[str] = Field(None, description="Địa chỉ email đã ẩn để bảo mật")
+    phone_masked: Optional[str] = Field(None, description="Số điện thoại đã ẩn để bảo mật")
 
 class LoginResponse(BaseModel):
     """
@@ -64,10 +67,10 @@ class ChangePasswordRequest(BaseModel):
     """
     Schema for changing password request.
     """
-    old_password: str = Field(..., description="Mật khẩu hiện tại", min_length=6)
+    old_password: str = Field(..., description="Mật khẩu hiện tại", min_length=1)
     new_password: str = Field(
         ..., 
-        description="Mật khẩu mới (phải có ít nhất 6 ký tự)",
-        min_length=6,
+        description="Mật khẩu mới (phải có ít nhất 8 ký tự)",
+        min_length=8,
         max_length=128
     )

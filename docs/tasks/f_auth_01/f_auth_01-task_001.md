@@ -5,7 +5,7 @@
 > Depends on: `F-FND-01`
 > Status: `ready to test`
 > Created At: `2026-07-11`
-> Updated At: `2026-07-16`
+> Updated At: `2026-07-17`
 > Updated By: `Tam Khang`
 
 ---
@@ -30,7 +30,8 @@ Xây dựng các Pydantic schema cần thiết cho module Authentication để p
     - `user_id` (UUID).
     - `full_name` (str).
     - `role` (str - tên vai trò).
-    - `email` hoặc `email_masked` (chuỗi đã được che giấu phần đầu để bảo mật PII, ví dụ: `u***@email.com`).
+    - `email_masked` (chuỗi đã được che giấu phần đầu để bảo mật PII, ví dụ: `u***@email.com`).
+    - `phone_masked` (chuỗi đã được che giấu phần đầu để bảo mật PII, ví dụ: `0******123`).
   - `LoginResponse`:
     - `access_token` (str).
     - `token_type` (mặc định là `"bearer"`).
