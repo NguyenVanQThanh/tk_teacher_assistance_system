@@ -74,3 +74,22 @@ class ChangePasswordRequest(BaseModel):
         min_length=8,
         max_length=128
     )
+
+class RegisterRequest(BaseModel):
+    """
+    Schema for register request.
+    """
+    full_name: str = Field(..., description="Họ và tên người dùng", min_length=1, max_length=128)
+    phone: str = Field(
+        ..., 
+        description="Số điện thoại dùng để đăng nhập",
+        pattern=r"^0\d{9}$",
+        min_length=10,
+        max_length=10
+    )
+    password: str = Field(
+        ..., 
+        description="Mật khẩu người dùng",
+        min_length=8,
+        max_length=128
+    )

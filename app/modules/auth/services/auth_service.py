@@ -12,10 +12,10 @@ from fastapi import HTTPException, status
 from sqlalchemy.orm import Session
 
 from models.models import User, Role
-from app.modules.auth.repository import UserRepository
+from app.modules.auth.repository import UserRepository, RoleRepository
 from app.modules.auth.schemas import LoginResponse, UserOut
 from app.core.security import create_access_token, verify_password, ACCESS_TOKEN_EXPIRE_MINUTES
-
+from .password_service import PasswordService
 logger = logging.getLogger("auth_service")
 
 class AuthService:
@@ -154,3 +154,23 @@ class AuthService:
             expires_in=ACCESS_TOKEN_EXPIRE_MINUTES * 60,
             user=user_out
         )
+    @staticmethod
+    def create_user(db: Session, full_name: str, phone: str, password_plain: str) -> User:
+        """
+        Create a new user with hashed password.
+        """
+        user = UserRepository.get_by_phone(db, phone)
+        if user:
+            logger.warning("Domain Event: EVT-AUTH-USER_EXISTS - User already exists for phone: %s", phone)
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail={
+                    "code": "ERR-AUTH-DUPLICATE_FIELD",
+                    "message": "Số điện thoại đã tồn tại."
+                }
+            )
+        password_hash = PasswordService.hash_password(password_plain)
+        role = RoleRepository.get_by_name(db, "Student")
+        user = UserRepository.create(db, full_name, role.role_id, phone, password_hash)
+        logger.info("Domain Event: EVT-AUTH-USER_CREATED - Successfully created user_id: %s", user.user_id)
+        return user

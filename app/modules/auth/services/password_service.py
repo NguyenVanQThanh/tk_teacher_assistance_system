@@ -49,3 +49,9 @@ class PasswordService:
 
         # 4. Log success event
         logger.info("Domain Event: EVT-AUTH-PASSWORD_CHANGED - Successfully changed password for user_id: %s", user.user_id)
+    @staticmethod
+    def hash_password(password: str) -> str:
+        """
+        Hashes a plaintext password.
+        """
+        return get_password_hash(password)

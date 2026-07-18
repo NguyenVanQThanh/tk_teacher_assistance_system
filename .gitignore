@@ -64,3 +64,4 @@ coverage.xml
 .DS_Store
 Thumbs.db
 Desktop.ini
+.agents/mcp_config.json

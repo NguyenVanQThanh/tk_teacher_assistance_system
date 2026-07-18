@@ -11,7 +11,7 @@ from sqlalchemy.orm import Session
 from app.core.database import get_db
 from app.core.rate_limit import check_rate_limit, record_login_failure, reset_login_failures
 from models.models import User, Role
-from app.modules.auth.schemas import LoginRequest, LoginResponse, UserProfileOut, ChangePasswordRequest
+from app.modules.auth.schemas import LoginRequest, LoginResponse, UserProfileOut, ChangePasswordRequest, RegisterRequest
 from app.modules.auth.services.auth_service import AuthService
 from app.modules.auth.services.password_service import PasswordService
 from app.modules.auth.dependencies import get_current_user, require_perm
@@ -94,4 +94,24 @@ def change_password(
         old_password=request_data.old_password,
         new_password=request_data.new_password
     )
+    return {"status": "ok"}
+
+@router.post("/register")
+def register(request_data: RegisterRequest, db: Session = Depends(get_db)):
+    """
+    Register a new user.
+    """
+    try:
+        user = AuthService.create_user(
+            db=db,
+            full_name=request_data.full_name,
+            phone=request_data.phone,
+            password_plain=request_data.password
+        )
+    except HTTPException as e:
+        # If email/phone already exists, record it
+        if isinstance(e.detail, dict) and e.detail.get("code") == "ERR-AUTH-DUPLICATE_FIELD":
+            record_login_failure(request_data.phone)
+        raise e
+
     return {"status": "ok"}
