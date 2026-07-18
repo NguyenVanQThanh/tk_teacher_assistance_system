@@ -3,7 +3,7 @@
 > Path: `docs/tasks/f_auth_01/f_auth_01-task_005.md`
 > Slice: `S05` · Type: `API` · Size: `M` · SP: `2`
 > Depends on: `F-AUTH-01-TASK-003` và `F-AUTH-01-TASK-004`
-> Status: `ready to test`
+> Status: `done`
 > Created At: `2026-07-11`
 > Updated At: `2026-07-17`
 > Updated By: `Tam Khang`

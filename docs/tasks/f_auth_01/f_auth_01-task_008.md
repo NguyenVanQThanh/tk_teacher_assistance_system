@@ -3,7 +3,7 @@
 > Path: `docs/tasks/f_auth_01/f_auth_01-task_008.md`
 > Slice: `S08` · Type: `TEST` · Size: `M` · SP: `2`
 > Depends on: `F-AUTH-01-TASK-005`, `F-AUTH-01-TASK-006` và `F-AUTH-01-TASK-007`
-> Status: `ready to test`
+> Status: `done`
 > Created At: `2026-07-11`
 > Updated At: `2026-07-17`
 > Updated By: `Tam Khang`

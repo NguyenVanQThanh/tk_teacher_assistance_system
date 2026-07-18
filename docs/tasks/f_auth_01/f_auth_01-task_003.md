@@ -3,7 +3,7 @@
 > Path: `docs/tasks/f_auth_01/f_auth_01-task_003.md`
 > Slice: `S03` · Type: `SERVICE` · Size: `M` · SP: `3`
 > Depends on: `F-AUTH-01-TASK-002`
-> Status: `ready to test`
+> Status: `done`
 > Created At: `2026-07-11`
 > Updated At: `2026-07-16`
 > Updated By: `Tam Khang`

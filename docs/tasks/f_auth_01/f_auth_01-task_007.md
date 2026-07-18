@@ -3,7 +3,7 @@
 > Path: `docs/tasks/f_auth_01/f_auth_01-task_007.md`
 > Slice: `S07` · Type: `MIDDLEWARE` · Size: `S` · SP: `1`
 > Depends on: `F-AUTH-01-TASK-005`
-> Status: `ready to test`
+> Status: `done`
 > Created At: `2026-07-11`
 > Updated At: `2026-07-17`
 > Updated By: `Tam Khang`

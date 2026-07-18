@@ -4,7 +4,7 @@
 
 | | |
 |---|---|
-| **Trạng thái** | 🚧 Đang thiết kế (Sprint 0 — Foundation & Auth) |
+| **Trạng thái** | ✅ Hoàn thành (Sprint 0 — Foundation & Auth) |
 | **Tài liệu nguồn** | SRS v1.0 — `docs/HỆ THỐNG QUẢN LÍ BÀI TẬP KẾT HỢP PHÂN TÍCH HÀNH VI.pdf` |
 | **Stack** | Python · FastAPI · SQLAlchemy 2.0 · Alembic · PostgreSQL · JWT |
 
@@ -115,7 +115,7 @@ Phân quyền **mịn theo permission (usecase)**, không chỉ theo role:
 
 | Sprint | Module | Mục tiêu |
 |---|---|---|
-| **S0** | Foundation & Auth | Scaffold, baseline migration, login JWT, RBAC permission-based ← *đang làm* |
+| **S0** | Foundation & Auth | Scaffold, baseline migration, login JWT, RBAC permission-based ← *đã hoàn thành* |
 | S1 | Academic Org | Môn học, lớp, ghi danh HS, phân công GV |
 | S2 | Bài tập lõi | Câu hỏi, giao bài, làm & chấm điểm |
 | S3 | Tracking | Ghi vết hành vi, cảnh báo hạn nộp |
