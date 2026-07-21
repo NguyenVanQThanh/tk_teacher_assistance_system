@@ -2,7 +2,7 @@
 # Description: Testing configuration, database setup using SQLite in-memory, and fixtures.
 # Created At: 2026-07-17
 # Created By: Tam Khang
-# Updated At: 2026-07-17
+# Updated At: 2026-07-21
 # Updated By: Tam Khang
 
 import os
@@ -76,8 +76,20 @@ def setup_db() -> Generator[None, None, None]:
             name="Manage system permissions",
             description="Allows admin to manage permissions"
         )
+        acad_subject_manage_perm = Permission(
+            permission_id=uuid.uuid4(),
+            permission_code="ACAD_SUBJECT_MANAGE",
+            name="Manage subjects",
+            description="Allows admin to create, update, delete subjects"
+        )
+        acad_subject_view_perm = Permission(
+            permission_id=uuid.uuid4(),
+            permission_code="ACAD_SUBJECT_VIEW",
+            name="View subjects",
+            description="Allows viewing subjects"
+        )
         
-        db.add_all([me_view_perm, pwd_change_perm, perm_manage_perm])
+        db.add_all([me_view_perm, pwd_change_perm, perm_manage_perm, acad_subject_manage_perm, acad_subject_view_perm])
         db.flush()
 
         # 3. Seed RolePermission mappings
@@ -85,7 +97,9 @@ def setup_db() -> Generator[None, None, None]:
         db.add_all([
             RolePermission(role_id=admin_role.role_id, permission_id=me_view_perm.permission_id),
             RolePermission(role_id=admin_role.role_id, permission_id=pwd_change_perm.permission_id),
-            RolePermission(role_id=admin_role.role_id, permission_id=perm_manage_perm.permission_id)
+            RolePermission(role_id=admin_role.role_id, permission_id=perm_manage_perm.permission_id),
+            RolePermission(role_id=admin_role.role_id, permission_id=acad_subject_manage_perm.permission_id),
+            RolePermission(role_id=admin_role.role_id, permission_id=acad_subject_view_perm.permission_id),
         ])
         # Teacher & Student get view & change password
         db.add_all([

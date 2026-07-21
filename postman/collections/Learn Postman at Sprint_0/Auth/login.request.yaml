@@ -1,0 +1,14 @@
+$kind: http-request
+name: login
+url: http://127.0.0.1:8000/api/v1/auth/login
+method: POST
+body:
+  type: json
+  content: "{\r
+
+    \    \"phone\": \"0987654321\",\r
+
+    \    \"password\": \"12345678\"\r
+
+    }"
+order: 1784383849660

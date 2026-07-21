@@ -1,0 +1,16 @@
+$kind: http-request
+name: register
+url: "{{BASE_URL}}/auth/register"
+method: POST
+body:
+  type: json
+  content: "{\r
+
+    \    \"full_name\": \"TK\",\r
+
+    \    \"phone\": \"0987654321\",\r
+
+    \    \"password\": \"12345678\"\r
+
+    }"
+order: 3054861660903754
