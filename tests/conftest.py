@@ -2,8 +2,9 @@
 # Description: Testing configuration, database setup using SQLite in-memory, and fixtures.
 # Created At: 2026-07-17
 # Created By: Tam Khang
-# Updated At: 2026-07-21
+# Updated At: 2026-07-22
 # Updated By: Tam Khang
+
 
 import os
 import uuid
@@ -88,8 +89,28 @@ def setup_db() -> Generator[None, None, None]:
             name="View subjects",
             description="Allows viewing subjects"
         )
+        acad_class_manage_perm = Permission(
+            permission_id=uuid.uuid4(),
+            permission_code="ACAD_CLASS_MANAGE",
+            name="Manage classes",
+            description="Allows admin to create, update, delete classes"
+        )
+        acad_class_view_perm = Permission(
+            permission_id=uuid.uuid4(),
+            permission_code="ACAD_CLASS_VIEW",
+            name="View classes",
+            description="Allows viewing classes"
+        )
         
-        db.add_all([me_view_perm, pwd_change_perm, perm_manage_perm, acad_subject_manage_perm, acad_subject_view_perm])
+        db.add_all([
+            me_view_perm,
+            pwd_change_perm,
+            perm_manage_perm,
+            acad_subject_manage_perm,
+            acad_subject_view_perm,
+            acad_class_manage_perm,
+            acad_class_view_perm
+        ])
         db.flush()
 
         # 3. Seed RolePermission mappings
@@ -100,6 +121,8 @@ def setup_db() -> Generator[None, None, None]:
             RolePermission(role_id=admin_role.role_id, permission_id=perm_manage_perm.permission_id),
             RolePermission(role_id=admin_role.role_id, permission_id=acad_subject_manage_perm.permission_id),
             RolePermission(role_id=admin_role.role_id, permission_id=acad_subject_view_perm.permission_id),
+            RolePermission(role_id=admin_role.role_id, permission_id=acad_class_manage_perm.permission_id),
+            RolePermission(role_id=admin_role.role_id, permission_id=acad_class_view_perm.permission_id),
         ])
         # Teacher & Student get view & change password
         db.add_all([

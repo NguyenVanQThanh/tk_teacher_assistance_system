@@ -2,7 +2,7 @@
 # Description: Script to seed the initial database with roles, permissions, and role-permission mappings.
 # Created At: 2026-07-17
 # Created By: Tam Khang
-# Updated At: 2026-07-21
+# Updated At: 2026-07-22
 # Updated By: Tam Khang
 
 import os
@@ -66,6 +66,8 @@ def seed_data():
             {"permission_code": "AUTH_PERM_MANAGE", "name": "Quản lý quyền hệ thống", "description": "Cho phép quản trị viên quản lý vai trò và quyền của người dùng"},
             {"permission_code": "ACAD_SUBJECT_MANAGE", "name": "Quản lý môn học", "description": "Cho phép Admin tạo, sửa, xóa môn học"},
             {"permission_code": "ACAD_SUBJECT_VIEW", "name": "Xem môn học", "description": "Cho phép xem danh sách và chi tiết môn học"},
+            {"permission_code": "ACAD_CLASS_MANAGE", "name": "Quản lý lớp học", "description": "Cho phép Admin tạo, sửa, xóa lớp học"},
+            {"permission_code": "ACAD_CLASS_VIEW", "name": "Xem lớp học", "description": "Cho phép xem danh sách và chi tiết lớp học"},
         ]
 
         perms_db = {}
@@ -96,10 +98,11 @@ def seed_data():
 
         # 3. Seed RolePermission mapping (Idempotent: check if exists first)
         mappings = {
-            "Admin": ["AUTH_ME_VIEW", "AUTH_PASSWORD_CHANGE", "AUTH_PERM_MANAGE", "ACAD_SUBJECT_MANAGE", "ACAD_SUBJECT_VIEW"],
+            "Admin": ["AUTH_ME_VIEW", "AUTH_PASSWORD_CHANGE", "AUTH_PERM_MANAGE", "ACAD_SUBJECT_MANAGE", "ACAD_SUBJECT_VIEW", "ACAD_CLASS_MANAGE", "ACAD_CLASS_VIEW"],
             "Teacher": ["AUTH_ME_VIEW", "AUTH_PASSWORD_CHANGE"],
             "Student": ["AUTH_ME_VIEW", "AUTH_PASSWORD_CHANGE"]
         }
+
 
         role_perm_count = 0
         for role_name, perm_codes in mappings.items():
