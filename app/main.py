@@ -18,6 +18,7 @@ from app.modules.academic.routers.classes import router as classes_router
 app = FastAPI(title="SmartLMS API", version="1.0.0")
 
 # Register routers
+# Trigger uvicorn reload to refresh in-memory permission cache
 app.include_router(auth_router)
 app.include_router(subjects_router)
 app.include_router(classes_router)
