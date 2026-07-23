@@ -1,0 +1,13 @@
+$kind: http-request
+name: List_assignment_in_class
+url: "{{BASE_URL}}/classes/:class_id/teacher-subjects"
+method: GET
+pathVariables:
+  - key: class_id
+    value: 4da6d444-db22-4980-aa7d-f61235d04a41
+    description: ""
+auth:
+  type: bearer
+  credentials:
+    token: "{{json_web_token_10q6}}"
+order: 4503599118049747

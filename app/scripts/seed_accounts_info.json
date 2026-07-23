@@ -5,7 +5,7 @@
     "email": "admin@school.com",
     "full_name": "Quản trị viên Hệ thống",
     "role_name": "Admin",
-    "password_plain": "Admin@1234"
+    "password_plain": "(Đã tồn tại trong DB - Sử dụng mật khẩu cũ)"
   },
   {
     "user_id": "808c8232-f550-4a89-abfe-5372ed77a36e",
@@ -13,7 +13,7 @@
     "email": "teacher@school.com",
     "full_name": "Giáo viên Mẫu",
     "role_name": "Teacher",
-    "password_plain": "Teacher@1234"
+    "password_plain": "(Đã tồn tại trong DB - Sử dụng mật khẩu cũ)"
   },
   {
     "user_id": "4f64cb51-9d51-4c12-aab4-1aa757cea9ba",
@@ -21,6 +21,6 @@
     "email": "student@school.com",
     "full_name": "Học sinh Mẫu",
     "role_name": "Student",
-    "password_plain": "Student@1234"
+    "password_plain": "(Đã tồn tại trong DB - Sử dụng mật khẩu cũ)"
   }
 ]

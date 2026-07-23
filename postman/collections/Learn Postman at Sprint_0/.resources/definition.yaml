@@ -1,2 +1,9 @@
 $kind: collection
 name: Learn Postman at Sprint_0
+variables:
+  - key: json_web_token_09ae
+    secret: true
+  - key: supabase_service_role_api_key_10q6
+    secret: true
+  - key: json_web_token_10q6
+    secret: true
