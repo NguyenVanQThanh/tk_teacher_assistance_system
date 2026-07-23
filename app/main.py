@@ -2,7 +2,7 @@
 # Description: Main entry point of the FastAPI application.
 # Created At: 2026-07-17
 # Created By: Tam Khang
-# Updated At: 2026-07-22
+# Updated At: 2026-07-23
 # Updated By: Tam Khang
 
 from dotenv import load_dotenv
@@ -14,6 +14,8 @@ from fastapi import FastAPI
 from app.modules.auth.routers.auth import router as auth_router
 from app.modules.academic.routers.subjects import router as subjects_router
 from app.modules.academic.routers.classes import router as classes_router
+from app.modules.academic.routers.enrollments import router as enrollments_router
+from app.modules.academic.routers.teacher_assignments import router as teacher_assignments_router
 
 app = FastAPI(title="SmartLMS API", version="1.0.0")
 
@@ -22,6 +24,10 @@ app = FastAPI(title="SmartLMS API", version="1.0.0")
 app.include_router(auth_router)
 app.include_router(subjects_router)
 app.include_router(classes_router)
+app.include_router(enrollments_router)
+app.include_router(teacher_assignments_router)
+
+
 
 
 @app.get("/health")

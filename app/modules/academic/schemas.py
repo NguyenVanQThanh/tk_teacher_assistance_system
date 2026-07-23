@@ -1,8 +1,8 @@
 # File Name: schemas.py
-# Description: Pydantic schemas for the academic module (Subject and Class CRUD).
+# Description: Pydantic schemas for the academic module (Subject, Class, Enrollment, and Teacher Assignment).
 # Created At: 2026-07-21
 # Created By: Tam Khang
-# Updated At: 2026-07-22
+# Updated At: 2026-07-23
 # Updated By: Tam Khang
 
 from uuid import UUID
@@ -58,4 +58,36 @@ class ClassOut(BaseModel):
     updated_at: datetime
 
     model_config = {"from_attributes": True, "populate_by_name": True}
+
+
+class EnrollmentCreate(BaseModel):
+    """Schema for enrolling a student into a class."""
+    student_id: UUID = Field(..., description="UUID của học sinh")
+    student_code: Optional[str] = Field(None, max_length=50, description="Mã số học sinh (duy nhất nếu có)")
+
+
+class EnrollmentOut(BaseModel):
+    """Schema for enrollment response output."""
+    student_id: UUID
+    class_id: UUID
+    student_code: Optional[str] = None
+
+    model_config = {"from_attributes": True}
+
+
+class TeacherAssignmentCreate(BaseModel):
+    """Schema for assigning a teacher to a subject in a class."""
+    teacher_id: UUID = Field(..., description="UUID của giáo viên")
+    subject_id: UUID = Field(..., description="UUID của môn học")
+
+
+class TeacherAssignmentOut(BaseModel):
+    """Schema for teacher assignment response output."""
+    teacher_id: UUID
+    class_id: UUID
+    subject_id: UUID
+
+    model_config = {"from_attributes": True}
+
+
 

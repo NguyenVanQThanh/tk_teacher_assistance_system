@@ -68,6 +68,10 @@ def seed_data():
             {"permission_code": "ACAD_SUBJECT_VIEW", "name": "Xem môn học", "description": "Cho phép xem danh sách và chi tiết môn học"},
             {"permission_code": "ACAD_CLASS_MANAGE", "name": "Quản lý lớp học", "description": "Cho phép Admin tạo, sửa, xóa lớp học"},
             {"permission_code": "ACAD_CLASS_VIEW", "name": "Xem lớp học", "description": "Cho phép xem danh sách và chi tiết lớp học"},
+            {"permission_code": "ACAD_ENROLLMENT_MANAGE", "name": "Quản lý ghi danh học sinh", "description": "Cho phép Admin ghi danh và hủy ghi danh học sinh vào lớp"},
+            {"permission_code": "ACAD_ENROLLMENT_VIEW", "name": "Xem ghi danh học sinh", "description": "Cho phép xem danh sách học sinh ghi danh trong lớp"},
+            {"permission_code": "ACAD_TEACHER_ASSIGN_MANAGE", "name": "Quản lý phân công giáo viên", "description": "Cho phép Admin phân công và hủy phân công giáo viên bộ môn"},
+            {"permission_code": "ACAD_TEACHER_ASSIGN_VIEW", "name": "Xem phân công giáo viên", "description": "Cho phép xem danh sách phân công giáo viên theo lớp"},
         ]
 
         perms_db = {}
@@ -98,7 +102,7 @@ def seed_data():
 
         # 3. Seed RolePermission mapping (Idempotent: check if exists first)
         mappings = {
-            "Admin": ["AUTH_ME_VIEW", "AUTH_PASSWORD_CHANGE", "AUTH_PERM_MANAGE", "ACAD_SUBJECT_MANAGE", "ACAD_SUBJECT_VIEW", "ACAD_CLASS_MANAGE", "ACAD_CLASS_VIEW"],
+            "Admin": ["AUTH_ME_VIEW", "AUTH_PASSWORD_CHANGE", "AUTH_PERM_MANAGE", "ACAD_SUBJECT_MANAGE", "ACAD_SUBJECT_VIEW", "ACAD_CLASS_MANAGE", "ACAD_CLASS_VIEW", "ACAD_ENROLLMENT_MANAGE", "ACAD_ENROLLMENT_VIEW", "ACAD_TEACHER_ASSIGN_MANAGE", "ACAD_TEACHER_ASSIGN_VIEW"],
             "Teacher": ["AUTH_ME_VIEW", "AUTH_PASSWORD_CHANGE"],
             "Student": ["AUTH_ME_VIEW", "AUTH_PASSWORD_CHANGE"]
         }

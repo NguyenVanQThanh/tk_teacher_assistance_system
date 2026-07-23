@@ -101,6 +101,30 @@ def setup_db() -> Generator[None, None, None]:
             name="View classes",
             description="Allows viewing classes"
         )
+        acad_enrollment_manage_perm = Permission(
+            permission_id=uuid.uuid4(),
+            permission_code="ACAD_ENROLLMENT_MANAGE",
+            name="Manage enrollments",
+            description="Allows admin to enroll and unenroll students"
+        )
+        acad_enrollment_view_perm = Permission(
+            permission_id=uuid.uuid4(),
+            permission_code="ACAD_ENROLLMENT_VIEW",
+            name="View enrollments",
+            description="Allows viewing enrollments"
+        )
+        acad_teacher_assign_manage_perm = Permission(
+            permission_id=uuid.uuid4(),
+            permission_code="ACAD_TEACHER_ASSIGN_MANAGE",
+            name="Manage teacher assignments",
+            description="Allows admin to assign and unassign teachers"
+        )
+        acad_teacher_assign_view_perm = Permission(
+            permission_id=uuid.uuid4(),
+            permission_code="ACAD_TEACHER_ASSIGN_VIEW",
+            name="View teacher assignments",
+            description="Allows viewing teacher assignments"
+        )
         
         db.add_all([
             me_view_perm,
@@ -109,7 +133,11 @@ def setup_db() -> Generator[None, None, None]:
             acad_subject_manage_perm,
             acad_subject_view_perm,
             acad_class_manage_perm,
-            acad_class_view_perm
+            acad_class_view_perm,
+            acad_enrollment_manage_perm,
+            acad_enrollment_view_perm,
+            acad_teacher_assign_manage_perm,
+            acad_teacher_assign_view_perm
         ])
         db.flush()
 
@@ -123,6 +151,10 @@ def setup_db() -> Generator[None, None, None]:
             RolePermission(role_id=admin_role.role_id, permission_id=acad_subject_view_perm.permission_id),
             RolePermission(role_id=admin_role.role_id, permission_id=acad_class_manage_perm.permission_id),
             RolePermission(role_id=admin_role.role_id, permission_id=acad_class_view_perm.permission_id),
+            RolePermission(role_id=admin_role.role_id, permission_id=acad_enrollment_manage_perm.permission_id),
+            RolePermission(role_id=admin_role.role_id, permission_id=acad_enrollment_view_perm.permission_id),
+            RolePermission(role_id=admin_role.role_id, permission_id=acad_teacher_assign_manage_perm.permission_id),
+            RolePermission(role_id=admin_role.role_id, permission_id=acad_teacher_assign_view_perm.permission_id),
         ])
         # Teacher & Student get view & change password
         db.add_all([
