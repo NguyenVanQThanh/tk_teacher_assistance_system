@@ -2,7 +2,7 @@
 # Description: API router for Class CRUD endpoints (F-ACAD-02).
 # Created At: 2026-07-22
 # Created By: Tam Khang
-# Updated At: 2026-07-22
+# Updated At: 2026-07-25
 # Updated By: Tam Khang
 
 from uuid import UUID
@@ -95,6 +95,6 @@ def update_class(
 )
 def delete_class(class_id: UUID, db: Session = Depends(get_db)):
     """
-    Xóa lớp học. Yêu cầu quyền ACAD_CLASS_MANAGE.
+    Xóa mềm lớp học. Yêu cầu quyền ACAD_CLASS_MANAGE.
     """
     ClassService.delete_class(db=db, class_id=class_id)

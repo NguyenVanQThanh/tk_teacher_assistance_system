@@ -1,4 +1,13 @@
 $kind: http-request
-url: ""
+name: List_student_in_class
+url: "{{BASE_URL}}/classes/:class_id/students"
 method: GET
+pathVariables:
+  - key: class_id
+    value: b96c850b-563d-4624-912e-abccdbf9cdee
+    description: ""
+auth:
+  type: bearer
+  credentials:
+    token: ""
 order: 4503585355814480

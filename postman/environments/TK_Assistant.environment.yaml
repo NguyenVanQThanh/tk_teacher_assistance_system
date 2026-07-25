@@ -2,3 +2,5 @@ name: TK_Assistant
 values:
   - key: BASE_URL
     value: ''
+  - key: ACCESS_TOKEN
+    value: ''

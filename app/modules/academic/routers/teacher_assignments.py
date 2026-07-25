@@ -2,7 +2,7 @@
 # Description: API router for Teacher Assignment endpoints (F-ACAD-04).
 # Created At: 2026-07-23
 # Created By: Tam Khang
-# Updated At: 2026-07-23
+# Updated At: 2026-07-25
 # Updated By: Tam Khang
 
 from uuid import UUID
@@ -68,7 +68,7 @@ def unassign_teacher(
     db: Session = Depends(get_db)
 ):
     """
-    Hủy phân công giáo viên. Yêu cầu quyền ACAD_TEACHER_ASSIGN_MANAGE.
+    Hủy phân công giáo viên (xóa mềm). Yêu cầu quyền ACAD_TEACHER_ASSIGN_MANAGE.
     """
     TeacherAssignmentService.unassign_teacher(
         db=db,

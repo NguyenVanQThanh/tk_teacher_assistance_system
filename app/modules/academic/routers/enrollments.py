@@ -2,7 +2,7 @@
 # Description: API router for Enrollment endpoints (F-ACAD-03).
 # Created At: 2026-07-23
 # Created By: Tam Khang
-# Updated At: 2026-07-23
+# Updated At: 2026-07-25
 # Updated By: Tam Khang
 
 from uuid import UUID
@@ -67,6 +67,6 @@ def unenroll_student(
     db: Session = Depends(get_db)
 ):
     """
-    Hủy ghi danh học sinh khỏi lớp. Yêu cầu quyền ACAD_ENROLLMENT_MANAGE.
+    Hủy ghi danh học sinh khỏi lớp (xóa mềm). Yêu cầu quyền ACAD_ENROLLMENT_MANAGE.
     """
     EnrollmentService.unenroll_student(db=db, class_id=class_id, student_id=student_id)

@@ -1,0 +1,9 @@
+$kind: http-request
+name: List_Classes
+url: "{{BASE_URL}}/classes"
+method: GET
+auth:
+  type: bearer
+  credentials:
+    token: ""
+order: 2348857359356960

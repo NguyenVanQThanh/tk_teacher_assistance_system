@@ -2,7 +2,7 @@
 # Description: API router for Subject CRUD endpoints (F-ACAD-01).
 # Created At: 2026-07-21
 # Created By: Tam Khang
-# Updated At: 2026-07-21
+# Updated At: 2026-07-25
 # Updated By: Tam Khang
 
 from uuid import UUID
@@ -91,6 +91,6 @@ def update_subject(
 )
 def delete_subject(subject_id: UUID, db: Session = Depends(get_db)):
     """
-    Xóa môn học. Yêu cầu quyền ACAD_SUBJECT_MANAGE.
+    Xóa mềm môn học. Yêu cầu quyền ACAD_SUBJECT_MANAGE.
     """
     SubjectService.delete_subject(db=db, subject_id=subject_id)
