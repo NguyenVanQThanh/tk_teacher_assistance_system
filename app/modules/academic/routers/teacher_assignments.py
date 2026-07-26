@@ -1,19 +1,20 @@
 # File Name: teacher_assignments.py
-# Description: API router for Teacher Assignment endpoints (F-ACAD-04).
+# Description: API router for Teacher Assignment & Restore endpoints (F-ACAD-04).
 # Created At: 2026-07-23
 # Created By: Tam Khang
-# Updated At: 2026-07-25
+# Updated At: 2026-07-26
 # Updated By: Tam Khang
 
 from uuid import UUID
-from typing import List
+from typing import List, Optional
 
-from fastapi import APIRouter, Depends, status
+from fastapi import APIRouter, Depends, Query, status
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
-from app.modules.auth.dependencies import require_perm
-from app.modules.academic.schemas import TeacherAssignmentCreate, TeacherAssignmentOut
+from models.models import User
+from app.modules.auth.dependencies import require_perm, get_current_user
+from app.modules.academic.schemas import TeacherAssignmentCreate, TeacherAssignmentOut, AcademicStatusEnum
 from app.modules.academic.services.teacher_assignment_service import TeacherAssignmentService
 
 router = APIRouter(prefix="/api/v1/classes", tags=["academic-teacher-assignment"])
@@ -37,7 +38,8 @@ def assign_teacher(
         db=db,
         class_id=class_id,
         teacher_id=payload.teacher_id,
-        subject_id=payload.subject_id
+        subject_id=payload.subject_id,
+        status_val=payload.status.value
     )
 
 
@@ -48,12 +50,17 @@ def assign_teacher(
 )
 def list_assignments_in_class(
     class_id: UUID,
-    db: Session = Depends(get_db)
+    status: Optional[AcademicStatusEnum] = Query(None, description="Lọc theo trạng thái (ACTIVE, INACTIVE, DRAFT, DELETED)"),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
 ):
     """
-    Liệt kê tất cả phân công giáo viên theo lớp. Yêu cầu quyền ACAD_TEACHER_ASSIGN_VIEW.
+    Liệt kê các phân công giáo viên theo lớp và trạng thái với phân quyền dữ liệu. Yêu cầu quyền ACAD_TEACHER_ASSIGN_VIEW.
     """
-    return TeacherAssignmentService.list_assignments_in_class(db=db, class_id=class_id)
+    status_val = status.value if status else None
+    return TeacherAssignmentService.list_assignments_in_class(
+        db=db, class_id=class_id, status_val=status_val, current_user=current_user
+    )
 
 
 @router.delete(
@@ -68,9 +75,31 @@ def unassign_teacher(
     db: Session = Depends(get_db)
 ):
     """
-    Hủy phân công giáo viên (xóa mềm). Yêu cầu quyền ACAD_TEACHER_ASSIGN_MANAGE.
+    Hủy phân công giáo viên (chuyển sang trạng thái DELETED). Yêu cầu quyền ACAD_TEACHER_ASSIGN_MANAGE.
     """
     TeacherAssignmentService.unassign_teacher(
+        db=db,
+        class_id=class_id,
+        teacher_id=teacher_id,
+        subject_id=subject_id
+    )
+
+
+@router.post(
+    "/{class_id}/teacher-subjects/{teacher_id}/{subject_id}/restore",
+    response_model=TeacherAssignmentOut,
+    dependencies=[Depends(require_perm("ACAD_TEACHER_ASSIGN_MANAGE"))]
+)
+def restore_assignment(
+    class_id: UUID,
+    teacher_id: UUID,
+    subject_id: UUID,
+    db: Session = Depends(get_db)
+):
+    """
+    Khôi phục phân công giáo viên bị xóa mềm về ACTIVE (dành riêng cho Admin). Yêu cầu quyền ACAD_TEACHER_ASSIGN_MANAGE.
+    """
+    return TeacherAssignmentService.restore_assignment(
         db=db,
         class_id=class_id,
         teacher_id=teacher_id,

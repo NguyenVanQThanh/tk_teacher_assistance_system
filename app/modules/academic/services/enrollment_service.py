@@ -1,8 +1,8 @@
 # File Name: enrollment_service.py
-# Description: Service layer for Enrollment business logic — validation of class, student role/status, duplicate checks, CRUD.
+# Description: Service layer for Enrollment business logic — validation of class, student role/status, duplicate checks, RBAC Data Scoping, CRUD, and restore operations.
 # Created At: 2026-07-23
 # Created By: Tam Khang
-# Updated At: 2026-07-23
+# Updated At: 2026-07-26
 # Updated By: Tam Khang
 
 import logging
@@ -15,6 +15,7 @@ from sqlalchemy.orm import Session
 from models.models import User, Role
 from app.modules.academic.models import StudentClass
 from app.modules.academic.repository import ClassRepository, EnrollmentRepository
+from app.modules.academic.scoping import check_class_access
 
 logger = logging.getLogger("enrollment_service")
 
@@ -25,7 +26,8 @@ class EnrollmentService:
         db: Session,
         class_id: UUID,
         student_id: UUID,
-        student_code: Optional[str] = None
+        student_code: Optional[str] = None,
+        status_val: str = "ACTIVE"
     ) -> StudentClass:
         """
         Enroll a student into a class.
@@ -66,7 +68,7 @@ class EnrollmentService:
             .filter(
                 User.user_id == student_id,
                 Role.name == "Student",
-                User.status == "Active"
+                User.status.in_(["Active", "ACTIVE"])
             )
             .first()
         )
@@ -112,11 +114,16 @@ class EnrollmentService:
                 )
 
         # 6. Insert enrollment record
+        kwargs = {}
+        if status_val and status_val != "ACTIVE":
+            kwargs["status"] = status_val
+
         enrollment = EnrollmentRepository.create(
             db=db,
             class_id=class_id,
             student_id=student_id,
-            student_code=student_code
+            student_code=student_code,
+            **kwargs
         )
         logger.info(
             "Domain Event: EVT-ACAD-STUDENT_ENROLLED - class_id: %s, student_id: %s",
@@ -125,9 +132,14 @@ class EnrollmentService:
         return enrollment
 
     @staticmethod
-    def list_students_in_class(db: Session, class_id: UUID) -> List[StudentClass]:
+    def list_students_in_class(
+        db: Session,
+        class_id: UUID,
+        status_val: Optional[str] = None,
+        current_user: Optional[User] = None
+    ) -> List[StudentClass]:
         """
-        List all enrolled students in a class.
+        List enrolled students in a class with RBAC Data Scoping.
         Raises 404 ERR-ACAD-CLASS_NOT_FOUND if class does not exist.
         """
         cls = ClassRepository.get_by_id(db, class_id)
@@ -140,6 +152,12 @@ class EnrollmentService:
                     "message": "Lớp học không tồn tại."
                 }
             )
+
+        if current_user:
+            check_class_access(db, current_user, class_id)
+
+        if status_val:
+            return EnrollmentRepository.list_by_class_id(db, class_id, status=status_val)
         return EnrollmentRepository.list_by_class_id(db, class_id)
 
     @staticmethod
@@ -178,3 +196,25 @@ class EnrollmentService:
             "Domain Event: EVT-ACAD-STUDENT_UNENROLLED - class_id: %s, student_id: %s",
             class_id, student_id
         )
+
+    @staticmethod
+    def restore_enrollment(db: Session, class_id: UUID, student_id: UUID) -> StudentClass:
+        """
+        Restore a soft-deleted student enrollment record for Admin.
+        Raises 404 if enrollment record does not exist.
+        """
+        results = EnrollmentRepository.filter_enrollments(
+            db, class_id=class_id, student_id=student_id, exclude_status=None
+        )
+        if not results:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail={
+                    "code": "ERR-ACAD-ENROLLMENT_NOT_FOUND",
+                    "message": "Bản ghi ghi danh không tồn tại trong lớp."
+                }
+            )
+        enrollment = results[0]
+        EnrollmentRepository.restore(db, enrollment)
+        logger.info("Domain Event: EVT-ACAD-STUDENT_ENROLLMENT_RESTORED - class_id: %s, student_id: %s", class_id, student_id)
+        return enrollment

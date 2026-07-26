@@ -3,7 +3,7 @@ File Name: models.py
 Description: Database models definition for Sprint 0 tables (User, Role, Permission, Class, Subject, Document, etc.).
 Created At: 2026-07-04
 Created By: Nguyen-Thai-Tam-Khang
-Updated At: 2026-07-25
+Updated At: 2026-07-26
 Updated By: Tam Khang
 """
 import uuid
@@ -27,7 +27,7 @@ class User(Base):
     full_name = Column(String(100), nullable=False)
     birthday = Column(Date, nullable=True)
     role_id = Column(UUID(as_uuid=True), ForeignKey('roles.role_id'), nullable=False) # Note: You need to define the roles table first if errors occur
-    status = Column(String(20), default='Active')
+    status = Column(String(20), default='ACTIVE')
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
 
@@ -83,7 +83,7 @@ class Subject(Base):
     subject_id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     subject_name = Column(String(100), unique=True, nullable=False)
     description = Column(Text, nullable=True)
-    is_deleted = Column(Boolean, default=False, nullable=False)
+    status = Column(String(20), default='ACTIVE', nullable=False)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
 
@@ -95,7 +95,7 @@ class Class(Base):
     class_name = Column(String(50), unique=True, nullable=False)
     homeroom_teacher_id = Column(UUID(as_uuid=True), ForeignKey('users.user_id', ondelete='SET NULL'), nullable=True)
     academic_year = Column(String(20), nullable=True)
-    is_deleted = Column(Boolean, default=False, nullable=False)
+    status = Column(String(20), default='ACTIVE', nullable=False)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
 
@@ -106,7 +106,7 @@ class StudentClass(Base):
     student_id = Column(UUID(as_uuid=True), ForeignKey('users.user_id', ondelete='CASCADE'), nullable=False)
     class_id = Column(UUID(as_uuid=True), ForeignKey('classes.class_id', ondelete='CASCADE'), nullable=False)
     student_code = Column(String(50), unique=True, nullable=True)
-    is_deleted = Column(Boolean, default=False, nullable=False)
+    status = Column(String(20), default='ACTIVE', nullable=False)
 
     __table_args__ = (
         PrimaryKeyConstraint('student_id', 'class_id'),
@@ -119,7 +119,7 @@ class TeacherSubject(Base):
     teacher_id = Column(UUID(as_uuid=True), ForeignKey('users.user_id', ondelete='CASCADE'), nullable=False)
     class_id = Column(UUID(as_uuid=True), ForeignKey('classes.class_id', ondelete='CASCADE'), nullable=False)
     subject_id = Column(UUID(as_uuid=True), ForeignKey('subjects.subject_id', ondelete='CASCADE'), nullable=False)
-    is_deleted = Column(Boolean, default=False, nullable=False)
+    status = Column(String(20), default='ACTIVE', nullable=False)
 
     __table_args__ = (
         PrimaryKeyConstraint('teacher_id', 'class_id', 'subject_id'),

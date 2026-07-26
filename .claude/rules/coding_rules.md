@@ -41,3 +41,7 @@ Updated By: <author_name_or_email>
 ## 6. Security Restrictions
 - **Strict Prohibition**: Under no circumstances should any script, tool, or automated process read, modify, or interact with `.env` files or any other files containing sensitive environment variables or secrets.
 - **Secrets Management**: Rely on secure environment variable injection or a dedicated secrets manager instead of hardcoding or reading raw config files.
+
+## 7. Database & Alembic Migrations
+- **New Alembic Migration Requirement**: Every time there is a schema change or database structural update, a NEW Alembic migration file MUST be created (`alembic revision --autogenerate -m "..."`). Never edit or modify existing migration files that have already been applied to avoid schema mismatch and migration history corruption.
+

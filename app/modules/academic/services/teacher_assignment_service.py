@@ -1,12 +1,12 @@
 # File Name: teacher_assignment_service.py
-# Description: Service layer for Teacher Assignment business logic — validation of class, subject, teacher role/status, duplicate checks, CRUD.
+# Description: Service layer for Teacher Assignment business logic — validation of class, subject, teacher role/status, duplicate checks, RBAC Data Scoping, CRUD, and restore operations.
 # Created At: 2026-07-23
 # Created By: Tam Khang
-# Updated At: 2026-07-23
+# Updated At: 2026-07-26
 # Updated By: Tam Khang
 
 import logging
-from typing import List
+from typing import List, Optional
 from uuid import UUID
 
 from fastapi import HTTPException, status
@@ -19,6 +19,7 @@ from app.modules.academic.repository import (
     SubjectRepository,
     TeacherAssignmentRepository,
 )
+from app.modules.academic.scoping import check_class_access
 
 logger = logging.getLogger("teacher_assignment_service")
 
@@ -29,7 +30,8 @@ class TeacherAssignmentService:
         db: Session,
         class_id: UUID,
         teacher_id: UUID,
-        subject_id: UUID
+        subject_id: UUID,
+        status_val: str = "ACTIVE"
     ) -> TeacherSubject:
         """
         Assign a teacher to teach a subject in a class.
@@ -69,7 +71,7 @@ class TeacherAssignmentService:
             .filter(
                 User.user_id == teacher_id,
                 Role.name == "Teacher",
-                User.status == "Active"
+                User.status.in_(["Active", "ACTIVE"])
             )
             .first()
         )
@@ -103,11 +105,16 @@ class TeacherAssignmentService:
             )
 
         # 5. Insert assignment record
+        kwargs = {}
+        if status_val and status_val != "ACTIVE":
+            kwargs["status"] = status_val
+
         assignment = TeacherAssignmentRepository.create(
             db=db,
             class_id=class_id,
             teacher_id=teacher_id,
-            subject_id=subject_id
+            subject_id=subject_id,
+            **kwargs
         )
         logger.info(
             "Domain Event: EVT-ACAD-TEACHER_ASSIGNED - class_id: %s, teacher_id: %s, subject_id: %s",
@@ -116,9 +123,14 @@ class TeacherAssignmentService:
         return assignment
 
     @staticmethod
-    def list_assignments_in_class(db: Session, class_id: UUID) -> List[TeacherSubject]:
+    def list_assignments_in_class(
+        db: Session,
+        class_id: UUID,
+        status_val: Optional[str] = None,
+        current_user: Optional[User] = None
+    ) -> List[TeacherSubject]:
         """
-        List all teacher assignments for a specific class.
+        List teacher assignments for a specific class with RBAC Data Scoping.
         Raises 404 ERR-ACAD-CLASS_NOT_FOUND if class does not exist.
         """
         cls = ClassRepository.get_by_id(db, class_id)
@@ -131,6 +143,12 @@ class TeacherAssignmentService:
                     "message": "Lớp học không tồn tại."
                 }
             )
+
+        if current_user:
+            check_class_access(db, current_user, class_id)
+
+        if status_val:
+            return TeacherAssignmentRepository.list_by_class_id(db, class_id, status=status_val)
         return TeacherAssignmentRepository.list_by_class_id(db, class_id)
 
     @staticmethod
@@ -177,3 +195,30 @@ class TeacherAssignmentService:
             "Domain Event: EVT-ACAD-TEACHER_UNASSIGNED - class_id: %s, teacher_id: %s, subject_id: %s",
             class_id, teacher_id, subject_id
         )
+
+    @staticmethod
+    def restore_assignment(
+        db: Session,
+        class_id: UUID,
+        teacher_id: UUID,
+        subject_id: UUID
+    ) -> TeacherSubject:
+        """
+        Restore a soft-deleted teacher assignment record for Admin.
+        Raises 404 if assignment record does not exist.
+        """
+        results = TeacherAssignmentRepository.filter_teacher_assignments(
+            db, class_id=class_id, teacher_id=teacher_id, subject_id=subject_id, exclude_status=None
+        )
+        if not results:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail={
+                    "code": "ERR-ACAD-ASSIGNMENT_NOT_FOUND",
+                    "message": "Bản ghi phân công không tồn tại."
+                }
+            )
+        assignment = results[0]
+        TeacherAssignmentRepository.restore(db, assignment)
+        logger.info("Domain Event: EVT-ACAD-TEACHER_ASSIGNMENT_RESTORED - class_id: %s, teacher_id: %s, subject_id: %s", class_id, teacher_id, subject_id)
+        return assignment
