@@ -117,7 +117,7 @@ Phân quyền **mịn theo permission (usecase)**, không chỉ theo role:
 |---|---|---|
 | **S0** | Foundation & Auth | Scaffold, baseline migration, login JWT, RBAC permission-based ← *đã hoàn thành* |
 | S1 | Academic Org | Môn học, lớp, ghi danh HS, phân công GV — xem [sprint_1_overview.md](docs/v_1/sprints/sprint_1_overview.md) |
-| S2 | Bài tập lõi | Câu hỏi, giao bài, làm & chấm điểm |
+| S2 | Bài tập lõi | Câu hỏi, giao bài, làm & chấm điểm — xem [sprint_2_overview.md](docs/v_1/sprints/sprint_2_overview.md) |
 | S3 | Tracking | Ghi vết hành vi, cảnh báo hạn nộp |
 | S4 | AI Generation | Upload tài liệu, AI sinh đề, GV duyệt |
 | S5 | Teacher Dashboard | Phổ điểm, phân tích hành vi, khuyến nghị |

@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<title>Phiếu Bài Tập Mẫu - Sprint 2</title>
+<style>
+  @page { size: A4; margin: 2cm 1.8cm; }
+  body { font-family: "Times New Roman", serif; font-size: 13pt; line-height: 1.5; color: #111; }
+  h1 { text-align: center; font-size: 16pt; margin-bottom: 4px; }
+  h2 { text-align: center; font-size: 13pt; font-weight: normal; margin-top: 0; }
+  .meta-table { width: 100%; border-collapse: collapse; margin: 16px 0 24px; font-size: 11pt; }
+  .meta-table td { border: 1px solid #333; padding: 6px 10px; }
+  .meta-label { font-weight: bold; width: 30%; background: #f2f2f2; }
+  .question { margin-bottom: 22px; }
+  .qhead { font-weight: bold; }
+  .options { margin: 8px 0 0 20px; list-style: none; padding: 0; }
+  .options li { margin-bottom: 6px; }
+  .options li.correct::after { content: " ✓ (đáp án đúng)"; color: #0a7d2c; font-weight: bold; }
+  .answer-line { border-bottom: 1px solid #999; height: 22px; margin-top: 10px; }
+  .footer-note { margin-top: 30px; font-size: 10pt; color: #555; border-top: 1px dashed #999; padding-top: 10px; }
+  .tag { display: inline-block; font-size: 9.5pt; padding: 1px 8px; border-radius: 10px; background: #eef; margin-left: 8px; }
+  .result-box { margin-top: 30px; border: 1px solid #333; padding: 12px 16px; background: #fafafa; }
+  .result-box h3 { margin-top: 0; font-size: 12pt; }
+  code { font-family: Consolas, monospace; font-size: 10pt; background: #f4f4f4; padding: 1px 4px; }
+</style>
+</head>
+<body>
+
+<h1>PHIẾU BÀI TẬP</h1>
+<h2>Kiểm tra 15 phút — Chương 1 Đại số</h2>
+
+<table class="meta-table">
+  <tr><td class="meta-label">Mã đề (exercise_id)</td><td>e5f6...</td></tr>
+  <tr><td class="meta-label">Môn học</td><td>Đại số</td></tr>
+  <tr><td class="meta-label">Họ và tên học sinh</td><td>&nbsp;</td></tr>
+  <tr><td class="meta-label">Lớp</td><td>&nbsp;</td></tr>
+  <tr><td class="meta-label">Hạn nộp (due_at)</td><td>05/08/2026 23:59</td></tr>
+</table>
+
+<div class="question">
+  <div class="qhead">Câu 1. (Trắc nghiệm) <span class="tag">Nhận biết</span></div>
+  <div>2 + 2 x 3 bằng bao nhiêu?</div>
+  <ul class="options">
+    <li class="correct">A. 8</li>
+    <li>B. 12</li>
+    <li>C. 6</li>
+    <li>D. 10</li>
+  </ul>
+</div>
+
+<div class="question">
+  <div class="qhead">Câu 2. (Trắc nghiệm) <span class="tag">Thông hiểu</span></div>
+  <div>Nghiệm của phương trình x + 5 = 0 là?</div>
+  <ul class="options">
+    <li class="correct">A. x = -5</li>
+    <li>B. x = 5</li>
+  </ul>
+</div>
+
+<div class="question">
+  <div class="qhead">Câu 3. (Tự luận) <span class="tag">Vận dụng</span></div>
+  <div>Trình bày cách giải phương trình bậc nhất một ẩn.</div>
+  <div class="answer-line"></div>
+  <div class="answer-line"></div>
+  <div class="answer-line"></div>
+</div>
+
+<div class="result-box">
+  <h3>Kết quả chấm điểm minh họa (F-EXE-04 Auto Grading)</h3>
+  <p>Học sinh chọn: Câu 1 → A (đúng) · Câu 2 → B (sai) · Câu 3 → tự luận (chờ GV chấm tay)</p>
+  <p><b>Điểm (score):</b> 5.00 / 10 &nbsp;·&nbsp; <b>Trạng thái:</b> is_finished = true</p>
+  <p>Câu 3 được đánh dấu <code>pending_manual_grade: true</code>, không tính vào điểm tự động.</p>
+</div>
+
+<div class="footer-note">
+  Nguồn: docs/v_1/specs/f_exe_01_exercises_spec.md, f_exe_03_submission_spec.md, f_exe_04_grading_spec.md (Sprint 2 — Bài tập lõi).
+  Phiếu này là ví dụ minh họa input/output API, không phải chứng từ chính thức.
+</div>
+
+</body>
+</html>
