@@ -33,3 +33,7 @@ Trong tất cả các file mã nguồn, file task, file tài liệu, hoặc bấ
 
 ## 5. Ngôn ngữ hiển thị (User-Facing Language)
 Tất cả những nội dung hiển thị trên trang web/giao diện người dùng hoặc phản hồi trực tiếp mà người dùng có thể đọc được (ví dụ: mô tả trường dữ liệu hiển thị, nhãn, thông báo lỗi, thông điệp phản hồi) **BẮT BUỘC** phải được viết bằng **Tiếng Việt**. Các thành phần kỹ thuật khác như mã nguồn, tên biến, tên hàm, chú thích (comments), tài liệu kỹ thuật (docstrings) vẫn viết bằng **Tiếng Anh**.
+
+## 6. Chính sách Xóa dữ liệu (Soft Delete Policy)
+Hệ thống **CHỈ CHẤP NHẬN** cơ chế Xóa mềm (**Soft Delete**) đối với tất cả các tài nguyên/thực thể dữ liệu trong toàn bộ hệ thống (ví dụ: cập nhật trạng thái `status` sang `DELETED` hoặc cờ xóa). Tuyệt đối **KHÔNG** sử dụng Xóa cứng (**Hard Delete**). Mọi thiết kế hoặc yêu cầu tính năng trước đây nếu chỉ định Hard Delete đều **BẮT BUỘC** phải chuyển đổi hoàn toàn sang Soft Delete.
+

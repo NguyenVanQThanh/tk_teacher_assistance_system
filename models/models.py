@@ -1,15 +1,16 @@
 """
 File Name: models.py
-Description: Database models definition for Sprint 0 tables (User, Role, Permission, Class, Subject, Document, etc.).
+Description: Database models definition for Sprint 0 & Sprint 2 tables (User, Role, Permission, Exercise, Question, AnswerOption, etc.).
 Created At: 2026-07-04
 Created By: Nguyen-Thai-Tam-Khang
-Updated At: 2026-07-26
+Updated At: 2026-07-31
 Updated By: Tam Khang
 """
 import uuid
 from datetime import datetime
-from sqlalchemy import Column, Integer, String, Text, Date, ForeignKey, DateTime, CheckConstraint, PrimaryKeyConstraint, Boolean
+from sqlalchemy import Column, Integer, String, Text, Date, ForeignKey, DateTime, CheckConstraint, PrimaryKeyConstraint, Boolean, JSON
 from sqlalchemy.dialects.postgresql import UUID
+from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 from models.base import Base
 
@@ -143,6 +144,74 @@ class Document(Base):
     status = Column(String(20), default='Uploaded')
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+
+
+class Exercise(Base):
+    __tablename__ = 'exercises'
+
+    exercise_id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    title = Column(String(255), nullable=False)
+    subject_id = Column(UUID(as_uuid=True), ForeignKey('subjects.subject_id', ondelete='CASCADE'), nullable=False)
+    created_by = Column(UUID(as_uuid=True), ForeignKey('users.user_id', ondelete='CASCADE'), nullable=False)
+    total_questions = Column(Integer, default=0)
+    ai_metadata = Column(JSON, nullable=True)
+    status = Column(String(20), default='ACTIVE', nullable=False)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+
+    questions = relationship("Question", back_populates="exercise", cascade="all, delete-orphan")
+
+
+class Question(Base):
+    __tablename__ = 'questions'
+
+    question_id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    exercise_id = Column(UUID(as_uuid=True), ForeignKey('exercises.exercise_id', ondelete='CASCADE'), nullable=False)
+    document_id = Column(UUID(as_uuid=True), ForeignKey('documents.document_id', ondelete='SET NULL'), nullable=True)
+    content = Column(Text, nullable=False)
+    question_type = Column(String(20), nullable=False, default='MultipleChoice')
+    difficulty = Column(String(20), nullable=True)
+    correct_answer = Column(Text, nullable=True)
+    explanation = Column(Text, nullable=True)
+    display_order = Column(Integer, default=0)
+    is_ai_generated = Column(Boolean, default=False)
+    status = Column(String(20), default='ACTIVE', nullable=False)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+
+    exercise = relationship("Exercise", back_populates="questions")
+    answer_options = relationship("AnswerOption", back_populates="question", cascade="all, delete-orphan")
+
+
+class AnswerOption(Base):
+    __tablename__ = 'answer_options'
+
+    option_id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    question_id = Column(UUID(as_uuid=True), ForeignKey('questions.question_id', ondelete='CASCADE'), nullable=False)
+    content = Column(Text, nullable=False)
+    is_correct = Column(Boolean, default=False)
+    display_order = Column(Integer, default=0)
+
+    question = relationship("Question", back_populates="answer_options")
+
+
+class ClassAssignment(Base):
+    __tablename__ = 'class_assignments'
+
+    assignment_id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    class_id = Column(UUID(as_uuid=True), ForeignKey('classes.class_id', ondelete='CASCADE'), nullable=False)
+    exercise_id = Column(UUID(as_uuid=True), ForeignKey('exercises.exercise_id', ondelete='CASCADE'), nullable=False)
+    assigned_by = Column(UUID(as_uuid=True), ForeignKey('users.user_id', ondelete='CASCADE'), nullable=False)
+    assigned_at = Column(DateTime(timezone=True), server_default=func.now())
+    due_at = Column(DateTime(timezone=True), nullable=False)
+    status = Column(String(20), default='ACTIVE', nullable=False)
+
+    class_obj = relationship("Class", backref="assignments")
+    exercise = relationship("Exercise", backref="assignments")
+    assigner = relationship("User", backref="created_assignments")
+
+
+
 class Role(Base):
     __tablename__ = 'roles'
     
@@ -151,4 +220,5 @@ class Role(Base):
     description = Column(Text, nullable=True)
     created_at = Column(DateTime(timezone=True), default=func.now())
     updated_at = Column(DateTime(timezone=True), default=func.now(), onupdate=func.now())
+
 

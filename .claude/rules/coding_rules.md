@@ -45,3 +45,8 @@ Updated By: <author_name_or_email>
 ## 7. Database & Alembic Migrations
 - **New Alembic Migration Requirement**: Every time there is a schema change or database structural update, a NEW Alembic migration file MUST be created (`alembic revision --autogenerate -m "..."`). Never edit or modify existing migration files that have already been applied to avoid schema mismatch and migration history corruption.
 
+## 8. Deletion Strategy (Soft Delete Policy)
+- **Strict Soft Delete Only**: System ONLY accepts **Soft Delete** for all data resources/entities (e.g. updating `status` column to `DELETED` or setting soft delete flag). **Hard Delete is strictly prohibited**.
+- Any feature specs or initial requirements specifying Hard Delete MUST be converted to Soft Delete.
+
+

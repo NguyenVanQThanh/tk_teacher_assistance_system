@@ -2,9 +2,9 @@
 
 > Path: `docs/v_1/specs/f_exe_02_assignments_spec.md` · Sprint: [sprint_2_overview.md](../sprints/sprint_2_overview.md)
 > Created At: `2026-07-28`
-> Created By: `AI Agent`
-> Updated At: `2026-07-28`
-> Updated By: `AI Agent`
+> Created By: `Tam Khang`
+> Updated At: `2026-07-31`
+> Updated By: `Tam Khang`
 
 ---
 
@@ -18,18 +18,19 @@
 | Sprint(s) allocated | `SPRINT-02` |
 | Lane | `standard` |
 | Spec version | `v1.0` |
-| Last updated | `2026-07-28` |
+| Last updated | `2026-07-31` |
 | Source binding | `docs/base_sql_erd.sql` (bảng `class_assignments`) · `f_exe_01_exercises_spec.md` (đề phải tồn tại & thuộc quyền) · `f_acad_04_teacher_assignment_spec.md` (`teacher_subjects` scoping) · `.claude/rules/coding_rules.md` |
 
 ---
 
 # PART A — Business
 
-> **Owner:** AI Agent · **Gate:** G3
+> **Owner:** Tam Khang · **Gate:** G3
 
 ## A.1 Feature Summary
 
-Cho phép **Giáo viên** giao đề bài tập (`exercises`) cho lớp mình đang dạy đúng môn học của đề đó, kèm hạn nộp (`due_at`). **Học sinh** thuộc lớp xem được danh sách bài được giao. Hủy giao bài là **hard delete** (`class_assignments` không có cột `status` trong schema gốc) — chỉ cho phép khi chưa có học sinh nào bắt đầu làm bài (`student_exercise_attempts`), để tránh mất dữ liệu attempt.
+Cho phép **Giáo viên** giao đề bài tập (`exercises`) cho lớp mình đang dạy đúng môn học của đề đó, kèm hạn nộp (`due_at`). **Học sinh** thuộc lớp xem được danh sách bài được giao. Hủy giao bài thực hiện **soft delete** (chuyển `status` sang `DELETED` theo quy chuẩn hệ thống) — chỉ cho phép khi chưa có học sinh nào bắt đầu làm bài (`student_exercise_attempts`), để bảo toàn toàn vẹn dữ liệu.
+
 
 ## A.2 User Stories
 
@@ -64,7 +65,7 @@ Cho phép **Giáo viên** giao đề bài tập (`exercises`) cho lớp mình đ
     │     ├── Admin: toàn bộ
     │     ├── Teacher: assignment của lớp mình dạy/chủ nhiệm (dùng get_accessible_class_ids)
     │     └── Student: assignment của lớp mình ghi danh
-    └── Delete Assignment: Kiểm tra chưa có student_exercise_attempts nào liên kết -> Raise 409 ERR-EXE-ASSIGNMENT_HAS_ATTEMPTS nếu có -> Hard delete nếu không
+    └── Delete Assignment: Kiểm tra chưa có student_exercise_attempts nào liên kết -> Raise 409 ERR-EXE-ASSIGNMENT_HAS_ATTEMPTS nếu có -> Soft delete (`status = 'DELETED'`) nếu không
        │
        ▼
  4. Database Transaction & Output Serialization (AssignmentOut DTO)
@@ -80,7 +81,7 @@ Cho phép **Giáo viên** giao đề bài tập (`exercises`) cho lớp mình đ
 | AC-04 | REQ-EXE-012 | Student xem danh sách bài giao của lớp mình | `GET /api/v1/classes/{class_id}/assignments` | 200, danh sách assignment |
 | AC-05 | REQ-EXE-012 | Student/Teacher truy cập lớp ngoài phạm vi | `GET /api/v1/classes/{class_id}/assignments` | 403 `ERR-ACAD-CLASS_ACCESS_DENIED` |
 | AC-06 | REQ-EXE-013 | Assignment đã có học sinh attempt | `DELETE /api/v1/assignments/{assignment_id}` | 409 `ERR-EXE-ASSIGNMENT_HAS_ATTEMPTS` |
-| AC-07 | REQ-EXE-013 | Assignment chưa có attempt nào | `DELETE /api/v1/assignments/{assignment_id}` | 204 |
+| AC-07 | REQ-EXE-013 | Assignment chưa có attempt nào | `DELETE /api/v1/assignments/{assignment_id}` | 204 (soft-deleted, status sang `DELETED`) |
 
 ## A.5 Out of Scope
 
@@ -91,16 +92,17 @@ Cho phép **Giáo viên** giao đề bài tập (`exercises`) cho lớp mình đ
 
 # PART B — Architecture & API Design
 
-> **Owner:** AI Agent · **Gate:** G4
+> **Owner:** Tam Khang · **Gate:** G4
 
 ### Endpoints
 
 1. `POST /api/v1/classes/{class_id}/assignments`: Giao bài. Yêu cầu `EXE_ASSIGNMENT_MANAGE`.
 2. `GET /api/v1/classes/{class_id}/assignments`: Danh sách bài giao (RBAC Data Scoping, tái dùng `check_class_access` từ `app/modules/academic/scoping.py`). Yêu cầu `EXE_ASSIGNMENT_VIEW`.
-3. `DELETE /api/v1/assignments/{assignment_id}`: Hủy giao bài (hard delete có điều kiện). Yêu cầu `EXE_ASSIGNMENT_MANAGE`.
+3. `DELETE /api/v1/assignments/{assignment_id}`: Hủy giao bài (soft delete có điều kiện). Yêu cầu `EXE_ASSIGNMENT_MANAGE`.
 
 ### Database Boundary
 
 | Table | Op | Migration |
 |---|---|---|
-| `class_assignments` | CREATE (nếu chưa có trong DB thực tế) | migration mới nếu cần, không cần cột `status` theo schema gốc |
+| `class_assignments` | CREATE | Migration mới với cột `status` VARCHAR(20) DEFAULT 'ACTIVE' NOT NULL hỗ trợ Soft Delete |
+

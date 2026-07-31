@@ -1,0 +1,18 @@
+$kind: http-request
+name: Create_exercise
+url: "{{BASE_URL}}/exercises"
+method: POST
+body:
+  type: json
+  content: "{\r
+
+    \  \"title\": \"Bài tập tin\",\r
+
+    \  \"subject_id\": \"f9792637-2862-4dc8-8b57-ecfbcb895cf3\"\r
+
+    }\r\n"
+auth:
+  type: bearer
+  credentials:
+    token: "{{ACCESS_TOKEN}}"
+order: 1785480880622

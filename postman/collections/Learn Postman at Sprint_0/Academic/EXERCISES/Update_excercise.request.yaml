@@ -1,0 +1,17 @@
+$kind: http-request
+url: "{{BASE_URL}}/exercises/:exercise_id"
+method: PUT
+pathVariables:
+  exercise_id: 39b113b2-fc91-44ba-8140-28b4a64bc084
+body:
+  type: json
+  content: "{\r
+
+    \  \"title\": \"Bài tập tin 2\"\r
+
+    }\r\n"
+auth:
+  type: bearer
+  credentials:
+    token: "{{ACCESS_TOKEN}}"
+order: 4060856755868478

@@ -6,9 +6,47 @@ body:
   type: json
   content: "{\r
 
-    \    \"phone\": \"0987654321\",\r
+    \  \"phone\": \"0999000001\",\r
 
-    \    \"password\": \"12345678\"\r
+    \  \"password\": \"Admin@1234\"\r
 
-    }"
+    }\r\n"
+scripts:
+  - type: afterResponse
+    code: "// Created By: Tam Khang\r
+
+      // Updated By: Tam Khang\r
+
+      \r
+
+      // 1. Kiểm tra request trả về status code 200 OK\r
+
+      pm.test(\"Status code is 200\", function () {\r
+
+      \    pm.response.to.have.status(200);\r
+
+      });\r
+
+      \r
+
+      // 2. Parse dữ liệu JSON trả về từ Server\r
+
+      const responseData = pm.response.json();\r
+
+      \r
+
+      // 3. Trích xuất access_token và lưu vào biến môi trường (Environment Variable)\r
+
+      if (responseData && responseData.access_token) {\r
+
+      \    pm.environment.set(\"ACCESS_TOKEN\", responseData.access_token);\r
+
+      \    console.log(\"✅ Đã cập nhật ACCESS_TOKEN thành công:\", responseData.access_token);\r
+
+      } else {\r
+
+      \    console.error(\"❌ Không tìm thấy access_token trong dữ liệu response!\", responseData);\r
+
+      }\r\n"
+    language: text/javascript
 order: 1784383849660

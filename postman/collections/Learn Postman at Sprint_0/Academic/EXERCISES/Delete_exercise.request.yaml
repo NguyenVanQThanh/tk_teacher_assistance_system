@@ -1,0 +1,13 @@
+$kind: http-request
+name: Delete_exercise
+url: "{{BASE_URL}}/exercises/:exercise_id"
+method: DELETE
+pathVariables:
+  - key: exercise_id
+    value: 39b113b2-fc91-44ba-8140-28b4a64bc084
+    description: ""
+auth:
+  type: bearer
+  credentials:
+    token: "{{ACCESS_TOKEN}}"
+order: 4255122986351744

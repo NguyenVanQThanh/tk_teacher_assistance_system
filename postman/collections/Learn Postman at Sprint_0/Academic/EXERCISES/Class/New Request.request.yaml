@@ -1,0 +1,13 @@
+$kind: http-request
+name: New Request
+url: "{{BASE_URL}}/assignments/:assignment_id/restore"
+method: POST
+pathVariables:
+  - key: assignment_id
+    value: ef8f83ad-246c-4495-bf11-16db2a96b942
+    description: ""
+auth:
+  type: bearer
+  credentials:
+    token: "{{ACCESS_TOKEN}}"
+order: 2735602968639106

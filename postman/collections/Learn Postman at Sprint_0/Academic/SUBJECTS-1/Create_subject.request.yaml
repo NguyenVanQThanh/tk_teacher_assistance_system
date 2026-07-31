@@ -1,0 +1,16 @@
+$kind: http-request
+name: Create_subject
+url: "{{BASE_URL}}/subjects"
+method: POST
+body:
+  type: json
+  content: "{\r
+
+    \    \"subject_name\": \"Tin học\"\r
+
+    }\r\n"
+auth:
+  type: bearer
+  credentials:
+    token: "{{ACCESS_TOKEN}}"
+order: 1785477886869

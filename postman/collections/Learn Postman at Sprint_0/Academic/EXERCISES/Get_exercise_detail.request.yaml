@@ -1,0 +1,13 @@
+$kind: http-request
+name: Get_exercise_detail
+url: "{{BASE_URL}}/exercises/:exercise_id"
+method: GET
+pathVariables:
+  - key: exercise_id
+    value: 39b113b2-fc91-44ba-8140-28b4a64bc084
+    description: ""
+auth:
+  type: bearer
+  credentials:
+    token: "{{ACCESS_TOKEN}}"
+order: 3780084381887454

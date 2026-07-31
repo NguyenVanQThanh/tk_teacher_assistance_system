@@ -2,7 +2,7 @@
 # Description: Script to seed the initial database with roles, permissions, and role-permission mappings.
 # Created At: 2026-07-17
 # Created By: Tam Khang
-# Updated At: 2026-07-22
+# Updated At: 2026-07-31
 # Updated By: Tam Khang
 
 import os
@@ -72,6 +72,10 @@ def seed_data():
             {"permission_code": "ACAD_ENROLLMENT_VIEW", "name": "Xem ghi danh học sinh", "description": "Cho phép xem danh sách học sinh ghi danh trong lớp"},
             {"permission_code": "ACAD_TEACHER_ASSIGN_MANAGE", "name": "Quản lý phân công giáo viên", "description": "Cho phép Admin phân công và hủy phân công giáo viên bộ môn"},
             {"permission_code": "ACAD_TEACHER_ASSIGN_VIEW", "name": "Xem phân công giáo viên", "description": "Cho phép xem danh sách phân công giáo viên theo lớp"},
+            {"permission_code": "EXE_EXERCISE_MANAGE", "name": "Quản lý kho đề bài tập", "description": "Cho phép tạo, sửa, xóa mềm, khôi phục đề bài tập và câu hỏi"},
+            {"permission_code": "EXE_EXERCISE_VIEW", "name": "Xem kho đề bài tập", "description": "Cho phép xem danh sách và chi tiết đề bài tập"},
+            {"permission_code": "EXE_ASSIGNMENT_MANAGE", "name": "Quản lý giao bài tập cho lớp", "description": "Cho phép giao bài tập, hủy giao bài tập (xóa mềm) và khôi phục"},
+            {"permission_code": "EXE_ASSIGNMENT_VIEW", "name": "Xem bài tập được giao", "description": "Cho phép xem danh sách bài tập được giao theo lớp"},
         ]
 
         perms_db = {}
@@ -102,10 +106,11 @@ def seed_data():
 
         # 3. Seed RolePermission mapping (Idempotent: check if exists first)
         mappings = {
-            "Admin": ["AUTH_ME_VIEW", "AUTH_PASSWORD_CHANGE", "AUTH_PERM_MANAGE", "ACAD_SUBJECT_MANAGE", "ACAD_SUBJECT_VIEW", "ACAD_CLASS_MANAGE", "ACAD_CLASS_VIEW", "ACAD_ENROLLMENT_MANAGE", "ACAD_ENROLLMENT_VIEW", "ACAD_TEACHER_ASSIGN_MANAGE", "ACAD_TEACHER_ASSIGN_VIEW"],
-            "Teacher": ["AUTH_ME_VIEW", "AUTH_PASSWORD_CHANGE"],
-            "Student": ["AUTH_ME_VIEW", "AUTH_PASSWORD_CHANGE"]
+            "Admin": ["AUTH_ME_VIEW", "AUTH_PASSWORD_CHANGE", "AUTH_PERM_MANAGE", "ACAD_SUBJECT_MANAGE", "ACAD_SUBJECT_VIEW", "ACAD_CLASS_MANAGE", "ACAD_CLASS_VIEW", "ACAD_ENROLLMENT_MANAGE", "ACAD_ENROLLMENT_VIEW", "ACAD_TEACHER_ASSIGN_MANAGE", "ACAD_TEACHER_ASSIGN_VIEW", "EXE_EXERCISE_MANAGE", "EXE_EXERCISE_VIEW", "EXE_ASSIGNMENT_MANAGE", "EXE_ASSIGNMENT_VIEW"],
+            "Teacher": ["AUTH_ME_VIEW", "AUTH_PASSWORD_CHANGE", "EXE_EXERCISE_MANAGE", "EXE_EXERCISE_VIEW", "EXE_ASSIGNMENT_MANAGE", "EXE_ASSIGNMENT_VIEW"],
+            "Student": ["AUTH_ME_VIEW", "AUTH_PASSWORD_CHANGE", "EXE_ASSIGNMENT_VIEW"]
         }
+
 
 
         role_perm_count = 0

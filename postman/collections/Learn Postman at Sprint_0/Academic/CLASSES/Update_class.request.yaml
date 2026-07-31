@@ -4,17 +4,17 @@ url: "{{BASE_URL}}/classes/:class_id"
 method: PUT
 pathVariables:
   - key: class_id
-    value: d1dd2136-3bc4-454b-925a-c9425fbddade
+    value: b96c850b-563d-4624-912e-abccdbf9cdee
     description: ""
 body:
   type: json
   content: "{\r
 
-    \  \"school_year\": \"2027-2028\"\r
+    \    \"class_name\": \"____****@@!!$$%^11A2\"\r
 
     }\r\n"
 auth:
   type: bearer
   credentials:
-    token: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiI5MzNlYzY1MS1lY2YyLTRiNDMtOTY3Ni1hOTg3YzI5ZDJkYWQiLCJyb2xlIjoiQWRtaW4iLCJleHAiOjE3ODQ3MzE0Mzh9.L6S7loptSbfP-mN_vWoageGpaJkQIF3SxG9vvxg7_6w
+    token: "{{ACCESS_TOKEN}}"
 order: 66666195047

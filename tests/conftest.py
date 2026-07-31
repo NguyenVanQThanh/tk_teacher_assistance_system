@@ -125,6 +125,30 @@ def setup_db() -> Generator[None, None, None]:
             name="View teacher assignments",
             description="Allows viewing teacher assignments"
         )
+        exe_exercise_manage_perm = Permission(
+            permission_id=uuid.uuid4(),
+            permission_code="EXE_EXERCISE_MANAGE",
+            name="Manage exercises",
+            description="Allows creating and managing exercise bank"
+        )
+        exe_exercise_view_perm = Permission(
+            permission_id=uuid.uuid4(),
+            permission_code="EXE_EXERCISE_VIEW",
+            name="View exercises",
+            description="Allows viewing exercise bank"
+        )
+        exe_assignment_manage_perm = Permission(
+            permission_id=uuid.uuid4(),
+            permission_code="EXE_ASSIGNMENT_MANAGE",
+            name="Manage class assignments",
+            description="Allows creating, soft deleting, and restoring assignments"
+        )
+        exe_assignment_view_perm = Permission(
+            permission_id=uuid.uuid4(),
+            permission_code="EXE_ASSIGNMENT_VIEW",
+            name="View class assignments",
+            description="Allows viewing class assignments"
+        )
         
         db.add_all([
             me_view_perm,
@@ -137,7 +161,11 @@ def setup_db() -> Generator[None, None, None]:
             acad_enrollment_manage_perm,
             acad_enrollment_view_perm,
             acad_teacher_assign_manage_perm,
-            acad_teacher_assign_view_perm
+            acad_teacher_assign_view_perm,
+            exe_exercise_manage_perm,
+            exe_exercise_view_perm,
+            exe_assignment_manage_perm,
+            exe_assignment_view_perm
         ])
         db.flush()
 
@@ -155,14 +183,24 @@ def setup_db() -> Generator[None, None, None]:
             RolePermission(role_id=admin_role.role_id, permission_id=acad_enrollment_view_perm.permission_id),
             RolePermission(role_id=admin_role.role_id, permission_id=acad_teacher_assign_manage_perm.permission_id),
             RolePermission(role_id=admin_role.role_id, permission_id=acad_teacher_assign_view_perm.permission_id),
+            RolePermission(role_id=admin_role.role_id, permission_id=exe_exercise_manage_perm.permission_id),
+            RolePermission(role_id=admin_role.role_id, permission_id=exe_exercise_view_perm.permission_id),
+            RolePermission(role_id=admin_role.role_id, permission_id=exe_assignment_manage_perm.permission_id),
+            RolePermission(role_id=admin_role.role_id, permission_id=exe_assignment_view_perm.permission_id),
         ])
         # Teacher & Student get view & change password
         db.add_all([
             RolePermission(role_id=teacher_role.role_id, permission_id=me_view_perm.permission_id),
             RolePermission(role_id=teacher_role.role_id, permission_id=pwd_change_perm.permission_id),
+            RolePermission(role_id=teacher_role.role_id, permission_id=exe_exercise_manage_perm.permission_id),
+            RolePermission(role_id=teacher_role.role_id, permission_id=exe_exercise_view_perm.permission_id),
+            RolePermission(role_id=teacher_role.role_id, permission_id=exe_assignment_manage_perm.permission_id),
+            RolePermission(role_id=teacher_role.role_id, permission_id=exe_assignment_view_perm.permission_id),
             RolePermission(role_id=student_role.role_id, permission_id=me_view_perm.permission_id),
             RolePermission(role_id=student_role.role_id, permission_id=pwd_change_perm.permission_id),
+            RolePermission(role_id=student_role.role_id, permission_id=exe_assignment_view_perm.permission_id),
         ])
+
         
         # 4. Seed Users
         hashed_password = get_password_hash("password123")

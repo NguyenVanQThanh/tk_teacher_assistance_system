@@ -2,9 +2,9 @@
 
 > Path: `docs/v_1/specs/f_exe_01_exercises_spec.md` · Sprint: [sprint_2_overview.md](../sprints/sprint_2_overview.md)
 > Created At: `2026-07-28`
-> Created By: `AI Agent`
-> Updated At: `2026-07-28`
-> Updated By: `AI Agent`
+> Created By: `Tam Khang`
+> Updated At: `2026-07-31`
+> Updated By: `Tam Khang`
 
 ---
 
@@ -18,14 +18,14 @@
 | Sprint(s) allocated | `SPRINT-02` |
 | Lane | `standard` |
 | Spec version | `v1.0` |
-| Last updated | `2026-07-28` |
+| Last updated | `2026-07-31` |
 | Source binding | `docs/base_sql_erd.sql` (bảng `exercises`, `questions`, `answer_options`) · `f_auth_01_spec.md` (RBAC, current-user) · `f_acad_04_teacher_assignment_spec.md` (`teacher_subjects` scoping) · `.claude/rules/coding_rules.md` |
 
 ---
 
 # PART A — Business
 
-> **Owner:** AI Agent · **Gate:** G3
+> **Owner:** Tam Khang · **Gate:** G3
 
 ## A.1 Feature Summary
 
@@ -62,7 +62,7 @@ Cho phép **Giáo viên** quản lý kho đề bài tập (`exercises`) thuộc 
     ├── Create Exercise: Kiểm tra subject_id tồn tại -> Kiểm tra teacher_id có teacher_subjects ACTIVE với subject_id đó (trừ Admin) -> Raise 403 ERR-EXE-INVALID_SUBJECT_SCOPE nếu không
     ├── List/Detail: Admin xem toàn bộ; Teacher chỉ xem đề created_by = mình hoặc subject thuộc teacher_subjects của mình
     ├── Add Question: Kiểm tra exercise tồn tại & thuộc quyền -> validate answer_options nếu MultipleChoice
-    ├── Update/Delete Question: Kiểm tra question thuộc đúng exercise được phép sửa
+    ├── Update/Delete Question: Kiểm tra question thuộc đúng exercise được phép sửa -> Delete Question chuyển status sang DELETED (soft-delete)
     ├── Delete Exercise: Chuyển status sang DELETED (giữ nguyên questions/answer_options — cascade không xóa cứng)
     └── Restore: Tìm đề bao gồm DELETED -> chuyển status về ACTIVE
        │
@@ -91,7 +91,7 @@ Cho phép **Giáo viên** quản lý kho đề bài tập (`exercises`) thuộc 
 
 # PART B — Architecture & API Design
 
-> **Owner:** AI Agent · **Gate:** G4
+> **Owner:** Tam Khang · **Gate:** G4
 
 ### Endpoints
 
@@ -103,14 +103,14 @@ Cho phép **Giáo viên** quản lý kho đề bài tập (`exercises`) thuộc 
 6. `POST /api/v1/exercises/{exercise_id}/restore`: Khôi phục đề. Yêu cầu `EXE_EXERCISE_MANAGE`.
 7. `POST /api/v1/exercises/{exercise_id}/questions`: Thêm câu hỏi (+ answer_options lồng trong body). Yêu cầu `EXE_EXERCISE_MANAGE`.
 8. `PUT /api/v1/questions/{question_id}`: Sửa câu hỏi. Yêu cầu `EXE_EXERCISE_MANAGE`.
-9. `DELETE /api/v1/questions/{question_id}`: Xóa câu hỏi (hard delete — câu hỏi không cần soft-delete vì không bị tham chiếu ngoài `exercise`). Yêu cầu `EXE_EXERCISE_MANAGE`.
+9. `DELETE /api/v1/questions/{question_id}`: Xóa mềm câu hỏi (chuyển status sang DELETED). Yêu cầu `EXE_EXERCISE_MANAGE`.
 
 ### Database Boundary
 
 | Table | Op | Migration |
 |---|---|---|
 | `exercises` | ALTER (add `status VARCHAR(20) DEFAULT 'ACTIVE'`) | migration mới, Section 7 coding rules |
-| `questions` | CREATE (nếu chưa có trong DB thực tế, theo `base_sql_erd.sql`) | migration mới nếu cần |
+| `questions` | CREATE / ALTER (add `status VARCHAR(20) DEFAULT 'ACTIVE'`) | migration mới |
 | `answer_options` | CREATE (nếu chưa có) | migration mới nếu cần |
 
 > Ghi chú: kiểm tra state DB hiện tại trước khi viết migration — nếu bảng đã tồn tại từ baseline thì chỉ cần ALTER thêm `status`.

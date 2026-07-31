@@ -1,4 +1,5 @@
 $kind: http-request
-url: ""
+name: Check Health
+url: http://localhost:8000/health
 method: GET
 order: 1784383628630
