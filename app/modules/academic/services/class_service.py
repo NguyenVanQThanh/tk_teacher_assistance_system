@@ -49,7 +49,7 @@ class ClassService:
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail={
                     "code": "ERR-ACAD-INVALID_HOMEROOM_TEACHER",
-                    "message": "Giáo viên chủ nhiệm không hợp lệ (phải có vai trò Teacher và trạng thái Active)."
+                    "message": "Invalid homeroom teacher (must have Teacher role and Active status)."
                 }
             )
 
@@ -78,7 +78,7 @@ class ClassService:
                 status_code=status.HTTP_409_CONFLICT,
                 detail={
                     "code": "ERR-ACAD-CLASS_DUPLICATE_NAME",
-                    "message": "Tên lớp học đã tồn tại trong hệ thống."
+                    "message": "Class name already exists in the system."
                 }
             )
 
@@ -143,7 +143,7 @@ class ClassService:
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail={
                     "code": "ERR-ACAD-CLASS_NOT_FOUND",
-                    "message": "Lớp học không tồn tại."
+                    "message": "Class not found."
                 }
             )
 
@@ -184,7 +184,7 @@ class ClassService:
                     status_code=status.HTTP_409_CONFLICT,
                     detail={
                         "code": "ERR-ACAD-CLASS_DUPLICATE_NAME",
-                        "message": "Tên lớp học đã tồn tại trong hệ thống."
+                        "message": "Class name already exists in the system."
                     }
                 )
 
@@ -226,7 +226,7 @@ class ClassService:
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail={
                     "code": "ERR-ACAD-CLASS_NOT_FOUND",
-                    "message": "Lớp học không tồn tại."
+                    "message": "Class not found."
                 }
             )
         cls = results[0]

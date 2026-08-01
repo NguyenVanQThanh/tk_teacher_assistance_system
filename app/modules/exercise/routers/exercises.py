@@ -35,7 +35,7 @@ def create_exercise(
     current_user: User = Depends(get_current_user)
 ):
     """
-    Tạo đề bài tập mới. Yêu cầu quyền EXE_EXERCISE_MANAGE.
+    Create a new exercise. Requires EXE_EXERCISE_MANAGE permission.
     """
     service = ExerciseService(db)
     return service.create_exercise(current_user, payload)
@@ -47,12 +47,12 @@ def create_exercise(
     dependencies=[Depends(require_perm("EXE_EXERCISE_VIEW"))]
 )
 def list_exercises(
-    subject_id: Optional[UUID] = Query(None, description="Lọc theo ID môn học"),
+    subject_id: Optional[UUID] = Query(None, description="Filter by subject ID"),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
     """
-    Lấy danh sách đề bài tập theo phạm vi môn học giảng dạy. Yêu cầu quyền EXE_EXERCISE_VIEW.
+    List exercises within the user's teaching scope. Requires EXE_EXERCISE_VIEW permission.
     """
     service = ExerciseService(db)
     return service.list_exercises(current_user, subject_id=subject_id)
@@ -69,7 +69,7 @@ def get_exercise_detail(
     current_user: User = Depends(get_current_user)
 ):
     """
-    Xem chi tiết đề bài tập kèm câu hỏi và đáp án lựa chọn. Yêu cầu quyền EXE_EXERCISE_VIEW.
+    Retrieve details of an exercise including its questions and options. Requires EXE_EXERCISE_VIEW permission.
     """
     service = ExerciseService(db)
     return service.get_exercise_detail(current_user, exercise_id)
@@ -87,7 +87,7 @@ def update_exercise(
     current_user: User = Depends(get_current_user)
 ):
     """
-    Cập nhật thông tin đề bài tập. Yêu cầu quyền EXE_EXERCISE_MANAGE.
+    Update exercise title or AI metadata. Requires EXE_EXERCISE_MANAGE permission.
     """
     service = ExerciseService(db)
     return service.update_exercise(current_user, exercise_id, payload)
@@ -104,7 +104,7 @@ def delete_exercise(
     current_user: User = Depends(get_current_user)
 ):
     """
-    Xóa mềm đề bài tập (chuyển status sang DELETED). Yêu cầu quyền EXE_EXERCISE_MANAGE.
+    Soft-delete an exercise (sets status to DELETED). Requires EXE_EXERCISE_MANAGE permission.
     """
     service = ExerciseService(db)
     service.delete_exercise(current_user, exercise_id)
@@ -121,7 +121,7 @@ def restore_exercise(
     current_user: User = Depends(get_current_user)
 ):
     """
-    Khôi phục đề bài tập đã xóa mềm về trạng thái ACTIVE. Yêu cầu quyền EXE_EXERCISE_MANAGE.
+    Restore a soft-deleted exercise back to ACTIVE status. Requires EXE_EXERCISE_MANAGE permission.
     """
     service = ExerciseService(db)
     return service.restore_exercise(current_user, exercise_id)
@@ -140,7 +140,7 @@ def add_question(
     current_user: User = Depends(get_current_user)
 ):
     """
-    Thêm câu hỏi (+ đáp án trắc nghiệm) vào đề bài tập. Yêu cầu quyền EXE_EXERCISE_MANAGE.
+    Add a question (with answer options) to an exercise. Requires EXE_EXERCISE_MANAGE permission.
     """
     service = QuestionService(db)
     return service.add_question(current_user, exercise_id, payload)

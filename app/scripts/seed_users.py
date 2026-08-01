@@ -40,36 +40,36 @@ SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 def seed_users():
     session = SessionLocal()
     try:
-        print("Bắt đầu khởi tạo dữ liệu tài khoản mẫu...")
+        print("Starting sample user account initialization...")
         
-        # 1. Lấy thông tin các vai trò từ database
+        # 1. Get roles from database
         roles = session.query(Role).all()
         if not roles:
-            print("Lỗi: Không tìm thấy vai trò nào trong DB. Vui lòng chạy script seed.py trước.")
+            print("Error: No roles found in DB. Please run seed.py first.")
             return
 
         roles_dict = {role.name: role for role in roles}
         
-        # Định nghĩa các tài khoản cần tạo cho từng vai trò
+        # Define sample accounts to create for each role
         accounts_to_seed = [
             {
                 "phone": "0999000001",
                 "email": "admin@school.com",
-                "full_name": "Quản trị viên Hệ thống",
+                "full_name": "System Administrator",
                 "role_name": "Admin",
                 "password_plain": "Admin@1234"
             },
             {
                 "phone": "0999000002",
                 "email": "teacher@school.com",
-                "full_name": "Giáo viên Mẫu",
+                "full_name": "Sample Teacher",
                 "role_name": "Teacher",
                 "password_plain": "Teacher@1234"
             },
             {
                 "phone": "0999000003",
                 "email": "student@school.com",
-                "full_name": "Học sinh Mẫu",
+                "full_name": "Sample Student",
                 "role_name": "Student",
                 "password_plain": "Student@1234"
             }
@@ -80,10 +80,10 @@ def seed_users():
         for acc in accounts_to_seed:
             role = roles_dict.get(acc["role_name"])
             if not role:
-                print(f"Bỏ qua tài khoản {acc['full_name']} vì vai trò '{acc['role_name']}' không tồn tại trong DB.")
+                print(f"Skipping account {acc['full_name']} because role '{acc['role_name']}' does not exist in DB.")
                 continue
 
-            # Kiểm tra xem tài khoản đã tồn tại chưa (qua số điện thoại hoặc email)
+            # Check if account already exists (by phone or email)
             existing_user = session.query(User).filter(
                 (User.phone == acc["phone"]) | (User.email == acc["email"])
             ).first()
@@ -101,7 +101,7 @@ def seed_users():
                 )
                 session.add(new_user)
                 session.flush()
-                print(f"Đã tạo tài khoản cho vai trò {acc['role_name']}: {acc['phone']} / {acc['email']}")
+                print(f"Created account for role {acc['role_name']}: {acc['phone']} / {acc['email']}")
                 
                 seeded_accounts.append({
                     "user_id": str(new_user.user_id),
@@ -112,29 +112,29 @@ def seed_users():
                     "password_plain": acc["password_plain"]
                 })
             else:
-                # Nếu đã tồn tại thì lấy thông tin hiển thị
+                # If already exists, get display info
                 seeded_accounts.append({
                     "user_id": str(existing_user.user_id),
                     "phone": existing_user.phone,
                     "email": existing_user.email,
                     "full_name": existing_user.full_name,
                     "role_name": acc["role_name"],
-                    "password_plain": "(Đã tồn tại trong DB - Sử dụng mật khẩu cũ)"
+                    "password_plain": "(Already exists in DB - Using existing password)"
                 })
 
         session.commit()
-        print("Lưu dữ liệu thành công!")
+        print("Data saved successfully!")
         
-        # 2. Ghi thông tin tài khoản mẫu ra file seed_data.json để lưu trữ tham chiếu
+        # 2. Write sample account info to seed_accounts_info.json for reference
         output_file_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "seed_accounts_info.json")
         with open(output_file_path, "w", encoding="utf-8") as f:
             json.dump(seeded_accounts, f, indent=2, ensure_ascii=False)
             
-        print(f"Đã lưu thông tin tài khoản mẫu vào file: {output_file_path}")
+        print(f"Saved sample account info to file: {output_file_path}")
         
     except Exception as e:
         session.rollback()
-        print(f"Đã xảy ra lỗi khi tạo dữ liệu mẫu: {e}")
+        print(f"An error occurred while creating sample data: {e}")
     finally:
         session.close()
 

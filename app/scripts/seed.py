@@ -40,11 +40,11 @@ def seed_data():
 
         # 1. Seed Roles (Idempotent: check if they exist first, update if descriptions change)
         roles_to_seed = [
-            {"name": "Admin", "description": "Quản trị viên hệ thống"},
-            {"name": "Teacher", "description": "Giáo viên"},
-            {"name": "Student", "description": "Học sinh"}
+            {"name": "Admin", "description": "System Administrator"},
+            {"name": "Teacher", "description": "Teacher"},
+            {"name": "Student", "description": "Student"}
         ]
-        
+
         roles_db = {}
         for role_data in roles_to_seed:
             role = session.query(Role).filter(Role.name == role_data["name"]).first()
@@ -61,21 +61,21 @@ def seed_data():
 
         # 2. Seed Permissions (Idempotent: check if they exist first, update if name/description change)
         permissions_to_seed = [
-            {"permission_code": "AUTH_ME_VIEW", "name": "Xem thông tin cá nhân", "description": "Cho phép người dùng xem thông tin cá nhân của chính mình"},
-            {"permission_code": "AUTH_PASSWORD_CHANGE", "name": "Thay đổi mật khẩu", "description": "Cho phép người dùng thay đổi mật khẩu của mình"},
-            {"permission_code": "AUTH_PERM_MANAGE", "name": "Quản lý quyền hệ thống", "description": "Cho phép quản trị viên quản lý vai trò và quyền của người dùng"},
-            {"permission_code": "ACAD_SUBJECT_MANAGE", "name": "Quản lý môn học", "description": "Cho phép Admin tạo, sửa, xóa môn học"},
-            {"permission_code": "ACAD_SUBJECT_VIEW", "name": "Xem môn học", "description": "Cho phép xem danh sách và chi tiết môn học"},
-            {"permission_code": "ACAD_CLASS_MANAGE", "name": "Quản lý lớp học", "description": "Cho phép Admin tạo, sửa, xóa lớp học"},
-            {"permission_code": "ACAD_CLASS_VIEW", "name": "Xem lớp học", "description": "Cho phép xem danh sách và chi tiết lớp học"},
-            {"permission_code": "ACAD_ENROLLMENT_MANAGE", "name": "Quản lý ghi danh học sinh", "description": "Cho phép Admin ghi danh và hủy ghi danh học sinh vào lớp"},
-            {"permission_code": "ACAD_ENROLLMENT_VIEW", "name": "Xem ghi danh học sinh", "description": "Cho phép xem danh sách học sinh ghi danh trong lớp"},
-            {"permission_code": "ACAD_TEACHER_ASSIGN_MANAGE", "name": "Quản lý phân công giáo viên", "description": "Cho phép Admin phân công và hủy phân công giáo viên bộ môn"},
-            {"permission_code": "ACAD_TEACHER_ASSIGN_VIEW", "name": "Xem phân công giáo viên", "description": "Cho phép xem danh sách phân công giáo viên theo lớp"},
-            {"permission_code": "EXE_EXERCISE_MANAGE", "name": "Quản lý kho đề bài tập", "description": "Cho phép tạo, sửa, xóa mềm, khôi phục đề bài tập và câu hỏi"},
-            {"permission_code": "EXE_EXERCISE_VIEW", "name": "Xem kho đề bài tập", "description": "Cho phép xem danh sách và chi tiết đề bài tập"},
-            {"permission_code": "EXE_ASSIGNMENT_MANAGE", "name": "Quản lý giao bài tập cho lớp", "description": "Cho phép giao bài tập, hủy giao bài tập (xóa mềm) và khôi phục"},
-            {"permission_code": "EXE_ASSIGNMENT_VIEW", "name": "Xem bài tập được giao", "description": "Cho phép xem danh sách bài tập được giao theo lớp"},
+            {"permission_code": "AUTH_ME_VIEW", "name": "View Personal Information", "description": "Allows users to view their own personal profile information"},
+            {"permission_code": "AUTH_PASSWORD_CHANGE", "name": "Change Password", "description": "Allows users to change their own password"},
+            {"permission_code": "AUTH_PERM_MANAGE", "name": "Manage System Permissions", "description": "Allows administrators to manage user roles and permissions"},
+            {"permission_code": "ACAD_SUBJECT_MANAGE", "name": "Manage Subjects", "description": "Allows Admin to create, edit, and delete subjects"},
+            {"permission_code": "ACAD_SUBJECT_VIEW", "name": "View Subjects", "description": "Allows viewing subject list and details"},
+            {"permission_code": "ACAD_CLASS_MANAGE", "name": "Manage Classes", "description": "Allows Admin to create, edit, and delete classes"},
+            {"permission_code": "ACAD_CLASS_VIEW", "name": "View Classes", "description": "Allows viewing class list and details"},
+            {"permission_code": "ACAD_ENROLLMENT_MANAGE", "name": "Manage Student Enrollments", "description": "Allows Admin to enroll and unenroll students in classes"},
+            {"permission_code": "ACAD_ENROLLMENT_VIEW", "name": "View Student Enrollments", "description": "Allows viewing list of enrolled students in a class"},
+            {"permission_code": "ACAD_TEACHER_ASSIGN_MANAGE", "name": "Manage Teacher Assignments", "description": "Allows Admin to assign and unassign subject teachers"},
+            {"permission_code": "ACAD_TEACHER_ASSIGN_VIEW", "name": "View Teacher Assignments", "description": "Allows viewing list of teacher assignments by class"},
+            {"permission_code": "EXE_EXERCISE_MANAGE", "name": "Manage Exercise Bank", "description": "Allows creating, editing, soft deleting, and restoring exercises and questions"},
+            {"permission_code": "EXE_EXERCISE_VIEW", "name": "View Exercise Bank", "description": "Allows viewing list and details of exercises"},
+            {"permission_code": "EXE_ASSIGNMENT_MANAGE", "name": "Manage Class Assignments", "description": "Allows assigning exercises, cancelling assignments (soft delete), and restoring"},
+            {"permission_code": "EXE_ASSIGNMENT_VIEW", "name": "View Assigned Exercises", "description": "Allows viewing list of assigned exercises by class"},
         ]
 
         perms_db = {}

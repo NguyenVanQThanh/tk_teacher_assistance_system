@@ -82,6 +82,6 @@ def check_class_access(db: Session, user: User, class_id: UUID, role_name: Optio
         status_code=status.HTTP_403_FORBIDDEN,
         detail={
             "code": "ERR-ACAD-CLASS_ACCESS_DENIED",
-            "message": "Bạn không có quyền truy cập thông tin lớp học này."
+            "message": "You do not have permission to access information for this class."
         }
     )

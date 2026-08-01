@@ -38,7 +38,7 @@ class ExerciseService:
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail={
                     "code": "ERR-EXE-SUBJECT_NOT_FOUND",
-                    "message": "Môn học không tồn tại."
+                    "message": "Subject not found."
                 }
             )
 
@@ -50,7 +50,7 @@ class ExerciseService:
                     status_code=status.HTTP_403_FORBIDDEN,
                     detail={
                         "code": "ERR-EXE-INVALID_SUBJECT_SCOPE",
-                        "message": "Bạn không có quyền tạo đề bài tập cho môn học này."
+                        "message": "You do not have permission to create exercises for this subject."
                     }
                 )
 
@@ -92,7 +92,7 @@ class ExerciseService:
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail={
                     "code": "ERR-EXE-EXERCISE_NOT_FOUND",
-                    "message": "Đề bài tập không tồn tại."
+                    "message": "Exercise not found."
                 }
             )
 
@@ -103,7 +103,7 @@ class ExerciseService:
                     status_code=status.HTTP_404_NOT_FOUND,
                     detail={
                         "code": "ERR-EXE-EXERCISE_NOT_FOUND",
-                        "message": "Đề bài tập không tồn tại."
+                        "message": "Exercise not found."
                     }
                 )
 
@@ -126,7 +126,7 @@ class ExerciseService:
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail={
                     "code": "ERR-EXE-EXERCISE_NOT_FOUND",
-                    "message": "Đề bài tập không tồn tại."
+                    "message": "Exercise not found."
                 }
             )
 
@@ -137,7 +137,7 @@ class ExerciseService:
                     status_code=status.HTTP_404_NOT_FOUND,
                     detail={
                         "code": "ERR-EXE-EXERCISE_NOT_FOUND",
-                        "message": "Đề bài tập không tồn tại."
+                        "message": "Exercise not found."
                     }
                 )
 

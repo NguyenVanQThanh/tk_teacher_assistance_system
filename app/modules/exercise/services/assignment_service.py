@@ -32,7 +32,7 @@ class AssignmentService:
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail={
                     "code": "ERR-ACAD-CLASS_NOT_FOUND",
-                    "message": "Lớp học không tồn tại."
+                    "message": "Class not found."
                 }
             )
 
@@ -43,7 +43,7 @@ class AssignmentService:
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail={
                     "code": "ERR-EXE-EXERCISE_NOT_FOUND",
-                    "message": "Đề bài tập không tồn tại."
+                    "message": "Exercise not found."
                 }
             )
 
@@ -61,7 +61,7 @@ class AssignmentService:
                     status_code=status.HTTP_403_FORBIDDEN,
                     detail={
                         "code": "ERR-EXE-CLASS_ACCESS_DENIED",
-                        "message": "Bạn không có quyền giao bài tập cho môn học của lớp này."
+                        "message": "You do not have permission to assign exercises for this class's subject."
                     }
                 )
 
@@ -72,7 +72,7 @@ class AssignmentService:
                 status_code=status.HTTP_409_CONFLICT,
                 detail={
                     "code": "ERR-EXE-DUPLICATE_ASSIGNMENT",
-                    "message": "Bài tập này đã được giao cho lớp trước đó."
+                    "message": "This exercise has already been assigned to this class."
                 }
             )
 
@@ -93,7 +93,7 @@ class AssignmentService:
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail={
                     "code": "ERR-ACAD-CLASS_NOT_FOUND",
-                    "message": "Lớp học không tồn tại."
+                    "message": "Class not found."
                 }
             )
 
@@ -110,7 +110,7 @@ class AssignmentService:
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail={
                     "code": "ERR-EXE-ASSIGNMENT_NOT_FOUND",
-                    "message": "Lượt giao bài tập không tồn tại."
+                    "message": "Class assignment record not found."
                 }
             )
 
@@ -119,7 +119,7 @@ class AssignmentService:
                 status_code=status.HTTP_409_CONFLICT,
                 detail={
                     "code": "ERR-EXE-ASSIGNMENT_HAS_ATTEMPTS",
-                    "message": "Bài tập đã được học sinh làm, không thể hủy giao."
+                    "message": "Assignment has student attempts and cannot be cancelled."
                 }
             )
 
@@ -132,7 +132,7 @@ class AssignmentService:
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail={
                     "code": "ERR-EXE-ASSIGNMENT_NOT_FOUND",
-                    "message": "Lượt giao bài tập không tồn tại."
+                    "message": "Class assignment record not found."
                 }
             )
 

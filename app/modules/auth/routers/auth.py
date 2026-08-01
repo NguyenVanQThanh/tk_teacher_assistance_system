@@ -30,7 +30,7 @@ def login(request_data: LoginRequest, db: Session = Depends(get_db)):
             status_code=status.HTTP_429_TOO_MANY_REQUESTS,
             detail={
                 "code": "ERR-AUTH-TOO_MANY_ATTEMPTS",
-                "message": f"Quá số lần thử đăng nhập cho phép. Vui lòng thử lại sau {retry_after} giây."
+                "message": f"Too many failed login attempts. Please try again in {retry_after} seconds."
             },
             headers={"Retry-After": str(retry_after)}
         )

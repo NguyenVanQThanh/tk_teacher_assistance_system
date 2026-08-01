@@ -45,7 +45,7 @@ class EnrollmentService:
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail={
                     "code": "ERR-ACAD-CLASS_NOT_FOUND",
-                    "message": "Lớp học không tồn tại."
+                    "message": "Class not found."
                 }
             )
 
@@ -57,7 +57,7 @@ class EnrollmentService:
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail={
                     "code": "ERR-ACAD-STUDENT_NOT_FOUND",
-                    "message": "Học sinh không tồn tại trong hệ thống."
+                    "message": "Student does not exist in the system."
                 }
             )
 
@@ -80,7 +80,7 @@ class EnrollmentService:
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail={
                     "code": "ERR-ACAD-INVALID_STUDENT_ROLE",
-                    "message": "Học sinh không hợp lệ (phải có vai trò Student và trạng thái Active)."
+                    "message": "Invalid student (must have Student role and Active status)."
                 }
             )
 
@@ -94,7 +94,7 @@ class EnrollmentService:
                 status_code=status.HTTP_409_CONFLICT,
                 detail={
                     "code": "ERR-ACAD-ALREADY_ENROLLED",
-                    "message": "Học sinh đã được ghi danh vào lớp học này."
+                    "message": "Student is already enrolled in this class."
                 }
             )
 
@@ -109,7 +109,7 @@ class EnrollmentService:
                     status_code=status.HTTP_409_CONFLICT,
                     detail={
                         "code": "ERR-ACAD-DUPLICATE_STUDENT_CODE",
-                        "message": "Mã số học sinh đã tồn tại trong hệ thống."
+                        "message": "Student code already exists in the system."
                     }
                 )
 
@@ -149,7 +149,7 @@ class EnrollmentService:
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail={
                     "code": "ERR-ACAD-CLASS_NOT_FOUND",
-                    "message": "Lớp học không tồn tại."
+                    "message": "Class not found."
                 }
             )
 
@@ -174,7 +174,7 @@ class EnrollmentService:
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail={
                     "code": "ERR-ACAD-CLASS_NOT_FOUND",
-                    "message": "Lớp học không tồn tại."
+                    "message": "Class not found."
                 }
             )
 
@@ -187,7 +187,7 @@ class EnrollmentService:
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail={
                     "code": "ERR-ACAD-ENROLLMENT_NOT_FOUND",
-                    "message": "Bản ghi ghi danh không tồn tại trong lớp."
+                    "message": "Enrollment record not found in class."
                 }
             )
 
@@ -211,7 +211,7 @@ class EnrollmentService:
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail={
                     "code": "ERR-ACAD-ENROLLMENT_NOT_FOUND",
-                    "message": "Bản ghi ghi danh không tồn tại trong lớp."
+                    "message": "Enrollment record not found in class."
                 }
             )
         enrollment = results[0]

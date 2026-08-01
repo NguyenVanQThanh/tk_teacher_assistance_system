@@ -29,16 +29,16 @@ class ExerciseStatusEnum(str, Enum):
 
 
 class AnswerOptionCreate(BaseModel):
-    content: str = Field(..., min_length=1, description="Nội dung đáp án")
-    is_correct: bool = Field(False, description="Đáp án đúng hay sai")
-    display_order: int = Field(0, description="Thứ tự hiển thị")
+    content: str = Field(..., min_length=1, description="Option content text")
+    is_correct: bool = Field(False, description="Whether option is correct")
+    display_order: int = Field(0, description="Display order sequence")
 
     @field_validator("content")
     @classmethod
     def validate_content(cls, v: str) -> str:
         v = v.strip()
         if not v:
-            raise ValueError("Nội dung đáp án không được để trống.")
+            raise ValueError("Option content cannot be empty.")
         return v
 
 
@@ -53,21 +53,21 @@ class AnswerOptionOut(BaseModel):
 
 
 class QuestionCreate(BaseModel):
-    content: str = Field(..., min_length=1, description="Nội dung câu hỏi")
-    question_type: QuestionTypeEnum = Field(QuestionTypeEnum.MultipleChoice, description="Loại câu hỏi")
-    difficulty: Optional[DifficultyEnum] = Field(None, description="Độ khó câu hỏi")
-    correct_answer: Optional[str] = Field(None, description="Đáp án cho câu hỏi tự luận ngắn")
-    explanation: Optional[str] = Field(None, description="Lời giải chi tiết")
-    display_order: int = Field(0, description="Thứ tự câu trong đề")
-    document_id: Optional[UUID] = Field(None, description="ID tài liệu gốc nếu có")
-    answer_options: Optional[List[AnswerOptionCreate]] = Field(default=None, description="Danh sách đáp án lựa chọn")
+    content: str = Field(..., min_length=1, description="Question content text")
+    question_type: QuestionTypeEnum = Field(QuestionTypeEnum.MultipleChoice, description="Question type category")
+    difficulty: Optional[DifficultyEnum] = Field(None, description="Question difficulty level")
+    correct_answer: Optional[str] = Field(None, description="Correct answer for ShortAnswer questions")
+    explanation: Optional[str] = Field(None, description="Detailed answer explanation")
+    display_order: int = Field(0, description="Display order within exercise")
+    document_id: Optional[UUID] = Field(None, description="Associated source document ID")
+    answer_options: Optional[List[AnswerOptionCreate]] = Field(default=None, description="List of answer choices")
 
     @field_validator("content")
     @classmethod
     def validate_content(cls, v: str) -> str:
         v = v.strip()
         if not v:
-            raise ValueError("Nội dung câu hỏi không được để trống.")
+            raise ValueError("Question content cannot be empty.")
         return v
 
     @model_validator(mode="after")
@@ -75,10 +75,10 @@ class QuestionCreate(BaseModel):
         if self.question_type == QuestionTypeEnum.MultipleChoice:
             options = self.answer_options or []
             if len(options) < 2:
-                raise ValueError("Câu hỏi trắc nghiệm (MultipleChoice) phải có ít nhất 2 đáp án lựa chọn.")
+                raise ValueError("MultipleChoice questions must have at least 2 answer options.")
             correct_count = sum(1 for opt in options if opt.is_correct)
             if correct_count != 1:
-                raise ValueError(f"Câu hỏi trắc nghiệm phải có đúng 1 đáp án đúng (hiện tại có {correct_count} đáp án đúng).")
+                raise ValueError(f"MultipleChoice questions must have exactly 1 correct answer (found {correct_count}).")
         return self
 
 
@@ -97,7 +97,7 @@ class QuestionUpdate(BaseModel):
         if v is not None:
             v = v.strip()
             if not v:
-                raise ValueError("Nội dung câu hỏi không được để trống.")
+                raise ValueError("Question content cannot be empty.")
             return v
         return v
 
@@ -106,10 +106,10 @@ class QuestionUpdate(BaseModel):
         if self.question_type == QuestionTypeEnum.MultipleChoice and self.answer_options is not None:
             options = self.answer_options
             if len(options) < 2:
-                raise ValueError("Câu hỏi trắc nghiệm (MultipleChoice) phải có ít nhất 2 đáp án lựa chọn.")
+                raise ValueError("MultipleChoice questions must have at least 2 answer options.")
             correct_count = sum(1 for opt in options if opt.is_correct)
             if correct_count != 1:
-                raise ValueError(f"Câu hỏi trắc nghiệm phải có đúng 1 đáp án đúng (hiện tại có {correct_count} đáp án đúng).")
+                raise ValueError(f"MultipleChoice questions must have exactly 1 correct answer (found {correct_count}).")
         return self
 
 
@@ -133,22 +133,22 @@ class QuestionOut(BaseModel):
 
 
 class ExerciseCreate(BaseModel):
-    title: str = Field(..., min_length=1, max_length=255, description="Tiêu đề đề bài tập")
-    subject_id: UUID = Field(..., description="ID môn học")
-    ai_metadata: Optional[Any] = Field(None, description="Metadata cho AI sinh câu hỏi")
+    title: str = Field(..., min_length=1, max_length=255, description="Exercise title")
+    subject_id: UUID = Field(..., description="Subject UUID")
+    ai_metadata: Optional[Any] = Field(None, description="Metadata for AI generation")
 
     @field_validator("title")
     @classmethod
     def validate_title(cls, v: str) -> str:
         v = v.strip()
         if not v:
-            raise ValueError("Tiêu đề đề bài tập không được để trống.")
+            raise ValueError("Exercise title cannot be empty.")
         return v
 
 
 class ExerciseUpdate(BaseModel):
-    title: Optional[str] = Field(None, min_length=1, max_length=255, description="Tiêu đề mới")
-    ai_metadata: Optional[Any] = Field(None, description="Metadata mới")
+    title: Optional[str] = Field(None, min_length=1, max_length=255, description="New exercise title")
+    ai_metadata: Optional[Any] = Field(None, description="New AI metadata")
 
     @field_validator("title")
     @classmethod
@@ -156,7 +156,7 @@ class ExerciseUpdate(BaseModel):
         if v is not None:
             v = v.strip()
             if not v:
-                raise ValueError("Tiêu đề đề bài tập không được để trống.")
+                raise ValueError("Exercise title cannot be empty.")
             return v
         return v
 
@@ -177,15 +177,15 @@ class ExerciseOut(BaseModel):
 
 
 class AssignmentCreate(BaseModel):
-    exercise_id: UUID = Field(..., description="ID đề bài tập")
-    due_at: datetime = Field(..., description="Hạn nộp bài tập")
+    exercise_id: UUID = Field(..., description="Exercise UUID")
+    due_at: datetime = Field(..., description="Assignment due date")
 
     @field_validator("due_at")
     @classmethod
     def validate_due_at(cls, v: datetime) -> datetime:
         now = datetime.now(v.tzinfo) if v.tzinfo else datetime.now()
         if v <= now:
-            raise ValueError("Hạn nộp bài tập (due_at) phải là một mốc thời gian trong tương lai.")
+            raise ValueError("Assignment due date (due_at) must be in the future.")
         return v
 
 

@@ -32,7 +32,7 @@ def create_class_assignment(
     current_user: User = Depends(get_current_user)
 ):
     """
-    Giao đề bài tập cho lớp học. Yêu cầu quyền EXE_ASSIGNMENT_MANAGE.
+    Assign an exercise to a class. Requires EXE_ASSIGNMENT_MANAGE permission.
     """
     service = AssignmentService(db)
     return service.create_assignment(class_id, payload, current_user)
@@ -49,7 +49,7 @@ def list_class_assignments(
     current_user: User = Depends(get_current_user)
 ):
     """
-    Xem danh sách bài tập được giao của lớp. Yêu cầu quyền EXE_ASSIGNMENT_VIEW.
+    List exercise assignments for a class. Requires EXE_ASSIGNMENT_VIEW permission.
     """
     service = AssignmentService(db)
     return service.list_class_assignments(class_id, current_user)
@@ -66,7 +66,7 @@ def delete_class_assignment(
     current_user: User = Depends(get_current_user)
 ):
     """
-    Hủy giao bài tập (Soft Delete). Yêu cầu quyền EXE_ASSIGNMENT_MANAGE.
+    Cancel an assignment (Soft Delete). Requires EXE_ASSIGNMENT_MANAGE permission.
     """
     service = AssignmentService(db)
     service.delete_assignment(assignment_id, current_user)
@@ -83,7 +83,7 @@ def restore_class_assignment(
     current_user: User = Depends(get_current_user)
 ):
     """
-    Khôi phục lượt giao bài tập đã bị hủy (Soft Delete). Yêu cầu quyền EXE_ASSIGNMENT_MANAGE.
+    Restore a cancelled assignment (Soft Delete). Requires EXE_ASSIGNMENT_MANAGE permission.
     """
     service = AssignmentService(db)
     return service.restore_assignment(assignment_id, current_user)

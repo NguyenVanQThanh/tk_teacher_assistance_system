@@ -73,10 +73,10 @@ class TestExerciseBankModule:
         q_valid = client.post(
             f"/api/v1/exercises/{exercise_id}/questions",
             json={
-                "content": "1 + 1 bằng mấy?",
+                "content": "What is 1 + 1?",
                 "question_type": "MultipleChoice",
                 "difficulty": "NhanBiet",
-                "explanation": "1 + 1 = 2 theo phép cộng cơ bản",
+                "explanation": "1 + 1 = 2 based on basic addition",
                 "answer_options": [
                     {"content": "1", "is_correct": False},
                     {"content": "2", "is_correct": True},
@@ -88,7 +88,7 @@ class TestExerciseBankModule:
         )
         assert q_valid.status_code == status.HTTP_201_CREATED
         question_id = q_valid.json()["question_id"]
-        assert q_valid.json()["content"] == "1 + 1 bằng mấy?"
+        assert q_valid.json()["content"] == "What is 1 + 1?"
 
         # 6. Detail Exercise includes total_questions = 1 and question
         detail_resp = client.get(f"/api/v1/exercises/{exercise_id}", headers=admin_headers)
@@ -100,13 +100,13 @@ class TestExerciseBankModule:
         q_update = client.put(
             f"/api/v1/questions/{question_id}",
             json={
-                "content": "1 + 1 bằng mấy? (Đã sửa)",
+                "content": "What is 1 + 1? (Updated)",
                 "difficulty": "ThongHieu"
             },
             headers=admin_headers
         )
         assert q_update.status_code == status.HTTP_200_OK
-        assert q_update.json()["content"] == "1 + 1 bằng mấy? (Đã sửa)"
+        assert q_update.json()["content"] == "What is 1 + 1? (Updated)"
 
         # 8. Soft Delete Question
         q_del = client.delete(f"/api/v1/questions/{question_id}", headers=admin_headers)

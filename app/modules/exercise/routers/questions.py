@@ -30,7 +30,7 @@ def update_question(
     current_user: User = Depends(get_current_user)
 ):
     """
-    Cập nhật câu hỏi (+ đáp án trắc nghiệm). Yêu cầu quyền EXE_EXERCISE_MANAGE.
+    Update question content and answer options. Requires EXE_EXERCISE_MANAGE permission.
     """
     service = QuestionService(db)
     return service.update_question(current_user, question_id, payload)
@@ -47,7 +47,7 @@ def delete_question(
     current_user: User = Depends(get_current_user)
 ):
     """
-    Xóa mềm câu hỏi (chuyển status sang DELETED). Yêu cầu quyền EXE_EXERCISE_MANAGE.
+    Soft-delete a question (sets status to DELETED). Requires EXE_EXERCISE_MANAGE permission.
     """
     service = QuestionService(db)
     service.delete_question(current_user, question_id)

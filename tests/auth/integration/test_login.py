@@ -47,7 +47,7 @@ def test_login_wrong_password(client: TestClient):
     
     data = response.json()
     assert data["detail"]["code"] == "ERR-AUTH-INVALID_CREDENTIALS"
-    assert "Tên đăng nhập hoặc mật khẩu không chính xác." in data["detail"]["message"]
+    assert "Incorrect username or password." in data["detail"]["message"]
 
 def test_login_non_existent_phone(client: TestClient):
     """
@@ -63,7 +63,7 @@ def test_login_non_existent_phone(client: TestClient):
     data = response.json()
     # Should use identical error code and message to prevent user enumeration
     assert data["detail"]["code"] == "ERR-AUTH-INVALID_CREDENTIALS"
-    assert "Tên đăng nhập hoặc mật khẩu không chính xác." in data["detail"]["message"]
+    assert "Incorrect username or password." in data["detail"]["message"]
 
 def test_login_blocked_user(client: TestClient):
     """
@@ -78,7 +78,7 @@ def test_login_blocked_user(client: TestClient):
     
     data = response.json()
     assert data["detail"]["code"] == "ERR-AUTH-ACCOUNT_BLOCKED"
-    assert "Tài khoản của bạn đã bị khóa." in data["detail"]["message"]
+    assert "Your account has been blocked." in data["detail"]["message"]
 
 def test_login_inactive_user(client: TestClient):
     """
@@ -93,7 +93,7 @@ def test_login_inactive_user(client: TestClient):
     
     data = response.json()
     assert data["detail"]["code"] == "ERR-AUTH-ACCOUNT_INACTIVE"
-    assert "Tài khoản chưa được kích hoạt." in data["detail"]["message"]
+    assert "Account has not been activated." in data["detail"]["message"]
 
 def test_login_rate_limiting(client: TestClient):
     """
@@ -120,7 +120,7 @@ def test_login_rate_limiting(client: TestClient):
     
     data = response.json()
     assert data["detail"]["code"] == "ERR-AUTH-TOO_MANY_ATTEMPTS"
-    assert "Quá số lần thử đăng nhập cho phép" in data["detail"]["message"]
+    assert "Too many failed login attempts" in data["detail"]["message"]
     
     # Cleanup rate limit dict
     _failed_attempts.pop(phone, None)

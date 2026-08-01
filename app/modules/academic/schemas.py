@@ -22,16 +22,16 @@ class AcademicStatusEnum(str, Enum):
 
 class SubjectCreate(BaseModel):
     """Schema for creating a new subject."""
-    subject_name: str = Field(..., min_length=1, max_length=100, description="Tên môn học (phải là duy nhất)")
-    description: Optional[str] = Field(None, max_length=500, description="Mô tả môn học")
-    status: AcademicStatusEnum = Field(AcademicStatusEnum.ACTIVE, description="Trạng thái môn học")
+    subject_name: str = Field(..., min_length=1, max_length=100, description="Subject name (must be unique)")
+    description: Optional[str] = Field(None, max_length=500, description="Subject description")
+    status: AcademicStatusEnum = Field(AcademicStatusEnum.ACTIVE, description="Subject status")
 
     @field_validator("subject_name")
     @classmethod
     def validate_subject_name(cls, v: str) -> str:
         v = v.strip()
         if not v:
-            raise ValueError("Tên môn học không được để trống hoặc chỉ chứa khoảng trắng.")
+            raise ValueError("Subject name cannot be empty or blank.")
         return v
 
     @field_validator("description")
@@ -45,9 +45,9 @@ class SubjectCreate(BaseModel):
 
 class SubjectUpdate(BaseModel):
     """Schema for updating an existing subject."""
-    subject_name: Optional[str] = Field(None, min_length=1, max_length=100, description="Tên môn học mới")
-    description: Optional[str] = Field(None, max_length=500, description="Mô tả mới")
-    status: Optional[AcademicStatusEnum] = Field(None, description="Trạng thái mới")
+    subject_name: Optional[str] = Field(None, min_length=1, max_length=100, description="New subject name")
+    description: Optional[str] = Field(None, max_length=500, description="New description")
+    status: Optional[AcademicStatusEnum] = Field(None, description="New status")
 
     @field_validator("subject_name")
     @classmethod
@@ -55,7 +55,7 @@ class SubjectUpdate(BaseModel):
         if v is not None:
             v = v.strip()
             if not v:
-                raise ValueError("Tên môn học không được để trống hoặc chỉ chứa khoảng trắng.")
+                raise ValueError("Subject name cannot be empty or blank.")
             return v
         return v
 
@@ -82,17 +82,17 @@ class SubjectOut(BaseModel):
 
 class ClassCreate(BaseModel):
     """Schema for creating a new class."""
-    class_name: str = Field(..., min_length=1, max_length=50, description="Tên lớp học (phải là duy nhất)")
-    school_year: Optional[str] = Field(None, max_length=20, description="Năm học (ví dụ: 2026-2027)")
-    homeroom_teacher_id: Optional[UUID] = Field(None, description="UUID của Giáo viên chủ nhiệm")
-    status: AcademicStatusEnum = Field(AcademicStatusEnum.ACTIVE, description="Trạng thái lớp học")
+    class_name: str = Field(..., min_length=1, max_length=50, description="Class name (must be unique)")
+    school_year: Optional[str] = Field(None, max_length=20, description="Academic year (e.g., 2026-2027)")
+    homeroom_teacher_id: Optional[UUID] = Field(None, description="UUID of Homeroom Teacher")
+    status: AcademicStatusEnum = Field(AcademicStatusEnum.ACTIVE, description="Class status")
 
     @field_validator("class_name")
     @classmethod
     def validate_class_name(cls, v: str) -> str:
         v = v.strip()
         if not v:
-            raise ValueError("Tên lớp học không được để trống hoặc chỉ chứa khoảng trắng.")
+            raise ValueError("Class name cannot be empty or blank.")
         return v
 
     @field_validator("school_year")
@@ -103,17 +103,17 @@ class ClassCreate(BaseModel):
             if not v:
                 return None
             if not re.match(r"^\d{4}-\d{4}$", v):
-                raise ValueError("Năm học phải theo định dạng YYYY-YYYY (ví dụ: 2025-2026).")
+                raise ValueError("Academic year must follow YYYY-YYYY format (e.g., 2025-2026).")
             return v
         return v
 
 
 class ClassUpdate(BaseModel):
     """Schema for updating an existing class."""
-    class_name: Optional[str] = Field(None, min_length=1, max_length=50, description="Tên lớp học mới")
-    school_year: Optional[str] = Field(None, max_length=20, description="Năm học mới")
-    homeroom_teacher_id: Optional[UUID] = Field(None, description="UUID của Giáo viên chủ nhiệm mới")
-    status: Optional[AcademicStatusEnum] = Field(None, description="Trạng thái mới")
+    class_name: Optional[str] = Field(None, min_length=1, max_length=50, description="New class name")
+    school_year: Optional[str] = Field(None, max_length=20, description="New academic year")
+    homeroom_teacher_id: Optional[UUID] = Field(None, description="UUID of new Homeroom Teacher")
+    status: Optional[AcademicStatusEnum] = Field(None, description="New status")
 
     @field_validator("class_name")
     @classmethod
@@ -121,9 +121,8 @@ class ClassUpdate(BaseModel):
         if v is not None:
             v = v.strip()
             if not v:
-                raise ValueError("Tên lớp học không được để trống hoặc chỉ chứa khoảng trắng.")
+                raise ValueError("Class name cannot be empty or blank.")
             return v
-        return v
 
     @field_validator("school_year")
     @classmethod
@@ -133,7 +132,7 @@ class ClassUpdate(BaseModel):
             if not v:
                 return None
             if not re.match(r"^\d{4}-\d{4}$", v):
-                raise ValueError("Năm học phải theo định dạng YYYY-YYYY (ví dụ: 2025-2026).")
+                raise ValueError("Academic year must follow YYYY-YYYY format (e.g., 2025-2026).")
             return v
         return v
 
@@ -153,9 +152,9 @@ class ClassOut(BaseModel):
 
 class EnrollmentCreate(BaseModel):
     """Schema for enrolling a student into a class."""
-    student_id: UUID = Field(..., description="UUID của học sinh")
-    student_code: Optional[str] = Field(None, max_length=50, description="Mã số học sinh (duy nhất nếu có)")
-    status: AcademicStatusEnum = Field(AcademicStatusEnum.ACTIVE, description="Trạng thái ghi danh")
+    student_id: UUID = Field(..., description="UUID of Student")
+    student_code: Optional[str] = Field(None, max_length=50, description="Student code (unique if provided)")
+    status: AcademicStatusEnum = Field(AcademicStatusEnum.ACTIVE, description="Enrollment status")
 
     @field_validator("student_code")
     @classmethod
@@ -178,9 +177,9 @@ class EnrollmentOut(BaseModel):
 
 class TeacherAssignmentCreate(BaseModel):
     """Schema for assigning a teacher to a subject in a class."""
-    teacher_id: UUID = Field(..., description="UUID của giáo viên")
-    subject_id: UUID = Field(..., description="UUID của môn học")
-    status: AcademicStatusEnum = Field(AcademicStatusEnum.ACTIVE, description="Trạng thái phân công")
+    teacher_id: UUID = Field(..., description="UUID of Teacher")
+    subject_id: UUID = Field(..., description="UUID of Subject")
+    status: AcademicStatusEnum = Field(AcademicStatusEnum.ACTIVE, description="Assignment status")
 
 
 class TeacherAssignmentOut(BaseModel):

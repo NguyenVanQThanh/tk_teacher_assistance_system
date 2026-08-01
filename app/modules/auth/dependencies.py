@@ -29,7 +29,7 @@ def get_current_user(token: str = Depends(oauth2_scheme), db: Session = Depends(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail={
                 "code": "ERR-AUTH-MISSING_TOKEN",
-                "message": "Yêu cầu cung cấp mã xác thực."
+                "message": "Authentication token required."
             }
         )
     try:
@@ -40,7 +40,7 @@ def get_current_user(token: str = Depends(oauth2_scheme), db: Session = Depends(
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 detail={
                     "code": "ERR-AUTH-INVALID_TOKEN",
-                    "message": "Mã xác thực không hợp lệ."
+                    "message": "Invalid authentication token."
                 }
             )
     except JWTError:
@@ -48,7 +48,7 @@ def get_current_user(token: str = Depends(oauth2_scheme), db: Session = Depends(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail={
                 "code": "ERR-AUTH-INVALID_TOKEN",
-                "message": "Mã xác thực không hợp lệ hoặc đã hết hạn."
+                "message": "Authentication token is invalid or expired."
             }
         )
     
@@ -59,7 +59,7 @@ def get_current_user(token: str = Depends(oauth2_scheme), db: Session = Depends(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail={
                 "code": "ERR-AUTH-INVALID_TOKEN",
-                "message": "Mã xác thực không hợp lệ."
+                "message": "Invalid authentication token."
             }
         )
         
@@ -69,7 +69,7 @@ def get_current_user(token: str = Depends(oauth2_scheme), db: Session = Depends(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail={
                 "code": "ERR-AUTH-INVALID_TOKEN",
-                "message": "Người dùng không tồn tại trong hệ thống."
+                "message": "User does not exist in the system."
             }
         )
         
@@ -78,7 +78,7 @@ def get_current_user(token: str = Depends(oauth2_scheme), db: Session = Depends(
             status_code=status.HTTP_403_FORBIDDEN,
             detail={
                 "code": "ERR-AUTH-ACCOUNT_BLOCKED",
-                "message": "Tài khoản của bạn đã bị khóa."
+                "message": "Your account has been blocked."
             }
         )
     elif user.status == "Inactive":
@@ -86,7 +86,7 @@ def get_current_user(token: str = Depends(oauth2_scheme), db: Session = Depends(
             status_code=status.HTTP_403_FORBIDDEN,
             detail={
                 "code": "ERR-AUTH-ACCOUNT_INACTIVE",
-                "message": "Tài khoản chưa được kích hoạt."
+                "message": "Account has not been activated."
             }
         )
         
@@ -104,7 +104,7 @@ def require_perm(permission_code: str):
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail={
                     "code": "ERR-AUTH-FORBIDDEN",
-                    "message": "Bạn không có quyền truy cập chức năng này."
+                    "message": "You do not have permission to access this resource."
                 }
             )
     return dependency

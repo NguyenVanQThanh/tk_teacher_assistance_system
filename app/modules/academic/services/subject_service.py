@@ -36,7 +36,7 @@ class SubjectService:
                 status_code=status.HTTP_409_CONFLICT,
                 detail={
                     "code": "ERR-ACAD-SUBJECT_DUPLICATE_NAME",
-                    "message": "Tên môn học đã tồn tại trong hệ thống."
+                    "message": "Subject name already exists in the system."
                 }
             )
         if status_val and status_val != "ACTIVE":
@@ -92,7 +92,7 @@ class SubjectService:
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail={
                     "code": "ERR-ACAD-SUBJECT_NOT_FOUND",
-                    "message": "Môn học không tồn tại."
+                    "message": "Subject not found."
                 }
             )
         return subject
@@ -123,7 +123,7 @@ class SubjectService:
                     status_code=status.HTTP_409_CONFLICT,
                     detail={
                         "code": "ERR-ACAD-SUBJECT_DUPLICATE_NAME",
-                        "message": "Tên môn học đã tồn tại trong hệ thống."
+                        "message": "Subject name already exists in the system."
                     }
                 )
 
@@ -157,7 +157,7 @@ class SubjectService:
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail={
                     "code": "ERR-ACAD-SUBJECT_NOT_FOUND",
-                    "message": "Môn học không tồn tại."
+                    "message": "Subject not found."
                 }
             )
         subject = results[0]

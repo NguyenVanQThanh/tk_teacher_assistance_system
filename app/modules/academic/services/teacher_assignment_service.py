@@ -48,7 +48,7 @@ class TeacherAssignmentService:
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail={
                     "code": "ERR-ACAD-CLASS_NOT_FOUND",
-                    "message": "Lớp học không tồn tại."
+                    "message": "Class not found."
                 }
             )
 
@@ -60,7 +60,7 @@ class TeacherAssignmentService:
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail={
                     "code": "ERR-ACAD-SUBJECT_NOT_FOUND",
-                    "message": "Môn học không tồn tại."
+                    "message": "Subject not found."
                 }
             )
 
@@ -83,7 +83,7 @@ class TeacherAssignmentService:
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail={
                     "code": "ERR-ACAD-INVALID_TEACHER_ROLE",
-                    "message": "Giáo viên không hợp lệ (phải có vai trò Teacher và trạng thái Active)."
+                    "message": "Invalid teacher (must have Teacher role and Active status)."
                 }
             )
 
@@ -100,7 +100,7 @@ class TeacherAssignmentService:
                 status_code=status.HTTP_409_CONFLICT,
                 detail={
                     "code": "ERR-ACAD-ASSIGNMENT_EXISTS",
-                    "message": "Phân công giáo viên cho môn học ở lớp này đã tồn tại."
+                    "message": "Teacher assignment for this subject in this class already exists."
                 }
             )
 
@@ -140,7 +140,7 @@ class TeacherAssignmentService:
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail={
                     "code": "ERR-ACAD-CLASS_NOT_FOUND",
-                    "message": "Lớp học không tồn tại."
+                    "message": "Class not found."
                 }
             )
 
@@ -170,7 +170,7 @@ class TeacherAssignmentService:
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail={
                     "code": "ERR-ACAD-CLASS_NOT_FOUND",
-                    "message": "Lớp học không tồn tại."
+                    "message": "Class not found."
                 }
             )
 
@@ -186,7 +186,7 @@ class TeacherAssignmentService:
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail={
                     "code": "ERR-ACAD-ASSIGNMENT_NOT_FOUND",
-                    "message": "Bản ghi phân công không tồn tại."
+                    "message": "Teacher assignment record not found."
                 }
             )
 
@@ -215,7 +215,7 @@ class TeacherAssignmentService:
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail={
                     "code": "ERR-ACAD-ASSIGNMENT_NOT_FOUND",
-                    "message": "Bản ghi phân công không tồn tại."
+                    "message": "Teacher assignment record not found."
                 }
             )
         assignment = results[0]

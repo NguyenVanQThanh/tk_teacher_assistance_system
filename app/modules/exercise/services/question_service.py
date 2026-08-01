@@ -61,7 +61,7 @@ class QuestionService:
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail={
                     "code": "ERR-EXE-QUESTION_NOT_FOUND",
-                    "message": "Câu hỏi không tồn tại."
+                    "message": "Question not found."
                 }
             )
 
@@ -98,7 +98,7 @@ class QuestionService:
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail={
                     "code": "ERR-EXE-QUESTION_NOT_FOUND",
-                    "message": "Câu hỏi không tồn tại."
+                    "message": "Question not found."
                 }
             )
 

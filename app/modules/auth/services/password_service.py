@@ -28,7 +28,7 @@ class PasswordService:
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 detail={
                     "code": "ERR-AUTH-INVALID_CREDENTIALS",
-                    "message": "Mật khẩu cũ không chính xác."
+                    "message": "Incorrect old password."
                 }
             )
 
@@ -39,7 +39,7 @@ class PasswordService:
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail={
                     "code": "ERR-AUTH-PASSWORD_REUSE",
-                    "message": "Mật khẩu mới không được trùng với mật khẩu cũ."
+                    "message": "New password cannot be the same as the old password."
                 }
             )
 

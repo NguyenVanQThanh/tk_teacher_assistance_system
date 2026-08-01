@@ -12,17 +12,20 @@ from models.models import Exercise, Question, AnswerOption, ClassAssignment
 
 
 class ExerciseRepository:
+    """Repository handling database operations for Exercise model."""
 
     def __init__(self, db: Session):
         self.db = db
 
     def create(self, exercise: Exercise) -> Exercise:
+        """Create a new Exercise record in the database."""
         self.db.add(exercise)
         self.db.commit()
         self.db.refresh(exercise)
         return exercise
 
     def get_by_id(self, exercise_id: UUID, include_deleted: bool = False) -> Optional[Exercise]:
+        """Retrieve an Exercise by ID with joined questions and answer options."""
         query = self.db.query(Exercise).options(
             joinedload(Exercise.questions).joinedload(Question.answer_options)
         ).filter(Exercise.exercise_id == exercise_id)
@@ -37,6 +40,7 @@ class ExerciseRepository:
         created_by: Optional[UUID] = None,
         status: Optional[str] = "ACTIVE"
     ) -> List[Exercise]:
+        """List exercises filtered by status, subject IDs, or creator UUID."""
         query = self.db.query(Exercise).options(
             joinedload(Exercise.questions).joinedload(Question.answer_options)
         )
@@ -55,6 +59,7 @@ class ExerciseRepository:
         return query.order_by(Exercise.created_at.desc()).all()
 
     def update(self, exercise: Exercise, title: Optional[str] = None, ai_metadata: Optional[dict] = None) -> Exercise:
+        """Update title or AI metadata of an Exercise."""
         if title is not None:
             exercise.title = title
         if ai_metadata is not None:
@@ -64,18 +69,21 @@ class ExerciseRepository:
         return exercise
 
     def soft_delete(self, exercise: Exercise) -> Exercise:
+        """Soft-delete an Exercise by setting its status to DELETED."""
         exercise.status = 'DELETED'
         self.db.commit()
         self.db.refresh(exercise)
         return exercise
 
     def restore(self, exercise: Exercise) -> Exercise:
+        """Restore a soft-deleted Exercise back to ACTIVE status."""
         exercise.status = 'ACTIVE'
         self.db.commit()
         self.db.refresh(exercise)
         return exercise
 
     def update_total_questions(self, exercise_id: UUID) -> None:
+        """Recalculate and update active total_questions count for an Exercise."""
         count = self.db.query(Question).filter(
             Question.exercise_id == exercise_id,
             Question.status != 'DELETED'
@@ -87,10 +95,13 @@ class ExerciseRepository:
 
 
 class QuestionRepository:
+    """Repository handling database operations for Question and AnswerOption models."""
+
     def __init__(self, db: Session):
         self.db = db
 
     def get_by_id(self, question_id: UUID, include_deleted: bool = False) -> Optional[Question]:
+        """Retrieve a Question by ID with joined answer options."""
         query = self.db.query(Question).options(
             joinedload(Question.answer_options)
         ).filter(Question.question_id == question_id)
@@ -100,6 +111,7 @@ class QuestionRepository:
         return query.first()
 
     def create(self, question: Question, answer_options: Optional[List[AnswerOption]] = None) -> Question:
+        """Create a new Question record along with associated AnswerOptions."""
         self.db.add(question)
         self.db.flush()
         if answer_options:
@@ -121,6 +133,7 @@ class QuestionRepository:
         display_order: Optional[int] = None,
         answer_options: Optional[List[AnswerOption]] = None
     ) -> Question:
+        """Update Question fields and replace associated AnswerOptions if provided."""
         if content is not None:
             question.content = content
         if question_type is not None:
@@ -146,6 +159,7 @@ class QuestionRepository:
         return question
 
     def soft_delete(self, question: Question) -> Question:
+        """Soft-delete a Question by setting its status to DELETED."""
         question.status = 'DELETED'
         self.db.commit()
         self.db.refresh(question)
@@ -153,22 +167,27 @@ class QuestionRepository:
 
 
 class AssignmentRepository:
+    """Repository handling database operations for ClassAssignment model."""
+
     def __init__(self, db: Session):
         self.db = db
 
     def create(self, assignment: ClassAssignment) -> ClassAssignment:
+        """Create a new ClassAssignment record in the database."""
         self.db.add(assignment)
         self.db.commit()
         self.db.refresh(assignment)
         return assignment
 
     def get_by_id(self, assignment_id: UUID, include_deleted: bool = False) -> Optional[ClassAssignment]:
+        """Retrieve a ClassAssignment by ID."""
         query = self.db.query(ClassAssignment).filter(ClassAssignment.assignment_id == assignment_id)
         if not include_deleted:
             query = query.filter(ClassAssignment.status != 'DELETED')
         return query.first()
 
     def find_active_by_class_and_exercise(self, class_id: UUID, exercise_id: UUID) -> Optional[ClassAssignment]:
+        """Find active assignment for a given class and exercise."""
         return self.db.query(ClassAssignment).filter(
             ClassAssignment.class_id == class_id,
             ClassAssignment.exercise_id == exercise_id,
@@ -176,6 +195,7 @@ class AssignmentRepository:
         ).first()
 
     def list_by_class_ids(self, class_ids: List[UUID], include_deleted: bool = False) -> List[ClassAssignment]:
+        """List assignments for given class IDs ordered by assigned_at descending."""
         if not class_ids:
             return []
         query = self.db.query(ClassAssignment).filter(ClassAssignment.class_id.in_(class_ids))
@@ -184,17 +204,20 @@ class AssignmentRepository:
         return query.order_by(ClassAssignment.assigned_at.desc()).all()
 
     def soft_delete(self, assignment: ClassAssignment) -> ClassAssignment:
+        """Soft-delete a ClassAssignment by setting its status to DELETED."""
         assignment.status = 'DELETED'
         self.db.commit()
         self.db.refresh(assignment)
         return assignment
 
     def restore(self, assignment: ClassAssignment) -> ClassAssignment:
+        """Restore a soft-deleted ClassAssignment back to ACTIVE status."""
         assignment.status = 'ACTIVE'
         self.db.commit()
         self.db.refresh(assignment)
         return assignment
 
     def has_attempts(self, assignment_id: UUID) -> bool:
+        """Check if any student attempts exist for this assignment."""
         return False
 

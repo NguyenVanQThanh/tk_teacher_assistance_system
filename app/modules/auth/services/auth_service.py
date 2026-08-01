@@ -77,7 +77,7 @@ class AuthService:
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 detail={
                     "code": "ERR-AUTH-INVALID_CREDENTIALS",
-                    "message": "Tên đăng nhập hoặc mật khẩu không chính xác."
+                    "message": "Incorrect username or password."
                 }
             )
 
@@ -88,7 +88,7 @@ class AuthService:
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 detail={
                     "code": "ERR-AUTH-INVALID_CREDENTIALS",
-                    "message": "Tên đăng nhập hoặc mật khẩu không chính xác."
+                    "message": "Incorrect username or password."
                 }
             )
 
@@ -99,7 +99,7 @@ class AuthService:
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail={
                     "code": "ERR-AUTH-ACCOUNT_BLOCKED",
-                    "message": "Tài khoản của bạn đã bị khóa."
+                    "message": "Your account has been blocked."
                 }
             )
         elif user.status == "Inactive":
@@ -108,7 +108,7 @@ class AuthService:
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail={
                     "code": "ERR-AUTH-ACCOUNT_INACTIVE",
-                    "message": "Tài khoản chưa được kích hoạt."
+                    "message": "Account has not been activated."
                 }
             )
 
@@ -166,7 +166,7 @@ class AuthService:
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail={
                     "code": "ERR-AUTH-DUPLICATE_FIELD",
-                    "message": "Số điện thoại đã tồn tại."
+                    "message": "Phone number already exists."
                 }
             )
         password_hash = PasswordService.hash_password(password_plain)
