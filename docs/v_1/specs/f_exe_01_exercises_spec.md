@@ -3,8 +3,8 @@
 > Path: `docs/v_1/specs/f_exe_01_exercises_spec.md` · Sprint: [sprint_2_overview.md](../sprints/sprint_2_overview.md)
 > Created At: `2026-07-28`
 > Created By: `Tam Khang`
-> Updated At: `2026-07-31`
-> Updated By: `Tam Khang`
+> Updated At: `2026-08-03`
+> Updated By: `Thanh Nguyen`
 
 ---
 
@@ -17,8 +17,8 @@
 | Module(s) | `exercise` |
 | Sprint(s) allocated | `SPRINT-02` |
 | Lane | `standard` |
-| Spec version | `v1.0` |
-| Last updated | `2026-07-31` |
+| Spec version | `v1.1` |
+| Last updated | `2026-08-03` |
 | Source binding | `docs/base_sql_erd.sql` (bảng `exercises`, `questions`, `answer_options`) · `f_auth_01_spec.md` (RBAC, current-user) · `f_acad_04_teacher_assignment_spec.md` (`teacher_subjects` scoping) · `.claude/rules/coding_rules.md` |
 
 ---
@@ -114,3 +114,12 @@ Cho phép **Giáo viên** quản lý kho đề bài tập (`exercises`) thuộc 
 | `answer_options` | CREATE (nếu chưa có) | migration mới nếu cần |
 
 > Ghi chú: kiểm tra state DB hiện tại trước khi viết migration — nếu bảng đã tồn tại từ baseline thì chỉ cần ALTER thêm `status`.
+
+---
+
+## Changelog
+
+| Version | Date | Author | Thay đổi |
+|---|---|---|---|
+| v1.0 | 2026-07-31 | Tam Khang | Khởi tạo spec, implement CRUD + soft delete/restore cho exercises/questions/answer_options |
+| v1.1 | 2026-08-03 | Thanh Nguyen | Ghi nhận đề xuất refactor: khai báo `ExerciseService`/`QuestionService` qua dependency injection chung (`Depends(get_exercise_service)` / `Depends(get_question_service)`) thay vì khởi tạo `Service(db)` lặp lại trong từng route handler của `exercises.py` và `questions.py` — chưa áp dụng vào code, cần schedule riêng. |

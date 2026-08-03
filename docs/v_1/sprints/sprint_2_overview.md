@@ -3,8 +3,8 @@
 Path: `docs/v_1/sprints/sprint_2_overview.md` · Module(s): `exercise`
 Created At: `2026-07-28`
 Created By: `AI Agent`
-Updated At: `2026-07-28`
-Updated By: `AI Agent`
+Updated At: `2026-08-03`
+Updated By: `Thanh Nguyen`
 
 ## Mục tiêu Sprint
 
@@ -73,6 +73,8 @@ F-EXE-02 không được start trước khi F-EXE-01 đạt gate G6.5 `approved`
 | ☐ | `POST /api/v1/exercises/{exercise_id}/questions/import` — nhập hàng loạt câu hỏi từ file `.docx`/`.pdf` theo template cố định, all-or-nothing |
 | ☐ | `pytest tests` pass 100% cho module `exercise` |
 | ☐ | Specs `F-EXE-01..05` cập nhật theo thực tế triển khai, status `done` |
+| ☐ | Refactor: đồng bộ convention khai báo Service trong router — module `academic` (`classes.py`, `enrollments.py`, `subjects.py`, `teacher_assignments.py`) đang dùng static method (`ClassService.create_class(db=db, ...)`), module `exercise` dùng instance + DI (`service: ExerciseService = Depends(get_exercise_service)`). Chuyển 4 router + 4 service của `academic` sang instance + `Depends(get_xxx_service)` để khớp `exercise`. Lý do: instance-based compose tốt hơn khi service cần gọi service khác (như `QuestionService` đang tự tạo `ExerciseService` con) — static method phải truyền `db` xuyên suốt, cồng kềnh hơn. Sau khi đổi: chạy lại `pytest tests/academic` đảm bảo không regression. |
+| ☐ | Refactor: dịch toàn bộ comment/docstring tiếng Việt sang Standard English trong 4 router `academic` (`classes.py`, `enrollments.py`, `subjects.py`, `teacher_assignments.py`) — vi phạm rule 2 `.claude/rules/coding_rules.md` (toàn bộ comment/docstring phải là Standard English). Các module khác (`exercise`, `auth`) đã đúng chuẩn, chỉ còn 4 file này lẫn tiếng Việt. Giữ nguyên logic, chỉ đổi text comment/docstring. |
 
 ## Catalogs khởi tạo trong Sprint này
 
