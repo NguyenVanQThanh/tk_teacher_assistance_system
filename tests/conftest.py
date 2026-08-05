@@ -34,7 +34,9 @@ from models.base import Base
 from models.models import User, Role, Permission, RolePermission, UserPermission
 from app.core.database import get_db
 from app.core.security import get_password_hash
+from app.modules.auth.services.permission_service import PermissionService
 from app.main import app
+
 
 # Create SQLite in-memory engine for testing
 SQLALCHEMY_DATABASE_URL = "sqlite:///:memory:"
@@ -149,6 +151,18 @@ def setup_db() -> Generator[None, None, None]:
             name="View class assignments",
             description="Allows viewing class assignments"
         )
+        exe_attempt_submit_perm = Permission(
+            permission_id=uuid.uuid4(),
+            permission_code="EXE_ATTEMPT_SUBMIT",
+            name="Start and submit attempts",
+            description="Allows students to start and submit attempts"
+        )
+        exe_attempt_view_perm = Permission(
+            permission_id=uuid.uuid4(),
+            permission_code="EXE_ATTEMPT_VIEW",
+            name="View attempt results",
+            description="Allows viewing attempt results"
+        )
         
         db.add_all([
             me_view_perm,
@@ -165,7 +179,9 @@ def setup_db() -> Generator[None, None, None]:
             exe_exercise_manage_perm,
             exe_exercise_view_perm,
             exe_assignment_manage_perm,
-            exe_assignment_view_perm
+            exe_assignment_view_perm,
+            exe_attempt_submit_perm,
+            exe_attempt_view_perm
         ])
         db.flush()
 
@@ -187,6 +203,7 @@ def setup_db() -> Generator[None, None, None]:
             RolePermission(role_id=admin_role.role_id, permission_id=exe_exercise_view_perm.permission_id),
             RolePermission(role_id=admin_role.role_id, permission_id=exe_assignment_manage_perm.permission_id),
             RolePermission(role_id=admin_role.role_id, permission_id=exe_assignment_view_perm.permission_id),
+            RolePermission(role_id=admin_role.role_id, permission_id=exe_attempt_view_perm.permission_id),
         ])
         # Teacher & Student get view & change password
         db.add_all([
@@ -196,10 +213,14 @@ def setup_db() -> Generator[None, None, None]:
             RolePermission(role_id=teacher_role.role_id, permission_id=exe_exercise_view_perm.permission_id),
             RolePermission(role_id=teacher_role.role_id, permission_id=exe_assignment_manage_perm.permission_id),
             RolePermission(role_id=teacher_role.role_id, permission_id=exe_assignment_view_perm.permission_id),
+            RolePermission(role_id=teacher_role.role_id, permission_id=exe_attempt_view_perm.permission_id),
             RolePermission(role_id=student_role.role_id, permission_id=me_view_perm.permission_id),
             RolePermission(role_id=student_role.role_id, permission_id=pwd_change_perm.permission_id),
             RolePermission(role_id=student_role.role_id, permission_id=exe_assignment_view_perm.permission_id),
+            RolePermission(role_id=student_role.role_id, permission_id=exe_attempt_submit_perm.permission_id),
+            RolePermission(role_id=student_role.role_id, permission_id=exe_attempt_view_perm.permission_id),
         ])
+
 
         
         # 4. Seed Users
@@ -295,7 +316,9 @@ def setup_db() -> Generator[None, None, None]:
         ])
 
         db.commit()
+        PermissionService.invalidate_role_cache()
     except Exception as e:
+
         db.rollback()
         raise e
     finally:

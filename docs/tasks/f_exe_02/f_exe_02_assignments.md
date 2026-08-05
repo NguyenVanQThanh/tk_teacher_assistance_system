@@ -3,7 +3,7 @@
 > Depends on: `F-EXE-01`
 > Status: `ready to test`
 > Created At: `2026-07-28`
-> Updated At: `2026-07-31`
+> Updated At: `2026-08-04`
 
 # Task — `F-EXE-02` Class Assignments (Giao bài tập cho lớp)
 
@@ -54,4 +54,11 @@ Bước 8: Automated Testing Verification
 - `pytest tests/exercise/test_assignments.py -v` -> PASSED 100% (2/2 integration test scenarios passed).
 - `pytest tests/exercise/ -v` -> PASSED 100% (4/4 tests passed).
 - `pytest tests/ -v` -> PASSED 100% (119/119 tests passed across all system modules).
+
+## Các đầu việc bổ sung & Refactor (Pending Items)
+- [ ] **Refactor Dependency Injection**: Cập nhật router `app/modules/exercise/routers/assignments.py` sử dụng provider `get_assignment_service` với `Depends(get_assignment_service)` thay cho khởi tạo thủ công `AssignmentService(db)` bên trong route handler.
+- [ ] **Chuẩn hóa Ngôn ngữ**: Rà soát các docstrings/comments trong `assignments.py` và `assignment_service.py` đảm bảo tuân thủ 100% Standard English.
+- [ ] **Nghiệm thu kiểm thử người dùng (UAT)**: Tiến hành kiểm thử các API giao bài, xem danh sách bài giao và hủy giao bài trên Postman/Swagger UI.
+- [ ] **Hoàn tất Task & Lưu vết Memory**: Đổi `Status` sang `done` và khởi tạo file ghi nhớ tại `.claude/memory/feature/f_exe_02_assignments_complete.md` sau khi User nghiệm thu thành công.
+
 

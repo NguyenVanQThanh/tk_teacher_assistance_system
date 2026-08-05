@@ -8,11 +8,12 @@ Updated By: Tam Khang
 """
 import uuid
 from datetime import datetime
-from sqlalchemy import Column, Integer, String, Text, Date, ForeignKey, DateTime, CheckConstraint, PrimaryKeyConstraint, Boolean, JSON
+from sqlalchemy import Column, Integer, String, Text, Date, ForeignKey, DateTime, CheckConstraint, PrimaryKeyConstraint, Boolean, JSON, Numeric
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 from models.base import Base
+
 
 # =====================================================================
 # 1. ACCOUNT MANAGEMENT & AUTHORIZATION
@@ -220,5 +221,26 @@ class Role(Base):
     description = Column(Text, nullable=True)
     created_at = Column(DateTime(timezone=True), default=func.now())
     updated_at = Column(DateTime(timezone=True), default=func.now(), onupdate=func.now())
+
+
+class StudentExerciseAttempt(Base):
+    __tablename__ = 'student_exercise_attempts'
+
+    attempt_id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    student_id = Column(UUID(as_uuid=True), ForeignKey('users.user_id', ondelete='CASCADE'), nullable=False)
+    assignment_id = Column(UUID(as_uuid=True), ForeignKey('class_assignments.assignment_id', ondelete='CASCADE'), nullable=False)
+    start_time = Column(DateTime(timezone=True), server_default=func.now())
+    end_time = Column(DateTime(timezone=True), nullable=True)
+    total_time_seconds = Column(Integer, nullable=True)
+    score = Column(Numeric(5, 2), nullable=True)
+    detailed_results = Column(JSON, nullable=True)
+    is_finished = Column(Boolean, default=False, nullable=False)
+    status = Column(String(20), default='ACTIVE', nullable=False)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+
+    student = relationship("User", backref="exercise_attempts")
+    assignment = relationship("ClassAssignment", backref="attempts")
+
 
 

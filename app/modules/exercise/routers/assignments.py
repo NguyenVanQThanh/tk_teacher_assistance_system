@@ -2,7 +2,7 @@
 # Description: API Router for ClassAssignment endpoints (F-EXE-02).
 # Created At: 2026-07-31
 # Created By: Tam Khang
-# Updated At: 2026-07-31
+# Updated At: 2026-08-04
 # Updated By: Tam Khang
 
 from uuid import UUID
@@ -19,6 +19,11 @@ from app.modules.exercise.services.assignment_service import AssignmentService
 router = APIRouter(tags=["class-assignments"])
 
 
+def get_assignment_service(db: Session = Depends(get_db)) -> AssignmentService:
+    """Dependency provider for AssignmentService."""
+    return AssignmentService(db)
+
+
 @router.post(
     "/api/v1/classes/{class_id}/assignments",
     response_model=AssignmentOut,
@@ -28,13 +33,12 @@ router = APIRouter(tags=["class-assignments"])
 def create_class_assignment(
     class_id: UUID,
     payload: AssignmentCreate,
-    db: Session = Depends(get_db),
+    service: AssignmentService = Depends(get_assignment_service),
     current_user: User = Depends(get_current_user)
 ):
     """
     Assign an exercise to a class. Requires EXE_ASSIGNMENT_MANAGE permission.
     """
-    service = AssignmentService(db)
     return service.create_assignment(class_id, payload, current_user)
 
 
@@ -45,13 +49,12 @@ def create_class_assignment(
 )
 def list_class_assignments(
     class_id: UUID,
-    db: Session = Depends(get_db),
+    service: AssignmentService = Depends(get_assignment_service),
     current_user: User = Depends(get_current_user)
 ):
     """
     List exercise assignments for a class. Requires EXE_ASSIGNMENT_VIEW permission.
     """
-    service = AssignmentService(db)
     return service.list_class_assignments(class_id, current_user)
 
 
@@ -62,13 +65,12 @@ def list_class_assignments(
 )
 def delete_class_assignment(
     assignment_id: UUID,
-    db: Session = Depends(get_db),
+    service: AssignmentService = Depends(get_assignment_service),
     current_user: User = Depends(get_current_user)
 ):
     """
     Cancel an assignment (Soft Delete). Requires EXE_ASSIGNMENT_MANAGE permission.
     """
-    service = AssignmentService(db)
     service.delete_assignment(assignment_id, current_user)
 
 
@@ -79,11 +81,11 @@ def delete_class_assignment(
 )
 def restore_class_assignment(
     assignment_id: UUID,
-    db: Session = Depends(get_db),
+    service: AssignmentService = Depends(get_assignment_service),
     current_user: User = Depends(get_current_user)
 ):
     """
     Restore a cancelled assignment (Soft Delete). Requires EXE_ASSIGNMENT_MANAGE permission.
     """
-    service = AssignmentService(db)
     return service.restore_assignment(assignment_id, current_user)
+

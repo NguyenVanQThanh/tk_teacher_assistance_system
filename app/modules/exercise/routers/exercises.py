@@ -2,7 +2,7 @@
 # Description: API Router for Exercise endpoints (F-EXE-01).
 # Created At: 2026-07-31
 # Created By: Tam Khang
-# Updated At: 2026-07-31
+# Updated At: 2026-08-04
 # Updated By: Tam Khang
 
 from uuid import UUID
@@ -23,6 +23,16 @@ from app.modules.exercise.services.question_service import QuestionService
 router = APIRouter(prefix="/api/v1/exercises", tags=["exercise-bank"])
 
 
+def get_exercise_service(db: Session = Depends(get_db)) -> ExerciseService:
+    """Dependency provider for ExerciseService."""
+    return ExerciseService(db)
+
+
+def get_question_service(db: Session = Depends(get_db)) -> QuestionService:
+    """Dependency provider for QuestionService."""
+    return QuestionService(db)
+
+
 @router.post(
     "",
     response_model=ExerciseOut,
@@ -31,13 +41,12 @@ router = APIRouter(prefix="/api/v1/exercises", tags=["exercise-bank"])
 )
 def create_exercise(
     payload: ExerciseCreate,
-    db: Session = Depends(get_db),
+    service: ExerciseService = Depends(get_exercise_service),
     current_user: User = Depends(get_current_user)
 ):
     """
     Create a new exercise. Requires EXE_EXERCISE_MANAGE permission.
     """
-    service = ExerciseService(db)
     return service.create_exercise(current_user, payload)
 
 
@@ -48,13 +57,12 @@ def create_exercise(
 )
 def list_exercises(
     subject_id: Optional[UUID] = Query(None, description="Filter by subject ID"),
-    db: Session = Depends(get_db),
+    service: ExerciseService = Depends(get_exercise_service),
     current_user: User = Depends(get_current_user)
 ):
     """
     List exercises within the user's teaching scope. Requires EXE_EXERCISE_VIEW permission.
     """
-    service = ExerciseService(db)
     return service.list_exercises(current_user, subject_id=subject_id)
 
 
@@ -65,13 +73,12 @@ def list_exercises(
 )
 def get_exercise_detail(
     exercise_id: UUID,
-    db: Session = Depends(get_db),
+    service: ExerciseService = Depends(get_exercise_service),
     current_user: User = Depends(get_current_user)
 ):
     """
     Retrieve details of an exercise including its questions and options. Requires EXE_EXERCISE_VIEW permission.
     """
-    service = ExerciseService(db)
     return service.get_exercise_detail(current_user, exercise_id)
 
 
@@ -83,13 +90,12 @@ def get_exercise_detail(
 def update_exercise(
     exercise_id: UUID,
     payload: ExerciseUpdate,
-    db: Session = Depends(get_db),
+    service: ExerciseService = Depends(get_exercise_service),
     current_user: User = Depends(get_current_user)
 ):
     """
     Update exercise title or AI metadata. Requires EXE_EXERCISE_MANAGE permission.
     """
-    service = ExerciseService(db)
     return service.update_exercise(current_user, exercise_id, payload)
 
 
@@ -100,13 +106,12 @@ def update_exercise(
 )
 def delete_exercise(
     exercise_id: UUID,
-    db: Session = Depends(get_db),
+    service: ExerciseService = Depends(get_exercise_service),
     current_user: User = Depends(get_current_user)
 ):
     """
     Soft-delete an exercise (sets status to DELETED). Requires EXE_EXERCISE_MANAGE permission.
     """
-    service = ExerciseService(db)
     service.delete_exercise(current_user, exercise_id)
 
 
@@ -117,13 +122,12 @@ def delete_exercise(
 )
 def restore_exercise(
     exercise_id: UUID,
-    db: Session = Depends(get_db),
+    service: ExerciseService = Depends(get_exercise_service),
     current_user: User = Depends(get_current_user)
 ):
     """
     Restore a soft-deleted exercise back to ACTIVE status. Requires EXE_EXERCISE_MANAGE permission.
     """
-    service = ExerciseService(db)
     return service.restore_exercise(current_user, exercise_id)
 
 
@@ -136,11 +140,11 @@ def restore_exercise(
 def add_question(
     exercise_id: UUID,
     payload: QuestionCreate,
-    db: Session = Depends(get_db),
+    service: QuestionService = Depends(get_question_service),
     current_user: User = Depends(get_current_user)
 ):
     """
     Add a question (with answer options) to an exercise. Requires EXE_EXERCISE_MANAGE permission.
     """
-    service = QuestionService(db)
     return service.add_question(current_user, exercise_id, payload)
+

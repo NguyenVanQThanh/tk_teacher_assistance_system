@@ -200,3 +200,47 @@ class AssignmentOut(BaseModel):
 
     model_config = {"from_attributes": True}
 
+
+class AttemptStartOut(BaseModel):
+    attempt_id: UUID
+    assignment_id: UUID
+    student_id: UUID
+    start_time: Optional[datetime] = None
+    is_finished: bool
+
+    model_config = {"from_attributes": True}
+
+
+class AnswerInput(BaseModel):
+    question_id: UUID
+    answer_option_id: Optional[UUID] = None
+    answer_text: Optional[str] = None
+
+    @model_validator(mode="after")
+    def validate_answer_content(self):
+        if self.answer_option_id is None and (self.answer_text is None or not self.answer_text.strip()):
+            raise ValueError("Answer must provide either answer_option_id or non-empty answer_text.")
+        return self
+
+
+class AttemptSubmitRequest(BaseModel):
+    answers: List[AnswerInput] = Field(default_factory=list, description="List of question answers")
+
+
+class AttemptOut(BaseModel):
+    attempt_id: UUID
+    student_id: UUID
+    assignment_id: UUID
+    start_time: Optional[datetime] = None
+    end_time: Optional[datetime] = None
+    total_time_seconds: Optional[int] = None
+    score: Optional[float] = None
+    detailed_results: Optional[Any] = None
+    is_finished: bool
+    status: str
+    created_at: Optional[datetime] = None
+    updated_at: Optional[datetime] = None
+
+    model_config = {"from_attributes": True}
+
+

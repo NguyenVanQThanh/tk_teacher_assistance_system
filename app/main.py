@@ -19,6 +19,7 @@ from app.modules.academic.routers.teacher_assignments import router as teacher_a
 from app.modules.exercise.routers.exercises import router as exercises_router
 from app.modules.exercise.routers.questions import router as questions_router
 from app.modules.exercise.routers.assignments import router as assignments_router
+from app.modules.exercise.routers.attempts import router as attempts_router
 
 app = FastAPI(title="SmartLMS API", version="1.0.0")
 
@@ -32,6 +33,8 @@ app.include_router(teacher_assignments_router)
 app.include_router(exercises_router)
 app.include_router(questions_router)
 app.include_router(assignments_router)
+app.include_router(attempts_router)
+
 
 
 

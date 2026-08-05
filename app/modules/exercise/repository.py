@@ -8,7 +8,8 @@
 from typing import List, Optional
 from uuid import UUID
 from sqlalchemy.orm import Session, joinedload
-from models.models import Exercise, Question, AnswerOption, ClassAssignment
+from models.models import Exercise, Question, AnswerOption, ClassAssignment, StudentExerciseAttempt
+
 
 
 class ExerciseRepository:
@@ -218,6 +219,47 @@ class AssignmentRepository:
         return assignment
 
     def has_attempts(self, assignment_id: UUID) -> bool:
-        """Check if any student attempts exist for this assignment."""
-        return False
+        """Check if any active student attempts exist for this assignment."""
+        count = self.db.query(StudentExerciseAttempt).filter(
+            StudentExerciseAttempt.assignment_id == assignment_id,
+            StudentExerciseAttempt.status != 'DELETED'
+        ).count()
+        return count > 0
+
+
+class AttemptRepository:
+    """Repository handling database operations for StudentExerciseAttempt model."""
+
+    def __init__(self, db: Session):
+        self.db = db
+
+    def create(self, attempt: StudentExerciseAttempt) -> StudentExerciseAttempt:
+        """Create a new StudentExerciseAttempt record."""
+        self.db.add(attempt)
+        self.db.commit()
+        self.db.refresh(attempt)
+        return attempt
+
+    def get_by_id(self, attempt_id: UUID, include_deleted: bool = False) -> Optional[StudentExerciseAttempt]:
+        """Retrieve a StudentExerciseAttempt by ID."""
+        query = self.db.query(StudentExerciseAttempt).filter(StudentExerciseAttempt.attempt_id == attempt_id)
+        if not include_deleted:
+            query = query.filter(StudentExerciseAttempt.status != 'DELETED')
+        return query.first()
+
+    def find_open_attempt(self, student_id: UUID, assignment_id: UUID) -> Optional[StudentExerciseAttempt]:
+        """Find an unsubmitted (is_finished=False) active attempt for a student and assignment."""
+        return self.db.query(StudentExerciseAttempt).filter(
+            StudentExerciseAttempt.student_id == student_id,
+            StudentExerciseAttempt.assignment_id == assignment_id,
+            StudentExerciseAttempt.is_finished == False,
+            StudentExerciseAttempt.status != 'DELETED'
+        ).first()
+
+    def update(self, attempt: StudentExerciseAttempt) -> StudentExerciseAttempt:
+        """Commit changes to an existing StudentExerciseAttempt."""
+        self.db.commit()
+        self.db.refresh(attempt)
+        return attempt
+
 
