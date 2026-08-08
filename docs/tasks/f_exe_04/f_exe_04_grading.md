@@ -1,14 +1,14 @@
 > Path: `docs/tasks/f_exe_04/f_exe_04_grading.md`
 > Slice: `SL-EXE-04` · Type: `service` · Size: `small` · SP: `2`
 > Depends on: `F-EXE-01`
-> Status: `draft`
+> Status: `ready to test`
 > Created At: `2026-07-28`
-> Updated At: `2026-07-28`
+> Updated At: `2026-08-08`
 
 # Task — `F-EXE-04` Auto Grading (Chấm điểm tự động trắc nghiệm)
 
-**Author:** AI Agent
-**Updated By:** AI Agent
+**Author:** Tam Khang
+**Updated By:** Tam Khang
 
 ## Mô tả Task
 Triển khai service chấm điểm tự động (không có router/endpoint riêng — được `F-EXE-03` gọi trực tiếp):
@@ -37,4 +37,6 @@ Bước 3: Integration vào F-EXE-03
 ```
 
 ## Kết quả kiểm thử
-- (chưa thực thi — task ở trạng thái `draft`, cập nhật khi triển khai xong)
+- **Unit Tests:** 5/5 test cases trong `tests/exercise/unit/test_grading_service.py` vượt qua thành công (AC-01 -> AC-05).
+- **Integration Tests:** 100% test cases trong `tests/exercise/test_attempts.py` đã passed.
+
