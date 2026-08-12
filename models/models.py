@@ -2,8 +2,8 @@
 File Name: models.py
 Description: Database models definition for Sprint 0 & Sprint 2 tables (User, Role, Permission, Exercise, Question, AnswerOption, etc.).
 Created At: 2026-07-04
-Created By: Nguyen-Thai-Tam-Khang
-Updated At: 2026-07-31
+Created By: Tam Khang
+Updated At: 2026-08-09
 Updated By: Tam Khang
 """
 import uuid
@@ -175,6 +175,7 @@ class Question(Base):
     correct_answer = Column(Text, nullable=True)
     explanation = Column(Text, nullable=True)
     display_order = Column(Integer, default=0)
+    image_url = Column(String(500), nullable=True)
     is_ai_generated = Column(Boolean, default=False)
     status = Column(String(20), default='ACTIVE', nullable=False)
     created_at = Column(DateTime(timezone=True), server_default=func.now())

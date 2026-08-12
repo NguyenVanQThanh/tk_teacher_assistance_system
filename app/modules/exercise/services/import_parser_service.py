@@ -1,0 +1,707 @@
+# File Name: import_parser_service.py
+# Description: Service for extracting text/images and parsing question templates and answer keys (Docx/PDF).
+# Created At: 2026-08-09
+# Created By: Tam Khang
+# Updated At: 2026-08-12
+# Updated By: Tam Khang
+
+import os
+import re
+import io
+import uuid
+from typing import List, Optional, Dict, Any, Tuple
+from dataclasses import dataclass, field
+import docx
+import pdfplumber
+
+from app.modules.exercise.schemas import QuestionTypeEnum, DifficultyEnum
+
+
+@dataclass
+class ParsedOption:
+    content: str
+    is_correct: bool = False
+    display_order: int = 0
+
+
+@dataclass
+class ParsedQuestion:
+    question_number: int
+    part: str  # "Part1", "Part2", "Part3"
+    question_type: QuestionTypeEnum
+    difficulty: Optional[DifficultyEnum]
+    content: str
+    image_url: Optional[str] = None
+    answer_options: List[ParsedOption] = field(default_factory=list)
+    correct_answer: Optional[str] = None
+
+
+@dataclass
+class ParseError:
+    question_number: Optional[int]
+    message: str
+
+
+@dataclass
+class ParseResult:
+    questions: List[ParsedQuestion] = field(default_factory=list)
+    errors: List[ParseError] = field(default_factory=list)
+
+
+UPLOAD_DIR = os.path.join("uploads", "questions")
+
+
+class ImportParserService:
+    """Service to parse question documents (.docx/.pdf) and separate answer keys."""
+
+    @staticmethod
+    def extract_docx_content(file_bytes: bytes) -> Tuple[str, List[List[List[str]]], List[Dict[str, Any]]]:
+        """
+        Extract text, tables, and images from docx file bytes.
+        Supports both standard text (<w:t>) and native Word OMath equations (<m:t>).
+        Returns (full_text, tables_data, inline_images).
+        """
+        doc = docx.Document(io.BytesIO(file_bytes))
+        full_text_lines = []
+        tables_data = []
+        inline_images = []
+
+        os.makedirs(UPLOAD_DIR, exist_ok=True)
+
+        # Extract images from docx relationships
+        image_count = 0
+        for rel in doc.part.rels.values():
+            if "image" in rel.target_ref:
+                image_bytes = rel.target_part.blob
+                image_ext = rel.target_ref.split(".")[-1] if "." in rel.target_ref else "png"
+                if image_ext.lower() not in ["png", "jpg", "jpeg", "gif", "bmp", "webp"]:
+                    image_ext = "png"
+                filename = f"q_img_{uuid.uuid4().hex[:10]}.{image_ext}"
+                filepath = os.path.join(UPLOAD_DIR, filename)
+                with open(filepath, "wb") as f:
+                    f.write(image_bytes)
+                image_url = f"/uploads/questions/{filename}"
+                inline_images.append({
+                    "url": image_url,
+                    "index": image_count
+                })
+                image_count += 1
+
+        def omml_to_latex(elem) -> str:
+            """Recursively convert Word OMML (<m:oMath>) elements to LaTeX math string."""
+            tag = elem.tag.split("}")[-1] if "}" in elem.tag else elem.tag
+
+            # Fraction (<m:f>) -> \frac{num}{den}
+            if tag == 'f':
+                num = "".join(omml_to_latex(c) for c in elem.xpath('./*[local-name()="num"]'))
+                den = "".join(omml_to_latex(c) for c in elem.xpath('./*[local-name()="den"]'))
+                return f"\\frac{{{num}}}{{{den}}}"
+
+            # Superscript (<m:sSup>) -> base^{sup}
+            elif tag == 'sSup':
+                e = "".join(omml_to_latex(c) for c in elem.xpath('./*[local-name()="e"]'))
+                sup = "".join(omml_to_latex(c) for c in elem.xpath('./*[local-name()="sup"]'))
+                return f"{e}^{{{sup}}}"
+
+            # Subscript (<m:sSub>) -> base_{sub}
+            elif tag == 'sSub':
+                e = "".join(omml_to_latex(c) for c in elem.xpath('./*[local-name()="e"]'))
+                sub = "".join(omml_to_latex(c) for c in elem.xpath('./*[local-name()="sub"]'))
+                return f"{e}_{{{sub}}}"
+
+            # Sub-Superscript (<m:sSubSup>) -> base_{sub}^{sup}
+            elif tag == 'sSubSup':
+                e = "".join(omml_to_latex(c) for c in elem.xpath('./*[local-name()="e"]'))
+                sub = "".join(omml_to_latex(c) for c in elem.xpath('./*[local-name()="sub"]'))
+                sup = "".join(omml_to_latex(c) for c in elem.xpath('./*[local-name()="sup"]'))
+                return f"{e}_{{{sub}}}^{{{sup}}}"
+
+            # Radical / Square Root (<m:rad>) -> \sqrt[deg]{e}
+            elif tag == 'rad':
+                deg = "".join(omml_to_latex(c) for c in elem.xpath('./*[local-name()="deg"]'))
+                e = "".join(omml_to_latex(c) for c in elem.xpath('./*[local-name()="e"]'))
+                if deg.strip():
+                    return f"\\sqrt[{deg}]{{{e}}}"
+                return f"\\sqrt{{{e}}}"
+
+            # Accent / Vector (<m:acc>) -> \vec{e} or \hat{e}
+            elif tag == 'acc':
+                e = "".join(omml_to_latex(c) for c in elem.xpath('./*[local-name()="e"]'))
+                chr_val = elem.xpath('.//*[local-name()="chr"]/@*[local-name()="val"]')
+                accent_char = chr_val[0] if chr_val else ""
+                if accent_char in ["⃗", "->", "→"]:
+                    return f"\\vec{{{e}}}"
+                elif accent_char == "^":
+                    return f"\\hat{{{e}}}"
+                elif accent_char in ["̅", "‾"]:
+                    return f"\\bar{{{e}}}"
+                return f"\\vec{{{e}}}"
+
+            # Text node (<m:t> or <w:t>)
+            elif tag == 't':
+                return elem.text or ""
+
+            res = []
+            for child in elem:
+                res.append(omml_to_latex(child))
+            return "".join(res)
+
+        def get_elem_text(elem) -> str:
+            """Extract text from paragraph or table cell, converting OMML math equations to $ LaTeX $."""
+            parts = []
+            for child in elem:
+                tag = child.tag.split("}")[-1] if "}" in child.tag else child.tag
+                if tag in ["oMath", "oMathPara"]:
+                    latex_expr = omml_to_latex(child).strip()
+                    if latex_expr:
+                        parts.append(f" ${latex_expr}$ ")
+                else:
+                    omath_nodes = child.xpath('.//*[local-name()="oMath"]')
+                    if omath_nodes:
+                        for sub in child:
+                            sub_tag = sub.tag.split("}")[-1] if "}" in sub.tag else sub.tag
+                            if sub_tag in ["oMath", "oMathPara"]:
+                                latex_expr = omml_to_latex(sub).strip()
+                                if latex_expr:
+                                    parts.append(f" ${latex_expr}$ ")
+                            else:
+                                txts = sub.xpath('.//*[local-name()="t"]/text()')
+                                parts.append("".join(txts))
+                    else:
+                        txts = child.xpath('.//*[local-name()="t"]/text()')
+                        parts.append("".join(txts))
+            return "".join(parts).strip()
+
+        for p in doc.paragraphs:
+            text = get_elem_text(p._p)
+            if text:
+                full_text_lines.append(text)
+
+        for table in doc.tables:
+            table_matrix = []
+            for row in table.rows:
+                row_data = [get_elem_text(cell._tc) for cell in row.cells]
+                table_matrix.append(row_data)
+            if table_matrix:
+                tables_data.append(table_matrix)
+
+        full_text = "\n".join(full_text_lines)
+        return full_text, tables_data, inline_images
+
+
+    @staticmethod
+    def extract_pdf_content(file_bytes: bytes) -> Tuple[str, List[List[List[str]]], List[Dict[str, Any]]]:
+        """
+        Extract text and tables from PDF file bytes.
+        Uses marker-pdf with TORCH_DEVICE (read from environment) if available to retain LaTeX math formulas.
+        Falls back to pdfplumber if marker-pdf is not installed or fails.
+        """
+        torch_device = os.environ.get("TORCH_DEVICE", "cpu")
+        os.environ["TORCH_DEVICE"] = torch_device
+
+        full_text_lines = []
+        tables_data = []
+        inline_images = []
+
+        # Try using marker-pdf for LaTeX math formula extraction
+        try:
+            import tempfile
+            from marker.convert import convert_single_pdf
+            from marker.models import load_all_models
+
+            models = load_all_models()
+            with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as tmp_pdf:
+                tmp_pdf.write(file_bytes)
+                tmp_pdf_path = tmp_pdf.name
+
+            try:
+                full_text, out_meta, images = convert_single_pdf(tmp_pdf_path, models)
+                if full_text and full_text.strip():
+                    full_text_lines.append(full_text.strip())
+            finally:
+                if os.path.exists(tmp_pdf_path):
+                    os.remove(tmp_pdf_path)
+        except Exception:
+            # Fallback to pdfplumber text extraction
+            with pdfplumber.open(io.BytesIO(file_bytes)) as pdf:
+                for page in pdf.pages:
+                    text = page.extract_text()
+                    if text:
+                        full_text_lines.append(text.strip())
+
+        # Extract tables using pdfplumber
+        with pdfplumber.open(io.BytesIO(file_bytes)) as pdf:
+            for page in pdf.pages:
+                tables = page.extract_tables()
+                for tbl in tables:
+                    clean_tbl = [[str(cell or '').strip() for cell in row] for row in tbl if row]
+                    if clean_tbl:
+                        tables_data.append(clean_tbl)
+
+        full_text = "\n".join(full_text_lines)
+        return full_text, tables_data, inline_images
+
+
+    @classmethod
+    def parse_document(
+        cls,
+        file_bytes: bytes,
+        filename: str,
+        answer_file_bytes: Optional[bytes] = None,
+        answer_filename: Optional[str] = None,
+        test_code: Optional[str] = None
+    ) -> ParseResult:
+        """
+        Main entry point to parse question document and optional separate answer key.
+        """
+        is_pdf = filename.lower().endswith(".pdf")
+        if is_pdf:
+            q_text, q_tables, q_images = cls.extract_pdf_content(file_bytes)
+        else:
+            q_text, q_tables, q_images = cls.extract_docx_content(file_bytes)
+
+        if not q_text.strip() and not q_tables:
+            return ParseResult(errors=[ParseError(question_number=None, message="File is empty or contains no readable text.")])
+
+        ans_text = ""
+        ans_tables = []
+        if answer_file_bytes and answer_filename:
+            if answer_filename.lower().endswith(".pdf"):
+                ans_text, ans_tables, _ = cls.extract_pdf_content(answer_file_bytes)
+            else:
+                ans_text, ans_tables, _ = cls.extract_docx_content(answer_file_bytes)
+
+        # Parse question blocks
+        questions, q_errors = cls.parse_questions(q_text, q_images)
+        if q_errors:
+            return ParseResult(questions=[], errors=q_errors)
+
+        if not questions:
+            return ParseResult(errors=[ParseError(question_number=None, message="No valid questions could be identified in the file.")])
+
+        # Combine main document tables and separate answer tables
+        all_tables = q_tables + ans_tables
+        all_ans_text = q_text + "\n" + ans_text
+
+        # Parse answer keys
+        parsed_answers = cls.parse_answer_keys(all_ans_text, all_tables, test_code)
+
+        # Merge questions and answers
+        merged_questions, merge_errors = cls.merge_questions_and_answers(questions, parsed_answers)
+        if merge_errors:
+            return ParseResult(questions=[], errors=merge_errors)
+
+        return ParseResult(questions=merged_questions, errors=[])
+
+    @classmethod
+    def parse_questions(cls, full_text: str, inline_images: List[Dict[str, Any]]) -> Tuple[List[ParsedQuestion], List[ParseError]]:
+        """
+        Regex parse question blocks for Part 1 (MCQ), Part 2 (True/False), Part 3 (Short Answer).
+        """
+        questions: List[ParsedQuestion] = []
+        errors: List[ParseError] = []
+
+        # Separate text into sections (PHẦN I, PHẦN II, PHẦN III)
+        sections = cls.split_sections(full_text)
+
+        img_idx = 0
+        q_global_counter = 1
+
+        for part_name, section_text in sections:
+            # Split section text into question blocks starting with "Câu N." or "Câu N:"
+            q_blocks = cls.split_question_blocks(section_text)
+            
+            for q_num, block_text in q_blocks:
+                num = q_num if q_num is not None else q_global_counter
+                q_global_counter = max(q_global_counter + 1, num + 1)
+
+                # Extract difficulty tag
+                difficulty = cls.extract_difficulty(block_text)
+                clean_block = cls.strip_difficulty_tags(block_text)
+
+                image_url = None
+                if img_idx < len(inline_images):
+                    image_url = inline_images[img_idx]["url"]
+                    img_idx += 1
+
+                if part_name == "Part1":
+                    parsed_q, q_err = cls.parse_part1_question(num, clean_block, difficulty, image_url)
+                elif part_name == "Part2":
+                    parsed_q, q_err = cls.parse_part2_question(num, clean_block, difficulty, image_url)
+                else:
+                    parsed_q, q_err = cls.parse_part3_question(num, clean_block, difficulty, image_url)
+
+                if q_err:
+                    errors.append(q_err)
+                elif parsed_q:
+                    questions.append(parsed_q)
+
+        return questions, errors
+
+    @staticmethod
+    def split_sections(text: str) -> List[Tuple[str, str]]:
+        """
+        Splits text into Part1, Part2, Part3 based on section headers (PHẦN I, PHẦN II, PHẦN III).
+        """
+        lines = text.splitlines()
+        current_part = "Part1"
+        section_buffers: Dict[str, List[str]] = {"Part1": [], "Part2": [], "Part3": []}
+
+        for line in lines:
+            normalized = line.strip().upper()
+            if "PHẦN I." in normalized or "PHẦN I " in normalized or "PHẦN 1" in normalized or "PHẦN TRẮC NGHIỆM 4 LỰA CHỌN" in normalized:
+                current_part = "Part1"
+                continue
+            elif "PHẦN II." in normalized or "PHẦN II " in normalized or "PHẦN 2" in normalized or "PHẦN TRẮC NGHIỆM ĐÚNG SAI" in normalized:
+                current_part = "Part2"
+                continue
+            elif "PHẦN III." in normalized or "PHẦN III " in normalized or "PHẦN 3" in normalized or "PHẦN TRẢ LỜI NGẮN" in normalized:
+                current_part = "Part3"
+                continue
+
+            section_buffers[current_part].append(line)
+
+        result = []
+        for part in ["Part1", "Part2", "Part3"]:
+            buf = "\n".join(section_buffers[part]).strip()
+            if buf:
+                result.append((part, buf))
+        if not result:
+            result = [("Part1", text)]
+        return result
+
+    @staticmethod
+    def split_question_blocks(section_text: str) -> List[Tuple[Optional[int], str]]:
+        """
+        Split section text into question blocks starting with "Câu N." or "Câu N:" or "Câu N ".
+        """
+        pattern = r"(?im)^(Câu\s+(\d+)[\.:/]?)"
+        matches = list(re.finditer(pattern, section_text))
+
+        blocks: List[Tuple[Optional[int], str]] = []
+        if not matches:
+            return blocks
+
+        for i in range(len(matches)):
+            start_pos = matches[i].start()
+            end_pos = matches[i + 1].start() if i + 1 < len(matches) else len(section_text)
+            block_content = section_text[start_pos:end_pos].strip()
+            q_num = int(matches[i].group(2))
+            blocks.append((q_num, block_content))
+
+        return blocks
+
+    @staticmethod
+    def extract_difficulty(text: str) -> Optional[DifficultyEnum]:
+        """Extract [NB], [TH], [VD] tags. Returns None if missing."""
+        if re.search(r"\[NB\]|\[Nhận biết\]", text, re.IGNORECASE):
+            return DifficultyEnum.NhanBiet
+        elif re.search(r"\[TH\]|\[Thông hiểu\]", text, re.IGNORECASE):
+            return DifficultyEnum.ThongHieu
+        elif re.search(r"\[VD\]|\[Vận dụng\]", text, re.IGNORECASE):
+            return DifficultyEnum.VanDung
+        return None
+
+    @staticmethod
+    def strip_difficulty_tags(text: str) -> str:
+        """Strip tags like [NB], [TH], [VD], [TN], [DS], [TL] from text."""
+        return re.sub(r"\[(NB|TH|VD|TN|DS|TL|TU|Nhận biết|Thông hiểu|Vận dụng)\]", "", text, flags=re.IGNORECASE).strip()
+
+    @classmethod
+    def parse_part1_question(cls, q_num: int, block_text: str, difficulty: Optional[DifficultyEnum], image_url: Optional[str]) -> Tuple[Optional[ParsedQuestion], Optional[ParseError]]:
+        """Parse Part 1 (Multiple Choice 4 options)."""
+        opt_pattern = r"(?im)(^[A-Da-d][\.:/\)]\s*|\s+[A-Da-d][\.:/\)]\s*)"
+        parts = re.split(opt_pattern, block_text)
+
+        if len(parts) < 3:
+            return None, ParseError(question_number=q_num, message=f"Question {q_num} does not contain option choices A, B, C, D.")
+
+        stem_match = re.match(r"(?i)^Câu\s+\d+[\.:/]?\s*", parts[0])
+        stem = parts[0][stem_match.end():].strip() if stem_match else parts[0].strip()
+
+        options: List[ParsedOption] = []
+        i = 1
+        disp_order = 0
+        while i < len(parts):
+            label = parts[i].strip()
+            content = parts[i + 1].strip() if i + 1 < len(parts) else ""
+            i += 2
+            if content:
+                content = re.sub(r"\s+[A-Da-d][\.:/\)]$", "", content).strip()
+                options.append(ParsedOption(
+                    content=f"{label} {content}",
+                    is_correct=False,
+                    display_order=disp_order
+                ))
+                disp_order += 1
+
+        if len(options) < 2:
+            return None, ParseError(question_number=q_num, message=f"Question {q_num} must have at least 2 option choices.")
+
+        return ParsedQuestion(
+            question_number=q_num,
+            part="Part1",
+            question_type=QuestionTypeEnum.MultipleChoice,
+            difficulty=difficulty,
+            content=stem if stem else block_text,
+            image_url=image_url,
+            answer_options=options
+        ), None
+
+    @classmethod
+    def parse_part2_question(cls, q_num: int, block_text: str, difficulty: Optional[DifficultyEnum], image_url: Optional[str]) -> Tuple[Optional[ParsedQuestion], Optional[ParseError]]:
+        """Parse Part 2 (True/False 4 items a, b, c, d)."""
+        opt_pattern = r"(?im)(^[A-Da-d][\.:/\)]\s*|\s+[A-Da-d][\.:/\)]\s*)"
+        parts = re.split(opt_pattern, block_text)
+
+        if len(parts) < 3:
+            return None, ParseError(question_number=q_num, message=f"Question {q_num} (Part II True/False) does not contain items a, b, c, d.")
+
+        stem_match = re.match(r"(?i)^Câu\s+\d+[\.:/]?\s*", parts[0])
+        stem = parts[0][stem_match.end():].strip() if stem_match else parts[0].strip()
+
+        options: List[ParsedOption] = []
+        i = 1
+        disp_order = 0
+        while i < len(parts):
+            label = parts[i].strip()
+            content = parts[i + 1].strip() if i + 1 < len(parts) else ""
+            i += 2
+            if content:
+                content = re.sub(r"\s+[A-Da-d][\.:/\)]$", "", content).strip()
+                options.append(ParsedOption(
+                    content=f"{label} {content}",
+                    is_correct=False,
+                    display_order=disp_order
+                ))
+                disp_order += 1
+
+        if len(options) < 1:
+            return None, ParseError(question_number=q_num, message=f"Question {q_num} (Part II) must have items a, b, c, d.")
+
+        return ParsedQuestion(
+            question_number=q_num,
+            part="Part2",
+            question_type=QuestionTypeEnum.TrueFalse,
+            difficulty=difficulty,
+            content=stem if stem else block_text,
+            image_url=image_url,
+            answer_options=options
+        ), None
+
+    @classmethod
+    def parse_part3_question(cls, q_num: int, block_text: str, difficulty: Optional[DifficultyEnum], image_url: Optional[str]) -> Tuple[Optional[ParsedQuestion], Optional[ParseError]]:
+        """Parse Part 3 (Short Answer)."""
+        stem_match = re.match(r"(?i)^Câu\s+\d+[\.:/]?\s*", block_text)
+        stem = block_text[stem_match.end():].strip() if stem_match else block_text.strip()
+
+        return ParsedQuestion(
+            question_number=q_num,
+            part="Part3",
+            question_type=QuestionTypeEnum.ShortAnswer,
+            difficulty=difficulty,
+            content=stem if stem else block_text,
+            image_url=image_url,
+            answer_options=[]
+        ), None
+
+    @classmethod
+    def parse_answer_keys(
+        cls,
+        full_text: str,
+        tables: List[List[List[str]]],
+        target_test_code: Optional[str] = None
+    ) -> Dict[int, Any]:
+        """
+        Parse Answer Keys from:
+        - Format 1: Multi-Test Code Table Matrix (`Câu` | `Mã đề 0121` | `Mã đề 0122`...)
+        - Format 2: Single Test Code Table (`Câu` | `Đáp án`)
+        - Format 3: Multi-pair Grid Table (`Câu` | `ĐA` | `Câu` | `ĐA`...)
+        - Format 4: True/False Table Matrix (`Câu` | `a)` | `b)` | `c)` | `d)`)
+        - Format 5: Text List Format (`1. A`, `1. a) Đ, b) S...`, `1. 450`)
+        Returns dictionary mapping q_num -> answer_data.
+        """
+        answers: Dict[int, Any] = {}
+
+        # 1. Try parsing tables
+        for tbl in tables:
+            if not tbl or len(tbl) < 2:
+                continue
+            header = [cell.strip() for cell in tbl[0]]
+
+            # Sub-case A: True/False table header e.g. ["Câu", "a)", "b)", "c)", "d)"] or ["Câu", "a", "b", "c", "d"]
+            labels = [re.sub(r"[^a-d]", "", h.lower()) for h in header[1:5]] if len(header) >= 5 else []
+            if labels == ["a", "b", "c", "d"]:
+                for row in tbl[1:]:
+                    if not row or not row[0].strip():
+                        continue
+                    q_num_match = re.search(r"\d+", row[0].strip())
+                    if q_num_match:
+                        q_num = int(q_num_match.group(0))
+                        tf_dict = {}
+                        for idx, col_name in enumerate(['a', 'b', 'c', 'd'], start=1):
+                            if len(row) > idx:
+                                val = row[idx].strip()
+                                is_true = val.upper().startswith(("Đ", "T", "1"))
+                                tf_dict[col_name] = is_true
+                        answers[q_num] = tf_dict
+                continue
+
+            # Check if header contains "CÂU" or "STT"
+            q_col_count = sum(1 for h in header if "CÂU" in h.upper() or "STT" in h.upper())
+
+            # Sub-case B: Multi-pair Column Table e.g. ["Câu", "ĐA", "Câu", "ĐA", ...]
+            if q_col_count >= 2 or (len(header) >= 4 and ("CÂU" in header[0].upper() or "STT" in header[0].upper()) and ("CÂU" in header[2].upper() or "STT" in header[2].upper() or ("ĐA" in header[1].upper() and "ĐA" in header[3].upper()))):
+                for row in tbl[1:]:
+                    for c in range(0, len(row) - 1, 2):
+                        q_str = row[c].strip()
+                        ans_val = row[c + 1].strip()
+                        q_num_match = re.search(r"\d+", q_str)
+                        if q_num_match and ans_val:
+                            q_num = int(q_num_match.group(0))
+                            answers[q_num] = cls.parse_single_answer_cell(ans_val)
+                continue
+
+            # Sub-case C: Standard Single-Column or Multi-Test Code Table Matrix
+            if len(header) >= 2 and ("CÂU" in header[0].upper() or "STT" in header[0].upper()):
+                target_col_idx = -1
+                if target_test_code:
+                    for idx, h_text in enumerate(header[1:], start=1):
+                        if target_test_code in h_text:
+                            target_col_idx = idx
+                            break
+
+                if target_col_idx == -1:
+                    target_col_idx = 1  # Default to first answer column
+
+                # Iterate rows
+                for row in tbl[1:]:
+                    if len(row) > target_col_idx:
+                        q_str = row[0].strip()
+                        ans_val = row[target_col_idx].strip()
+                        q_num_match = re.search(r"\d+", q_str)
+                        if q_num_match and ans_val:
+                            q_num = int(q_num_match.group(0))
+                            answers[q_num] = cls.parse_single_answer_cell(ans_val)
+                continue
+
+            # Sub-case D: Fallback table scanning without standard header
+            for row in tbl:
+                for c in range(0, len(row) - 1, 2):
+                    q_str = row[c].strip()
+                    ans_val = row[c + 1].strip()
+                    q_num_match = re.match(r"^(?:Câu\s+)?(\d+)[\.:/]?$", q_str, re.IGNORECASE)
+                    if q_num_match and ans_val:
+                        q_num = int(q_num_match.group(1))
+                        if q_num not in answers:
+                            answers[q_num] = cls.parse_single_answer_cell(ans_val)
+
+        # 2. Try parsing text list format (Format 5) if missing answers
+        lines = full_text.splitlines()
+        for line in lines:
+            line_str = line.strip()
+            # Match Part 1: "1. A" or "Câu 1: A" or "1.A"
+            m1 = re.match(r"^(?:Câu\s+)?(\d+)[\.:/]\s*([A-Da-d])$", line_str, re.IGNORECASE)
+            if m1:
+                q_num = int(m1.group(1))
+                if q_num not in answers:
+                    answers[q_num] = m1.group(2).upper()
+                continue
+
+            # Match Part 2: "1. a) Đ, b) S, c) Đ, d) S" or "1. a) Đúng, b) Sai..."
+            m2 = re.match(r"^(?:Câu\s+)?(\d+)[\.:/]\s*(a[\.:\)].*)$", line_str, re.IGNORECASE)
+            if m2:
+                q_num = int(m2.group(1))
+                if q_num not in answers:
+                    answers[q_num] = cls.parse_single_answer_cell(m2.group(2))
+                continue
+
+            # Match Part 3: "1. 450" or "Câu 1: 0,66" or "1. Đáp án: 450"
+            m3 = re.match(r"^(?:Câu\s+)?(\d+)[\.:/]\s*(?:Đáp án:\s*)?([-\d\.,]+)$", line_str, re.IGNORECASE)
+            if m3:
+                q_num = int(m3.group(1))
+                if q_num not in answers:
+                    answers[q_num] = m3.group(2)
+
+        return answers
+
+    @staticmethod
+    def parse_single_answer_cell(val: str) -> Any:
+        """Parse string inside an answer cell (e.g. 'A', 'a) Đúng, b) Sai...', '450')."""
+        val_clean = val.strip()
+        # Single choice letter (Part 1)
+        if len(val_clean) == 1 and val_clean.upper() in ["A", "B", "C", "D"]:
+            return val_clean.upper()
+
+        # True/False sub-items (Part 2) e.g. "a) Sai \n b) Sai \n c) Đúng \n d) Đúng"
+        tf_dict = {}
+        tf_matches = re.findall(r"([a-d])[\)\.:/]?\s*(Đúng|Sai|Đ|S|True|False)", val_clean, re.IGNORECASE)
+        if tf_matches:
+            for item_label, item_stat in tf_matches:
+                item_label_clean = item_label.lower()
+                is_true = item_stat.upper().startswith(("Đ", "T"))
+                tf_dict[item_label_clean] = is_true
+            return tf_dict
+
+        # Short answer value (Part 3)
+        return val_clean
+
+    @classmethod
+    def merge_questions_and_answers(
+        cls,
+        questions: List[ParsedQuestion],
+        answers: Dict[int, Any]
+    ) -> Tuple[List[ParsedQuestion], List[ParseError]]:
+        """Combine parsed questions with parsed answers and perform all-or-nothing validation."""
+        errors: List[ParseError] = []
+        result_questions: List[ParsedQuestion] = []
+
+        for q in questions:
+            num = q.question_number
+            ans = answers.get(num)
+
+            if ans is None:
+                errors.append(ParseError(question_number=num, message=f"Missing answer key for question {num}."))
+                continue
+
+            if q.question_type == QuestionTypeEnum.MultipleChoice:
+                letter = str(ans).upper()
+                matched = False
+                for opt in q.answer_options:
+                    if opt.content.strip().upper().startswith(letter):
+                        opt.is_correct = True
+                        matched = True
+                        break
+                if not matched and q.answer_options:
+                    idx_map = {"A": 0, "B": 1, "C": 2, "D": 3}
+                    if letter in idx_map and idx_map[letter] < len(q.answer_options):
+                        q.answer_options[idx_map[letter]].is_correct = True
+                        matched = True
+
+                if not matched:
+                    errors.append(ParseError(question_number=num, message=f"Answer '{letter}' for question {num} does not match any choice."))
+                else:
+                    result_questions.append(q)
+
+            elif q.question_type == QuestionTypeEnum.TrueFalse:
+                if not isinstance(ans, dict) or not ans:
+                    errors.append(ParseError(question_number=num, message=f"Invalid True/False answer key structure for question {num}."))
+                    continue
+
+                for idx, opt in enumerate(q.answer_options):
+                    opt_label = chr(ord('a') + idx)
+                    for key in ['a', 'b', 'c', 'd']:
+                        if opt.content.strip().lower().startswith(key):
+                            opt_label = key
+                            break
+
+                    if opt_label in ans:
+                        opt.is_correct = ans[opt_label]
+
+                result_questions.append(q)
+
+            elif q.question_type == QuestionTypeEnum.ShortAnswer:
+                q.correct_answer = str(ans)
+                result_questions.append(q)
+
+        return result_questions, errors

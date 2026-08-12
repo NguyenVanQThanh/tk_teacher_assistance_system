@@ -2,7 +2,7 @@
 # Description: Pydantic schemas for Exercise, Question, and AnswerOption CRUD & validation.
 # Created At: 2026-07-31
 # Created By: Tam Khang
-# Updated At: 2026-07-31
+# Updated At: 2026-08-09
 # Updated By: Tam Khang
 
 from enum import Enum
@@ -14,6 +14,7 @@ from pydantic import BaseModel, Field, field_validator, model_validator
 
 class QuestionTypeEnum(str, Enum):
     MultipleChoice = "MultipleChoice"
+    TrueFalse = "TrueFalse"
     ShortAnswer = "ShortAnswer"
 
 
@@ -60,6 +61,7 @@ class QuestionCreate(BaseModel):
     explanation: Optional[str] = Field(None, description="Detailed answer explanation")
     display_order: int = Field(0, description="Display order within exercise")
     document_id: Optional[UUID] = Field(None, description="Associated source document ID")
+    image_url: Optional[str] = Field(None, description="URL of question image")
     answer_options: Optional[List[AnswerOptionCreate]] = Field(default=None, description="List of answer choices")
 
     @field_validator("content")
@@ -71,7 +73,7 @@ class QuestionCreate(BaseModel):
         return v
 
     @model_validator(mode="after")
-    def validate_answer_options_for_multiple_choice(self):
+    def validate_answer_options_for_type(self):
         if self.question_type == QuestionTypeEnum.MultipleChoice:
             options = self.answer_options or []
             if len(options) < 2:
@@ -79,6 +81,10 @@ class QuestionCreate(BaseModel):
             correct_count = sum(1 for opt in options if opt.is_correct)
             if correct_count != 1:
                 raise ValueError(f"MultipleChoice questions must have exactly 1 correct answer (found {correct_count}).")
+        elif self.question_type == QuestionTypeEnum.TrueFalse:
+            options = self.answer_options or []
+            if len(options) < 1:
+                raise ValueError("TrueFalse questions must have at least 1 option item.")
         return self
 
 
@@ -89,6 +95,7 @@ class QuestionUpdate(BaseModel):
     correct_answer: Optional[str] = None
     explanation: Optional[str] = None
     display_order: Optional[int] = None
+    image_url: Optional[str] = None
     answer_options: Optional[List[AnswerOptionCreate]] = None
 
     @field_validator("content")
@@ -123,6 +130,7 @@ class QuestionOut(BaseModel):
     correct_answer: Optional[str] = None
     explanation: Optional[str] = None
     display_order: int
+    image_url: Optional[str] = None
     is_ai_generated: bool
     status: str
     created_at: datetime

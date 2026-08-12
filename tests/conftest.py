@@ -163,6 +163,12 @@ def setup_db() -> Generator[None, None, None]:
             name="View attempt results",
             description="Allows viewing attempt results"
         )
+        exe_question_import_perm = Permission(
+            permission_id=uuid.uuid4(),
+            permission_code="EXE_QUESTION_IMPORT",
+            name="Bulk question import",
+            description="Allows bulk question import"
+        )
         
         db.add_all([
             me_view_perm,
@@ -181,7 +187,8 @@ def setup_db() -> Generator[None, None, None]:
             exe_assignment_manage_perm,
             exe_assignment_view_perm,
             exe_attempt_submit_perm,
-            exe_attempt_view_perm
+            exe_attempt_view_perm,
+            exe_question_import_perm
         ])
         db.flush()
 
@@ -204,6 +211,7 @@ def setup_db() -> Generator[None, None, None]:
             RolePermission(role_id=admin_role.role_id, permission_id=exe_assignment_manage_perm.permission_id),
             RolePermission(role_id=admin_role.role_id, permission_id=exe_assignment_view_perm.permission_id),
             RolePermission(role_id=admin_role.role_id, permission_id=exe_attempt_view_perm.permission_id),
+            RolePermission(role_id=admin_role.role_id, permission_id=exe_question_import_perm.permission_id),
         ])
         # Teacher & Student get view & change password
         db.add_all([
@@ -214,12 +222,15 @@ def setup_db() -> Generator[None, None, None]:
             RolePermission(role_id=teacher_role.role_id, permission_id=exe_assignment_manage_perm.permission_id),
             RolePermission(role_id=teacher_role.role_id, permission_id=exe_assignment_view_perm.permission_id),
             RolePermission(role_id=teacher_role.role_id, permission_id=exe_attempt_view_perm.permission_id),
+            RolePermission(role_id=teacher_role.role_id, permission_id=exe_question_import_perm.permission_id),
             RolePermission(role_id=student_role.role_id, permission_id=me_view_perm.permission_id),
             RolePermission(role_id=student_role.role_id, permission_id=pwd_change_perm.permission_id),
             RolePermission(role_id=student_role.role_id, permission_id=exe_assignment_view_perm.permission_id),
             RolePermission(role_id=student_role.role_id, permission_id=exe_attempt_submit_perm.permission_id),
             RolePermission(role_id=student_role.role_id, permission_id=exe_attempt_view_perm.permission_id),
         ])
+
+        PermissionService.invalidate_role_cache()
 
 
         

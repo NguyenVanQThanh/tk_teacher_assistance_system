@@ -36,6 +36,7 @@ class QuestionService:
             correct_answer=payload.correct_answer,
             explanation=payload.explanation,
             display_order=payload.display_order,
+            image_url=payload.image_url,
             is_ai_generated=False,
             status='ACTIVE'
         )
@@ -87,6 +88,7 @@ class QuestionService:
             correct_answer=payload.correct_answer,
             explanation=payload.explanation,
             display_order=payload.display_order,
+            image_url=payload.image_url,
             answer_options=options
         )
         return updated_question

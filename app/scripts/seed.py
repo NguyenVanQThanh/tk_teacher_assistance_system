@@ -78,6 +78,7 @@ def seed_data():
             {"permission_code": "EXE_ASSIGNMENT_VIEW", "name": "View Assigned Exercises", "description": "Allows viewing list of assigned exercises by class"},
             {"permission_code": "EXE_ATTEMPT_SUBMIT", "name": "Start and Submit Exercise Attempts", "description": "Allows students to start attempts and submit answers for evaluation"},
             {"permission_code": "EXE_ATTEMPT_VIEW", "name": "View Exercise Attempt Results", "description": "Allows viewing detailed results of exercise attempts"},
+            {"permission_code": "EXE_QUESTION_IMPORT", "name": "Bulk Question Import", "description": "Allows teachers and admins to bulk import questions from docx/pdf files"},
         ]
 
         perms_db = {}
@@ -108,8 +109,8 @@ def seed_data():
 
         # 3. Seed RolePermission mapping (Idempotent: check if exists first)
         mappings = {
-            "Admin": ["AUTH_ME_VIEW", "AUTH_PASSWORD_CHANGE", "AUTH_PERM_MANAGE", "ACAD_SUBJECT_MANAGE", "ACAD_SUBJECT_VIEW", "ACAD_CLASS_MANAGE", "ACAD_CLASS_VIEW", "ACAD_ENROLLMENT_MANAGE", "ACAD_ENROLLMENT_VIEW", "ACAD_TEACHER_ASSIGN_MANAGE", "ACAD_TEACHER_ASSIGN_VIEW", "EXE_EXERCISE_MANAGE", "EXE_EXERCISE_VIEW", "EXE_ASSIGNMENT_MANAGE", "EXE_ASSIGNMENT_VIEW", "EXE_ATTEMPT_VIEW"],
-            "Teacher": ["AUTH_ME_VIEW", "AUTH_PASSWORD_CHANGE", "EXE_EXERCISE_MANAGE", "EXE_EXERCISE_VIEW", "EXE_ASSIGNMENT_MANAGE", "EXE_ASSIGNMENT_VIEW", "EXE_ATTEMPT_VIEW"],
+            "Admin": ["AUTH_ME_VIEW", "AUTH_PASSWORD_CHANGE", "AUTH_PERM_MANAGE", "ACAD_SUBJECT_MANAGE", "ACAD_SUBJECT_VIEW", "ACAD_CLASS_MANAGE", "ACAD_CLASS_VIEW", "ACAD_ENROLLMENT_MANAGE", "ACAD_ENROLLMENT_VIEW", "ACAD_TEACHER_ASSIGN_MANAGE", "ACAD_TEACHER_ASSIGN_VIEW", "EXE_EXERCISE_MANAGE", "EXE_EXERCISE_VIEW", "EXE_ASSIGNMENT_MANAGE", "EXE_ASSIGNMENT_VIEW", "EXE_ATTEMPT_VIEW", "EXE_QUESTION_IMPORT"],
+            "Teacher": ["AUTH_ME_VIEW", "AUTH_PASSWORD_CHANGE", "EXE_EXERCISE_MANAGE", "EXE_EXERCISE_VIEW", "EXE_ASSIGNMENT_MANAGE", "EXE_ASSIGNMENT_VIEW", "EXE_ATTEMPT_VIEW", "EXE_QUESTION_IMPORT"],
             "Student": ["AUTH_ME_VIEW", "AUTH_PASSWORD_CHANGE", "EXE_ASSIGNMENT_VIEW", "EXE_ATTEMPT_SUBMIT", "EXE_ATTEMPT_VIEW"]
         }
 
