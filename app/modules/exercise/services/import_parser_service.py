@@ -146,8 +146,16 @@ class ImportParserService:
                 res.append(omml_to_latex(child))
             return "".join(res)
 
+        def normalize_extracted_text(text: str) -> str:
+            if not text:
+                return text
+            sup_map = str.maketrans("⁰¹²³⁴⁵⁶⁷⁸⁹", "0123456789")
+            text = re.sub(r'([a-zA-Z])([⁰¹²³⁴⁵⁶⁷⁸⁹]+)', lambda m: f"{m.group(1)}^{{{m.group(2).translate(sup_map)}}}", text)
+            text = re.sub(r'([a-zA-Z])[\u20d7\u2192⃗]', r'$\\vec{\1}$', text)
+            return text
+
         def get_elem_text(elem) -> str:
-            """Extract text from paragraph or table cell, converting OMML math equations to $ LaTeX $."""
+            """Extract text from paragraph or table cell, converting OMML math equations and Word run formatting to $ LaTeX $."""
             parts = []
             for child in elem:
                 tag = child.tag.split("}")[-1] if "}" in child.tag else child.tag
@@ -168,9 +176,26 @@ class ImportParserService:
                                 txts = sub.xpath('.//*[local-name()="t"]/text()')
                                 parts.append("".join(txts))
                     else:
-                        txts = child.xpath('.//*[local-name()="t"]/text()')
-                        parts.append("".join(txts))
-            return "".join(parts).strip()
+                        runs = child.xpath('.//*[local-name()="r"]')
+                        if runs:
+                            for r in runs:
+                                t_nodes = r.xpath('.//*[local-name()="t"]/text()')
+                                if not t_nodes:
+                                    continue
+                                r_text = "".join(t_nodes)
+                                vert_align = r.xpath('.//*[local-name()="vertAlign"]/@*[local-name()="val"]')
+                                val = vert_align[0] if vert_align else ""
+                                if val == "superscript":
+                                    parts.append(f"^{{{r_text}}}")
+                                elif val == "subscript":
+                                    parts.append(f"_{{{r_text}}}")
+                                else:
+                                    parts.append(r_text)
+                        else:
+                            txts = child.xpath('.//*[local-name()="t"]/text()')
+                            parts.append("".join(txts))
+            raw = "".join(parts).strip()
+            return normalize_extracted_text(raw)
 
         for p in doc.paragraphs:
             text = get_elem_text(p._p)

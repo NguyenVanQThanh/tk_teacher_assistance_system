@@ -3,7 +3,7 @@
 > Depends on: `F-EXE-05`
 > Status: `ready to test`
 > Created At: `2026-08-12`
-> Updated At: `2026-08-12`
+> Updated At: `2026-08-13`
 
 
 # Task — `F-EXE-05` Export Exercise to PDF (Xuất đề thi ra file PDF từ DB kèm LaTeX)
