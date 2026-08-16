@@ -1,0 +1,1447 @@
+{
+  "exercise_id": "3ad4c004-9616-4ee1-9b88-e281596bfa7b",
+  "title": "ĐỀ THI MINH HỌA - TOÁN 12",
+  "subject_id": "f9792637-2862-4dc8-8b57-ecfbcb895cf3",
+  "created_by": "933ec651-ecf2-4b43-9676-a987c29d2dad",
+  "total_questions": 20,
+  "ai_metadata": null,
+  "status": "ACTIVE",
+  "created_at": "2026-07-31T07:58:42.987825Z",
+  "updated_at": "2026-08-16T03:57:35.104319Z",
+  "questions": [
+    {
+      "question_id": "9f84c9eb-d80c-4f1d-ba01-e93dcc8120ba",
+      "exercise_id": "3ad4c004-9616-4ee1-9b88-e281596bfa7b",
+      "document_id": null,
+      "content": "Cho hàm số $f(x) = x^3 - 3x^2 + 2$. Giá trị cực đại của hàm số là:",
+      "content_markdown": "Cho hàm số f(x) = x³ - 3x² + 2. Giá trị cực đại của hàm số là:",
+      "content_latex": "Cho hàm số $f(x) = x^3 - 3x^2 + 2$. Giá trị cực đại của hàm số là:",
+      "segments": [
+        {
+          "type": "text",
+          "content": "Cho hàm số "
+        },
+        {
+          "type": "math",
+          "latex": "f(x) = x^3 - 3x^2 + 2",
+          "display": false,
+          "confidence": 0.98
+        },
+        {
+          "type": "text",
+          "content": ". Giá trị cực đại của hàm số là:"
+        }
+      ],
+      "confidence_score": 0.98,
+      "needs_review": false,
+      "question_type": "MultipleChoice",
+      "difficulty": "NB",
+      "correct_answer": null,
+      "explanation": null,
+      "display_order": 1,
+      "image_url": null,
+      "is_ai_generated": false,
+      "status": "ACTIVE",
+      "created_at": "2026-08-16T04:10:51.909720Z",
+      "updated_at": "2026-08-16T04:10:51.909720Z",
+      "answer_options": [
+        {
+          "option_id": "3734807c-40a8-481a-bed2-1aa99ced2e4e",
+          "question_id": "9f84c9eb-d80c-4f1d-ba01-e93dcc8120ba",
+          "content": "A. $0$",
+          "is_correct": false,
+          "display_order": 0
+        },
+        {
+          "option_id": "5293c79e-26ea-4ca0-b189-657227b926c2",
+          "question_id": "9f84c9eb-d80c-4f1d-ba01-e93dcc8120ba",
+          "content": "B. $2$",
+          "is_correct": true,
+          "display_order": 1
+        },
+        {
+          "option_id": "679df658-7a0d-44e1-9855-1412a57b9c33",
+          "question_id": "9f84c9eb-d80c-4f1d-ba01-e93dcc8120ba",
+          "content": "C. $-2$",
+          "is_correct": false,
+          "display_order": 2
+        },
+        {
+          "option_id": "57c2025f-2f44-4ff2-8206-1a093a5eb5ae",
+          "question_id": "9f84c9eb-d80c-4f1d-ba01-e93dcc8120ba",
+          "content": "D. $4$",
+          "is_correct": false,
+          "display_order": 3
+        }
+      ]
+    },
+    {
+      "question_id": "bc5728e9-b659-4b8d-92d5-80cae7a5843e",
+      "exercise_id": "3ad4c004-9616-4ee1-9b88-e281596bfa7b",
+      "document_id": null,
+      "content": "Tập nghiệm của bất phương trình $\\log_2(x - 1) < 3$ là:",
+      "content_markdown": "Tập nghiệm của bất phương trình \\log₂(x - 1) < 3 là:",
+      "content_latex": "Tập nghiệm của bất phương trình $\\log_2(x - 1) < 3$ là:",
+      "segments": [
+        {
+          "type": "text",
+          "content": "Tập nghiệm của bất phương trình "
+        },
+        {
+          "type": "math",
+          "latex": "\\log_2(x - 1) < 3",
+          "display": false,
+          "confidence": 0.98
+        },
+        {
+          "type": "text",
+          "content": " là:"
+        }
+      ],
+      "confidence_score": 0.98,
+      "needs_review": false,
+      "question_type": "MultipleChoice",
+      "difficulty": "TH",
+      "correct_answer": null,
+      "explanation": null,
+      "display_order": 2,
+      "image_url": null,
+      "is_ai_generated": false,
+      "status": "ACTIVE",
+      "created_at": "2026-08-16T04:10:51.909720Z",
+      "updated_at": "2026-08-16T04:10:51.909720Z",
+      "answer_options": [
+        {
+          "option_id": "0bedaa38-1584-4188-bebd-b18cd2bd217c",
+          "question_id": "bc5728e9-b659-4b8d-92d5-80cae7a5843e",
+          "content": "A. $(1; 9)$",
+          "is_correct": true,
+          "display_order": 0
+        },
+        {
+          "option_id": "7a45ce22-ef59-49a1-afab-43b75a79183e",
+          "question_id": "bc5728e9-b659-4b8d-92d5-80cae7a5843e",
+          "content": "B. $(-\\infty; 9)$",
+          "is_correct": false,
+          "display_order": 1
+        },
+        {
+          "option_id": "09f0f655-85c7-4bb8-b904-95a8786050e9",
+          "question_id": "bc5728e9-b659-4b8d-92d5-80cae7a5843e",
+          "content": "C. $(1; +\\infty)$",
+          "is_correct": false,
+          "display_order": 2
+        },
+        {
+          "option_id": "571c2c0d-b8a4-4e7a-8c23-17d603e0e15e",
+          "question_id": "bc5728e9-b659-4b8d-92d5-80cae7a5843e",
+          "content": "D. $[1; 9]$",
+          "is_correct": false,
+          "display_order": 3
+        }
+      ]
+    },
+    {
+      "question_id": "702387ef-dbc8-4413-85e3-48ac4d5c4851",
+      "exercise_id": "3ad4c004-9616-4ee1-9b88-e281596bfa7b",
+      "document_id": null,
+      "content": "Một nguyên hàm của hàm số $f(x) = \\frac{2x}{x^2 + 1}$ là:",
+      "content_markdown": "Một nguyên hàm của hàm số f(x) = (2x)/(x² + 1) là:",
+      "content_latex": "Một nguyên hàm của hàm số $f(x) = \\frac{2x}{x^2 + 1}$ là:",
+      "segments": [
+        {
+          "type": "text",
+          "content": "Một nguyên hàm của hàm số "
+        },
+        {
+          "type": "math",
+          "latex": "f(x) = \\frac{2x}{x^2 + 1}",
+          "display": false,
+          "confidence": 0.98
+        },
+        {
+          "type": "text",
+          "content": " là:"
+        }
+      ],
+      "confidence_score": 0.98,
+      "needs_review": false,
+      "question_type": "MultipleChoice",
+      "difficulty": "TH",
+      "correct_answer": null,
+      "explanation": null,
+      "display_order": 3,
+      "image_url": null,
+      "is_ai_generated": false,
+      "status": "ACTIVE",
+      "created_at": "2026-08-16T04:10:51.909720Z",
+      "updated_at": "2026-08-16T04:10:51.909720Z",
+      "answer_options": [
+        {
+          "option_id": "237b9dc8-4a46-4691-9dd7-439df53c750d",
+          "question_id": "702387ef-dbc8-4413-85e3-48ac4d5c4851",
+          "content": "A. $\\ln(x^2 + 1) + C$",
+          "is_correct": true,
+          "display_order": 0
+        },
+        {
+          "option_id": "ba4dc63a-4365-4882-8114-02db606c6f15",
+          "question_id": "702387ef-dbc8-4413-85e3-48ac4d5c4851",
+          "content": "B. $2\\ln(x^2 + 1) + C$",
+          "is_correct": false,
+          "display_order": 1
+        },
+        {
+          "option_id": "72bd26d1-29a0-4d53-ad69-881600d7d60d",
+          "question_id": "702387ef-dbc8-4413-85e3-48ac4d5c4851",
+          "content": "C. $\\frac{1}{x^2 + 1} + C$",
+          "is_correct": false,
+          "display_order": 2
+        },
+        {
+          "option_id": "740b2e29-445d-4bf5-9aac-573b33a550c6",
+          "question_id": "702387ef-dbc8-4413-85e3-48ac4d5c4851",
+          "content": "D. $\\frac{x^2}{x^2 + 1} + C$",
+          "is_correct": false,
+          "display_order": 3
+        }
+      ]
+    },
+    {
+      "question_id": "0ef95de0-1f78-49b5-9bdf-ae54221007da",
+      "exercise_id": "3ad4c004-9616-4ee1-9b88-e281596bfa7b",
+      "document_id": null,
+      "content": "Trong không gian $Oxyz$, mặt phẳng đi qua $A(1; -2; 3)$ và có vectơ pháp tuyến $\\vec{n} = (2; 1; -1)$ có phương trình là:",
+      "content_markdown": "Trong không gian Oxyz, mặt phẳng đi qua A(1; -2; 3) và có vectơ pháp tuyến n⃗ = (2; 1; -1) có phương trình là:",
+      "content_latex": "Trong không gian $Oxyz$, mặt phẳng đi qua $A(1; -2; 3)$ và có vectơ pháp tuyến $\\vec{n} = (2; 1; -1)$ có phương trình là:",
+      "segments": [
+        {
+          "type": "text",
+          "content": "Trong không gian "
+        },
+        {
+          "type": "math",
+          "latex": "Oxyz",
+          "display": false,
+          "confidence": 0.98
+        },
+        {
+          "type": "text",
+          "content": ", mặt phẳng đi qua "
+        },
+        {
+          "type": "math",
+          "latex": "A(1; - 2; 3)",
+          "display": false,
+          "confidence": 0.98
+        },
+        {
+          "type": "text",
+          "content": " và có vectơ pháp tuyến "
+        },
+        {
+          "type": "math",
+          "latex": "\\vec{n} = (2; 1; - 1)",
+          "display": false,
+          "confidence": 0.98
+        },
+        {
+          "type": "text",
+          "content": " có phương trình là:"
+        }
+      ],
+      "confidence_score": 0.98,
+      "needs_review": false,
+      "question_type": "MultipleChoice",
+      "difficulty": "TH",
+      "correct_answer": null,
+      "explanation": null,
+      "display_order": 4,
+      "image_url": null,
+      "is_ai_generated": false,
+      "status": "ACTIVE",
+      "created_at": "2026-08-16T04:10:51.909720Z",
+      "updated_at": "2026-08-16T04:10:51.909720Z",
+      "answer_options": [
+        {
+          "option_id": "55e76229-941d-401b-bca0-28f25456139d",
+          "question_id": "0ef95de0-1f78-49b5-9bdf-ae54221007da",
+          "content": "A. $2x + y - z + 3 = 0$",
+          "is_correct": false,
+          "display_order": 0
+        },
+        {
+          "option_id": "aee70f80-68e3-40a1-abd6-835d53e61d01",
+          "question_id": "0ef95de0-1f78-49b5-9bdf-ae54221007da",
+          "content": "B. $2x + y - z - 3 = 0$",
+          "is_correct": true,
+          "display_order": 1
+        },
+        {
+          "option_id": "befa0451-df1f-437c-99d3-399f97dc2ad1",
+          "question_id": "0ef95de0-1f78-49b5-9bdf-ae54221007da",
+          "content": "C. $2x + y + z - 3 = 0$",
+          "is_correct": false,
+          "display_order": 2
+        },
+        {
+          "option_id": "d51c33c3-c59e-4bec-8846-b67389c951dd",
+          "question_id": "0ef95de0-1f78-49b5-9bdf-ae54221007da",
+          "content": "D. $x + 2y - z + 3 = 0$",
+          "is_correct": false,
+          "display_order": 3
+        }
+      ]
+    },
+    {
+      "question_id": "c73797fb-d27c-4516-9169-fbaa44850428",
+      "exercise_id": "3ad4c004-9616-4ee1-9b88-e281596bfa7b",
+      "document_id": null,
+      "content": "Cho hàm số $$y = \\frac{x^2 + 1}{x - 1}.$$ Số đường tiệm cận đứng của đồ thị hàm số là:",
+      "content_markdown": "Cho hàm số y = (x² + 1)/(x - 1). Số đường tiệm cận đứng của đồ thị hàm số là:",
+      "content_latex": "Cho hàm số $$y = \\frac{x^2 + 1}{x - 1}.$$ Số đường tiệm cận đứng của đồ thị hàm số là:",
+      "segments": [
+        {
+          "type": "text",
+          "content": "Cho hàm số "
+        },
+        {
+          "type": "math",
+          "latex": "y = \\frac{x^2 + 1}{x - 1}.",
+          "display": true,
+          "confidence": 0.98
+        },
+        {
+          "type": "text",
+          "content": " Số đường tiệm cận đứng của đồ thị hàm số là:"
+        }
+      ],
+      "confidence_score": 0.98,
+      "needs_review": false,
+      "question_type": "MultipleChoice",
+      "difficulty": "VD",
+      "correct_answer": null,
+      "explanation": null,
+      "display_order": 5,
+      "image_url": null,
+      "is_ai_generated": false,
+      "status": "ACTIVE",
+      "created_at": "2026-08-16T04:10:51.909720Z",
+      "updated_at": "2026-08-16T04:10:51.909720Z",
+      "answer_options": [
+        {
+          "option_id": "51952751-0235-4458-947a-b7aafed39de1",
+          "question_id": "c73797fb-d27c-4516-9169-fbaa44850428",
+          "content": "A. $0$",
+          "is_correct": false,
+          "display_order": 0
+        },
+        {
+          "option_id": "1f4b5516-54ec-46a7-b01a-548df4b3d819",
+          "question_id": "c73797fb-d27c-4516-9169-fbaa44850428",
+          "content": "B. $1$",
+          "is_correct": true,
+          "display_order": 1
+        },
+        {
+          "option_id": "061f5f53-6080-4236-94c7-d4938b859d40",
+          "question_id": "c73797fb-d27c-4516-9169-fbaa44850428",
+          "content": "C. $2$",
+          "is_correct": false,
+          "display_order": 2
+        },
+        {
+          "option_id": "6489181f-4541-4c84-9d65-5afa490445af",
+          "question_id": "c73797fb-d27c-4516-9169-fbaa44850428",
+          "content": "D. $3$",
+          "is_correct": false,
+          "display_order": 3
+        }
+      ]
+    },
+    {
+      "question_id": "6a203551-d4b3-4a95-a631-babee135638a",
+      "exercise_id": "3ad4c004-9616-4ee1-9b88-e281596bfa7b",
+      "document_id": null,
+      "content": "Một vật chuyển động theo phương trình $s(t) = t^3 - 6t^2 + 9t, t \\ge 0$. Vận tốc bằng $0$ tại các thời điểm:",
+      "content_markdown": "Một vật chuyển động theo phương trình s(t) = t³ - 6t² + 9t, t \\ge 0. Vận tốc bằng 0 tại các thời điểm:",
+      "content_latex": "Một vật chuyển động theo phương trình $s(t) = t^3 - 6t^2 + 9t, t \\ge 0$. Vận tốc bằng $0$ tại các thời điểm:",
+      "segments": [
+        {
+          "type": "text",
+          "content": "Một vật chuyển động theo phương trình "
+        },
+        {
+          "type": "math",
+          "latex": "s(t) = t^3 - 6t^2 + 9t, t \\ge 0",
+          "display": false,
+          "confidence": 0.98
+        },
+        {
+          "type": "text",
+          "content": ". Vận tốc bằng "
+        },
+        {
+          "type": "math",
+          "latex": "0",
+          "display": false,
+          "confidence": 0.98
+        },
+        {
+          "type": "text",
+          "content": " tại các thời điểm:"
+        }
+      ],
+      "confidence_score": 0.98,
+      "needs_review": false,
+      "question_type": "MultipleChoice",
+      "difficulty": "VD",
+      "correct_answer": null,
+      "explanation": null,
+      "display_order": 6,
+      "image_url": null,
+      "is_ai_generated": false,
+      "status": "ACTIVE",
+      "created_at": "2026-08-16T04:10:51.909720Z",
+      "updated_at": "2026-08-16T04:10:51.909720Z",
+      "answer_options": [
+        {
+          "option_id": "dd0dc8f7-1639-4ab5-b0ec-ff2287cf2f0b",
+          "question_id": "6a203551-d4b3-4a95-a631-babee135638a",
+          "content": "A. $t = 1\\text{ và }t = 3$",
+          "is_correct": false,
+          "display_order": 0
+        },
+        {
+          "option_id": "6e7b801a-a1e6-44b5-a7ec-7d4e2031ef05",
+          "question_id": "6a203551-d4b3-4a95-a631-babee135638a",
+          "content": "B. $t = 0\\text{ và }t = 3$",
+          "is_correct": false,
+          "display_order": 1
+        },
+        {
+          "option_id": "7fb79cd5-2627-4628-955b-583f7453664f",
+          "question_id": "6a203551-d4b3-4a95-a631-babee135638a",
+          "content": "C. $t = 1\\text{ và }t = 2$",
+          "is_correct": true,
+          "display_order": 2
+        },
+        {
+          "option_id": "f49cb802-7b6d-4035-ba83-52cea245ab47",
+          "question_id": "6a203551-d4b3-4a95-a631-babee135638a",
+          "content": "D. $t = 2\\text{ và }t = 3$",
+          "is_correct": false,
+          "display_order": 3
+        }
+      ]
+    },
+    {
+      "question_id": "d7fd658a-b230-41c7-8ebb-cca2ba8f0ff5",
+      "exercise_id": "3ad4c004-9616-4ee1-9b88-e281596bfa7b",
+      "document_id": null,
+      "content": "Một hình trụ có bán kính đáy $r = 3$ và chiều cao $h = 5$. Thể tích của hình trụ là:",
+      "content_markdown": "Một hình trụ có bán kính đáy r = 3 và chiều cao h = 5. Thể tích của hình trụ là:",
+      "content_latex": "Một hình trụ có bán kính đáy $r = 3$ và chiều cao $h = 5$. Thể tích của hình trụ là:",
+      "segments": [
+        {
+          "type": "text",
+          "content": "Một hình trụ có bán kính đáy "
+        },
+        {
+          "type": "math",
+          "latex": "r = 3",
+          "display": false,
+          "confidence": 0.98
+        },
+        {
+          "type": "text",
+          "content": " và chiều cao "
+        },
+        {
+          "type": "math",
+          "latex": "h = 5",
+          "display": false,
+          "confidence": 0.98
+        },
+        {
+          "type": "text",
+          "content": ". Thể tích của hình trụ là:"
+        }
+      ],
+      "confidence_score": 0.98,
+      "needs_review": false,
+      "question_type": "MultipleChoice",
+      "difficulty": "VD",
+      "correct_answer": null,
+      "explanation": null,
+      "display_order": 7,
+      "image_url": null,
+      "is_ai_generated": false,
+      "status": "ACTIVE",
+      "created_at": "2026-08-16T04:10:51.909720Z",
+      "updated_at": "2026-08-16T04:10:51.909720Z",
+      "answer_options": [
+        {
+          "option_id": "f93be880-0c28-4807-b9ca-84544d02804b",
+          "question_id": "d7fd658a-b230-41c7-8ebb-cca2ba8f0ff5",
+          "content": "A. $15\\pi$",
+          "is_correct": false,
+          "display_order": 0
+        },
+        {
+          "option_id": "82381d6e-c0d5-43dc-bd2b-d962b6abe8d0",
+          "question_id": "d7fd658a-b230-41c7-8ebb-cca2ba8f0ff5",
+          "content": "B. $30\\pi$",
+          "is_correct": false,
+          "display_order": 1
+        },
+        {
+          "option_id": "8b62916a-68c4-4191-bfad-6da582933ddb",
+          "question_id": "d7fd658a-b230-41c7-8ebb-cca2ba8f0ff5",
+          "content": "C. $45\\pi$",
+          "is_correct": true,
+          "display_order": 2
+        },
+        {
+          "option_id": "19931fc8-3d5c-4f99-b9ce-7b4473e183d8",
+          "question_id": "d7fd658a-b230-41c7-8ebb-cca2ba8f0ff5",
+          "content": "D. $90\\pi$",
+          "is_correct": false,
+          "display_order": 3
+        }
+      ]
+    },
+    {
+      "question_id": "1ef0492b-d03d-4b4f-8238-87ee2842777c",
+      "exercise_id": "3ad4c004-9616-4ee1-9b88-e281596bfa7b",
+      "document_id": null,
+      "content": "Cho hai vectơ $\\vec{a} = (1; 2; -1)$, $\\vec{b} = (2; -1; 3)$. Khi đó $\\vec{a} \\cdot \\vec{b}$ bằng:",
+      "content_markdown": "Cho hai vectơ a⃗ = (1; 2; -1), b⃗ = (2; -1; 3). Khi đó a⃗ \\cdot b⃗ bằng:",
+      "content_latex": "Cho hai vectơ $\\vec{a} = (1; 2; -1)$, $\\vec{b} = (2; -1; 3)$. Khi đó $\\vec{a} \\cdot \\vec{b}$ bằng:",
+      "segments": [
+        {
+          "type": "text",
+          "content": "Cho hai vectơ "
+        },
+        {
+          "type": "math",
+          "latex": "\\vec{a} = (1; 2; - 1)",
+          "display": false,
+          "confidence": 0.98
+        },
+        {
+          "type": "text",
+          "content": ", "
+        },
+        {
+          "type": "math",
+          "latex": "\\vec{b} = (2; - 1; 3)",
+          "display": false,
+          "confidence": 0.98
+        },
+        {
+          "type": "text",
+          "content": ". Khi đó "
+        },
+        {
+          "type": "math",
+          "latex": "\\vec{a} \\cdot \\vec{b}",
+          "display": false,
+          "confidence": 0.98
+        },
+        {
+          "type": "text",
+          "content": " bằng:"
+        }
+      ],
+      "confidence_score": 0.98,
+      "needs_review": false,
+      "question_type": "MultipleChoice",
+      "difficulty": "VD",
+      "correct_answer": null,
+      "explanation": null,
+      "display_order": 8,
+      "image_url": null,
+      "is_ai_generated": false,
+      "status": "ACTIVE",
+      "created_at": "2026-08-16T04:10:51.909720Z",
+      "updated_at": "2026-08-16T04:10:51.909720Z",
+      "answer_options": [
+        {
+          "option_id": "9332de38-baf5-436d-b23e-b10adf56bb9b",
+          "question_id": "1ef0492b-d03d-4b4f-8238-87ee2842777c",
+          "content": "A. $-5$",
+          "is_correct": false,
+          "display_order": 0
+        },
+        {
+          "option_id": "794cf75d-c5d0-4f26-803e-cd4c3e31d21d",
+          "question_id": "1ef0492b-d03d-4b4f-8238-87ee2842777c",
+          "content": "B. $-3$",
+          "is_correct": false,
+          "display_order": 1
+        },
+        {
+          "option_id": "ec56fdb1-e537-4a19-9c9d-9667967b9f41",
+          "question_id": "1ef0492b-d03d-4b4f-8238-87ee2842777c",
+          "content": "C. $1$",
+          "is_correct": true,
+          "display_order": 2
+        },
+        {
+          "option_id": "b5714578-ff04-4bc3-8acd-154dc8dd214c",
+          "question_id": "1ef0492b-d03d-4b4f-8238-87ee2842777c",
+          "content": "D. $5$",
+          "is_correct": false,
+          "display_order": 3
+        }
+      ]
+    },
+    {
+      "question_id": "cc8c5706-328f-4a91-9c97-d113b66f6375",
+      "exercise_id": "3ad4c004-9616-4ee1-9b88-e281596bfa7b",
+      "document_id": null,
+      "content": "Hàm số $$y = \\frac{x^2 + 1}{x - 1}$$ có số đường tiệm cận đứng và ngang lần lượt là:",
+      "content_markdown": "Hàm số y = (x² + 1)/(x - 1) có số đường tiệm cận đứng và ngang lần lượt là:",
+      "content_latex": "Hàm số $$y = \\frac{x^2 + 1}{x - 1}$$ có số đường tiệm cận đứng và ngang lần lượt là:",
+      "segments": [
+        {
+          "type": "text",
+          "content": "Hàm số "
+        },
+        {
+          "type": "math",
+          "latex": "y = \\frac{x^2 + 1}{x - 1}",
+          "display": true,
+          "confidence": 0.98
+        },
+        {
+          "type": "text",
+          "content": " có số đường tiệm cận đứng và ngang lần lượt là:"
+        }
+      ],
+      "confidence_score": 0.98,
+      "needs_review": false,
+      "question_type": "MultipleChoice",
+      "difficulty": "VD",
+      "correct_answer": null,
+      "explanation": null,
+      "display_order": 9,
+      "image_url": null,
+      "is_ai_generated": false,
+      "status": "ACTIVE",
+      "created_at": "2026-08-16T04:10:51.909720Z",
+      "updated_at": "2026-08-16T04:10:51.909720Z",
+      "answer_options": [
+        {
+          "option_id": "ea2ca8b7-2bd7-45f3-bac8-6868d81df200",
+          "question_id": "cc8c5706-328f-4a91-9c97-d113b66f6375",
+          "content": "A. $1\\text{ và }0$",
+          "is_correct": false,
+          "display_order": 0
+        },
+        {
+          "option_id": "0b15ab9a-2935-4aba-8bfa-923ef0a8999c",
+          "question_id": "cc8c5706-328f-4a91-9c97-d113b66f6375",
+          "content": "B. $1\\text{ và }1$",
+          "is_correct": true,
+          "display_order": 1
+        },
+        {
+          "option_id": "892875de-c18b-4c76-8276-c8afde616e67",
+          "question_id": "cc8c5706-328f-4a91-9c97-d113b66f6375",
+          "content": "C. $0\\text{ và }1$",
+          "is_correct": false,
+          "display_order": 2
+        },
+        {
+          "option_id": "7d616edd-dc57-4225-94f4-c42eb26d87c3",
+          "question_id": "cc8c5706-328f-4a91-9c97-d113b66f6375",
+          "content": "D. $2\\text{ và }1$",
+          "is_correct": false,
+          "display_order": 3
+        }
+      ]
+    },
+    {
+      "question_id": "7b54cbdb-2b96-464a-88e8-bca2f0b723c8",
+      "exercise_id": "3ad4c004-9616-4ee1-9b88-e281596bfa7b",
+      "document_id": null,
+      "content": "Với $m$ là tham số, phương trình $x^3 - 3x + m = 0$ có ba nghiệm thực phân biệt khi:",
+      "content_markdown": "Với m là tham số, phương trình x³ - 3x + m = 0 có ba nghiệm thực phân biệt khi:",
+      "content_latex": "Với $m$ là tham số, phương trình $x^3 - 3x + m = 0$ có ba nghiệm thực phân biệt khi:",
+      "segments": [
+        {
+          "type": "text",
+          "content": "Với "
+        },
+        {
+          "type": "math",
+          "latex": "m",
+          "display": false,
+          "confidence": 0.98
+        },
+        {
+          "type": "text",
+          "content": " là tham số, phương trình "
+        },
+        {
+          "type": "math",
+          "latex": "x^3 - 3x + m = 0",
+          "display": false,
+          "confidence": 0.98
+        },
+        {
+          "type": "text",
+          "content": " có ba nghiệm thực phân biệt khi:"
+        }
+      ],
+      "confidence_score": 0.98,
+      "needs_review": false,
+      "question_type": "MultipleChoice",
+      "difficulty": "VDC",
+      "correct_answer": null,
+      "explanation": null,
+      "display_order": 10,
+      "image_url": null,
+      "is_ai_generated": false,
+      "status": "ACTIVE",
+      "created_at": "2026-08-16T04:10:51.909720Z",
+      "updated_at": "2026-08-16T04:10:51.909720Z",
+      "answer_options": [
+        {
+          "option_id": "841f89bc-ad82-4505-a0ed-8c9da2865c03",
+          "question_id": "7b54cbdb-2b96-464a-88e8-bca2f0b723c8",
+          "content": "A. $-2 < m < 2$",
+          "is_correct": true,
+          "display_order": 0
+        },
+        {
+          "option_id": "647e21b0-01b5-4862-a9e8-c022adfede2f",
+          "question_id": "7b54cbdb-2b96-464a-88e8-bca2f0b723c8",
+          "content": "B. $m < -2$",
+          "is_correct": false,
+          "display_order": 1
+        },
+        {
+          "option_id": "92a4af5a-5b57-475a-ac36-b6c02119cc7d",
+          "question_id": "7b54cbdb-2b96-464a-88e8-bca2f0b723c8",
+          "content": "C. $m > 2$",
+          "is_correct": false,
+          "display_order": 2
+        },
+        {
+          "option_id": "fcacaed9-fa99-438d-8e36-ca61705dfa5e",
+          "question_id": "7b54cbdb-2b96-464a-88e8-bca2f0b723c8",
+          "content": "D. $|m| \\ge 2$",
+          "is_correct": false,
+          "display_order": 3
+        }
+      ]
+    },
+    {
+      "question_id": "84c8bf44-980f-40ac-875d-50889decf59d",
+      "exercise_id": "3ad4c004-9616-4ee1-9b88-e281596bfa7b",
+      "document_id": null,
+      "content": "Một nhà sản xuất thiết kế hộp chữ nhật không nắp có thể tích $108\\text{ cm}^3$, đáy là hình vuông cạnh $x$. Diện tích vật liệu nhỏ nhất đạt được khi $x$ bằng:",
+      "content_markdown": "Một nhà sản xuất thiết kế hộp chữ nhật không nắp có thể tích 108\\text cm³, đáy là hình vuông cạnh x. Diện tích vật liệu nhỏ nhất đạt được khi x bằng:",
+      "content_latex": "Một nhà sản xuất thiết kế hộp chữ nhật không nắp có thể tích $108\\text{ cm}^3$, đáy là hình vuông cạnh $x$. Diện tích vật liệu nhỏ nhất đạt được khi $x$ bằng:",
+      "segments": [
+        {
+          "type": "text",
+          "content": "Một nhà sản xuất thiết kế hộp chữ nhật không nắp có thể tích "
+        },
+        {
+          "type": "math",
+          "latex": "108\\text{cm}^3",
+          "display": false,
+          "confidence": 0.98
+        },
+        {
+          "type": "text",
+          "content": ", đáy là hình vuông cạnh "
+        },
+        {
+          "type": "math",
+          "latex": "x",
+          "display": false,
+          "confidence": 0.98
+        },
+        {
+          "type": "text",
+          "content": ". Diện tích vật liệu nhỏ nhất đạt được khi "
+        },
+        {
+          "type": "math",
+          "latex": "x",
+          "display": false,
+          "confidence": 0.98
+        },
+        {
+          "type": "text",
+          "content": " bằng:"
+        }
+      ],
+      "confidence_score": 0.98,
+      "needs_review": false,
+      "question_type": "MultipleChoice",
+      "difficulty": "VDC",
+      "correct_answer": null,
+      "explanation": null,
+      "display_order": 11,
+      "image_url": null,
+      "is_ai_generated": false,
+      "status": "ACTIVE",
+      "created_at": "2026-08-16T04:10:51.909720Z",
+      "updated_at": "2026-08-16T04:10:51.909720Z",
+      "answer_options": [
+        {
+          "option_id": "4ab06dc2-d509-4522-9a7e-23d7b7776427",
+          "question_id": "84c8bf44-980f-40ac-875d-50889decf59d",
+          "content": "A. $3\\text{ cm}$",
+          "is_correct": false,
+          "display_order": 0
+        },
+        {
+          "option_id": "b1cbdd45-45c0-4ee5-a9c0-5397865b2a41",
+          "question_id": "84c8bf44-980f-40ac-875d-50889decf59d",
+          "content": "B. $4\\text{ cm}$",
+          "is_correct": true,
+          "display_order": 1
+        },
+        {
+          "option_id": "b36a537c-4cc3-4e8d-819e-d1871c7ed58b",
+          "question_id": "84c8bf44-980f-40ac-875d-50889decf59d",
+          "content": "C. $6\\text{ cm}$",
+          "is_correct": false,
+          "display_order": 2
+        },
+        {
+          "option_id": "965e908f-5f28-4e75-bf08-2c210a3748ee",
+          "question_id": "84c8bf44-980f-40ac-875d-50889decf59d",
+          "content": "D. $9\\text{ cm}$",
+          "is_correct": false,
+          "display_order": 3
+        }
+      ]
+    },
+    {
+      "question_id": "99b42562-74d6-42aa-b78b-75a2dacbd639",
+      "exercise_id": "3ad4c004-9616-4ee1-9b88-e281596bfa7b",
+      "document_id": null,
+      "content": "Trong không gian $Oxyz$, cho $A(1; 0; 0), B(0; 2; 0), C(0; 0; 3)$. Khoảng cách từ $O$ đến mặt phẳng $(ABC)$ bằng:",
+      "content_markdown": "Trong không gian Oxyz, cho A(1; 0; 0), B(0; 2; 0), C(0; 0; 3). Khoảng cách từ O đến mặt phẳng (ABC) bằng:",
+      "content_latex": "Trong không gian $Oxyz$, cho $A(1; 0; 0), B(0; 2; 0), C(0; 0; 3)$. Khoảng cách từ $O$ đến mặt phẳng $(ABC)$ bằng:",
+      "segments": [
+        {
+          "type": "text",
+          "content": "Trong không gian "
+        },
+        {
+          "type": "math",
+          "latex": "Oxyz",
+          "display": false,
+          "confidence": 0.98
+        },
+        {
+          "type": "text",
+          "content": ", cho "
+        },
+        {
+          "type": "math",
+          "latex": "A(1; 0; 0), B(0; 2; 0), C(0; 0; 3)",
+          "display": false,
+          "confidence": 0.98
+        },
+        {
+          "type": "text",
+          "content": ". Khoảng cách từ "
+        },
+        {
+          "type": "math",
+          "latex": "O",
+          "display": false,
+          "confidence": 0.98
+        },
+        {
+          "type": "text",
+          "content": " đến mặt phẳng "
+        },
+        {
+          "type": "math",
+          "latex": "(ABC)",
+          "display": false,
+          "confidence": 0.98
+        },
+        {
+          "type": "text",
+          "content": " bằng:"
+        }
+      ],
+      "confidence_score": 0.98,
+      "needs_review": false,
+      "question_type": "MultipleChoice",
+      "difficulty": "VDC",
+      "correct_answer": null,
+      "explanation": null,
+      "display_order": 12,
+      "image_url": null,
+      "is_ai_generated": false,
+      "status": "ACTIVE",
+      "created_at": "2026-08-16T04:10:51.909720Z",
+      "updated_at": "2026-08-16T04:10:51.909720Z",
+      "answer_options": [
+        {
+          "option_id": "2893b20d-2368-42e4-9cf9-10afb9570541",
+          "question_id": "99b42562-74d6-42aa-b78b-75a2dacbd639",
+          "content": "A. $\\frac{6}{\\sqrt{61}}$",
+          "is_correct": false,
+          "display_order": 0
+        },
+        {
+          "option_id": "87613c9a-e8c0-412f-b9aa-fa0d4989df06",
+          "question_id": "99b42562-74d6-42aa-b78b-75a2dacbd639",
+          "content": "B. $6$",
+          "is_correct": false,
+          "display_order": 1
+        },
+        {
+          "option_id": "965a3d4e-15f3-4ce3-b496-ec4f3c1c16e2",
+          "question_id": "99b42562-74d6-42aa-b78b-75a2dacbd639",
+          "content": "C. $\\frac{1}{\\sqrt{61}}$",
+          "is_correct": true,
+          "display_order": 2
+        },
+        {
+          "option_id": "318ff1f8-da00-44a9-a060-eace628bb34e",
+          "question_id": "99b42562-74d6-42aa-b78b-75a2dacbd639",
+          "content": "D. $\\frac{6}{7}$",
+          "is_correct": false,
+          "display_order": 3
+        }
+      ]
+    },
+    {
+      "question_id": "21a95ff4-13f4-42a7-9ae2-9460e7a2bfed",
+      "exercise_id": "3ad4c004-9616-4ee1-9b88-e281596bfa7b",
+      "document_id": null,
+      "content": "Cho hàm số $y = x^3 - 3x^2 + 2$.",
+      "content_markdown": "Cho hàm số y = x³ - 3x² + 2.",
+      "content_latex": "Cho hàm số $y = x^3 - 3x^2 + 2$.",
+      "segments": [
+        {
+          "type": "text",
+          "content": "Cho hàm số "
+        },
+        {
+          "type": "math",
+          "latex": "y = x^3 - 3x^2 + 2",
+          "display": false,
+          "confidence": 0.98
+        },
+        {
+          "type": "text",
+          "content": "."
+        }
+      ],
+      "confidence_score": 0.98,
+      "needs_review": false,
+      "question_type": "TrueFalse",
+      "difficulty": null,
+      "correct_answer": null,
+      "explanation": null,
+      "display_order": 13,
+      "image_url": null,
+      "is_ai_generated": false,
+      "status": "ACTIVE",
+      "created_at": "2026-08-16T04:10:51.909720Z",
+      "updated_at": "2026-08-16T04:10:51.909720Z",
+      "answer_options": [
+        {
+          "option_id": "50696c35-01f2-414d-8364-b9645611dd15",
+          "question_id": "21a95ff4-13f4-42a7-9ae2-9460e7a2bfed",
+          "content": "a) Hàm số có hai điểm cực trị.",
+          "is_correct": true,
+          "display_order": 0
+        },
+        {
+          "option_id": "7097a251-d2f2-4fda-97bd-a01f7596ece0",
+          "question_id": "21a95ff4-13f4-42a7-9ae2-9460e7a2bfed",
+          "content": "b) Hàm số đồng biến trên khoảng $(-\\infty; 0)$.",
+          "is_correct": false,
+          "display_order": 1
+        },
+        {
+          "option_id": "bfae2bb3-c956-4c75-afc4-23c8b3a3f248",
+          "question_id": "21a95ff4-13f4-42a7-9ae2-9460e7a2bfed",
+          "content": "c) Giá trị cực đại của hàm số bằng $2$.",
+          "is_correct": true,
+          "display_order": 2
+        },
+        {
+          "option_id": "f93abf74-9000-4074-82c3-001f0d8c5e37",
+          "question_id": "21a95ff4-13f4-42a7-9ae2-9460e7a2bfed",
+          "content": "d) Phương trình $f(x) = 0$ có đúng hai nghiệm thực.",
+          "is_correct": false,
+          "display_order": 3
+        }
+      ]
+    },
+    {
+      "question_id": "ca331330-32a4-4246-bad9-2da04cc9115a",
+      "exercise_id": "3ad4c004-9616-4ee1-9b88-e281596bfa7b",
+      "document_id": null,
+      "content": "Trong không gian $Oxyz$, cho $A(1; 2; -1), B(3; -1; 2)$.",
+      "content_markdown": "Trong không gian Oxyz, cho A(1; 2; -1), B(3; -1; 2).",
+      "content_latex": "Trong không gian $Oxyz$, cho $A(1; 2; -1), B(3; -1; 2)$.",
+      "segments": [
+        {
+          "type": "text",
+          "content": "Trong không gian "
+        },
+        {
+          "type": "math",
+          "latex": "Oxyz",
+          "display": false,
+          "confidence": 0.98
+        },
+        {
+          "type": "text",
+          "content": ", cho "
+        },
+        {
+          "type": "math",
+          "latex": "A(1; 2; - 1), B(3; - 1; 2)",
+          "display": false,
+          "confidence": 0.98
+        },
+        {
+          "type": "text",
+          "content": "."
+        }
+      ],
+      "confidence_score": 0.98,
+      "needs_review": false,
+      "question_type": "TrueFalse",
+      "difficulty": null,
+      "correct_answer": null,
+      "explanation": null,
+      "display_order": 14,
+      "image_url": null,
+      "is_ai_generated": false,
+      "status": "ACTIVE",
+      "created_at": "2026-08-16T04:10:51.909720Z",
+      "updated_at": "2026-08-16T04:10:51.909720Z",
+      "answer_options": [
+        {
+          "option_id": "2739c46e-e5c2-414f-963d-7a0b467f74d3",
+          "question_id": "ca331330-32a4-4246-bad9-2da04cc9115a",
+          "content": "a) Vectơ $\\vec{AB} = (2; -3; 3)$.",
+          "is_correct": true,
+          "display_order": 0
+        },
+        {
+          "option_id": "5314a690-acbe-4413-a008-179c1ce1f2be",
+          "question_id": "ca331330-32a4-4246-bad9-2da04cc9115a",
+          "content": "b) Độ dài $AB = \\sqrt{22}$.",
+          "is_correct": true,
+          "display_order": 1
+        },
+        {
+          "option_id": "f299be4d-2cc6-49ad-aa83-278b648a0c40",
+          "question_id": "ca331330-32a4-4246-bad9-2da04cc9115a",
+          "content": "c) Trung điểm của $AB$ là $M\\left(2; \\frac{1}{2}; \\frac{1}{2}\\right)$.",
+          "is_correct": true,
+          "display_order": 2
+        },
+        {
+          "option_id": "9299eff7-0573-4065-a444-e881501070a5",
+          "question_id": "ca331330-32a4-4246-bad9-2da04cc9115a",
+          "content": "d) Mặt phẳng trung trực của $AB$ có vectơ pháp tuyến $(2; -3; 3)$.",
+          "is_correct": true,
+          "display_order": 3
+        }
+      ]
+    },
+    {
+      "question_id": "0dc89cf9-4b9a-4bdd-ad2d-0f0ab98844fe",
+      "exercise_id": "3ad4c004-9616-4ee1-9b88-e281596bfa7b",
+      "document_id": null,
+      "content": "Cho hàm số $f(x) = \\ln(x^2 + 1)$.",
+      "content_markdown": "Cho hàm số f(x) = \\ln(x² + 1).",
+      "content_latex": "Cho hàm số $f(x) = \\ln(x^2 + 1)$.",
+      "segments": [
+        {
+          "type": "text",
+          "content": "Cho hàm số "
+        },
+        {
+          "type": "math",
+          "latex": "f(x) = \\ln(x^2 + 1)",
+          "display": false,
+          "confidence": 0.98
+        },
+        {
+          "type": "text",
+          "content": "."
+        }
+      ],
+      "confidence_score": 0.98,
+      "needs_review": false,
+      "question_type": "TrueFalse",
+      "difficulty": null,
+      "correct_answer": null,
+      "explanation": null,
+      "display_order": 15,
+      "image_url": null,
+      "is_ai_generated": false,
+      "status": "ACTIVE",
+      "created_at": "2026-08-16T04:10:51.909720Z",
+      "updated_at": "2026-08-16T04:10:51.909720Z",
+      "answer_options": [
+        {
+          "option_id": "71d52da9-a47b-46f2-b757-8ea7b2f85a6f",
+          "question_id": "0dc89cf9-4b9a-4bdd-ad2d-0f0ab98844fe",
+          "content": "a) $f'(x) = \\frac{2x}{x^2 + 1}$.",
+          "is_correct": true,
+          "display_order": 0
+        },
+        {
+          "option_id": "eaed19fc-be27-417c-bc5b-8aa3a37ffdaf",
+          "question_id": "0dc89cf9-4b9a-4bdd-ad2d-0f0ab98844fe",
+          "content": "b) Hàm số đồng biến trên $\\mathbb{R}$.",
+          "is_correct": true,
+          "display_order": 1
+        },
+        {
+          "option_id": "961c3282-0b36-4abd-8b30-4152fce2f38b",
+          "question_id": "0dc89cf9-4b9a-4bdd-ad2d-0f0ab98844fe",
+          "content": "c) Hàm số đạt giá trị nhỏ nhất bằng $0$.",
+          "is_correct": true,
+          "display_order": 2
+        },
+        {
+          "option_id": "290bd99f-1dc0-4b00-b9f2-a4a7e8f3c21c",
+          "question_id": "0dc89cf9-4b9a-4bdd-ad2d-0f0ab98844fe",
+          "content": "d) Đồ thị hàm số có tiệm cận ngang.",
+          "is_correct": false,
+          "display_order": 3
+        }
+      ]
+    },
+    {
+      "question_id": "4236f629-f2cc-48a7-b85c-f03dd0fb816c",
+      "exercise_id": "3ad4c004-9616-4ee1-9b88-e281596bfa7b",
+      "document_id": null,
+      "content": "Một hình hộp chữ nhật có ba kích thước $2, 3$ và $6$.",
+      "content_markdown": "Một hình hộp chữ nhật có ba kích thước 2, 3 và 6.",
+      "content_latex": "Một hình hộp chữ nhật có ba kích thước $2, 3$ và $6$.",
+      "segments": [
+        {
+          "type": "text",
+          "content": "Một hình hộp chữ nhật có ba kích thước "
+        },
+        {
+          "type": "math",
+          "latex": "2, 3",
+          "display": false,
+          "confidence": 0.98
+        },
+        {
+          "type": "text",
+          "content": " và "
+        },
+        {
+          "type": "math",
+          "latex": "6",
+          "display": false,
+          "confidence": 0.98
+        },
+        {
+          "type": "text",
+          "content": "."
+        }
+      ],
+      "confidence_score": 0.98,
+      "needs_review": false,
+      "question_type": "TrueFalse",
+      "difficulty": null,
+      "correct_answer": null,
+      "explanation": null,
+      "display_order": 16,
+      "image_url": null,
+      "is_ai_generated": false,
+      "status": "ACTIVE",
+      "created_at": "2026-08-16T04:10:51.909720Z",
+      "updated_at": "2026-08-16T04:10:51.909720Z",
+      "answer_options": [
+        {
+          "option_id": "83b00611-2321-49bd-bedb-b460b9ea2d37",
+          "question_id": "4236f629-f2cc-48a7-b85c-f03dd0fb816c",
+          "content": "a) Thể tích hình hộp bằng $36$.",
+          "is_correct": true,
+          "display_order": 0
+        },
+        {
+          "option_id": "b25c43f0-8493-4bee-954a-66510bfc0db0",
+          "question_id": "4236f629-f2cc-48a7-b85c-f03dd0fb816c",
+          "content": "b) Độ dài đường chéo bằng $7$.",
+          "is_correct": true,
+          "display_order": 1
+        },
+        {
+          "option_id": "2517cc1f-731a-4ef4-8f39-8c3539b8b908",
+          "question_id": "4236f629-f2cc-48a7-b85c-f03dd0fb816c",
+          "content": "c) Diện tích toàn phần bằng $72$.",
+          "is_correct": true,
+          "display_order": 2
+        },
+        {
+          "option_id": "969b3419-a10e-4075-a4be-8d14b38adfdc",
+          "question_id": "4236f629-f2cc-48a7-b85c-f03dd0fb816c",
+          "content": "d) Khoảng cách giữa hai mặt phẳng đối diện có diện tích lớn nhất bằng $6$.",
+          "is_correct": true,
+          "display_order": 3
+        }
+      ]
+    },
+    {
+      "question_id": "092e1553-135b-409a-a4c4-3a9ddbca660b",
+      "exercise_id": "3ad4c004-9616-4ee1-9b88-e281596bfa7b",
+      "document_id": null,
+      "content": "Trong không gian $Oxyz$, cho $A(1; 2; 3)$ và $B(4; 6; 3)$. Tính khoảng cách $AB$.",
+      "content_markdown": "Trong không gian Oxyz, cho A(1; 2; 3) và B(4; 6; 3). Tính khoảng cách AB.",
+      "content_latex": "Trong không gian $Oxyz$, cho $A(1; 2; 3)$ và $B(4; 6; 3)$. Tính khoảng cách $AB$.",
+      "segments": [
+        {
+          "type": "text",
+          "content": "Trong không gian "
+        },
+        {
+          "type": "math",
+          "latex": "Oxyz",
+          "display": false,
+          "confidence": 0.98
+        },
+        {
+          "type": "text",
+          "content": ", cho "
+        },
+        {
+          "type": "math",
+          "latex": "A(1; 2; 3)",
+          "display": false,
+          "confidence": 0.98
+        },
+        {
+          "type": "text",
+          "content": " và "
+        },
+        {
+          "type": "math",
+          "latex": "B(4; 6; 3)",
+          "display": false,
+          "confidence": 0.98
+        },
+        {
+          "type": "text",
+          "content": ". Tính khoảng cách "
+        },
+        {
+          "type": "math",
+          "latex": "AB",
+          "display": false,
+          "confidence": 0.98
+        },
+        {
+          "type": "text",
+          "content": "."
+        }
+      ],
+      "confidence_score": 0.98,
+      "needs_review": false,
+      "question_type": "ShortAnswer",
+      "difficulty": "VD",
+      "correct_answer": "5",
+      "explanation": null,
+      "display_order": 19,
+      "image_url": null,
+      "is_ai_generated": false,
+      "status": "ACTIVE",
+      "created_at": "2026-08-16T04:10:51.909720Z",
+      "updated_at": "2026-08-16T04:10:51.909720Z",
+      "answer_options": []
+    },
+    {
+      "question_id": "e0c67a18-f3cf-4511-b6fa-191686765c20",
+      "exercise_id": "3ad4c004-9616-4ee1-9b88-e281596bfa7b",
+      "document_id": null,
+      "content": "Cho hàm số $f(x) = x^3 - 3x + 1$. Tính giá trị $f(2)$.",
+      "content_markdown": "Cho hàm số f(x) = x³ - 3x + 1. Tính giá trị f(2).",
+      "content_latex": "Cho hàm số $f(x) = x^3 - 3x + 1$. Tính giá trị $f(2)$.",
+      "segments": [
+        {
+          "type": "text",
+          "content": "Cho hàm số "
+        },
+        {
+          "type": "math",
+          "latex": "f(x) = x^3 - 3x + 1",
+          "display": false,
+          "confidence": 0.98
+        },
+        {
+          "type": "text",
+          "content": ". Tính giá trị "
+        },
+        {
+          "type": "math",
+          "latex": "f(2)",
+          "display": false,
+          "confidence": 0.98
+        },
+        {
+          "type": "text",
+          "content": "."
+        }
+      ],
+      "confidence_score": 0.98,
+      "needs_review": false,
+      "question_type": "ShortAnswer",
+      "difficulty": "TH",
+      "correct_answer": "3",
+      "explanation": null,
+      "display_order": 17,
+      "image_url": null,
+      "is_ai_generated": false,
+      "status": "ACTIVE",
+      "created_at": "2026-08-16T04:10:51.909720Z",
+      "updated_at": "2026-08-16T04:10:51.909720Z",
+      "answer_options": []
+    },
+    {
+      "question_id": "8ff3caae-e528-45aa-805c-7cdf063f4dcf",
+      "exercise_id": "3ad4c004-9616-4ee1-9b88-e281596bfa7b",
+      "document_id": null,
+      "content": "Một hình trụ có thể tích $V = 1000\\text{ cm}^3$. Biết bán kính đáy bằng $5\\text{ cm}$. Tính chiều cao $h$ của hình trụ (làm tròn đến hàng phần mười).",
+      "content_markdown": "Một hình trụ có thể tích V = 1000\\text cm³. Biết bán kính đáy bằng 5\\text cm. Tính chiều cao h của hình trụ (làm tròn đến hàng phần mười).",
+      "content_latex": "Một hình trụ có thể tích $V = 1000\\text{ cm}^3$. Biết bán kính đáy bằng $5\\text{ cm}$. Tính chiều cao $h$ của hình trụ (làm tròn đến hàng phần mười).",
+      "segments": [
+        {
+          "type": "text",
+          "content": "Một hình trụ có thể tích "
+        },
+        {
+          "type": "math",
+          "latex": "V = 1000\\text{cm}^3",
+          "display": false,
+          "confidence": 0.98
+        },
+        {
+          "type": "text",
+          "content": ". Biết bán kính đáy bằng "
+        },
+        {
+          "type": "math",
+          "latex": "5\\text{cm}",
+          "display": false,
+          "confidence": 0.98
+        },
+        {
+          "type": "text",
+          "content": ". Tính chiều cao "
+        },
+        {
+          "type": "math",
+          "latex": "h",
+          "display": false,
+          "confidence": 0.98
+        },
+        {
+          "type": "text",
+          "content": " của hình trụ (làm tròn đến hàng phần mười)."
+        }
+      ],
+      "confidence_score": 0.98,
+      "needs_review": false,
+      "question_type": "ShortAnswer",
+      "difficulty": "VD",
+      "correct_answer": "12,7",
+      "explanation": null,
+      "display_order": 18,
+      "image_url": null,
+      "is_ai_generated": false,
+      "status": "ACTIVE",
+      "created_at": "2026-08-16T04:10:51.909720Z",
+      "updated_at": "2026-08-16T04:10:51.909720Z",
+      "answer_options": []
+    },
+    {
+      "question_id": "c4343e48-32ce-4c21-80bf-609db4f0bf5a",
+      "exercise_id": "3ad4c004-9616-4ee1-9b88-e281596bfa7b",
+      "document_id": null,
+      "content": "Một doanh nghiệp có chi phí $C(x) = x^2 - 20x + 300$ (triệu đồng) khi sản xuất $x$ sản phẩm. Doanh thu $R(x) = 80x - 0.5x^2$ (triệu đồng). Với $x \\in [0; 60]$, số sản phẩm cần sản xuất để lợi nhuận lớn nhất là bao nhiêu?",
+      "content_markdown": "Một doanh nghiệp có chi phí C(x) = x² - 20x + 300 (triệu đồng) khi sản xuất x sản phẩm. Doanh thu R(x) = 80x - 0.5x² (triệu đồng). Với x \\in [0; 60], số sản phẩm cần sản xuất để lợi nhuận lớn nhất là bao nhiêu?",
+      "content_latex": "Một doanh nghiệp có chi phí $C(x) = x^2 - 20x + 300$ (triệu đồng) khi sản xuất $x$ sản phẩm. Doanh thu $R(x) = 80x - 0.5x^2$ (triệu đồng). Với $x \\in [0; 60]$, số sản phẩm cần sản xuất để lợi nhuận lớn nhất là bao nhiêu?",
+      "segments": [
+        {
+          "type": "text",
+          "content": "Một doanh nghiệp có chi phí "
+        },
+        {
+          "type": "math",
+          "latex": "C(x) = x^2 - 20x + 300",
+          "display": false,
+          "confidence": 0.98
+        },
+        {
+          "type": "text",
+          "content": " (triệu đồng) khi sản xuất "
+        },
+        {
+          "type": "math",
+          "latex": "x",
+          "display": false,
+          "confidence": 0.98
+        },
+        {
+          "type": "text",
+          "content": " sản phẩm. Doanh thu "
+        },
+        {
+          "type": "math",
+          "latex": "R(x) = 80x - 0.5x^2",
+          "display": false,
+          "confidence": 0.98
+        },
+        {
+          "type": "text",
+          "content": " (triệu đồng). Với "
+        },
+        {
+          "type": "math",
+          "latex": "x \\in [0; 60]",
+          "display": false,
+          "confidence": 0.98
+        },
+        {
+          "type": "text",
+          "content": ", số sản phẩm cần sản xuất để lợi nhuận lớn nhất là bao nhiêu?"
+        }
+      ],
+      "confidence_score": 0.98,
+      "needs_review": false,
+      "question_type": "ShortAnswer",
+      "difficulty": "VDC",
+      "correct_answer": "100",
+      "explanation": null,
+      "display_order": 20,
+      "image_url": null,
+      "is_ai_generated": false,
+      "status": "ACTIVE",
+      "created_at": "2026-08-16T04:10:51.909720Z",
+      "updated_at": "2026-08-16T04:10:51.909720Z",
+      "answer_options": []
+    }
+  ]
+}

@@ -53,8 +53,22 @@ class AnswerOptionOut(BaseModel):
     model_config = {"from_attributes": True}
 
 
+class SegmentSchema(BaseModel):
+    type: str = Field("text", description="Segment type: text, math, or image")
+    content: Optional[str] = Field(None, description="Text content if type=text")
+    latex: Optional[str] = Field(None, description="LaTeX string if type=math")
+    display: bool = Field(False, description="Whether math is display/block style ($$) or inline ($)")
+    confidence: Optional[float] = Field(None, description="OCR recognition confidence score (0.0 - 1.0)")
+    bbox: Optional[List[float]] = Field(None, description="Bounding box coordinates [x0, y0, x1, y1]")
+
+
 class QuestionCreate(BaseModel):
     content: str = Field(..., min_length=1, description="Question content text")
+    content_markdown: Optional[str] = Field(None, description="Formatted plain Markdown text with converted Unicode math symbols")
+    content_latex: Optional[str] = Field(None, description="Raw LaTeX math formula content")
+    segments: Optional[List[SegmentSchema]] = Field(None, description="Structured content segments (text/math/image)")
+    confidence_score: Optional[float] = Field(None, description="Average OCR confidence score")
+    needs_review: bool = Field(False, description="Whether question needs teacher review/correction")
     question_type: QuestionTypeEnum = Field(QuestionTypeEnum.MultipleChoice, description="Question type category")
     difficulty: Optional[DifficultyEnum] = Field(None, description="Question difficulty level")
     correct_answer: Optional[str] = Field(None, description="Correct answer for ShortAnswer questions")
@@ -90,6 +104,11 @@ class QuestionCreate(BaseModel):
 
 class QuestionUpdate(BaseModel):
     content: Optional[str] = Field(None, min_length=1)
+    content_markdown: Optional[str] = None
+    content_latex: Optional[str] = None
+    segments: Optional[List[SegmentSchema]] = None
+    confidence_score: Optional[float] = None
+    needs_review: Optional[bool] = None
     question_type: Optional[QuestionTypeEnum] = None
     difficulty: Optional[DifficultyEnum] = None
     correct_answer: Optional[str] = None
@@ -125,6 +144,11 @@ class QuestionOut(BaseModel):
     exercise_id: UUID
     document_id: Optional[UUID] = None
     content: str
+    content_markdown: Optional[str] = None
+    content_latex: Optional[str] = None
+    segments: Optional[List[Any]] = None
+    confidence_score: Optional[float] = None
+    needs_review: bool = False
     question_type: str
     difficulty: Optional[str] = None
     correct_answer: Optional[str] = None

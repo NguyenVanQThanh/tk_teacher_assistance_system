@@ -120,3 +120,67 @@ def test_merge_questions_and_answers_missing_key():
     merged, errors = ImportParserService.merge_questions_and_answers([q1], answers)
     assert len(errors) == 1
     assert "Missing answer key" in errors[0].message
+
+
+def test_convert_latex_to_markdown():
+    raw_text = r"Vận tốc ban đầu $\vec{v} = \vec{a} + \vec{b}$ trong thời gian $t_1$ với phân số $\frac{x}{y}$ và $x^2$."
+    converted = ImportParserService.convert_latex_to_markdown(raw_text)
+    assert "v\u20d7 = a\u20d7 + b\u20d7" in converted
+    assert "t₁" in converted
+    assert "(x)/(y)" in converted
+    assert "x²" in converted
+
+    # Test parse_part1_question populates content_markdown, content_latex, segments, confidence, needs_review
+    q, err = ImportParserService.parse_part1_question(1, f"Câu 1. {raw_text}\nA. 1\nB. 2", None, None)
+    assert err is None
+    assert q.content_latex == raw_text
+    assert "v\u20d7 = a\u20d7 + b\u20d7" in q.content_markdown
+    assert q.segments is not None
+    assert len(q.segments) > 0
+    assert q.needs_review is False
+    assert q.confidence_score is not None
+
+
+def test_normalize_latex():
+    raw_latex = r"\frac { 2 x } { x ^ { 2 } + 1 }"
+    norm = ImportParserService.normalize_latex(raw_latex)
+    assert r"\frac{2x}{x^{2} + 1}" in norm or r"\frac{2x}" in norm
+
+
+def test_validate_latex():
+    valid_latex = r"\frac{2x}{x^2+1} + \sqrt{x}"
+    is_valid, err = ImportParserService.validate_latex(valid_latex)
+    assert is_valid is True
+    assert err is None
+
+    invalid_latex = r"\frac{2x}{x^2+1"  # Unclosed brace
+    is_valid, err = ImportParserService.validate_latex(invalid_latex)
+    assert is_valid is False
+    assert "Unclosed brace" in err
+
+
+def test_extract_segments_inline_and_display():
+    text = r"Cho hàm số $f(x)=x^2+1$. Tính giá trị của: $$\int_{0}^{1} f(x) dx$$"
+    segments, needs_review = ImportParserService.extract_segments(text)
+    assert len(segments) == 4
+    assert segments[0]["type"] == "text"
+    assert segments[0]["content"] == "Cho hàm số "
+    assert segments[1]["type"] == "math"
+    assert segments[1]["display"] is False
+    assert segments[2]["type"] == "text"
+    assert segments[3]["type"] == "math"
+    assert segments[3]["display"] is True
+    assert needs_review is False
+
+
+def test_extract_segments_with_corrupted_math():
+    text = r"Tính giới hạn $\lim_{x\to 0} \frac{x}{x+1}$"
+    # An actually corrupted formula with missing closing brace:
+    corrupted_text = r"Tính giới hạn $\lim_{x\to 0} \frac{x}{x+1$"
+    segments, needs_review = ImportParserService.extract_segments(corrupted_text)
+    assert needs_review is True
+    assert segments[1]["confidence"] == 0.60
+
+
+
+

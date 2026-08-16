@@ -3,7 +3,7 @@
 > Depends on: `F-EXE-01`
 > Status: `ready to test`
 > Created At: `2026-07-28`
-> Updated At: `2026-08-09`
+> Updated At: `2026-08-16`
 
 
 
@@ -15,14 +15,15 @@
 ## Mô tả Task
 Triển khai import hàng loạt câu hỏi từ file `.docx`/`.pdf` theo template đề thi Bộ GD&ĐT (regex/matrix, không AI):
 1. Thêm dependency `python-docx`, `pdfplumber`, `python-multipart` vào `requirements.txt`.
-2. Database Schema: Bổ sung cờ `TrueFalse` trong `QuestionTypeEnum` và cột `image_url` (nullable) vào bảng `questions` + model mapping.
+2. Database Schema: Bổ sung cờ `TrueFalse` trong `QuestionTypeEnum`, bổ sung hai cột `content_markdown` và `content_latex` + cột `image_url` (nullable) vào bảng `questions` và Pydantic models.
 3. `ImportParserService.extract_docx_content` / `extract_pdf_content` — trích xuất text thuần, bảng biểu và tệp hình ảnh đính kèm từ `.docx`/`.pdf`.
-4. `ImportParserService.parse_questions(text, images)` — regex tách theo `Câu N.`, parse 3 phần (Phần I MCQ, Phần II Đúng/Sai, Phần III Trả lời ngắn), parse tag `[NB]/[TH]/[VD]` (nếu thiếu -> `None`), tách các lựa chọn với nhãn `A.`, `A)`, `A/`... và gán tệp ảnh `image_url`.
-5. `ImportParserService.parse_answer_keys(text_or_tables, test_code)` — parse 3 dạng đáp án: Bảng matrix đáp án nhiều mã đề (Mã đề 0121, 0122...), Bảng đáp án 1 mã đề duy nhất (`Câu` | `Đáp án`), và Dạng danh sách dòng (`1. A`, `1. a) Đ, b) S...`, `1. 450`).
-6. `ImportParserService.merge_questions_and_answers(questions, answers)` — ghép câu hỏi và đáp án đúng, validate toàn bộ (all-or-nothing, trả về error list nếu có câu sai).
-7. API Router: `POST /api/v1/exercises/{exercise_id}/questions/import` (multipart: `question_file`, optional `answer_file`, optional `test_code`).
-8. Seed permission mới `EXE_QUESTION_IMPORT` — map role Teacher + Admin.
-9. Unit tests & Integration tests cho parser và endpoint (100% passed).
+4. `ImportParserService.convert_latex_to_markdown` — tự động phát hiện (math detection) công thức LaTeX `$ ... $` / `$$ ... $$` và quy đổi sang định dạng Markdown/Unicode đại diện (ví dụ: `\vec{v}` -> `v⃗` hoặc `**v**`, `x^2` -> `x²`). Tách và lưu 2 phiên bản độc lập `content_markdown` và `content_latex`.
+5. `ImportParserService.parse_questions(text, images)` — regex tách theo `Câu N.`, parse 3 phần (Phần I MCQ, Phần II Đúng/Sai, Phần III Trả lời ngắn), parse tag `[NB]/[TH]/[VD]` (nếu thiếu -> `None`), tách các lựa chọn với nhãn `A.`, `A)`, `A/`... và gán tệp ảnh `image_url`.
+6. `ImportParserService.parse_answer_keys(text_or_tables, test_code)` — parse 3 dạng đáp án: Bảng matrix đáp án nhiều mã đề (Mã đề 0121, 0122...), Bảng đáp án 1 mã đề duy nhất (`Câu` | `Đáp án`), và Dạng danh sách dòng (`1. A`, `1. a) Đ, b) S...`, `1. 450`).
+7. `ImportParserService.merge_questions_and_answers(questions, answers)` — ghép câu hỏi và đáp án đúng, validate toàn bộ (all-or-nothing, trả về error list nếu có câu sai).
+8. API Router: `POST /api/v1/exercises/{exercise_id}/questions/import` (multipart: `question_file`, optional `answer_file`, optional `test_code`).
+9. Seed permission mới `EXE_QUESTION_IMPORT` — map role Teacher + Admin.
+10. Unit tests & Integration tests cho parser và endpoint (100% passed).
 
 ## Technical Workflow
 
@@ -55,8 +56,9 @@ Bước 5: Automated Testing Verification
 ```
 
 ## Kết quả kiểm thử
-- `pytest tests/exercise/unit/test_import_parser_service.py` -> 9/9 passed.
+- `pytest tests/exercise/unit/test_import_parser_service.py` -> 14/14 passed.
 - `pytest tests/exercise/test_question_import.py` -> 2/2 passed.
-- `pytest` (Toàn bộ suite 136 tests) -> 136/136 passed (100%).
+- `pytest` (Toàn bộ suite 144 tests) -> 144/144 passed (100%).
+
 
 

@@ -5,7 +5,7 @@
 # Updated At: 2026-07-31
 # Updated By: Tam Khang
 
-from typing import List, Optional
+from typing import List, Optional, Any
 from uuid import UUID
 from sqlalchemy.orm import Session, joinedload
 from models.models import Exercise, Question, AnswerOption, ClassAssignment, StudentExerciseAttempt
@@ -127,6 +127,11 @@ class QuestionRepository:
         self,
         question: Question,
         content: Optional[str] = None,
+        content_markdown: Optional[str] = None,
+        content_latex: Optional[str] = None,
+        segments: Optional[Any] = None,
+        confidence_score: Optional[float] = None,
+        needs_review: Optional[bool] = None,
         question_type: Optional[str] = None,
         difficulty: Optional[str] = None,
         correct_answer: Optional[str] = None,
@@ -138,6 +143,16 @@ class QuestionRepository:
         """Update Question fields and replace associated AnswerOptions if provided."""
         if content is not None:
             question.content = content
+        if content_markdown is not None:
+            question.content_markdown = content_markdown
+        if content_latex is not None:
+            question.content_latex = content_latex
+        if segments is not None:
+            question.segments = segments
+        if confidence_score is not None:
+            question.confidence_score = confidence_score
+        if needs_review is not None:
+            question.needs_review = needs_review
         if question_type is not None:
             question.question_type = question_type
         if difficulty is not None:

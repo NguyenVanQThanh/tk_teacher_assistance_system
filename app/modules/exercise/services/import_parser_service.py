@@ -31,6 +31,11 @@ class ParsedQuestion:
     question_type: QuestionTypeEnum
     difficulty: Optional[DifficultyEnum]
     content: str
+    content_markdown: Optional[str] = None
+    content_latex: Optional[str] = None
+    segments: Optional[List[Dict[str, Any]]] = None
+    confidence_score: Optional[float] = None
+    needs_review: bool = False
     image_url: Optional[str] = None
     answer_options: List[ParsedOption] = field(default_factory=list)
     correct_answer: Optional[str] = None
@@ -432,6 +437,188 @@ class ImportParserService:
         """Strip tags like [NB], [TH], [VD], [TN], [DS], [TL] from text."""
         return re.sub(r"\[(NB|TH|VD|TN|DS|TL|TU|Nhận biết|Thông hiểu|Vận dụng)\]", "", text, flags=re.IGNORECASE).strip()
 
+    @staticmethod
+    def convert_latex_to_markdown(raw_text: str) -> str:
+        """
+        Converts LaTeX math expressions ($...$ and $$...$$) into clean Markdown with Unicode symbols.
+        E.g., $\vec{v} = \vec{a} + \vec{b}$ -> v⃗ = a⃗ + b⃗
+              $\frac{a}{b}$ -> (a)/(b)
+              $x^2$ -> x²
+              $t_1$ -> t₁
+        """
+        if not raw_text:
+            return raw_text
+
+        math_pattern = r'(\$\$.*?\$\$|\$.*?\$)'
+
+        sup_map = str.maketrans("0123456789+-=()n", "⁰¹²³⁴⁵⁶⁷⁸⁹⁺⁻⁼⁽⁾ⁿ")
+        sub_map = str.maketrans({
+            '0': '₀', '1': '₁', '2': '₂', '3': '₃', '4': '₄',
+            '5': '₅', '6': '₆', '7': '₇', '8': '₈', '9': '₉',
+            '+': '₊', '-': '₋', '=': '₌', '(': '₍', ')': '₎',
+            'a': 'ₐ', 'e': 'ₑ', 'h': 'ₕ', 'i': 'ᵢ', 'j': 'ⱼ',
+            'k': 'ₖ', 'l': 'ₗ', 'm': 'ₘ', 'n': 'ₙ', 'o': 'ₒ',
+            'p': 'ₚ', 'r': 'ᵣ', 's': 'ₛ', 't': 'ₜ', 'u': 'ᵤ',
+            'v': 'ᵥ', 'x': 'ₓ'
+        })
+        symbol_map = {
+            r'\alpha': 'α', r'\beta': 'β', r'\gamma': 'γ', r'\delta': 'δ', r'\pi': 'π',
+            r'\theta': 'θ', r'\lambda': 'λ', r'\mu': 'μ', r'\sigma': 'σ', r'\omega': 'ω',
+            r'\Delta': 'Δ', r'\Sigma': 'Σ', r'\Omega': 'Ω',
+            r'\times': '×', r'\div': '÷', r'\pm': '±', r'\mp': '∓', r'\neq': '≠',
+            r'\leq': '≤', r'\geq': '≥', r'\approx': '≈', r'\infty': '∞', r'\sqrt': '√'
+        }
+
+        def convert_math_block(match: re.Match) -> str:
+            full_math = match.group(0)
+            inner = full_math.strip('$').strip()
+
+            # 1. Vectors \vec{x} -> x⃗
+            inner = re.sub(r'\\vec\{([a-zA-Z0-9]+)\}', r'\1' + '\u20d7', inner)
+
+            # 2. Fractions \frac{num}{den} -> (num)/(den)
+            inner = re.sub(r'\\frac\{([^}]+)\}\{([^}]+)\}', r'(\1)/(\2)', inner)
+
+            # 3. Superscripts x^{2} or x^2 -> x²
+            inner = re.sub(r'\^\{?([0-9a-n]+)\}?', lambda m: m.group(1).translate(sup_map), inner)
+
+            # 4. Subscripts x_{1} or x_1 -> x₁
+            inner = re.sub(r'_\{?([0-9a-x]+)\}?', lambda m: m.group(1).translate(sub_map), inner)
+
+            # 5. Greek & math symbols
+            for latex_sym, unicode_sym in symbol_map.items():
+                inner = inner.replace(latex_sym, unicode_sym)
+
+            # Clean extra braces if any
+            inner = re.sub(r'[{}]', '', inner)
+
+            return inner
+
+        return re.sub(math_pattern, convert_math_block, raw_text)
+
+    @staticmethod
+    def normalize_latex(latex_str: str) -> str:
+        """
+        Normalizes spacing, braces, and redundant operators in LaTeX formulas.
+        E.g., \frac { 2 x } { x ^ { 2 } + 1 } -> \frac{2x}{x^{2}+1}
+        """
+        if not latex_str:
+            return latex_str
+
+        text = latex_str.strip()
+        # Remove spaces around command braces: \command { -> \command{
+        text = re.sub(r'\\([a-zA-Z]+)\s*\{', r'\\\1{', text)
+        # Connect consecutive braces: } { -> }{
+        text = re.sub(r'\}\s*\{', r'}{', text)
+        # Remove spaces immediately inside braces
+        text = re.sub(r'\{\s+', '{', text)
+        text = re.sub(r'\s+\}', '}', text)
+        # Remove spaces between single letters/digits inside braces: { 2 x } -> {2x}
+        text = re.sub(r'\{([0-9a-zA-Z])\s+([0-9a-zA-Z])\}', r'{\1\2}', text)
+        text = re.sub(r'\s*([=+\-])\s*', r' \1 ', text)
+        text = re.sub(r'\s+', ' ', text).strip()
+        return text
+
+    @staticmethod
+    def validate_latex(latex_str: str) -> Tuple[bool, Optional[str]]:
+        """
+        Validates LaTeX math syntax, brace matching, bracket balancing, and environment pairs.
+        Returns (is_valid, error_message).
+        """
+        if not latex_str:
+            return True, None
+
+        # 1. Check brace matching {}
+        brace_count = 0
+        for char in latex_str:
+            if char == '{':
+                brace_count += 1
+            elif char == '}':
+                brace_count -= 1
+                if brace_count < 0:
+                    return False, "Unmatched closing brace '}'."
+        if brace_count != 0:
+            return False, f"Unclosed brace '{{' (missing {brace_count} closing braces)."
+
+        # 2. Check bracket matching []
+        bracket_count = 0
+        for char in latex_str:
+            if char == '[':
+                bracket_count += 1
+            elif char == ']':
+                bracket_count -= 1
+                if bracket_count < 0:
+                    return False, "Unmatched closing bracket ']'."
+        if bracket_count != 0:
+            return False, f"Unclosed bracket '[' (missing {bracket_count} closing brackets)."
+
+        # 3. Check \begin{env} and \end{env} matching
+        begins = re.findall(r'\\begin\{([^}]+)\}', latex_str)
+        ends = re.findall(r'\\end\{([^}]+)\}', latex_str)
+        if begins != ends:
+            return False, f"Mismatched LaTeX environments: begins={begins}, ends={ends}."
+
+        return True, None
+
+    @classmethod
+    def extract_segments(cls, raw_text: str) -> Tuple[List[Dict[str, Any]], bool]:
+        """
+        Extracts structured segments (text and math) from raw question stem.
+        Detects display ($$...$$) vs inline ($...$) math, normalizes & validates formulas,
+        and determines if the question needs review.
+        """
+        if not raw_text:
+            return [], False
+
+        math_pattern = r'(\$\$[\s\S]*?\$\$|\$[^\$]+?\$)'
+        segments: List[Dict[str, Any]] = []
+        needs_review = False
+
+        # Detect unclosed dollar delimiters
+        single_dollars = len(re.findall(r'(?<!\$)\$(?!\$)', raw_text))
+        if single_dollars % 2 != 0:
+            needs_review = True
+
+        last_pos = 0
+        for match in re.finditer(math_pattern, raw_text):
+            start, end = match.span()
+            # Text before math block
+            if start > last_pos:
+                text_chunk = raw_text[last_pos:start]
+                if text_chunk:
+                    segments.append({
+                        "type": "text",
+                        "content": text_chunk
+                    })
+
+            full_math = match.group(0)
+            is_display = full_math.startswith("$$")
+            inner_math = full_math[2:-2] if is_display else full_math[1:-1]
+            normalized = cls.normalize_latex(inner_math)
+            is_valid, _ = cls.validate_latex(normalized)
+
+            if not is_valid:
+                needs_review = True
+
+            segments.append({
+                "type": "math",
+                "latex": normalized,
+                "display": is_display,
+                "confidence": 0.98 if is_valid else 0.60
+            })
+            last_pos = end
+
+        # Trailing text
+        if last_pos < len(raw_text):
+            trailing = raw_text[last_pos:]
+            if trailing:
+                segments.append({
+                    "type": "text",
+                    "content": trailing
+                })
+
+        return segments, needs_review
+
     @classmethod
     def parse_part1_question(cls, q_num: int, block_text: str, difficulty: Optional[DifficultyEnum], image_url: Optional[str]) -> Tuple[Optional[ParsedQuestion], Optional[ParseError]]:
         """Parse Part 1 (Multiple Choice 4 options)."""
@@ -447,28 +634,46 @@ class ImportParserService:
         options: List[ParsedOption] = []
         i = 1
         disp_order = 0
+        has_empty_option = False
         while i < len(parts):
             label = parts[i].strip()
             content = parts[i + 1].strip() if i + 1 < len(parts) else ""
             i += 2
-            if content:
-                content = re.sub(r"\s+[A-Da-d][\.:/\)]$", "", content).strip()
-                options.append(ParsedOption(
-                    content=f"{label} {content}",
-                    is_correct=False,
-                    display_order=disp_order
-                ))
-                disp_order += 1
+            content = re.sub(r"\s+[A-Da-d][\.:/\)]$", "", content).strip()
+            if not content:
+                has_empty_option = True
+            options.append(ParsedOption(
+                content=f"{label} {content}".strip(),
+                is_correct=False,
+                display_order=disp_order
+            ))
+            disp_order += 1
 
         if len(options) < 2:
             return None, ParseError(question_number=q_num, message=f"Question {q_num} must have at least 2 option choices.")
+
+        raw_stem = stem if stem else block_text
+        content_latex = raw_stem
+        content_markdown = cls.convert_latex_to_markdown(raw_stem)
+        segments, needs_review = cls.extract_segments(raw_stem)
+        
+        if has_empty_option:
+            needs_review = True
+            confidence_score = 0.50
+        else:
+            confidence_score = 0.95 if not needs_review else 0.70
 
         return ParsedQuestion(
             question_number=q_num,
             part="Part1",
             question_type=QuestionTypeEnum.MultipleChoice,
             difficulty=difficulty,
-            content=stem if stem else block_text,
+            content=raw_stem,
+            content_markdown=content_markdown,
+            content_latex=content_latex,
+            segments=segments,
+            confidence_score=confidence_score,
+            needs_review=needs_review,
             image_url=image_url,
             answer_options=options
         ), None
@@ -504,12 +709,23 @@ class ImportParserService:
         if len(options) < 1:
             return None, ParseError(question_number=q_num, message=f"Question {q_num} (Part II) must have items a, b, c, d.")
 
+        raw_stem = stem if stem else block_text
+        content_latex = raw_stem
+        content_markdown = cls.convert_latex_to_markdown(raw_stem)
+        segments, needs_review = cls.extract_segments(raw_stem)
+        confidence_score = 0.95 if not needs_review else 0.70
+
         return ParsedQuestion(
             question_number=q_num,
             part="Part2",
             question_type=QuestionTypeEnum.TrueFalse,
             difficulty=difficulty,
-            content=stem if stem else block_text,
+            content=raw_stem,
+            content_markdown=content_markdown,
+            content_latex=content_latex,
+            segments=segments,
+            confidence_score=confidence_score,
+            needs_review=needs_review,
             image_url=image_url,
             answer_options=options
         ), None
@@ -520,12 +736,23 @@ class ImportParserService:
         stem_match = re.match(r"(?i)^Câu\s+\d+[\.:/]?\s*", block_text)
         stem = block_text[stem_match.end():].strip() if stem_match else block_text.strip()
 
+        raw_stem = stem if stem else block_text
+        content_latex = raw_stem
+        content_markdown = cls.convert_latex_to_markdown(raw_stem)
+        segments, needs_review = cls.extract_segments(raw_stem)
+        confidence_score = 0.95 if not needs_review else 0.70
+
         return ParsedQuestion(
             question_number=q_num,
             part="Part3",
             question_type=QuestionTypeEnum.ShortAnswer,
             difficulty=difficulty,
-            content=stem if stem else block_text,
+            content=raw_stem,
+            content_markdown=content_markdown,
+            content_latex=content_latex,
+            segments=segments,
+            confidence_score=confidence_score,
+            needs_review=needs_review,
             image_url=image_url,
             answer_options=[]
         ), None

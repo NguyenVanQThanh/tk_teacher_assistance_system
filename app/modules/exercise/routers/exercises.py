@@ -254,6 +254,11 @@ async def import_questions(
         ]
         payload = QuestionCreate(
             content=parsed_q.content,
+            content_markdown=parsed_q.content_markdown,
+            content_latex=parsed_q.content_latex,
+            segments=parsed_q.segments,
+            confidence_score=parsed_q.confidence_score,
+            needs_review=parsed_q.needs_review,
             question_type=parsed_q.question_type,
             difficulty=parsed_q.difficulty,
             correct_answer=parsed_q.correct_answer,
