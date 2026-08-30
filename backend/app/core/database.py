@@ -6,9 +6,13 @@
 # Updated By: Tam Khang
 
 import os
+from dotenv import load_dotenv
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker, Session
 from typing import Generator
+
+# Load environment variables
+load_dotenv()
 
 # Read database configuration from the environment
 DB_USERNAME = os.environ.get("DB_USERNAME")

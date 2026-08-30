@@ -1,0 +1,195 @@
+/*
+File Name: RecentSubmissionsTable.css
+Description: Stylesheet for RecentSubmissionsTable with rows dynamically filling 100% of container height.
+Created At: 2026-08-30
+Created By: Tam Khang
+Updated At: 2026-08-30
+Updated By: Tam Khang
+*/
+
+.recent-submissions-card {
+  background-color: #FFFFFF;
+  border-radius: 12px;
+  border: 1px solid #EBE8F0;
+  box-sizing: border-box;
+  overflow: hidden;
+  flex: 1.05;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  font-family: 'Be Vietnam Pro', sans-serif;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.02);
+  transition: transform 0.25s ease, box-shadow 0.25s ease;
+}
+
+.recent-submissions-card:hover {
+  box-shadow: 0 8px 20px rgba(77, 48, 141, 0.06);
+}
+
+.submissions-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 20px;
+  border-bottom: 1px solid #EBE8F0;
+  height: 44px;
+  box-sizing: border-box;
+  flex-shrink: 0;
+}
+
+.submissions-title {
+  font-size: 16px;
+  font-weight: 700;
+  color: #1D1928;
+  line-height: 20px;
+}
+
+.view-all-link {
+  font-size: 13px;
+  font-weight: 600;
+  color: #4D308D;
+  text-decoration: none;
+  line-height: 20px;
+  transition: all 0.2s ease;
+}
+
+.view-all-link:hover {
+  text-decoration: underline;
+}
+
+.table-responsive {
+  width: 100%;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.submissions-table {
+  width: 100%;
+  height: 100%;
+  border-collapse: collapse;
+  text-align: left;
+}
+
+.submissions-table thead {
+  flex-shrink: 0;
+}
+
+.submissions-table thead tr {
+  background-color: #F8F7FA;
+  height: 36px;
+}
+
+.submissions-table th {
+  padding: 8px 20px;
+  font-size: 11.5px;
+  font-weight: 500;
+  color: #494551;
+  letter-spacing: 0.3px;
+  text-transform: uppercase;
+}
+
+.submissions-table tbody {
+  height: 100%;
+}
+
+.submissions-table tbody tr {
+  height: 25%;
+  transition: background-color 0.2s ease, transform 0.15s ease;
+}
+
+.submissions-table tbody tr:hover {
+  background-color: #FAF9FD;
+}
+
+.submissions-table td {
+  padding: 10px 20px;
+  font-size: 13.5px;
+  color: #494551;
+  border-top: 1px solid #EBE8F0;
+  vertical-align: middle;
+  line-height: 20px;
+}
+
+.student-cell {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.student-avatar-mini {
+  width: 32px;
+  height: 32px;
+  border-radius: 9999px;
+  background-color: #F3EAFF;
+  color: #4D308D;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+  font-weight: 700;
+  flex-shrink: 0;
+  transition: transform 0.2s ease;
+}
+
+.submissions-table tbody tr:hover .student-avatar-mini {
+  transform: scale(1.08);
+}
+
+.student-name {
+  font-weight: 500;
+  color: #1D1928;
+  font-size: 13.5px;
+}
+
+.exercise-title-cell {
+  color: #494551;
+  font-weight: 400;
+  font-size: 13.5px;
+}
+
+.time-cell {
+  color: #494551;
+  font-size: 13px;
+}
+
+.status-pill {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 3px 12px;
+  border-radius: 9999px;
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 16px;
+}
+
+.status-pill.submitted {
+  background-color: #E6F4EA;
+  border: 1px solid #C3E6CB;
+  color: #27AE60;
+}
+
+.status-pill.late {
+  background-color: #FFDAD6;
+  border: 1px solid #F5C6CB;
+  color: #93000A;
+}
+
+.btn-action-grade {
+  background: none;
+  border: none;
+  color: #4486F4;
+  font-size: 13.5px;
+  font-weight: 400;
+  cursor: pointer;
+  padding: 3px 8px;
+  border-radius: 4px;
+  font-family: inherit;
+  transition: all 0.2s ease;
+}
+
+.btn-action-grade:hover {
+  text-decoration: underline;
+}

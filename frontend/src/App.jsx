@@ -1,37 +1,80 @@
 // File Name: App.jsx
-// Description: Main Application Component for SmartLMS frontend.
+// Description: Main application router with AuthProvider, ProtectedRoute guards, and Exercise Creation views.
 // Created At: 2026-08-30
 // Created By: Tam Khang
 // Updated At: 2026-08-30
 // Updated By: Tam Khang
 
 import React from 'react';
+import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { AuthProvider } from './context/AuthContext';
+import ProtectedRoute from './components/common/ProtectedRoute';
+import LoginPage from './pages/LoginPage';
+import TeacherDashboard from './pages/teacher/TeacherDashboard';
+import DocumentRepositoryPage from './pages/teacher/DocumentRepositoryPage';
+import ExerciseRepositoryPage from './pages/teacher/ExerciseRepositoryPage';
+import CreateExerciseManualPage from './pages/teacher/CreateExerciseManualPage';
 
 export default function App() {
   return (
-    <div className="container">
-      <div className="hero">
-        <span className="status-badge">SmartLMS Frontend Ready</span>
-        <h1>SmartLMS — Teacher Assistance System</h1>
-        <p>
-          AI-driven LMS with Learning Analytics, Exercise Management, and Personalized Recommendations.
-        </p>
+    <AuthProvider>
+      <BrowserRouter>
+        <Routes>
+          {/* Public Login Route */}
+          <Route path="/login" element={<LoginPage />} />
 
-        <div className="grid">
-          <div className="card">
-            <h3>Backend API</h3>
-            <p>FastAPI service running on port 8000 with RBAC, PostgreSQL, and Alembic migrations.</p>
-          </div>
-          <div className="card">
-            <h3>Exercise & AI</h3>
-            <p>Smart document parser, math benchmark importer, and automated exercise generation.</p>
-          </div>
-          <div className="card">
-            <h3>Analytics & Tracking</h3>
-            <p>Real-time learning behavior analysis, radar charts, and student performance dashboard.</p>
-          </div>
-        </div>
-      </div>
-    </div>
+          {/* Protected Teacher Dashboard Routes */}
+          <Route 
+            path="/" 
+            element={
+              <ProtectedRoute>
+                <TeacherDashboard />
+              </ProtectedRoute>
+            } 
+          />
+          <Route 
+            path="/teacher" 
+            element={
+              <ProtectedRoute>
+                <TeacherDashboard />
+              </ProtectedRoute>
+            } 
+          />
+
+          {/* Protected Teacher Document Repository Route */}
+          <Route 
+            path="/teacher/documents" 
+            element={
+              <ProtectedRoute>
+                <DocumentRepositoryPage />
+              </ProtectedRoute>
+            } 
+          />
+
+          {/* Protected Teacher Exercise Repository Route */}
+          <Route 
+            path="/teacher/exercises" 
+            element={
+              <ProtectedRoute>
+                <ExerciseRepositoryPage />
+              </ProtectedRoute>
+            } 
+          />
+
+          {/* Protected Direct Exercise Creation Page */}
+          <Route 
+            path="/teacher/exercises/create-manual" 
+            element={
+              <ProtectedRoute>
+                <CreateExerciseManualPage />
+              </ProtectedRoute>
+            } 
+          />
+
+          {/* Catch-all Fallback */}
+          <Route path="*" element={<Navigate to="/" replace />} />
+        </Routes>
+      </BrowserRouter>
+    </AuthProvider>
   );
 }

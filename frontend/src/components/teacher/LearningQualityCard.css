@@ -1,0 +1,122 @@
+/*
+File Name: LearningQualityCard.css
+Description: Stylesheet for LearningQualityCard with expanded proportions and single-screen fit.
+Created At: 2026-08-30
+Created By: Tam Khang
+Updated At: 2026-08-30
+Updated By: Tam Khang
+*/
+
+.learning-quality-card {
+  background-color: #FFFFFF;
+  border-radius: 12px;
+  border: 1px solid #EBE8F0;
+  padding: 16px 20px;
+  box-sizing: border-box;
+  flex: 1.25;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  font-family: 'Be Vietnam Pro', sans-serif;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.02);
+  transition: transform 0.25s ease, box-shadow 0.25s ease;
+}
+
+.learning-quality-card:hover {
+  box-shadow: 0 8px 20px rgba(77, 48, 141, 0.06);
+}
+
+.card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
+  height: 22px;
+  flex-shrink: 0;
+}
+
+.card-title {
+  font-size: 17px;
+  font-weight: 700;
+  color: #1D1928;
+  line-height: 22px;
+}
+
+.icon-more-btn {
+  background: transparent;
+  border: none;
+  color: #4D308D;
+  cursor: pointer;
+  padding: 2px;
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s ease;
+}
+
+.icon-more-btn:hover {
+  background-color: #F8F1FF;
+}
+
+.quality-content-layout {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  flex: 1;
+  min-height: 0;
+}
+
+.radar-wrapper {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 250px;
+  height: 100%;
+}
+
+.observations-box {
+  flex: 1.15;
+  background-color: #F8F7FA;
+  border: 1px solid #EBE8F0;
+  border-radius: 10px;
+  padding: 12px 16px;
+  display: flex;
+  flex-direction: column;
+  box-sizing: border-box;
+  justify-content: center;
+}
+
+.observations-title {
+  font-size: 13.5px;
+  font-weight: 700;
+  color: #1D1928;
+  line-height: 18px;
+  margin-bottom: 8px;
+}
+
+.observations-list {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+}
+
+.observation-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  font-size: 12px;
+  line-height: 16px;
+  color: #1D1928;
+}
+
+.bullet-dot {
+  width: 5.5px;
+  height: 5.5px;
+  border-radius: 50%;
+  background-color: #4D308D;
+  margin-top: 5px;
+  flex-shrink: 0;
+}

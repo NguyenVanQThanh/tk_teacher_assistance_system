@@ -1,0 +1,194 @@
+/*
+File Name: TeacherSidebar.css
+Description: Compact styling for Teacher Sidebar to fit within 100vh viewport without scrolling.
+Created At: 2026-08-30
+Created By: Tam Khang
+Updated At: 2026-08-30
+Updated By: Tam Khang
+*/
+
+.teacher-sidebar {
+  width: 240px;
+  background-color: #F8F1FF;
+  border-right: 1px solid #EBE8F0;
+  display: flex;
+  flex-direction: column;
+  padding: 16px 0px;
+  height: 100%;
+  max-height: 100%;
+  box-sizing: border-box;
+  flex-shrink: 0;
+  overflow-y: auto;
+  font-family: 'Be Vietnam Pro', sans-serif;
+  animation: sidebarSlideIn 0.35s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes sidebarSlideIn {
+  from {
+    opacity: 0;
+    transform: translateX(-14px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+/* Profile section */
+.sidebar-profile-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  padding: 0 16px 12px;
+  border-bottom: 1px solid #EBE8F0;
+  margin-bottom: 10px;
+  flex-shrink: 0;
+}
+
+.avatar-wrapper {
+  position: relative;
+  margin-bottom: 8px;
+  cursor: pointer;
+}
+
+.teacher-avatar {
+  width: 52px;
+  height: 52px;
+  border-radius: 9999px;
+  background: linear-gradient(135deg, #6549A6, #7D49A6);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 2px solid #6549A6;
+  box-shadow: 0 3px 10px rgba(101, 73, 166, 0.2);
+  transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.3s ease;
+}
+
+.avatar-wrapper:hover .teacher-avatar {
+  transform: scale(1.06) rotate(3deg);
+  box-shadow: 0 6px 18px rgba(101, 73, 166, 0.35);
+}
+
+.avatar-text {
+  color: #FFFFFF;
+  font-size: 17px;
+  font-weight: 700;
+  user-select: none;
+}
+
+.teacher-name {
+  font-size: 16px;
+  font-weight: 700;
+  color: #4D308D;
+  line-height: 20px;
+  margin-bottom: 2px;
+}
+
+.teacher-school {
+  font-size: 11px;
+  color: #494551;
+  font-weight: 400;
+  line-height: 14px;
+}
+
+/* Action button */
+.btn-create-exercise {
+  width: 200px;
+  height: 36px;
+  margin: 10px auto 10px;
+  border-radius: 8px;
+  background: linear-gradient(90deg, #6549A6 0%, #7D49A6 100%);
+  color: #FFFFFF;
+  border: none;
+  font-size: 13px;
+  font-weight: 600;
+  font-family: inherit;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  cursor: pointer;
+  box-shadow: 0 3px 10px rgba(101, 73, 166, 0.2);
+  transition: transform 0.25s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.25s ease;
+  position: relative;
+  overflow: hidden;
+  flex-shrink: 0;
+}
+
+.btn-create-exercise::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 60%;
+  height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
+  transition: left 0.6s ease;
+}
+
+.btn-create-exercise:hover::after {
+  left: 140%;
+}
+
+.btn-create-exercise:hover {
+  transform: translateY(-1px) scale(1.01);
+  box-shadow: 0 6px 16px rgba(101, 73, 166, 0.3);
+}
+
+/* Nav items */
+.sidebar-nav {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 0 6px;
+  flex: 1;
+}
+
+.nav-item-btn {
+  width: 100%;
+  height: 38px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 14px;
+  border-radius: 0px 9999px 9999px 0px;
+  border: none;
+  background: transparent;
+  color: #494551;
+  font-size: 13px;
+  font-weight: 400;
+  font-family: inherit;
+  cursor: pointer;
+  text-align: left;
+  position: relative;
+  transition: transform 0.2s cubic-bezier(0.16, 1, 0.3, 1), background-color 0.2s ease, color 0.2s ease, padding 0.2s ease;
+}
+
+.nav-item-btn:hover {
+  background-color: #EDE4FC;
+  color: #4D308D;
+  transform: translateX(3px);
+  padding-left: 18px;
+}
+
+.nav-item-btn.active {
+  background-color: #E9DDFF;
+  border-left: 4px solid #4D308D;
+  color: #4D308D;
+  font-weight: 700;
+  box-shadow: 0 2px 6px rgba(77, 48, 141, 0.06);
+}
+
+.nav-item-btn.active:hover {
+  transform: translateX(0);
+  padding-left: 14px;
+}
+
+.nav-icon {
+  flex-shrink: 0;
+  color: inherit;
+  width: 17px;
+  height: 17px;
+}

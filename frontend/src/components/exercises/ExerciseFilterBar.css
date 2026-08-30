@@ -1,0 +1,116 @@
+/*
+File Name: ExerciseFilterBar.css
+Description: Stylesheet for ExerciseFilterBar component matching Figma designs.
+Created At: 2026-08-30
+Created By: Tam Khang
+Updated At: 2026-08-30
+Updated By: Tam Khang
+*/
+
+.exercise-filter-bar {
+  display: flex;
+  align-items: flex-end;
+  gap: 14px;
+  margin-bottom: 20px;
+  background-color: transparent;
+  font-family: 'Be Vietnam Pro', sans-serif;
+  flex-wrap: wrap;
+}
+
+.filter-field-group {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-width: 160px;
+}
+
+.filter-field-group.search-field-group {
+  flex: 1.4;
+  min-width: 220px;
+}
+
+.filter-field-label {
+  font-size: 12px;
+  font-weight: 500;
+  color: #494551;
+  margin-bottom: 6px;
+  line-height: 16px;
+}
+
+.select-container {
+  position: relative;
+  display: flex;
+  align-items: center;
+  width: 100%;
+}
+
+.filter-select {
+  width: 100%;
+  height: 42px;
+  padding: 0 34px 0 14px;
+  background-color: #FFFFFF;
+  border: 1px solid #EBE8F0;
+  border-radius: 8px;
+  font-size: 14px;
+  color: #1D1928;
+  font-family: inherit;
+  outline: none;
+  cursor: pointer;
+  appearance: none;
+  transition: all 0.2s ease;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.02);
+}
+
+.filter-select:hover {
+  border-color: #CBD5E1;
+}
+
+.filter-select:focus {
+  border-color: #4D308D;
+  box-shadow: 0 0 0 3px rgba(77, 48, 141, 0.1);
+}
+
+.select-arrow-icon {
+  position: absolute;
+  right: 12px;
+  color: #6B7280;
+  pointer-events: none;
+}
+
+.search-input-container {
+  position: relative;
+  display: flex;
+  align-items: center;
+  width: 100%;
+}
+
+.search-input-icon {
+  position: absolute;
+  left: 14px;
+  color: #6B7280;
+  pointer-events: none;
+}
+
+.exercise-search-input {
+  width: 100%;
+  height: 42px;
+  padding: 0 14px 0 38px;
+  background-color: #FFFFFF;
+  border: 1px solid #EBE8F0;
+  border-radius: 8px;
+  font-size: 14px;
+  color: #1D1928;
+  font-family: inherit;
+  outline: none;
+  transition: all 0.2s ease;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.02);
+}
+
+.exercise-search-input::placeholder {
+  color: #9CA3AF;
+}
+
+.exercise-search-input:focus {
+  border-color: #4D308D;
+  box-shadow: 0 0 0 3px rgba(77, 48, 141, 0.1);
+}

@@ -1,0 +1,150 @@
+/*
+File Name: DocumentPreviewModal.css
+Description: Stylesheet for DocumentPreviewModal with clean document reader styling.
+Created At: 2026-08-30
+Created By: Tam Khang
+Updated At: 2026-08-30
+Updated By: Tam Khang
+*/
+
+.preview-modal-container {
+  width: 780px;
+  max-width: 94vw;
+  height: 82vh;
+  background-color: #FFFFFF;
+  border-radius: 16px;
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.2), 0 4px 16px rgba(0, 0, 0, 0.08);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  font-family: 'Be Vietnam Pro', sans-serif;
+  animation: modalSpring 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.preview-modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 24px;
+  border-bottom: 1px solid #EBE8F0;
+  background-color: #FFFFFF;
+  flex-shrink: 0;
+}
+
+.preview-title-box {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.preview-header-icon {
+  color: #4D308D;
+  flex-shrink: 0;
+}
+
+.preview-modal-title {
+  font-size: 16px;
+  font-weight: 700;
+  color: #1D1928;
+  margin: 0;
+}
+
+.preview-modal-subtitle {
+  font-size: 12px;
+  color: #6B7280;
+  margin: 2px 0 0 0;
+}
+
+.preview-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.btn-preview-download {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 16px;
+  background-color: #F8F1FF;
+  color: #4D308D;
+  border: 1px solid #E9DDFF;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 600;
+  font-family: inherit;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.btn-preview-download:hover {
+  background-color: #EDE4FC;
+  transform: translateY(-1px);
+}
+
+.preview-modal-body {
+  flex: 1;
+  background-color: #F8F7FA;
+  padding: 24px;
+  overflow-y: auto;
+  display: flex;
+  justify-content: center;
+}
+
+.document-sheet-mockup {
+  width: 100%;
+  max-width: 650px;
+  background-color: #FFFFFF;
+  border-radius: 8px;
+  border: 1px solid #EBE8F0;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.04);
+  padding: 36px 40px;
+  box-sizing: border-box;
+}
+
+.mockup-header-banner {
+  text-align: center;
+  border-bottom: 2px solid #4D308D;
+  padding-bottom: 16px;
+  margin-bottom: 24px;
+}
+
+.mockup-header-banner h2 {
+  font-size: 20px;
+  font-weight: 700;
+  color: #1D1928;
+  margin: 0 0 6px 0;
+}
+
+.mockup-sub {
+  font-size: 11px;
+  letter-spacing: 0.5px;
+  font-weight: 600;
+  color: #6B7280;
+}
+
+.mockup-content-paragraphs h3 {
+  font-size: 14px;
+  font-weight: 700;
+  color: #4D308D;
+  margin: 18px 0 8px 0;
+}
+
+.mockup-content-paragraphs p {
+  font-size: 13px;
+  line-height: 22px;
+  color: #374151;
+  margin-bottom: 10px;
+}
+
+.mockup-code-block {
+  margin-top: 20px;
+  padding: 14px 18px;
+  background-color: #F8F1FF;
+  border-left: 4px solid #4D308D;
+  border-radius: 4px;
+  font-size: 12.5px;
+  color: #4D308D;
+  line-height: 20px;
+  font-weight: 500;
+}

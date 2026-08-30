@@ -1,26 +1,26 @@
 [
   {
-    "user_id": "933ec651-ecf2-4b43-9676-a987c29d2dad",
+    "user_id": "43b31a40-451e-402f-a402-4da726151e09",
     "phone": "0999000001",
     "email": "admin@school.com",
-    "full_name": "Quản trị viên Hệ thống",
+    "full_name": "System Administrator",
     "role_name": "Admin",
-    "password_plain": "(Đã tồn tại trong DB - Sử dụng mật khẩu cũ)"
+    "password_plain": "Admin@1234"
   },
   {
-    "user_id": "808c8232-f550-4a89-abfe-5372ed77a36e",
+    "user_id": "6e72faad-0e80-40a3-9745-c2aac0a0864c",
     "phone": "0999000002",
     "email": "teacher@school.com",
-    "full_name": "Giáo viên Mẫu",
+    "full_name": "Sample Teacher",
     "role_name": "Teacher",
-    "password_plain": "(Đã tồn tại trong DB - Sử dụng mật khẩu cũ)"
+    "password_plain": "Teacher@1234"
   },
   {
-    "user_id": "4f64cb51-9d51-4c12-aab4-1aa757cea9ba",
+    "user_id": "d05683f8-2f44-4f9a-9764-da3d6a4461e1",
     "phone": "0999000003",
     "email": "student@school.com",
-    "full_name": "Học sinh Mẫu",
+    "full_name": "Sample Student",
     "role_name": "Student",
-    "password_plain": "(Đã tồn tại trong DB - Sử dụng mật khẩu cũ)"
+    "password_plain": "Student@1234"
   }
 ]

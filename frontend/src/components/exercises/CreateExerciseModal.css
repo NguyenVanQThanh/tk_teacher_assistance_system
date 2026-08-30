@@ -1,0 +1,395 @@
+/*
+File Name: CreateExerciseModal.css
+Description: Stylesheet for 3-Option Exercise Creation Modal matching exact Figma specs.
+Created At: 2026-08-30
+Created By: Tam Khang
+Updated At: 2026-08-30
+Updated By: Tam Khang
+*/
+
+.creation-modal-wrapper {
+  width: 760px;
+  max-width: 94vw;
+  background-color: #FFFFFF;
+  border-radius: 16px;
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.18), 0 4px 16px rgba(0, 0, 0, 0.06);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  font-family: 'Be Vietnam Pro', sans-serif;
+  animation: modalSpring 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+/* ================= STEP 1: METHOD SELECTION ================= */
+.selection-modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 24px 32px 16px;
+}
+
+.selection-modal-title {
+  font-size: 20px;
+  font-weight: 700;
+  color: #1D1928;
+  letter-spacing: -0.2px;
+  margin: 0;
+}
+
+.btn-modal-close {
+  background: none;
+  border: none;
+  color: #6B7280;
+  cursor: pointer;
+  padding: 6px;
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s ease;
+}
+
+.btn-modal-close:hover {
+  background-color: #F1F3F7;
+  color: #1D1928;
+}
+
+/* 3 Cards Grid */
+.method-cards-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 18px;
+  padding: 12px 32px 28px;
+}
+
+.method-card {
+  background-color: #FFFFFF;
+  border: 1.5px solid #EBE8F0;
+  border-radius: 14px;
+  padding: 28px 18px 24px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  cursor: pointer;
+  transition: transform 0.25s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.25s ease, border-color 0.25s ease;
+  position: relative;
+}
+
+.method-card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 16px 36px rgba(77, 48, 141, 0.1);
+  border-color: #6549A6;
+}
+
+.method-card:active {
+  transform: scale(0.98);
+}
+
+.method-icon-circle {
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 18px;
+  transition: transform 0.2s ease;
+}
+
+.method-card:hover .method-icon-circle {
+  transform: scale(1.1);
+}
+
+.method-icon-circle.icon-purple {
+  background-color: #EDE4FC;
+  color: #7C3AED;
+}
+
+.method-icon-circle.icon-blue {
+  background-color: #EFF6FF;
+  color: #2563EB;
+}
+
+.method-icon-circle.icon-pink {
+  background-color: #FDF2F8;
+  color: #DB2777;
+}
+
+.method-card-title {
+  font-size: 15px;
+  font-weight: 700;
+  color: #1D1928;
+  margin: 0 0 10px 0;
+  line-height: 20px;
+}
+
+.method-card-desc {
+  font-size: 12px;
+  color: #494551;
+  line-height: 18px;
+  margin: 0;
+}
+
+/* Footer for Step 1 */
+.selection-modal-footer {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  padding: 16px 32px 20px;
+  background-color: #FAF9FD;
+  border-top: 1px solid #F1F3F7;
+}
+
+.btn-text-cancel {
+  background: none;
+  border: none;
+  color: #494551;
+  font-size: 14px;
+  font-weight: 500;
+  font-family: inherit;
+  cursor: pointer;
+  padding: 6px 12px;
+  border-radius: 6px;
+  transition: all 0.2s ease;
+}
+
+.btn-text-cancel:hover {
+  color: #1D1928;
+  background-color: #F1F3F7;
+}
+
+/* ================= STEP 2: DETAIL FORM ================= */
+.form-modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 18px 24px;
+  border-bottom: 1px solid #EBE8F0;
+  background-color: #FAF9FD;
+}
+
+.form-header-left {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.btn-back-step {
+  background: none;
+  border: 1px solid #EBE8F0;
+  border-radius: 6px;
+  padding: 6px;
+  color: #494551;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s ease;
+}
+
+.btn-back-step:hover {
+  background-color: #EDE4FC;
+  color: #4D308D;
+  border-color: #DDD4EC;
+}
+
+.form-modal-title {
+  font-size: 17px;
+  font-weight: 700;
+  color: #1D1928;
+  margin: 0;
+}
+
+.form-modal-body {
+  padding: 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.form-alert-error {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 14px;
+  background-color: #FEF2F2;
+  border: 1px solid #FECACA;
+  border-radius: 8px;
+  color: #DC2626;
+  font-size: 13px;
+}
+
+/* Dropzone for Upload Method */
+.file-upload-dropzone {
+  border: 2px dashed #CBD5E1;
+  border-radius: 12px;
+  padding: 20px 16px;
+  text-align: center;
+  background-color: #FAF9FD;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.file-upload-dropzone:hover {
+  border-color: #2563EB;
+  background-color: #EFF6FF;
+}
+
+.hidden-input {
+  display: none;
+}
+
+.dropzone-label {
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.dropzone-icon {
+  color: #2563EB;
+  margin-bottom: 6px;
+}
+
+.dropzone-title {
+  font-size: 13.5px;
+  font-weight: 600;
+  color: #1D1928;
+  margin-bottom: 2px;
+}
+
+.dropzone-sub {
+  font-size: 12px;
+  color: #6B7280;
+}
+
+.file-selected-text {
+  font-size: 13.5px;
+  color: #166534;
+  font-weight: 500;
+}
+
+/* AI Prompt Textarea */
+.ai-prompt-box {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.ai-textarea {
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid #EBE8F0;
+  border-radius: 8px;
+  font-size: 13.5px;
+  color: #1D1928;
+  font-family: inherit;
+  outline: none;
+  resize: vertical;
+  background-color: #FFFFFF;
+  box-sizing: border-box;
+  transition: all 0.2s ease;
+}
+
+.ai-textarea:focus {
+  border-color: #DB2777;
+  box-shadow: 0 0 0 3px rgba(219, 39, 119, 0.1);
+}
+
+/* Form Groups */
+.form-field-group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  flex: 1;
+}
+
+.form-row-2 {
+  display: flex;
+  gap: 12px;
+}
+
+.input-field-label {
+  font-size: 12.5px;
+  font-weight: 600;
+  color: #494551;
+}
+
+.text-input,
+.select-input {
+  height: 40px;
+  padding: 0 12px;
+  border: 1px solid #EBE8F0;
+  border-radius: 8px;
+  font-size: 13.5px;
+  color: #1D1928;
+  font-family: inherit;
+  outline: none;
+  background-color: #FFFFFF;
+  box-sizing: border-box;
+  transition: all 0.2s ease;
+}
+
+.text-input:focus,
+.select-input:focus {
+  border-color: #4D308D;
+  box-shadow: 0 0 0 3px rgba(77, 48, 141, 0.1);
+}
+
+.form-modal-footer {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 12px;
+  padding-top: 14px;
+  border-top: 1px solid #F1F3F7;
+  margin-top: 6px;
+}
+
+.btn-form-cancel {
+  padding: 9px 18px;
+  border: 1px solid #EBE8F0;
+  background-color: #FFFFFF;
+  color: #494551;
+  font-size: 13.5px;
+  font-weight: 500;
+  font-family: inherit;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.btn-form-cancel:hover {
+  background-color: #F8F7FA;
+}
+
+.btn-form-submit {
+  padding: 9px 22px;
+  border: none;
+  background: linear-gradient(90deg, #6549A6 0%, #7D49A6 100%);
+  color: #FFFFFF;
+  font-size: 13.5px;
+  font-weight: 600;
+  font-family: inherit;
+  border-radius: 8px;
+  cursor: pointer;
+  box-shadow: 0 4px 12px rgba(101, 73, 166, 0.25);
+  transition: all 0.2s ease;
+}
+
+.btn-form-submit:hover:not(:disabled) {
+  transform: translateY(-1px);
+  box-shadow: 0 6px 16px rgba(101, 73, 166, 0.35);
+}
+
+.btn-form-submit:active:not(:disabled) {
+  transform: scale(0.98);
+}
+
+@media (max-width: 768px) {
+  .method-cards-grid {
+    grid-template-columns: 1fr;
+    gap: 12px;
+  }
+}

@@ -1,0 +1,139 @@
+/*
+File Name: Header.css
+Description: Exact styles for global top navigation header matching Figma specifications.
+Created At: 2026-08-30
+Created By: Tam Khang
+Updated At: 2026-08-30
+Updated By: Tam Khang
+*/
+
+.main-header {
+  height: 64px;
+  background-color: #FFFFFF;
+  border-bottom: 1px solid #EBE8F0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 24px;
+  position: sticky;
+  top: 0;
+  z-index: 50;
+  font-family: 'Be Vietnam Pro', sans-serif;
+}
+
+.header-left {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.brand-logo-link {
+  text-decoration: none;
+}
+
+.brand-text {
+  font-size: 22px;
+  font-weight: 700;
+  color: #4D308D;
+  line-height: 28px;
+  letter-spacing: -0.2px;
+}
+
+.header-right {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.header-search-box {
+  position: relative;
+  display: flex;
+  align-items: center;
+  margin-right: 4px;
+}
+
+.search-icon {
+  position: absolute;
+  left: 12px;
+  color: #494551;
+  pointer-events: none;
+}
+
+.search-input {
+  width: 256px;
+  height: 34px;
+  padding: 7px 16px 7px 36px;
+  background-color: #F8F1FF;
+  border: 1px solid #EBE8F0;
+  border-radius: 9999px;
+  font-size: 14px;
+  color: #1D1928;
+  outline: none;
+  font-family: inherit;
+  transition: all 0.2s ease;
+}
+
+.search-input::placeholder {
+  color: #6B7280;
+}
+
+.search-input:focus {
+  background-color: #FFFFFF;
+  border-color: #4D308D;
+  box-shadow: 0 0 0 3px rgba(77, 48, 141, 0.1);
+}
+
+.icon-btn {
+  width: 36px;
+  height: 36px;
+  border-radius: 9999px;
+  border: none;
+  background: transparent;
+  color: #494551;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  position: relative;
+  transition: all 0.2s ease;
+}
+
+.icon-btn:hover {
+  background-color: #F8F1FF;
+  color: #4D308D;
+}
+
+.notif-dot {
+  position: absolute;
+  top: 7px;
+  right: 7px;
+  width: 7px;
+  height: 7px;
+  background-color: #BA1A1A;
+  border-radius: 50%;
+  border: 1.5px solid #FFFFFF;
+}
+
+.user-profile-btn {
+  text-decoration: none;
+  display: flex;
+  align-items: center;
+  margin-left: 4px;
+}
+
+.user-avatar-placeholder {
+  width: 32px;
+  height: 32px;
+  border-radius: 9999px;
+  background: linear-gradient(135deg, #6549A6, #7D49A6);
+  color: #FFFFFF;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid #EBE8F0;
+  transition: transform 0.2s ease;
+}
+
+.user-avatar-placeholder:hover {
+  transform: scale(1.05);
+}

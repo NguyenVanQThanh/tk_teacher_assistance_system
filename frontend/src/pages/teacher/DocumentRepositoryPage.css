@@ -1,0 +1,213 @@
+/*
+File Name: DocumentRepositoryPage.css
+Description: Stylesheet for DocumentRepositoryPage matching exact Figma design specifications.
+Created At: 2026-08-30
+Created By: Tam Khang
+Updated At: 2026-08-30
+Updated By: Tam Khang
+*/
+
+.doc-repository-layout {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  background-color: #F8F7FA;
+  font-family: 'Be Vietnam Pro', sans-serif;
+  animation: pageFadeIn 0.35s ease-out;
+}
+
+@keyframes pageFadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.doc-repository-body {
+  display: flex;
+  flex: 1;
+  min-height: calc(100vh - 64px);
+}
+
+.doc-repository-main {
+  flex: 1;
+  padding: 20px 24px 28px;
+  background-color: #F8F7FA;
+  display: flex;
+  flex-direction: column;
+  box-sizing: border-box;
+}
+
+/* Top bar: Breadcrumb & Upload Button */
+.doc-top-bar {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  margin-bottom: 18px;
+  flex-wrap: wrap;
+  gap: 16px;
+}
+
+.doc-title-group {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.breadcrumb-nav {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+}
+
+.breadcrumb-link {
+  color: #6B7280;
+  text-decoration: none;
+  transition: color 0.2s ease;
+}
+
+.breadcrumb-link:hover {
+  color: #4D308D;
+  text-decoration: underline;
+}
+
+.breadcrumb-separator {
+  color: #9CA3AF;
+}
+
+.breadcrumb-current {
+  color: #1D1928;
+  font-weight: 600;
+}
+
+.page-heading {
+  font-size: 28px;
+  font-weight: 700;
+  color: #1D1928;
+  line-height: 34px;
+  margin: 0;
+}
+
+.btn-upload-new {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 20px;
+  background: linear-gradient(90deg, #6549A6 0%, #7D49A6 100%);
+  color: #FFFFFF;
+  border: none;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 600;
+  font-family: inherit;
+  cursor: pointer;
+  box-shadow: 0 4px 12px rgba(101, 73, 166, 0.22);
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.btn-upload-new:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 18px rgba(101, 73, 166, 0.32);
+}
+
+.btn-upload-new:active {
+  transform: scale(0.98);
+}
+
+/* Grid Layout (3 columns x 2 rows = 6 items) */
+.doc-cards-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 16px;
+  margin-bottom: 24px;
+  flex: 1;
+}
+
+.doc-empty-state {
+  grid-column: 1 / -1;
+  background-color: #FFFFFF;
+  border: 1px dashed #CBD5E1;
+  border-radius: 12px;
+  padding: 48px;
+  text-align: center;
+  color: #6B7280;
+  font-size: 14px;
+}
+
+/* Pagination Row */
+.doc-pagination-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-top: 16px;
+  border-top: 1px solid #EBE8F0;
+  margin-top: auto;
+}
+
+.pagination-info {
+  font-size: 13.5px;
+  color: #494551;
+}
+
+.pagination-info strong {
+  color: #1D1928;
+}
+
+.pagination-controls {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.pagination-btn {
+  min-width: 32px;
+  height: 32px;
+  padding: 0 8px;
+  border: 1px solid #EBE8F0;
+  background-color: #FFFFFF;
+  color: #494551;
+  font-size: 13px;
+  font-weight: 500;
+  font-family: inherit;
+  border-radius: 6px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.15s ease;
+}
+
+.pagination-btn:hover:not(:disabled) {
+  border-color: #4D308D;
+  color: #4D308D;
+  background-color: #F8F1FF;
+}
+
+.pagination-btn.active {
+  background-color: #4D308D;
+  border-color: #4D308D;
+  color: #FFFFFF;
+  font-weight: 700;
+}
+
+.pagination-btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+/* Responsive */
+@media (max-width: 1200px) {
+  .doc-cards-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 768px) {
+  .doc-cards-grid {
+    grid-template-columns: 1fr;
+  }
+  .doc-pagination-row {
+    flex-direction: column;
+    gap: 12px;
+    align-items: flex-start;
+  }
+}
