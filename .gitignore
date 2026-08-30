@@ -42,6 +42,26 @@ coverage.xml
 *.cover
 *.log
 
+# Node / Frontend
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+.pnpm-debug.log*
+frontend/dist/
+frontend/build/
+.next/
+out/
+.nuxt/
+.vuepress/dist
+.serverless/
+.fusebox/
+.dynamodb/
+.tern-port
+.vscode-test
+
 # Environment variables (Sensitive secrets)
 .env
 .env.local
@@ -50,6 +70,8 @@ coverage.xml
 .env.test.local
 .env.production.local
 !.env.example
+!backend/.env.example
+!frontend/.env.example
 
 # IDEs and Editors
 .vscode/
