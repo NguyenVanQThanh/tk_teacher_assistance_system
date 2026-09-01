@@ -1,0 +1,261 @@
+/*
+File Name: AddStudentModal.css
+Description: Styles for AddStudentModal component matching the Academic Clarity modern theme.
+Created At: 2026-09-01
+Created By: Tam Khang
+Updated At: 2026-09-01
+Updated By: Tam Khang
+*/
+
+.add-student-modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(15, 23, 42, 0.5);
+  backdrop-filter: blur(4px);
+  z-index: 1100;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding: 16px;
+  animation: modalFadeIn 0.2s ease-out;
+}
+
+.add-student-modal-container {
+  background-color: #FFFFFF;
+  border-radius: 16px;
+  width: 100%;
+  max-width: 580px;
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.15);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  animation: modalScaleUp 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes modalScaleUp {
+  from {
+    opacity: 0;
+    transform: scale(0.96) translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+/* Modal Header */
+.add-student-modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 20px 24px 16px 24px;
+  border-bottom: 1px solid #F1F5F9;
+}
+
+.add-student-modal-title {
+  font-size: 18px;
+  font-weight: 700;
+  color: #1E293B;
+  margin: 0;
+}
+
+.add-student-btn-close {
+  background: transparent;
+  border: none;
+  color: #64748B;
+  cursor: pointer;
+  padding: 6px;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.15s ease;
+}
+
+.add-student-btn-close:hover {
+  background-color: #F1F5F9;
+  color: #1E293B;
+}
+
+/* Form Body */
+.add-student-modal-form {
+  display: flex;
+  flex-direction: column;
+}
+
+.add-student-form-body {
+  padding: 20px 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.add-student-form-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+}
+
+.add-student-form-group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.add-student-form-group.full-width {
+  width: 100%;
+}
+
+.add-student-label {
+  font-size: 13.5px;
+  font-weight: 600;
+  color: #334155;
+}
+
+.add-student-input {
+  width: 100%;
+  padding: 10px 14px;
+  border: 1px solid #E2E8F0;
+  border-radius: 8px;
+  font-size: 14px;
+  color: #1E293B;
+  background-color: #FFFFFF;
+  transition: all 0.15s ease;
+  font-family: inherit;
+  box-sizing: border-box;
+}
+
+.add-student-input:focus {
+  outline: none;
+  border-color: #7C3AED;
+  box-shadow: 0 0 0 3px rgba(124, 58, 237, 0.1);
+}
+
+.add-student-input::placeholder {
+  color: #94A3B8;
+}
+
+.add-student-code-input {
+  background-color: #EDE9FE;
+  border-color: #DDD6FE;
+  color: #5B21B6;
+  font-weight: 600;
+}
+
+.add-student-select-wrapper {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.add-student-select {
+  width: 100%;
+  appearance: none;
+  padding: 10px 36px 10px 14px;
+  border: 1px solid #E2E8F0;
+  border-radius: 8px;
+  font-size: 14px;
+  color: #1E293B;
+  background-color: #FFFFFF;
+  cursor: pointer;
+  font-family: inherit;
+  box-sizing: border-box;
+  transition: all 0.15s ease;
+}
+
+.add-student-select:focus {
+  outline: none;
+  border-color: #7C3AED;
+  box-shadow: 0 0 0 3px rgba(124, 58, 237, 0.1);
+}
+
+.add-student-select-arrow {
+  position: absolute;
+  right: 12px;
+  color: #64748B;
+  pointer-events: none;
+}
+
+.add-student-textarea {
+  width: 100%;
+  padding: 10px 14px;
+  border: 1px solid #E2E8F0;
+  border-radius: 8px;
+  font-size: 14px;
+  color: #1E293B;
+  background-color: #FFFFFF;
+  resize: vertical;
+  font-family: inherit;
+  box-sizing: border-box;
+  transition: all 0.15s ease;
+}
+
+.add-student-textarea:focus {
+  outline: none;
+  border-color: #7C3AED;
+  box-shadow: 0 0 0 3px rgba(124, 58, 237, 0.1);
+}
+
+.add-student-textarea::placeholder {
+  color: #94A3B8;
+}
+
+.input-error {
+  border-color: #EF4444 !important;
+}
+
+.add-student-error-text {
+  font-size: 12px;
+  color: #EF4444;
+  font-weight: 500;
+}
+
+/* Modal Footer */
+.add-student-modal-footer {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 12px;
+  padding: 16px 24px 20px 24px;
+  background-color: #FAF9FC;
+  border-top: 1px solid #F1F5F9;
+}
+
+.add-student-btn-cancel {
+  padding: 10px 20px;
+  background-color: #FFFFFF;
+  border: 1px solid #E2E8F0;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 600;
+  color: #475569;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.add-student-btn-cancel:hover {
+  background-color: #F8FAFC;
+  border-color: #CBD5E1;
+  color: #1E293B;
+}
+
+.add-student-btn-submit {
+  padding: 10px 24px;
+  background-color: #5B21B6;
+  border: 1px solid #5B21B6;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 600;
+  color: #FFFFFF;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  box-shadow: 0 4px 12px rgba(91, 33, 182, 0.25);
+}
+
+.add-student-btn-submit:hover {
+  background-color: #4C1D95;
+  border-color: #4C1D95;
+}

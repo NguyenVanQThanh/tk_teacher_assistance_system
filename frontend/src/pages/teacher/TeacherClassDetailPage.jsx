@@ -2,7 +2,7 @@
 // Description: Detailed class view with student roster, average scores, and full-screen student performance analytics modal.
 // Created At: 2026-08-31
 // Created By: Tam Khang
-// Updated At: 2026-08-31
+// Updated At: 2026-09-01
 // Updated By: Tam Khang
 
 import React, { useState, useMemo } from 'react';
@@ -36,8 +36,8 @@ export default function TeacherClassDetailPage() {
       maxStudents: 45,
     },
     '11b2': {
-      name: '11B2 - Vật lý cơ bản',
-      subjectName: 'Vật lý',
+      name: '11B2 - Toán cơ bản',
+      subjectName: 'Toán học',
       gradeText: 'Khối 11',
       term: 'Kì 1, 2023–2024',
       currentStudents: 42,

@@ -2,7 +2,7 @@
 // Description: Teacher Classes overview page with class cards, search, and filtering.
 // Created At: 2026-08-31
 // Created By: Tam Khang
-// Updated At: 2026-08-31
+// Updated At: 2026-09-01
 // Updated By: Tam Khang
 
 import React, { useState, useMemo } from 'react';
@@ -12,7 +12,6 @@ import {
   Users, 
   ChevronDown, 
   Sigma, 
-  FlaskConical, 
   LayoutGrid,
   BookOpen
 } from 'lucide-react';
@@ -25,10 +24,9 @@ export default function TeacherClassesPage() {
   const [showSidebar, setShowSidebar] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedGrade, setSelectedGrade] = useState('all');
-  const [selectedSubject, setSelectedSubject] = useState('all');
   const navigate = useNavigate();
 
-  // Mock data matching the design screenshot
+  // Mock data for the Mathematics department classes
   const classesData = [
     {
       id: '12a1',
@@ -45,16 +43,16 @@ export default function TeacherClassesPage() {
     },
     {
       id: '11b2',
-      name: '11B2 - Vật lý cơ bản',
+      name: '11B2 - Toán cơ bản',
       grade: '11',
       gradeText: 'Khối 11',
       term: 'Kì 1, 2023–2024',
       currentStudents: 42,
       maxStudents: 45,
-      subject: 'physics',
-      subjectName: 'Vật lý',
+      subject: 'math',
+      subjectName: 'Toán học',
       bannerTheme: 'lavender-theme',
-      iconType: 'flask',
+      iconType: 'sigma',
     },
     {
       id: '10a3',
@@ -76,16 +74,13 @@ export default function TeacherClassesPage() {
       if (selectedGrade !== 'all' && item.grade !== selectedGrade) {
         return false;
       }
-      if (selectedSubject !== 'all' && item.subject !== selectedSubject) {
-        return false;
-      }
       if (searchQuery.trim()) {
         const q = searchQuery.toLowerCase().trim();
-        return item.name.toLowerCase().includes(q) || item.subjectName.toLowerCase().includes(q);
+        return item.name.toLowerCase().includes(q) || item.gradeText.toLowerCase().includes(q);
       }
       return true;
     });
-  }, [classesData, selectedGrade, selectedSubject, searchQuery]);
+  }, [classesData, selectedGrade, searchQuery]);
 
   const renderClassIcon = (type) => {
     switch (type) {
@@ -156,21 +151,6 @@ export default function TeacherClassesPage() {
                 <option value="10">Khối 10</option>
                 <option value="11">Khối 11</option>
                 <option value="12">Khối 12</option>
-              </select>
-              <ChevronDown size={15} className="classes-select-arrow" />
-            </div>
-
-            {/* Subject Filter */}
-            <div className="classes-select-wrapper">
-              <select
-                className="classes-select"
-                value={selectedSubject}
-                onChange={(e) => setSelectedSubject(e.target.value)}
-              >
-                <option value="all">Tất cả môn học</option>
-                <option value="math">Toán học</option>
-                <option value="physics">Vật lý</option>
-                <option value="chemistry">Hóa học</option>
               </select>
               <ChevronDown size={15} className="classes-select-arrow" />
             </div>

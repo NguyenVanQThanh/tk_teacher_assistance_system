@@ -1,0 +1,323 @@
+/*
+File Name: EditStudentGradesModal.css
+Description: Stylesheet for EditStudentGradesModal component with full responsive gradebook table layout and 4 regular assessment columns.
+Created At: 2026-09-01
+Created By: Tam Khang
+Updated At: 2026-09-01
+Updated By: Tam Khang
+*/
+
+.edit-grades-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(15, 23, 42, 0.68);
+  backdrop-filter: blur(6px);
+  z-index: 1050;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  animation: editGradesFadeIn 0.22s ease-out;
+}
+
+@keyframes editGradesFadeIn {
+  from {
+    opacity: 0;
+    transform: scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+.edit-grades-window {
+  width: 100%;
+  max-width: 1020px;
+  max-height: 90vh;
+  background-color: #FFFFFF;
+  border-radius: 14px;
+  box-shadow: 0 20px 50px rgba(15, 23, 42, 0.25);
+  border: 1px solid #E2E8F0;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  font-family: 'Be Vietnam Pro', sans-serif;
+}
+
+.edit-grades-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 18px 24px;
+  border-bottom: 1px solid #F1F5F9;
+  background-color: #FAF9FC;
+}
+
+.edit-grades-title-group {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.edit-grades-title {
+  font-size: 17.5px;
+  font-weight: 700;
+  color: #1E1B4B;
+  margin: 0;
+}
+
+.edit-grades-subtitle {
+  font-size: 12.5px;
+  color: #64748B;
+}
+
+.btn-grades-close {
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  border: none;
+  background: transparent;
+  color: #64748B;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.btn-grades-close:hover {
+  background-color: #F1F5F9;
+  color: #0F172A;
+}
+
+.edit-grades-form {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.edit-grades-body {
+  padding: 18px 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  overflow-y: auto;
+  max-height: calc(90vh - 160px);
+}
+
+.grades-instruction-card {
+  background-color: #F5F3FF;
+  border: 1px solid #E9D5FF;
+  border-radius: 8px;
+  padding: 10px 16px;
+}
+
+.grades-instruction-text {
+  font-size: 12.5px;
+  color: #6D28D9;
+  margin: 0;
+  line-height: 1.45;
+}
+
+.grades-table-scroll-wrapper {
+  overflow-x: auto;
+  border: 1px solid #E2E8F0;
+  border-radius: 10px;
+}
+
+.edit-grades-table {
+  width: 100%;
+  border-collapse: collapse;
+  text-align: center;
+  font-size: 12.5px;
+}
+
+.edit-grades-table thead {
+  background-color: #F8FAFC;
+}
+
+.edit-grades-table th {
+  padding: 10px 8px;
+  font-size: 11.5px;
+  font-weight: 700;
+  color: #475569;
+  border: 1px solid #E2E8F0;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+  white-space: nowrap;
+}
+
+.edit-grades-table th.th-subj-header {
+  text-align: left;
+  padding-left: 16px;
+  min-width: 110px;
+}
+
+.edit-grades-table th.th-regular-header {
+  background-color: #FAF5FF;
+  color: #7C3AED;
+}
+
+.edit-grades-table th.th-tx-sub {
+  font-size: 11px;
+  width: 54px;
+  background-color: #FAF5FF;
+  color: #7C3AED;
+}
+
+.edit-grades-table th.th-midterm-header {
+  min-width: 90px;
+}
+
+.edit-grades-table th.th-final-header {
+  min-width: 90px;
+}
+
+.edit-grades-table th.th-tbm-header {
+  min-width: 110px;
+}
+
+.edit-grades-table th.th-total-header {
+  min-width: 95px;
+}
+
+.edit-grades-table th.th-rating-header {
+  min-width: 115px;
+}
+
+.edit-grade-row td {
+  padding: 8px 6px;
+  border: 1px solid #F1F5F9;
+  vertical-align: middle;
+}
+
+.edit-grade-row td.td-subj-cell {
+  text-align: left;
+  padding-left: 16px;
+  font-size: 13px;
+  color: #0F172A;
+}
+
+.grade-cell-input {
+  width: 44px;
+  height: 30px;
+  text-align: center;
+  border: 1px solid #CBD5E1;
+  border-radius: 6px;
+  font-size: 13px;
+  font-weight: 600;
+  color: #1E293B;
+  outline: none;
+  background-color: #FFFFFF;
+  transition: all 0.15s ease;
+  font-family: inherit;
+}
+
+.grade-cell-input:focus {
+  border-color: #7C3AED;
+  box-shadow: 0 0 0 2px rgba(124, 58, 237, 0.15);
+  background-color: #FAF5FF;
+}
+
+.grade-cell-input.highlight-mid {
+  border-color: #93C5FD;
+  color: #1D4ED8;
+}
+
+.grade-cell-input.highlight-fin {
+  border-color: #FCA5A5;
+  color: #B91C1C;
+}
+
+.grade-pill-purple {
+  display: inline-block;
+  padding: 3px 8px;
+  border-radius: 6px;
+  font-size: 12.5px;
+  font-weight: 600;
+  background-color: #EDE9FE;
+  color: #6D28D9;
+}
+
+.grade-pill-purple.bold-total {
+  font-weight: 700;
+  background-color: #DDD6FE;
+}
+
+.grade-rating-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 8px;
+  border-radius: 9999px;
+  font-size: 11.5px;
+  font-weight: 600;
+}
+
+.grade-rating-badge.rating-good {
+  background-color: #DCFCE7;
+  color: #15803D;
+}
+
+.grade-rating-badge.rating-fair {
+  background-color: #FEF3C7;
+  color: #B45309;
+}
+
+/* Footer */
+.edit-grades-footer {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
+  padding: 14px 24px;
+  border-top: 1px solid #F1F5F9;
+  background-color: #FAF9FC;
+}
+
+.btn-grades-cancel {
+  padding: 8px 18px;
+  border-radius: 8px;
+  border: 1px solid #CBD5E1;
+  background-color: #FFFFFF;
+  font-size: 13px;
+  font-weight: 600;
+  color: #475569;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.btn-grades-cancel:hover {
+  background-color: #F1F5F9;
+  color: #0F172A;
+}
+
+.btn-grades-save {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 20px;
+  border-radius: 8px;
+  border: 1px solid #7C3AED;
+  background-color: #7C3AED;
+  font-size: 13px;
+  font-weight: 600;
+  color: #FFFFFF;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  box-shadow: 0 2px 6px rgba(124, 58, 237, 0.25);
+}
+
+.btn-grades-save:hover {
+  background-color: #6D28D9;
+  border-color: #6D28D9;
+}
+
+.btn-grades-save.saved {
+  background-color: #059669;
+  border-color: #059669;
+}

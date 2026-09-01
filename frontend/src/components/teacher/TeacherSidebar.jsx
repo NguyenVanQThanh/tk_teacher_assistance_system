@@ -2,7 +2,7 @@
 // Description: Sidebar navigation component for Teacher role with dynamic route support.
 // Created At: 2026-08-30
 // Created By: Tam Khang
-// Updated At: 2026-08-31
+// Updated At: 2026-09-01
 // Updated By: Tam Khang
 
 import React from 'react';
@@ -52,6 +52,8 @@ export default function TeacherSidebar({
       navigate('/teacher');
     } else if (navId === 'classes') {
       navigate('/teacher/classes');
+    } else if (navId === 'homeroom') {
+      navigate('/teacher/homeroom');
     } else if (navId === 'documents') {
       navigate('/teacher/documents');
     } else if (navId === 'exercises') {
@@ -62,7 +64,7 @@ export default function TeacherSidebar({
   const menuItems = [
     { id: 'dashboard', label: 'Bảng điều khiển', icon: LayoutDashboard },
     { id: 'classes', label: 'Lớp học của tôi', icon: GraduationCap },
-    { id: 'students', label: 'Quản lý học sinh', icon: Users },
+    { id: 'homeroom', label: 'Lớp chủ nhiệm', icon: Users },
     { id: 'grading', label: 'Chấm bài & Phản hồi', icon: Star },
     { id: 'documents', label: 'Kho tài liệu', icon: FolderOpen },
     { id: 'exercises', label: 'Kho bài tập', icon: BookOpen },
