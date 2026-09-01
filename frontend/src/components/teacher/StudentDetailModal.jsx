@@ -224,7 +224,7 @@ export default function StudentDetailModal({ isOpen, onClose, student, classInfo
     student.subjectScores?.literature || 8.2,
     student.subjectScores?.biology || 8.2,
     student.subjectScores?.history || 8.7,
-    9.6 // Tin học
+    student.subjectScores?.informatics || 9.6
   ];
 
   const allSubjectAiRadarValues = [
@@ -237,6 +237,18 @@ export default function StudentDetailModal({ isOpen, onClose, student, classInfo
     (allSubjectClassroomRadarValues[6] * 0.98).toFixed(1),
     (allSubjectClassroomRadarValues[7] * 0.99).toFixed(1),
   ].map(Number);
+
+  // All 8 subjects matching radar axes for breakdown list display
+  const allSubjectBreakdownList = useMemo(() => [
+    { name: 'Toán học', classScore: allSubjectClassroomRadarValues[0], aiScore: allSubjectAiRadarValues[0], classDot: 'dot-purple', aiDot: 'dot-blue' },
+    { name: 'Vật lý', classScore: allSubjectClassroomRadarValues[1], aiScore: allSubjectAiRadarValues[1], classDot: 'dot-lavender', aiDot: 'dot-violet' },
+    { name: 'Hóa học', classScore: allSubjectClassroomRadarValues[2], aiScore: allSubjectAiRadarValues[2], classDot: 'dot-violet', aiDot: 'dot-lavender' },
+    { name: 'Tiếng Anh', classScore: allSubjectClassroomRadarValues[3], aiScore: allSubjectAiRadarValues[3], classDot: 'dot-sky', aiDot: 'dot-sky' },
+    { name: 'Ngữ văn', classScore: allSubjectClassroomRadarValues[4], aiScore: allSubjectAiRadarValues[4], classDot: 'dot-purple', aiDot: 'dot-blue' },
+    { name: 'Sinh học', classScore: allSubjectClassroomRadarValues[5], aiScore: allSubjectAiRadarValues[5], classDot: 'dot-lavender', aiDot: 'dot-violet' },
+    { name: 'Lịch sử', classScore: allSubjectClassroomRadarValues[6], aiScore: allSubjectAiRadarValues[6], classDot: 'dot-violet', aiDot: 'dot-sky' },
+    { name: 'Tin học', classScore: allSubjectClassroomRadarValues[7], aiScore: allSubjectAiRadarValues[7], classDot: 'dot-indigo', aiDot: 'dot-indigo' },
+  ], [allSubjectClassroomRadarValues, allSubjectAiRadarValues]);
 
   // Single-subject 3-criteria values when a specific subject is selected
   const singleSubjectClassroomCriteria = [
@@ -675,33 +687,13 @@ export default function StudentDetailModal({ isOpen, onClose, student, classInfo
 
                 <div className="radar-breakdown-list">
                   {selectedSubject === 'all' ? (
-                    <>
-                      <div className="breakdown-item">
-                        <span className="dot dot-purple"></span>
-                        <span className="breakdown-label">Toán học</span>
-                        <span className="breakdown-value">9.2/10</span>
+                    allSubjectBreakdownList.map((item, idx) => (
+                      <div key={`class-subj-${idx}`} className="breakdown-item">
+                        <span className={`dot ${item.classDot}`}></span>
+                        <span className="breakdown-label">{item.name}</span>
+                        <span className="breakdown-value">{item.classScore}/10</span>
                       </div>
-                      <div className="breakdown-item">
-                        <span className="dot dot-indigo"></span>
-                        <span className="breakdown-label">Tin học</span>
-                        <span className="breakdown-value">9.6/10</span>
-                      </div>
-                      <div className="breakdown-item">
-                        <span className="dot dot-sky"></span>
-                        <span className="breakdown-label">Tiếng Anh</span>
-                        <span className="breakdown-value">9.4/10</span>
-                      </div>
-                      <div className="breakdown-item">
-                        <span className="dot dot-lavender"></span>
-                        <span className="breakdown-label">Vật lý</span>
-                        <span className="breakdown-value">8.8/10</span>
-                      </div>
-                      <div className="breakdown-item">
-                        <span className="dot dot-violet"></span>
-                        <span className="breakdown-label">Lịch sử</span>
-                        <span className="breakdown-value">8.7/10</span>
-                      </div>
-                    </>
+                    ))
                   ) : (
                     <>
                       <div className="breakdown-item">
@@ -756,33 +748,13 @@ export default function StudentDetailModal({ isOpen, onClose, student, classInfo
 
                 <div className="radar-breakdown-list">
                   {selectedSubject === 'all' ? (
-                    <>
-                      <div className="breakdown-item">
-                        <span className="dot dot-blue"></span>
-                        <span className="breakdown-label">Toán học</span>
-                        <span className="breakdown-value">9.0/10</span>
+                    allSubjectBreakdownList.map((item, idx) => (
+                      <div key={`ai-subj-${idx}`} className="breakdown-item">
+                        <span className={`dot ${item.aiDot}`}></span>
+                        <span className="breakdown-label">{item.name}</span>
+                        <span className="breakdown-value">{item.aiScore}/10</span>
                       </div>
-                      <div className="breakdown-item">
-                        <span className="dot dot-indigo"></span>
-                        <span className="breakdown-label">Tin học</span>
-                        <span className="breakdown-value">9.5/10</span>
-                      </div>
-                      <div className="breakdown-item">
-                        <span className="dot dot-sky"></span>
-                        <span className="breakdown-label">Tiếng Anh</span>
-                        <span className="breakdown-value">9.2/10</span>
-                      </div>
-                      <div className="breakdown-item">
-                        <span className="dot dot-violet"></span>
-                        <span className="breakdown-label">Vật lý</span>
-                        <span className="breakdown-value">8.6/10</span>
-                      </div>
-                      <div className="breakdown-item">
-                        <span className="dot dot-lavender"></span>
-                        <span className="breakdown-label">Hóa học</span>
-                        <span className="breakdown-value">8.4/10</span>
-                      </div>
-                    </>
+                    ))
                   ) : (
                     <>
                       <div className="breakdown-item">

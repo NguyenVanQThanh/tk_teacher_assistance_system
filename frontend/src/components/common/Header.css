@@ -119,21 +119,209 @@ Updated By: Tam Khang
   display: flex;
   align-items: center;
   margin-left: 4px;
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
 }
 
 .user-avatar-placeholder {
-  width: 32px;
-  height: 32px;
-  border-radius: 9999px;
-  background: linear-gradient(135deg, #6549A6, #7D49A6);
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #7C3AED, #6D28D9);
   color: #FFFFFF;
   display: flex;
   align-items: center;
   justify-content: center;
-  border: 1px solid #EBE8F0;
-  transition: transform 0.2s ease;
+  border: 2px solid #EDE9FE;
+  position: relative;
+  transition: all 0.2s ease;
+  box-shadow: 0 2px 6px rgba(124, 58, 237, 0.2);
 }
 
 .user-avatar-placeholder:hover {
   transform: scale(1.05);
+  box-shadow: 0 4px 10px rgba(124, 58, 237, 0.3);
+}
+
+.header-avatar-initial {
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+}
+
+.header-online-status-dot {
+  position: absolute;
+  bottom: 0px;
+  right: 0px;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background-color: #10B981;
+  border: 1.5px solid #FFFFFF;
+}
+
+/* Account Popover Menu */
+.header-account-menu-popover {
+  position: absolute;
+  top: 48px;
+  right: 0px;
+  width: 290px;
+  background-color: #FFFFFF;
+  border-radius: 14px;
+  box-shadow: 0 14px 40px rgba(15, 23, 42, 0.14), 0 4px 12px rgba(15, 23, 42, 0.06);
+  border: 1px solid #E2E8F0;
+  padding: 0;
+  z-index: 1000;
+  font-family: 'Be Vietnam Pro', -apple-system, BlinkMacSystemFont, sans-serif;
+  overflow: hidden;
+  animation: popoverFadeIn 0.18s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+@keyframes popoverFadeIn {
+  from { opacity: 0; transform: translateY(-8px) scale(0.97); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+.account-popover-head {
+  padding: 16px 18px;
+  background: linear-gradient(135deg, #FAF5FF, #F5F3FF);
+  border-bottom: 1px solid #EDE9FE;
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+}
+
+.popover-avatar-circle {
+  width: 42px;
+  height: 42px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #7C3AED, #6D28D9);
+  color: #FFFFFF;
+  font-size: 15px;
+  font-weight: 800;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  box-shadow: 0 2px 8px rgba(124, 58, 237, 0.25);
+}
+
+.popover-user-info {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+}
+
+.popover-user-name {
+  font-size: 14px;
+  font-weight: 800;
+  color: #0F172A;
+  margin: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.popover-role-badge {
+  display: inline-block;
+  font-size: 11px;
+  font-weight: 700;
+  color: #7C3AED;
+  background-color: #EDE9FE;
+  padding: 2px 7px;
+  border-radius: 4px;
+  width: fit-content;
+  margin: 1px 0 2px;
+}
+
+.popover-meta-item {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 11px;
+  color: #64748B;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.popover-meta-icon {
+  color: #94A3B8;
+  flex-shrink: 0;
+}
+
+.account-menu-actions-list {
+  padding: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.account-menu-item {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 9px 12px;
+  font-size: 13px;
+  font-weight: 600;
+  color: #334155;
+  background: transparent;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  font-family: inherit;
+  transition: all 0.12s ease;
+  text-align: left;
+  text-decoration: none;
+  box-sizing: border-box;
+}
+
+.menu-item-left {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.menu-item-icon {
+  color: #64748B;
+  transition: color 0.12s;
+}
+
+.menu-item-arrow {
+  color: #CBD5E1;
+  transition: transform 0.12s;
+}
+
+.account-menu-item:hover {
+  background-color: #F8FAFC;
+  color: #7C3AED;
+}
+
+.account-menu-item:hover .menu-item-icon {
+  color: #7C3AED;
+}
+
+.account-menu-item:hover .menu-item-arrow {
+  color: #7C3AED;
+  transform: translateX(2px);
+}
+
+.account-menu-divider {
+  height: 1px;
+  background-color: #F1F5F9;
+  margin: 4px 6px;
+}
+
+.account-menu-item.item-logout {
+  color: #DC2626;
+  font-weight: 600;
+}
+
+.account-menu-item.item-logout:hover {
+  background-color: #FEF2F2;
+  color: #B91C1C;
 }

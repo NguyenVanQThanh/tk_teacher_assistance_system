@@ -367,15 +367,16 @@ Updated By: Tam Khang
 .radar-breakdown-list {
   display: flex;
   flex-direction: column;
-  gap: 10px;
-  min-width: 140px;
+  gap: 6px;
+  min-width: 145px;
+  flex: 1;
 }
 
 .breakdown-item {
   display: flex;
   align-items: center;
   gap: 8px;
-  font-size: 13px;
+  font-size: 12.5px;
 }
 
 .dot {

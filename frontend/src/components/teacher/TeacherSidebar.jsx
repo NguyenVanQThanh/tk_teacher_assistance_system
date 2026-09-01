@@ -54,10 +54,14 @@ export default function TeacherSidebar({
       navigate('/teacher/classes');
     } else if (navId === 'homeroom') {
       navigate('/teacher/homeroom');
+    } else if (navId === 'grading') {
+      navigate('/teacher/grading');
     } else if (navId === 'documents') {
       navigate('/teacher/documents');
     } else if (navId === 'exercises') {
       navigate('/teacher/exercises');
+    } else if (navId === 'schedule') {
+      navigate('/teacher/schedule');
     }
   };
 
@@ -68,8 +72,7 @@ export default function TeacherSidebar({
     { id: 'grading', label: 'Chấm bài & Phản hồi', icon: Star },
     { id: 'documents', label: 'Kho tài liệu', icon: FolderOpen },
     { id: 'exercises', label: 'Kho bài tập', icon: BookOpen },
-    { id: 'schedule', label: 'Lịch giảng dạy', icon: Calendar },
-    { id: 'settings', label: 'Cài đặt', icon: Settings },
+    { id: 'schedule', label: 'Lịch giảng dạy', icon: Calendar }
   ];
 
   return (
