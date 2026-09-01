@@ -30,6 +30,8 @@ export default function TeacherDashboard() {
       navigate('/teacher/documents');
     } else if (navId === 'exercises') {
       navigate('/teacher/exercises');
+    } else if (navId === 'classes') {
+      navigate('/teacher/classes');
     } else if (navId === 'dashboard') {
       navigate('/teacher');
     }

@@ -168,6 +168,7 @@ export default function CreateExerciseManualPage() {
             activeNav="exercises" 
             onSelectNav={(id) => {
               if (id === 'dashboard') navigate('/teacher');
+              else if (id === 'classes') navigate('/teacher/classes');
               else if (id === 'documents') navigate('/teacher/documents');
               else if (id === 'exercises') navigate('/teacher/exercises');
             }} 

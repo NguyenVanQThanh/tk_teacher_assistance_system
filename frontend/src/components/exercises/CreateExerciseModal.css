@@ -1,11 +1,26 @@
 /*
 File Name: CreateExerciseModal.css
-Description: Stylesheet for 3-Option Exercise Creation Modal matching exact Figma specs.
+Description: Stylesheet for Exercise Creation Modal supporting 3-Card Selection, AI Exercise Generation with Multi-Select Dropdown, and File Upload.
 Created At: 2026-08-30
 Created By: Tam Khang
 Updated At: 2026-08-30
 Updated By: Tam Khang
 */
+
+.modal-backdrop-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(29, 25, 40, 0.55);
+  backdrop-filter: blur(4px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 999;
+  padding: 16px;
+}
 
 .creation-modal-wrapper {
   width: 760px;
@@ -20,12 +35,28 @@ Updated By: Tam Khang
   animation: modalSpring 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }
 
+.creation-modal-wrapper.modal-ai-mode {
+  width: 860px;
+  max-width: 95vw;
+}
+
+@keyframes modalSpring {
+  0% {
+    opacity: 0;
+    transform: scale(0.96) translateY(8px);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
 /* ================= STEP 1: METHOD SELECTION ================= */
 .selection-modal-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 24px 32px 16px;
+  padding: 24px 32px 18px;
 }
 
 .selection-modal-title {
@@ -131,7 +162,6 @@ Updated By: Tam Khang
   margin: 0;
 }
 
-/* Footer for Step 1 */
 .selection-modal-footer {
   display: flex;
   align-items: center;
@@ -159,7 +189,534 @@ Updated By: Tam Khang
   background-color: #F1F3F7;
 }
 
-/* ================= STEP 2: DETAIL FORM ================= */
+/* ================= STEP 2: AI EXERCISE CREATION VIEW ================= */
+.ai-creation-view {
+  display: flex;
+  flex-direction: column;
+}
+
+.ai-modal-content {
+  padding: 8px 32px 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+/* Section Header */
+.ai-config-section {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.ai-section-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.ai-section-icon {
+  color: #6549A6;
+}
+
+.ai-section-title {
+  font-size: 15px;
+  font-weight: 700;
+  color: #4D308D;
+  letter-spacing: -0.1px;
+}
+
+/* 3-Card Question Matrix */
+.ai-matrix-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 16px;
+}
+
+.ai-matrix-card {
+  background-color: #FAF9FE;
+  border: 1px solid #ECE7F6;
+  border-radius: 12px;
+  padding: 16px 14px 18px;
+  display: flex;
+  flex-direction: column;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.ai-matrix-card:hover {
+  border-color: #DDD4EC;
+  box-shadow: 0 4px 12px rgba(101, 73, 166, 0.05);
+}
+
+.ai-matrix-card-title {
+  font-size: 14px;
+  font-weight: 700;
+  color: #1D1928;
+  margin: 0 0 14px 0;
+}
+
+.ai-matrix-inputs-row {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+}
+
+.ai-matrix-input-col {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+}
+
+.ai-matrix-input-label {
+  font-size: 10.5px;
+  font-weight: 700;
+  color: #8E8B99;
+  letter-spacing: 0.2px;
+  text-align: center;
+  white-space: nowrap;
+}
+
+.ai-matrix-number-input {
+  width: 100%;
+  height: 36px;
+  background-color: #FFFFFF;
+  border: 1px solid #D8D2E6;
+  border-radius: 6px;
+  text-align: center;
+  font-size: 14px;
+  font-weight: 600;
+  color: #1D1928;
+  outline: none;
+  font-family: inherit;
+  box-sizing: border-box;
+  transition: all 0.2s ease;
+}
+
+.ai-matrix-number-input:focus {
+  border-color: #6549A6;
+  box-shadow: 0 0 0 3px rgba(101, 73, 166, 0.12);
+}
+
+/* ================= MULTI-SELECT DOCUMENT DROPDOWN ================= */
+.doc-select-dropdown-container {
+  position: relative;
+  width: 100%;
+}
+
+.doc-select-trigger {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 11px 16px;
+  background-color: #FFFFFF;
+  border: 1.5px solid #DDD6EC;
+  border-radius: 10px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  user-select: none;
+}
+
+.doc-select-trigger:hover {
+  border-color: #6549A6;
+  background-color: #FAF8FF;
+}
+
+.doc-select-trigger.active {
+  border-color: #6549A6;
+  box-shadow: 0 0 0 3px rgba(101, 73, 166, 0.12);
+}
+
+.doc-trigger-left {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.doc-trigger-icon {
+  color: #6549A6;
+}
+
+.doc-trigger-text {
+  font-size: 13.5px;
+  color: #4B5563;
+  font-weight: 500;
+}
+
+.doc-trigger-right {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.doc-selected-count-badge {
+  background-color: #6549A6;
+  color: #FFFFFF;
+  font-size: 11.5px;
+  font-weight: 700;
+  padding: 2px 8px;
+  border-radius: 12px;
+}
+
+.doc-chevron-icon {
+  color: #6B7280;
+  transition: transform 0.2s ease;
+}
+
+.doc-chevron-icon.rotate {
+  transform: rotate(180deg);
+  color: #6549A6;
+}
+
+/* Dropdown Menu Popover */
+.doc-dropdown-menu {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  right: 0;
+  background-color: #FFFFFF;
+  border: 1px solid #E5E0F0;
+  border-radius: 12px;
+  box-shadow: 0 12px 32px rgba(46, 30, 84, 0.16);
+  z-index: 100;
+  max-height: 280px;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  animation: dropIn 0.2s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+@keyframes dropIn {
+  0% {
+    opacity: 0;
+    transform: translateY(-6px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.doc-search-box {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 14px;
+  border-bottom: 1px solid #F1EEF8;
+  background-color: #FAF9FE;
+}
+
+.doc-search-icon {
+  color: #6B7280;
+}
+
+.doc-search-input {
+  flex: 1;
+  border: none;
+  outline: none;
+  background: transparent;
+  font-size: 13px;
+  color: #1D1928;
+  font-family: inherit;
+}
+
+.btn-clear-doc-search {
+  background: none;
+  border: none;
+  color: #9CA3AF;
+  cursor: pointer;
+  padding: 2px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 4px;
+}
+
+.btn-clear-doc-search:hover {
+  color: #1D1928;
+}
+
+.doc-options-list {
+  padding: 6px 8px;
+  overflow-y: auto;
+  max-height: 220px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.doc-option-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 12px;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.doc-option-item:hover {
+  background-color: #F4EFFD;
+}
+
+.doc-option-item.selected {
+  background-color: #EDE4FC;
+}
+
+.doc-option-checkbox {
+  width: 18px;
+  height: 18px;
+  border-radius: 4px;
+  border: 1.5px solid #C4BED4;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background-color: #FFFFFF;
+  flex-shrink: 0;
+  transition: all 0.2s ease;
+}
+
+.doc-option-checkbox.checked {
+  background-color: #6549A6;
+  border-color: #6549A6;
+  color: #FFFFFF;
+}
+
+.doc-option-icon {
+  color: #6549A6;
+  flex-shrink: 0;
+}
+
+.doc-option-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  flex: 1;
+}
+
+.doc-option-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: #1D1928;
+}
+
+.doc-option-meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.doc-tag-badge {
+  font-size: 10.5px;
+  font-weight: 600;
+  color: #6549A6;
+  background-color: #FAF5FF;
+  padding: 1px 6px;
+  border-radius: 4px;
+  border: 1px solid #E9D5FF;
+}
+
+.doc-size-text {
+  font-size: 11px;
+  color: #8E8B99;
+}
+
+.doc-options-empty {
+  padding: 16px;
+  text-align: center;
+  font-size: 13px;
+  color: #8E8B99;
+}
+
+/* ================= SELECTED OUTSIDE CHIPS ================= */
+.ai-selected-docs-wrapper {
+  margin-top: 2px;
+}
+
+.ai-docs-chips-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.ai-doc-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 14px;
+  background-color: #FFFFFF;
+  border: 1px solid #DDD6EC;
+  border-radius: 8px;
+  cursor: pointer;
+  user-select: none;
+  transition: all 0.2s ease;
+}
+
+.ai-doc-chip.selected {
+  border-color: #6549A6;
+  background-color: #F8F5FF;
+}
+
+.ai-doc-chip.chip-removable {
+  padding: 6px 10px 6px 12px;
+}
+
+.ai-chip-doc-icon {
+  color: #6549A6;
+  flex-shrink: 0;
+}
+
+.ai-chip-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: #1D1928;
+}
+
+.btn-remove-chip {
+  background: none;
+  border: none;
+  color: #716D7C;
+  cursor: pointer;
+  padding: 2px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s ease;
+  margin-left: 2px;
+}
+
+.btn-remove-chip:hover {
+  background-color: #FEE2E2;
+  color: #DC2626;
+}
+
+.ai-docs-help-text {
+  font-size: 12px;
+  color: #716D7C;
+  margin: 2px 0 0 0;
+  font-style: normal;
+}
+
+/* ================= PROMPT TEXTAREA ================= */
+.ai-prompt-input-wrapper {
+  width: 100%;
+}
+
+.ai-prompt-custom-textarea {
+  width: 100%;
+  min-height: 86px;
+  padding: 14px 16px;
+  background-color: #FFFFFF;
+  border: 1px solid #DDD6EC;
+  border-radius: 10px;
+  font-size: 13.5px;
+  color: #1D1928;
+  font-family: inherit;
+  line-height: 1.5;
+  outline: none;
+  resize: vertical;
+  box-sizing: border-box;
+  transition: all 0.2s ease;
+}
+
+.ai-prompt-custom-textarea:focus {
+  border-color: #6549A6;
+  box-shadow: 0 0 0 3px rgba(101, 73, 166, 0.12);
+}
+
+.ai-prompt-custom-textarea::placeholder {
+  color: #9CA3AF;
+}
+
+/* Start AI Generate Primary Button */
+.btn-start-ai-generate {
+  width: 100%;
+  height: 48px;
+  border: none;
+  background: #6549A6;
+  background: linear-gradient(90deg, #6549A6 0%, #7D49A6 100%);
+  color: #FFFFFF;
+  font-size: 15px;
+  font-weight: 600;
+  font-family: inherit;
+  border-radius: 10px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  box-shadow: 0 4px 14px rgba(101, 73, 166, 0.28);
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  margin-top: 4px;
+}
+
+.btn-start-ai-generate:hover:not(:disabled) {
+  transform: translateY(-1px);
+  box-shadow: 0 6px 20px rgba(101, 73, 166, 0.38);
+}
+
+.btn-start-ai-generate:active:not(:disabled) {
+  transform: scale(0.99);
+}
+
+.btn-start-ai-generate:disabled {
+  opacity: 0.7;
+  cursor: not-allowed;
+}
+
+.sparkle-btn-icon {
+  color: #FFFFFF;
+}
+
+/* Bottom Footer for AI View */
+.ai-modal-bottom-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 32px 24px;
+}
+
+.btn-ai-back {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: none;
+  border: none;
+  color: #494551;
+  font-size: 14px;
+  font-weight: 500;
+  font-family: inherit;
+  cursor: pointer;
+  padding: 6px 8px;
+  border-radius: 6px;
+  transition: all 0.2s ease;
+}
+
+.btn-ai-back:hover {
+  color: #1D1928;
+  background-color: #F1F3F7;
+}
+
+.btn-ai-cancel {
+  background: none;
+  border: none;
+  color: #494551;
+  font-size: 14px;
+  font-weight: 500;
+  font-family: inherit;
+  cursor: pointer;
+  padding: 6px 12px;
+  border-radius: 6px;
+  transition: all 0.2s ease;
+}
+
+.btn-ai-cancel:hover {
+  color: #1D1928;
+  background-color: #F1F3F7;
+}
+
+/* ================= STEP 2: UPLOAD DETAIL FORM ================= */
 .form-modal-header {
   display: flex;
   align-items: center;
@@ -270,34 +827,7 @@ Updated By: Tam Khang
   font-weight: 500;
 }
 
-/* AI Prompt Textarea */
-.ai-prompt-box {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-}
-
-.ai-textarea {
-  width: 100%;
-  padding: 10px 12px;
-  border: 1px solid #EBE8F0;
-  border-radius: 8px;
-  font-size: 13.5px;
-  color: #1D1928;
-  font-family: inherit;
-  outline: none;
-  resize: vertical;
-  background-color: #FFFFFF;
-  box-sizing: border-box;
-  transition: all 0.2s ease;
-}
-
-.ai-textarea:focus {
-  border-color: #DB2777;
-  box-shadow: 0 0 0 3px rgba(219, 39, 119, 0.1);
-}
-
-/* Form Groups */
+/* Common form fields */
 .form-field-group {
   display: flex;
   flex-direction: column;
@@ -387,8 +917,13 @@ Updated By: Tam Khang
   transform: scale(0.98);
 }
 
-@media (max-width: 768px) {
+@media (max-width: 820px) {
   .method-cards-grid {
+    grid-template-columns: 1fr;
+    gap: 12px;
+  }
+
+  .ai-matrix-grid {
     grid-template-columns: 1fr;
     gap: 12px;
   }

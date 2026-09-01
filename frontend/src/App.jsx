@@ -2,7 +2,7 @@
 // Description: Main application router with AuthProvider, ProtectedRoute guards, and Exercise Creation views.
 // Created At: 2026-08-30
 // Created By: Tam Khang
-// Updated At: 2026-08-30
+// Updated At: 2026-08-31
 // Updated By: Tam Khang
 
 import React from 'react';
@@ -14,6 +14,8 @@ import TeacherDashboard from './pages/teacher/TeacherDashboard';
 import DocumentRepositoryPage from './pages/teacher/DocumentRepositoryPage';
 import ExerciseRepositoryPage from './pages/teacher/ExerciseRepositoryPage';
 import CreateExerciseManualPage from './pages/teacher/CreateExerciseManualPage';
+import TeacherClassesPage from './pages/teacher/TeacherClassesPage';
+import TeacherClassDetailPage from './pages/teacher/TeacherClassDetailPage';
 
 export default function App() {
   return (
@@ -37,6 +39,24 @@ export default function App() {
             element={
               <ProtectedRoute>
                 <TeacherDashboard />
+              </ProtectedRoute>
+            } 
+          />
+
+          {/* Protected Teacher Classes Routes */}
+          <Route 
+            path="/teacher/classes" 
+            element={
+              <ProtectedRoute>
+                <TeacherClassesPage />
+              </ProtectedRoute>
+            } 
+          />
+          <Route 
+            path="/teacher/classes/:classId" 
+            element={
+              <ProtectedRoute>
+                <TeacherClassDetailPage />
               </ProtectedRoute>
             } 
           />
@@ -78,3 +98,4 @@ export default function App() {
     </AuthProvider>
   );
 }
+

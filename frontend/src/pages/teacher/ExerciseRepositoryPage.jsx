@@ -137,6 +137,8 @@ export default function ExerciseRepositoryPage() {
   const handleNavSelect = (navId) => {
     if (navId === 'dashboard') {
       navigate('/teacher');
+    } else if (navId === 'classes') {
+      navigate('/teacher/classes');
     } else if (navId === 'documents') {
       navigate('/teacher/documents');
     } else if (navId === 'exercises') {

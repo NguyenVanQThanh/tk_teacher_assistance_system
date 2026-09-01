@@ -1,14 +1,16 @@
 /*
 File Name: ExerciseRepositoryPage.css
-Description: Stylesheet for ExerciseRepositoryPage matching exact Figma design specifications.
+Description: Stylesheet for ExerciseRepositoryPage matching exact Figma design specifications and fitted into 100vh viewport.
 Created At: 2026-08-30
 Created By: Tam Khang
-Updated At: 2026-08-30
+Updated At: 2026-08-31
 Updated By: Tam Khang
 */
 
 .exercise-repository-layout {
-  min-height: 100vh;
+  height: 100vh;
+  max-height: 100vh;
+  overflow: hidden;
   display: flex;
   flex-direction: column;
   background-color: #F8F7FA;
@@ -19,26 +21,31 @@ Updated By: Tam Khang
 .exercise-repository-body {
   display: flex;
   flex: 1;
-  min-height: calc(100vh - 64px);
+  height: calc(100vh - 64px);
+  max-height: calc(100vh - 64px);
+  overflow: hidden;
 }
 
 .exercise-repository-main {
   flex: 1;
-  padding: 20px 24px 28px;
+  padding: 12px 24px 14px;
   background-color: #F8F7FA;
   display: flex;
   flex-direction: column;
   box-sizing: border-box;
+  overflow: hidden;
+  height: 100%;
 }
 
 /* Top bar: Breadcrumb & Create Button */
 .exercise-top-bar {
   display: flex;
-  align-items: flex-start;
+  align-items: flex-end;
   justify-content: space-between;
-  margin-bottom: 18px;
+  margin-bottom: 8px;
   flex-wrap: wrap;
-  gap: 16px;
+  gap: 12px;
+  flex-shrink: 0;
 }
 
 .exercise-title-group {
@@ -47,33 +54,69 @@ Updated By: Tam Khang
   gap: 2px;
 }
 
+.breadcrumb-nav {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+}
+
+.breadcrumb-link {
+  color: #6B7280;
+  text-decoration: none;
+  transition: color 0.2s ease;
+}
+
+.breadcrumb-link:hover {
+  color: #4D308D;
+  text-decoration: underline;
+}
+
+.breadcrumb-separator {
+  color: #9CA3AF;
+}
+
+.breadcrumb-current {
+  color: #1D1928;
+  font-weight: 600;
+}
+
+.page-heading {
+  font-size: 22px;
+  font-weight: 700;
+  color: #1D1928;
+  line-height: 26px;
+  margin: 0;
+}
+
 .page-subheading {
-  font-size: 13.5px;
+  font-size: 12px;
   color: #494551;
-  margin: 4px 0 0 0;
-  line-height: 18px;
+  margin: 2px 0 0 0;
+  line-height: 16px;
 }
 
 .btn-create-new-exercise {
   display: flex;
   align-items: center;
-  gap: 8px;
-  padding: 10px 20px;
+  gap: 6px;
+  padding: 8px 16px;
   background: linear-gradient(90deg, #6549A6 0%, #7D49A6 100%);
   color: #FFFFFF;
   border: none;
   border-radius: 8px;
-  font-size: 14px;
+  font-size: 13px;
   font-weight: 600;
   font-family: inherit;
   cursor: pointer;
-  box-shadow: 0 4px 12px rgba(101, 73, 166, 0.22);
+  box-shadow: 0 3px 10px rgba(101, 73, 166, 0.2);
   transition: transform 0.2s ease, box-shadow 0.2s ease;
+  flex-shrink: 0;
 }
 
 .btn-create-new-exercise:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 6px 18px rgba(101, 73, 166, 0.32);
+  transform: translateY(-1px);
+  box-shadow: 0 5px 14px rgba(101, 73, 166, 0.3);
 }
 
 .btn-create-new-exercise:active {
@@ -84,9 +127,11 @@ Updated By: Tam Khang
 .exercise-cards-grid {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 16px;
-  margin-bottom: 24px;
+  grid-template-rows: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  margin-bottom: 8px;
   flex: 1;
+  min-height: 0;
 }
 
 .exercise-empty-state {
@@ -94,10 +139,10 @@ Updated By: Tam Khang
   background-color: #FFFFFF;
   border: 1px dashed #CBD5E1;
   border-radius: 12px;
-  padding: 48px;
+  padding: 36px;
   text-align: center;
   color: #6B7280;
-  font-size: 14px;
+  font-size: 13.5px;
 }
 
 /* Pagination Row matching Document Repository */
@@ -105,13 +150,15 @@ Updated By: Tam Khang
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding-top: 16px;
+  padding-top: 8px;
+  padding-bottom: 2px;
   border-top: 1px solid #EBE8F0;
   margin-top: auto;
+  flex-shrink: 0;
 }
 
 .pagination-info {
-  font-size: 13.5px;
+  font-size: 12.5px;
   color: #494551;
 }
 
@@ -126,13 +173,13 @@ Updated By: Tam Khang
 }
 
 .pagination-btn {
-  min-width: 32px;
-  height: 32px;
-  padding: 0 8px;
+  min-width: 28px;
+  height: 28px;
+  padding: 0 6px;
   border: 1px solid #EBE8F0;
   background-color: #FFFFFF;
   color: #494551;
-  font-size: 13px;
+  font-size: 12px;
   font-weight: 500;
   font-family: inherit;
   border-radius: 6px;
@@ -163,8 +210,19 @@ Updated By: Tam Khang
 
 /* Responsive */
 @media (max-width: 1200px) {
+  .exercise-repository-layout {
+    overflow-y: auto;
+  }
+  .exercise-repository-body {
+    height: auto;
+    overflow: visible;
+  }
+  .exercise-repository-main {
+    overflow: visible;
+  }
   .exercise-cards-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-template-rows: auto;
   }
 }
 
@@ -178,7 +236,7 @@ Updated By: Tam Khang
   }
   .exercise-pagination-row {
     flex-direction: column;
-    gap: 12px;
+    gap: 10px;
     align-items: flex-start;
   }
 }

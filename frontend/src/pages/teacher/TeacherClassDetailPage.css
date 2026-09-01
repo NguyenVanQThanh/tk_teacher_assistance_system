@@ -1,0 +1,241 @@
+/*
+File Name: TeacherClassDetailPage.css
+Description: Stylesheet for TeacherClassDetailPage matching exact Figma design specifications.
+Created At: 2026-08-31
+Created By: Tam Khang
+Updated At: 2026-08-31
+Updated By: Tam Khang
+*/
+
+.class-detail-layout {
+  height: 100vh;
+  max-height: 100vh;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  background-color: #F8F7FA;
+  font-family: 'Be Vietnam Pro', sans-serif;
+  animation: pageFadeIn 0.35s ease-out;
+}
+
+.class-detail-body {
+  display: flex;
+  flex: 1;
+  height: calc(100vh - 64px);
+  max-height: calc(100vh - 64px);
+  overflow: hidden;
+}
+
+.class-detail-main {
+  flex: 1;
+  padding: 16px 24px 20px;
+  background-color: #F8F7FA;
+  display: flex;
+  flex-direction: column;
+  box-sizing: border-box;
+  overflow-y: auto;
+}
+
+/* Header Section */
+.class-detail-header-section {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-bottom: 16px;
+}
+
+.class-detail-title-group {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin-top: 2px;
+}
+
+.class-detail-heading {
+  font-size: 24px;
+  font-weight: 700;
+  color: #1D1928;
+  line-height: 30px;
+  margin: 0;
+}
+
+.class-detail-subheading {
+  font-size: 13px;
+  color: #494551;
+  margin: 2px 0 0 0;
+}
+
+/* Student Roster Card */
+.students-roster-card {
+  background-color: #FFFFFF;
+  border: 1px solid #EBE8F0;
+  border-radius: 12px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.02);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  max-width: 100%;
+}
+
+.roster-card-header {
+  padding: 16px 20px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-bottom: 1px solid #F1F3F7;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.roster-card-title {
+  font-size: 17px;
+  font-weight: 700;
+  color: #1D1928;
+  margin: 0;
+}
+
+.roster-search-box {
+  position: relative;
+  display: flex;
+  align-items: center;
+  width: 240px;
+}
+
+.roster-search-icon {
+  position: absolute;
+  left: 12px;
+  color: #6B7280;
+  pointer-events: none;
+}
+
+.roster-search-input {
+  width: 100%;
+  height: 36px;
+  padding: 0 12px 0 34px;
+  background-color: #F8F7FA;
+  border: 1px solid #EBE8F0;
+  border-radius: 8px;
+  font-size: 13px;
+  color: #1D1928;
+  font-family: inherit;
+  outline: none;
+  transition: all 0.2s ease;
+}
+
+.roster-search-input::placeholder {
+  color: #9CA3AF;
+}
+
+.roster-search-input:focus {
+  background-color: #FFFFFF;
+  border-color: #4D308D;
+  box-shadow: 0 0 0 3px rgba(77, 48, 141, 0.1);
+}
+
+/* Roster Table */
+.roster-table-container {
+  overflow-x: auto;
+  width: 100%;
+}
+
+.roster-table {
+  width: 100%;
+  border-collapse: collapse;
+  text-align: left;
+  font-size: 13.5px;
+}
+
+.roster-table thead tr {
+  background-color: #FAF8FD;
+  border-bottom: 1px solid #EBE8F0;
+}
+
+.roster-table th {
+  padding: 12px 20px;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: #494551;
+  letter-spacing: 0.1px;
+}
+
+.roster-table th.th-score {
+  text-align: right;
+  padding-right: 24px;
+}
+
+.roster-row {
+  border-bottom: 1px solid #F3F1F8;
+  transition: background-color 0.15s ease;
+}
+
+.roster-row.clickable-row {
+  cursor: pointer;
+}
+
+.roster-row.clickable-row:hover {
+  background-color: #F8F1FF;
+}
+
+.roster-row:last-child {
+  border-bottom: none;
+}
+
+.roster-table td {
+  padding: 14px 20px;
+  color: #1D1928;
+}
+
+.td-name {
+  font-weight: 500;
+  color: #1D1928;
+}
+
+.td-code {
+  color: #494551;
+  font-family: monospace, inherit;
+  font-size: 13px;
+}
+
+.td-score {
+  text-align: right;
+  padding-right: 24px;
+}
+
+.score-badge {
+  font-weight: 700;
+  color: #4D308D;
+  font-size: 13.5px;
+}
+
+.empty-roster-row {
+  text-align: center;
+  padding: 32px 20px;
+  color: #6B7280;
+  font-size: 13.5px;
+}
+
+/* Footer Link */
+.roster-card-footer {
+  padding: 14px 20px;
+  text-align: center;
+  border-top: 1px solid #F1F3F7;
+  background-color: #FFFFFF;
+}
+
+.btn-view-all-students {
+  background: none;
+  border: none;
+  color: #4D308D;
+  font-size: 13.5px;
+  font-weight: 600;
+  font-family: inherit;
+  cursor: pointer;
+  padding: 6px 16px;
+  border-radius: 6px;
+  transition: all 0.2s ease;
+}
+
+.btn-view-all-students:hover {
+  background-color: #F8F1FF;
+  text-decoration: underline;
+}

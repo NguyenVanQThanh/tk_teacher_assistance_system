@@ -1,0 +1,313 @@
+/*
+File Name: TeacherClassesPage.css
+Description: Stylesheet for TeacherClassesPage matching exact Figma designs and fitted in 100vh viewport.
+Created At: 2026-08-31
+Created By: Tam Khang
+Updated At: 2026-08-31
+Updated By: Tam Khang
+*/
+
+.teacher-classes-layout {
+  height: 100vh;
+  max-height: 100vh;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  background-color: #F8F7FA;
+  font-family: 'Be Vietnam Pro', sans-serif;
+  animation: pageFadeIn 0.35s ease-out;
+}
+
+@keyframes pageFadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.teacher-classes-body {
+  display: flex;
+  flex: 1;
+  height: calc(100vh - 64px);
+  max-height: calc(100vh - 64px);
+  overflow: hidden;
+}
+
+.teacher-classes-main {
+  flex: 1;
+  padding: 16px 24px 20px;
+  background-color: #F8F7FA;
+  display: flex;
+  flex-direction: column;
+  box-sizing: border-box;
+  overflow-y: auto;
+}
+
+/* Top Section: Breadcrumb & Title */
+.classes-top-section {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin-bottom: 12px;
+}
+
+.breadcrumb-nav {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+}
+
+.breadcrumb-link {
+  color: #6B7280;
+  text-decoration: none;
+  transition: color 0.2s ease;
+}
+
+.breadcrumb-link:hover {
+  color: #4D308D;
+  text-decoration: underline;
+}
+
+.breadcrumb-separator {
+  color: #9CA3AF;
+}
+
+.breadcrumb-current {
+  color: #1D1928;
+  font-weight: 600;
+}
+
+.classes-page-heading {
+  font-size: 24px;
+  font-weight: 700;
+  color: #1D1928;
+  line-height: 30px;
+  margin: 0;
+}
+
+/* Filter Toolbar */
+.classes-filter-bar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 18px;
+  flex-wrap: wrap;
+}
+
+.classes-search-wrapper {
+  position: relative;
+  display: flex;
+  align-items: center;
+  flex: 1.8;
+  min-width: 220px;
+}
+
+.classes-search-icon {
+  position: absolute;
+  left: 14px;
+  color: #6B7280;
+  pointer-events: none;
+}
+
+.classes-search-input {
+  width: 100%;
+  height: 38px;
+  padding: 0 14px 0 38px;
+  background-color: #FFFFFF;
+  border: 1px solid #EBE8F0;
+  border-radius: 8px;
+  font-size: 13.5px;
+  color: #1D1928;
+  font-family: inherit;
+  outline: none;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.02);
+  transition: all 0.2s ease;
+}
+
+.classes-search-input::placeholder {
+  color: #9CA3AF;
+}
+
+.classes-search-input:focus {
+  border-color: #4D308D;
+  box-shadow: 0 0 0 3px rgba(77, 48, 141, 0.1);
+}
+
+.classes-select-wrapper {
+  position: relative;
+  display: flex;
+  align-items: center;
+  flex: 1;
+  min-width: 150px;
+}
+
+.classes-select {
+  width: 100%;
+  height: 38px;
+  padding: 0 32px 0 14px;
+  background-color: #FFFFFF;
+  border: 1px solid #EBE8F0;
+  border-radius: 8px;
+  font-size: 13px;
+  color: #1D1928;
+  font-family: inherit;
+  outline: none;
+  cursor: pointer;
+  appearance: none;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.02);
+  transition: all 0.2s ease;
+}
+
+.classes-select:hover {
+  border-color: #CBD5E1;
+}
+
+.classes-select:focus {
+  border-color: #4D308D;
+  box-shadow: 0 0 0 3px rgba(77, 48, 141, 0.1);
+}
+
+.classes-select-arrow {
+  position: absolute;
+  right: 12px;
+  color: #6B7280;
+  pointer-events: none;
+}
+
+/* Cards Grid */
+.classes-cards-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 16px;
+  margin-bottom: 20px;
+}
+
+.classes-empty-state {
+  grid-column: 1 / -1;
+  background-color: #FFFFFF;
+  border: 1px dashed #CBD5E1;
+  border-radius: 12px;
+  padding: 48px;
+  text-align: center;
+  color: #6B7280;
+  font-size: 14px;
+}
+
+/* Class Card */
+.class-card {
+  background-color: #FFFFFF;
+  border: 1px solid #EBE8F0;
+  border-radius: 12px;
+  overflow: hidden;
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.02);
+  transition: transform 0.25s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.25s cubic-bezier(0.16, 1, 0.3, 1), border-color 0.25s ease;
+}
+
+.class-card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 12px 24px rgba(77, 48, 141, 0.1);
+  border-color: #D5C4F5;
+}
+
+/* Banner Theme Styles */
+.class-card-banner {
+  padding: 16px 18px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 72px;
+}
+
+.class-card-banner.purple-theme {
+  background: linear-gradient(135deg, #EBE1FC 0%, #DFD0FA 100%);
+}
+
+.class-card-banner.lavender-theme {
+  background: linear-gradient(135deg, #F3E8FF 0%, #E9D5FF 100%);
+}
+
+.class-card-banner.pink-theme {
+  background: linear-gradient(135deg, #FCE7F3 0%, #FBCFE8 100%);
+}
+
+.class-icon-container {
+  width: 38px;
+  height: 38px;
+  background-color: #FFFFFF;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #4D308D;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.04);
+  flex-shrink: 0;
+}
+
+.class-banner-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.class-banner-title {
+  font-size: 15px;
+  font-weight: 700;
+  color: #1D1928;
+  line-height: 20px;
+  margin: 0;
+}
+
+.class-banner-subtext {
+  font-size: 11.5px;
+  color: #6549A6;
+  font-weight: 500;
+}
+
+/* Card Footer */
+.class-card-footer {
+  padding: 12px 18px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background-color: #FFFFFF;
+}
+
+.class-students-count {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12.5px;
+  color: #494551;
+}
+
+.users-icon {
+  color: #6B7280;
+}
+
+.class-subject-badge {
+  padding: 3px 10px;
+  border-radius: 9999px;
+  font-size: 11.5px;
+  font-weight: 600;
+  background-color: #F8F1FF;
+  color: #6549A6;
+}
+
+/* Responsive */
+@media (max-width: 1200px) {
+  .classes-cards-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 768px) {
+  .classes-cards-grid {
+    grid-template-columns: 1fr;
+  }
+  .classes-filter-bar {
+    flex-direction: column;
+    align-items: stretch;
+  }
+}
