@@ -12,7 +12,7 @@ import {
   Users, 
   ChevronDown, 
   Sigma, 
-  FlaskConical, 
+  FlaskConical,
   LayoutGrid,
   BookOpen,
   Loader2,
@@ -150,7 +150,9 @@ export default function TeacherClassesPage() {
       }
       if (searchQuery.trim()) {
         const q = searchQuery.toLowerCase().trim();
-        return item.name.toLowerCase().includes(q) || item.subjectName.toLowerCase().includes(q);
+        return item.name.toLowerCase().includes(q) || 
+               item.gradeText.toLowerCase().includes(q) || 
+               item.subjectName.toLowerCase().includes(q);
       }
       return true;
     });
@@ -241,7 +243,6 @@ export default function TeacherClassesPage() {
               </select>
               <ChevronDown size={15} className="classes-select-arrow" />
             </div>
-
             {/* Subject Filter */}
             <div className="classes-select-wrapper">
               <select

@@ -16,6 +16,7 @@ import ExerciseRepositoryPage from './pages/teacher/ExerciseRepositoryPage';
 import CreateExerciseManualPage from './pages/teacher/CreateExerciseManualPage';
 import TeacherClassesPage from './pages/teacher/TeacherClassesPage';
 import TeacherClassDetailPage from './pages/teacher/TeacherClassDetailPage';
+import TeacherHomeroomPage from './pages/teacher/TeacherHomeroomPage';
 
 export default function App() {
   return (
@@ -57,6 +58,16 @@ export default function App() {
             element={
               <ProtectedRoute>
                 <TeacherClassDetailPage />
+              </ProtectedRoute>
+            } 
+          />
+
+          {/* Protected Teacher Homeroom Route */}
+          <Route 
+            path="/teacher/homeroom" 
+            element={
+              <ProtectedRoute>
+                <TeacherHomeroomPage />
               </ProtectedRoute>
             } 
           />
