@@ -2,7 +2,7 @@
 # Description: Pydantic schemas for the academic module with comprehensive validation and AcademicStatusEnum.
 # Created At: 2026-07-21
 # Created By: Tam Khang
-# Updated At: 2026-07-26
+# Updated At: 2026-09-01
 # Updated By: Tam Khang
 
 import re
@@ -170,6 +170,7 @@ class EnrollmentOut(BaseModel):
     student_id: UUID
     class_id: UUID
     student_code: Optional[str] = None
+    student_name: Optional[str] = None
     status: AcademicStatusEnum = AcademicStatusEnum.ACTIVE
 
     model_config = {"from_attributes": True}

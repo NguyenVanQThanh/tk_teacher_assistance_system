@@ -1,8 +1,8 @@
 // File Name: CreateExerciseModal.jsx
-// Description: Multi-method Exercise Creation Modal supporting Direct Manual, File Upload, and AI Generation with Multi-Select Document Dropdown.
+// Description: Multi-method Exercise Creation Modal supporting Direct Manual, Multi-file Upload (Question File & Separate Answer Key), and AI Generation.
 // Created At: 2026-08-30
 // Created By: Tam Khang
-// Updated At: 2026-08-30
+// Updated At: 2026-09-01
 // Updated By: Tam Khang
 
 import React, { useState, useRef, useEffect } from 'react';
@@ -22,8 +22,11 @@ import {
   Check,
   ChevronDown,
   Search,
-  FolderOpen
+  FolderOpen,
+  Loader2,
+  FileCheck
 } from 'lucide-react';
+import { exercisesApi, subjectsApi } from '../../services/api';
 import './CreateExerciseModal.css';
 
 export default function CreateExerciseModal({ isOpen, onClose, onCreateSuccess }) {
@@ -34,9 +37,15 @@ export default function CreateExerciseModal({ isOpen, onClose, onCreateSuccess }
   const [grade, setGrade] = useState('12');
   const [subject, setSubject] = useState('math');
   const [type, setType] = useState('quiz');
+  
+  // Multi-file upload states
   const [uploadedFile, setUploadedFile] = useState(null);
+  const [answerFile, setAnswerFile] = useState(null);
+  const [testCode, setTestCode] = useState('');
+
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
+  const [subjectsList, setSubjectsList] = useState([]);
 
   // AI Generation Specific State
   const [aiPrompt, setAiPrompt] = useState('');
@@ -65,6 +74,27 @@ export default function CreateExerciseModal({ isOpen, onClose, onCreateSuccess }
   const [docSearchQuery, setDocSearchQuery] = useState('');
   const docDropdownRef = useRef(null);
 
+  useEffect(() => {
+    let isMounted = true;
+    async function loadSubjects() {
+      try {
+        const subjs = await subjectsApi.getSubjects();
+        if (isMounted && Array.isArray(subjs)) {
+          setSubjectsList(subjs);
+          if (subjs.length > 0) {
+            setSubject(subjs[0].subject_id);
+          }
+        }
+      } catch {
+        // Fallback
+      }
+    }
+    loadSubjects();
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
   // Close document dropdown when clicking outside
   useEffect(() => {
     function handleClickOutside(event) {
@@ -86,16 +116,17 @@ export default function CreateExerciseModal({ isOpen, onClose, onCreateSuccess }
     setCurrentStep('select_method');
     setTitle('');
     setAiPrompt('');
+    setUploadedFile(null);
+    setAnswerFile(null);
+    setTestCode('');
     setQuestionCounts({
       mcq: { recognize: 0, understand: 0, apply: 0 },
       tf: { recognize: 0, understand: 0, apply: 0 },
       shortAnswer: { recognize: 0, understand: 0, apply: 0 }
     });
     setSelectedDocIds([]);
-    setIsDocDropdownOpen(false);
-    setDocSearchQuery('');
-    setUploadedFile(null);
     setErrorMsg('');
+    setIsSubmitting(false);
     onClose();
   };
 
@@ -138,10 +169,6 @@ export default function CreateExerciseModal({ isOpen, onClose, onCreateSuccess }
     doc.tag.toLowerCase().includes(docSearchQuery.toLowerCase().trim())
   );
 
-  const selectedDocsList = availableDocuments.filter((doc) =>
-    selectedDocIds.includes(doc.id)
-  );
-
   const handleStartAiGeneration = (e) => {
     e.preventDefault();
 
@@ -165,16 +192,17 @@ export default function CreateExerciseModal({ isOpen, onClose, onCreateSuccess }
         : `Bài tập AI Sinh tự động (${totalQuestions || 10} câu)`;
 
       const newExercise = {
-        id: Date.now(),
+        id: `ai-${Date.now()}`,
         title: generatedTitle,
         type: 'quiz',
-        grade: '12',
+        grade: grade,
         subject: 'math',
+        subjectName: subjectsList[0]?.subject_name || 'Toán học',
         questionCount: `${totalQuestions || 10} câu hỏi AI`,
         duration: '20 phút',
         date: new Date().toLocaleDateString('vi-VN'),
-        authorName: 'GV. Nguyễn Văn A',
-        authorInitial: 'NA',
+        authorName: 'Giáo viên',
+        authorInitial: 'GV',
         hasShare: true,
       };
 
@@ -185,37 +213,73 @@ export default function CreateExerciseModal({ isOpen, onClose, onCreateSuccess }
     }, 800);
   };
 
-  const handleSubmitUpload = (e) => {
+  const handleSubmitUpload = async (e) => {
     e.preventDefault();
     if (!uploadedFile) {
-      setErrorMsg('Vui lòng chọn file đề bài tải lên.');
+      setErrorMsg('Vui lòng chọn file đề bài (.docx hoặc .pdf) để tải lên.');
       return;
     }
 
-    setIsSubmitting(true);
-    setErrorMsg('');
+    const fileName = uploadedFile.name.toLowerCase();
+    if (!fileName.endsWith('.docx') && !fileName.endsWith('.pdf')) {
+      setErrorMsg('Hệ thống chỉ hỗ trợ định dạng file .docx hoặc .pdf cho file đề bài.');
+      return;
+    }
 
-    setTimeout(() => {
-      setIsSubmitting(false);
+    try {
+      setIsSubmitting(true);
+      setErrorMsg('');
+
       const finalTitle = title.trim() || uploadedFile.name.replace(/\.[^/.]+$/, '');
-      const newExercise = {
-        id: Date.now(),
+      const targetSubjectId = subjectsList.length > 0 ? subjectsList[0].subject_id : subject;
+
+      // Step 1: Create exercise container in DB
+      const newEx = await exercisesApi.createExercise({
+        title: finalTitle,
+        subject_id: targetSubjectId,
+        total_questions: 0,
+        ai_metadata: {
+          grade: grade,
+          type: type,
+        },
+      });
+
+      // Step 2: Upload file(s) to bulk import & parse questions
+      const formData = new FormData();
+      formData.append('question_file', uploadedFile);
+      if (answerFile) {
+        formData.append('answer_file', answerFile);
+      }
+      if (testCode.trim()) {
+        formData.append('test_code', testCode.trim());
+      }
+
+      const importedQuestions = await exercisesApi.importQuestions(newEx.exercise_id, formData);
+
+      const createdExercise = {
+        id: newEx.exercise_id,
         title: finalTitle,
         type: type,
         grade: grade,
-        subject: subject,
-        questionCount: '15 câu hỏi',
-        duration: '15 phút',
+        subject: 'math',
+        subjectName: subjectsList[0]?.subject_name || 'Toán học',
+        questionCount: `${importedQuestions.length || 0} câu hỏi`,
+        duration: type === 'quiz' ? '15 phút' : '45 phút',
         date: new Date().toLocaleDateString('vi-VN'),
-        authorName: 'GV. Nguyễn Văn A',
-        authorInitial: 'NA',
+        authorName: 'Giáo viên',
+        authorInitial: 'GV',
         hasShare: true,
       };
+
       if (onCreateSuccess) {
-        onCreateSuccess(newExercise);
+        onCreateSuccess(createdExercise);
       }
       handleClose();
-    }, 600);
+    } catch (err) {
+      setErrorMsg(err.response?.data?.detail?.message || 'Có lỗi xảy ra khi tải lên và bóc tách câu hỏi từ file.');
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -266,7 +330,7 @@ export default function CreateExerciseModal({ isOpen, onClose, onCreateSuccess }
                 </div>
                 <h3 className="method-card-title">Tải lên từ file có sẵn</h3>
                 <p className="method-card-desc">
-                  Sử dụng file PDF, DOCX hoặc XLSX có sẵn để hệ thống tự động trích xuất nội dung.
+                  Sử dụng file đề bài (kèm hoặc không kèm file đáp án riêng) để hệ thống tự động bóc tách.
                 </p>
               </div>
 
@@ -301,7 +365,7 @@ export default function CreateExerciseModal({ isOpen, onClose, onCreateSuccess }
         {/* ================= STEP 2: AI EXERCISE CREATION CONFIG ================= */}
         {currentStep === 'ai' && (
           <div className="ai-creation-view">
-            {/* Header matching screenshot */}
+            {/* Header */}
             <div className="selection-modal-header">
               <h2 className="selection-modal-title">Lựa chọn hình thức tạo mới</h2>
               <button 
@@ -404,9 +468,9 @@ export default function CreateExerciseModal({ isOpen, onClose, onCreateSuccess }
                     </div>
                   </div>
 
-                  {/* Card 3: Trả lời ngắn */}
+                  {/* Card 3: Trắc nghiệm Trả lời ngắn */}
                   <div className="ai-matrix-card">
-                    <h4 className="ai-matrix-card-title">Trả lời ngắn</h4>
+                    <h4 className="ai-matrix-card-title">Trắc nghiệm Trả lời ngắn</h4>
                     <div className="ai-matrix-inputs-row">
                       <div className="ai-matrix-input-col">
                         <label className="ai-matrix-input-label">NHẬN BIẾT</label>
@@ -443,88 +507,75 @@ export default function CreateExerciseModal({ isOpen, onClose, onCreateSuccess }
                 </div>
               </div>
 
-              {/* SECTION 2: Chọn tài liệu từ kho (Multi-select Dropdown & Chips) */}
+              {/* SECTION 2: Chọn tài liệu tham khảo */}
               <div className="ai-config-section">
                 <div className="ai-section-header">
-                  <FileText size={18} className="ai-section-icon" />
-                  <span className="ai-section-title">Chọn tài liệu từ kho</span>
+                  <BookOpen size={18} className="ai-section-icon" />
+                  <span className="ai-section-title">Chọn tài liệu từ Kho tài liệu (Tham khảo nội dung)</span>
                 </div>
 
-                {/* Dropdown Selector */}
-                <div className="doc-select-dropdown-container" ref={docDropdownRef}>
+                <div className="doc-select-custom-wrapper" ref={docDropdownRef}>
                   <div 
-                    className={`doc-select-trigger ${isDocDropdownOpen ? 'active' : ''}`}
+                    className="doc-select-input-box"
                     onClick={() => setIsDocDropdownOpen(!isDocDropdownOpen)}
                   >
-                    <div className="doc-trigger-left">
-                      <FolderOpen size={17} className="doc-trigger-icon" />
-                      <span className="doc-trigger-text">
-                        {selectedDocIds.length === 0 
-                          ? 'Bấm để tìm kiếm & chọn tài liệu từ kho...' 
-                          : `Đã chọn ${selectedDocIds.length} tài liệu từ kho`}
-                      </span>
-                    </div>
-                    <div className="doc-trigger-right">
-                      {selectedDocIds.length > 0 && (
-                        <span className="doc-selected-count-badge">
-                          {selectedDocIds.length}
+                    <div className="doc-tags-container">
+                      {selectedDocIds.length > 0 ? (
+                        selectedDocIds.map((docId) => {
+                          const doc = availableDocuments.find((d) => d.id === docId);
+                          return (
+                            <span key={docId} className="selected-doc-tag">
+                              <span className="doc-tag-title">{doc?.title}</span>
+                              <button 
+                                type="button" 
+                                className="btn-remove-tag"
+                                onClick={(e) => removeSelectedDocument(docId, e)}
+                              >
+                                <X size={12} />
+                              </button>
+                            </span>
+                          );
+                        })
+                      ) : (
+                        <span className="placeholder-text">
+                          Bấm để chọn 1 hoặc nhiều tài liệu từ kho...
                         </span>
                       )}
-                      <ChevronDown 
-                        size={18} 
-                        className={`doc-chevron-icon ${isDocDropdownOpen ? 'rotate' : ''}`} 
-                      />
                     </div>
+                    <ChevronDown size={18} className="arrow-icon" />
                   </div>
 
-                  {/* Dropdown Menu Popover */}
+                  {/* Dropdown Menu */}
                   {isDocDropdownOpen && (
                     <div className="doc-dropdown-menu">
-                      {/* Search Inside Dropdown */}
                       <div className="doc-search-box">
-                        <Search size={15} className="doc-search-icon" />
+                        <Search size={14} className="doc-search-icon" />
                         <input 
-                          type="text"
-                          className="doc-search-input"
-                          placeholder="Tìm kiếm tài liệu theo tên, chuyên đề..."
+                          type="text" 
+                          placeholder="Tìm tài liệu theo tên..."
                           value={docSearchQuery}
                           onChange={(e) => setDocSearchQuery(e.target.value)}
                           onClick={(e) => e.stopPropagation()}
-                          autoFocus
                         />
-                        {docSearchQuery && (
-                          <button 
-                            type="button" 
-                            className="btn-clear-doc-search"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              setDocSearchQuery('');
-                            }}
-                          >
-                            <X size={14} />
-                          </button>
-                        )}
                       </div>
 
-                      {/* Document Options List */}
-                      <div className="doc-options-list">
+                      <div className="doc-list-scroll">
                         {filteredDocs.length > 0 ? (
                           filteredDocs.map((doc) => {
                             const isSelected = selectedDocIds.includes(doc.id);
                             return (
                               <div 
-                                key={doc.id}
-                                className={`doc-option-item ${isSelected ? 'selected' : ''}`}
+                                key={doc.id} 
+                                className={`doc-list-item ${isSelected ? 'selected' : ''}`}
                                 onClick={() => toggleDocumentSelection(doc.id)}
                               >
-                                <div className={`doc-option-checkbox ${isSelected ? 'checked' : ''}`}>
-                                  {isSelected && <Check size={12} strokeWidth={3} />}
+                                <div className="doc-checkbox">
+                                  {isSelected && <Check size={12} className="check-mark" />}
                                 </div>
-                                <FileText size={16} className="doc-option-icon" />
-                                <div className="doc-option-info">
-                                  <span className="doc-option-title">{doc.title}</span>
-                                  <div className="doc-option-meta">
-                                    <span className="doc-tag-badge">{doc.tag}</span>
+                                <div className="doc-item-info">
+                                  <span className="doc-item-title">{doc.title}</span>
+                                  <div className="doc-item-badges">
+                                    <span className="doc-type-badge">{doc.tag}</span>
                                     <span className="doc-size-text">{doc.size}</span>
                                   </div>
                                 </div>
@@ -532,76 +583,44 @@ export default function CreateExerciseModal({ isOpen, onClose, onCreateSuccess }
                             );
                           })
                         ) : (
-                          <div className="doc-options-empty">
-                            Không tìm thấy tài liệu phù hợp.
-                          </div>
+                          <div className="empty-docs-text">Không tìm thấy tài liệu phù hợp</div>
                         )}
                       </div>
                     </div>
                   )}
                 </div>
-
-                {/* Selected Document Chips Displayed Outside */}
-                {selectedDocsList.length > 0 && (
-                  <div className="ai-selected-docs-wrapper">
-                    <div className="ai-docs-chips-grid">
-                      {selectedDocsList.map((doc) => (
-                        <div 
-                          key={doc.id}
-                          className="ai-doc-chip selected chip-removable"
-                        >
-                          <FileText size={16} className="ai-chip-doc-icon" />
-                          <span className="ai-chip-title">{doc.title}</span>
-                          <button 
-                            type="button"
-                            className="btn-remove-chip"
-                            onClick={(e) => removeSelectedDocument(doc.id, e)}
-                            title="Xóa tài liệu này khỏi danh sách chọn"
-                          >
-                            <X size={14} />
-                          </button>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
-
-                <p className="ai-docs-help-text">
-                  AI sẽ dựa trên nội dung các tài liệu đã chọn để tạo câu hỏi chính xác hơn.
-                </p>
               </div>
 
-              {/* SECTION 3: Mô tả yêu cầu (Prompt) */}
+              {/* SECTION 3: Mô tả yêu cầu tạo bài */}
               <div className="ai-config-section">
                 <div className="ai-section-header">
-                  <Sparkles size={18} className="ai-section-icon" />
-                  <span className="ai-section-title">Mô tả yêu cầu (Prompt)</span>
+                  <FileText size={18} className="ai-section-icon" />
+                  <span className="ai-section-title">Mô tả yêu cầu tạo bài (Prompt)</span>
                 </div>
-
-                <div className="ai-prompt-input-wrapper">
-                  <textarea
-                    rows={3}
-                    className="ai-prompt-custom-textarea"
-                    placeholder="Ví dụ: Tạo 10 câu hỏi trắc nghiệm về chương Đạo hàm, mức độ thông hiểu và vận dụng..."
-                    value={aiPrompt}
-                    onChange={(e) => setAiPrompt(e.target.value)}
-                  />
-                </div>
+                <textarea 
+                  className="ai-prompt-textarea"
+                  rows={3}
+                  placeholder="Nhập hướng dẫn chi tiết cho AI (VD: Tạo đề kiểm tra 15 phút chương Đạo hàm, tập trung vào các câu hỏi tính đạo hàm hàm số hợp và ứng dụng thực tế...)"
+                  value={aiPrompt}
+                  onChange={(e) => setAiPrompt(e.target.value)}
+                />
               </div>
+            </div>
 
-              {/* ACTION BUTTON */}
+            {/* Action Bar */}
+            <div className="ai-action-bar">
               <button 
                 type="button" 
-                className="btn-start-ai-generate"
+                className="btn-create-exercise-gradient"
                 onClick={handleStartAiGeneration}
                 disabled={isSubmitting}
               >
-                <Sparkles size={18} className="sparkle-btn-icon" />
+                <Sparkles size={18} />
                 <span>{isSubmitting ? 'Đang tạo bài tập...' : 'Bắt đầu tạo bài tập'}</span>
               </button>
             </div>
 
-            {/* Footer Navigation matching screenshot */}
+            {/* Footer Navigation */}
             <div className="ai-modal-bottom-footer">
               <button 
                 type="button" 
@@ -637,7 +656,7 @@ export default function CreateExerciseModal({ isOpen, onClose, onCreateSuccess }
                 >
                   <ArrowLeft size={18} />
                 </button>
-                <h3 className="form-modal-title">Tải lên từ file có sẵn (PDF/Word/Excel)</h3>
+                <h3 className="form-modal-title">Tải lên từ file có sẵn (Word / PDF)</h3>
               </div>
               <button 
                 type="button" 
@@ -657,32 +676,90 @@ export default function CreateExerciseModal({ isOpen, onClose, onCreateSuccess }
                 </div>
               )}
 
-              <div className="file-upload-dropzone">
-                <input
-                  type="file"
-                  id="exercise-file-input"
-                  className="hidden-input"
-                  accept=".pdf,.docx,.doc,.xlsx,.xls"
-                  onChange={(e) => {
-                    if (e.target.files && e.target.files[0]) {
-                      setUploadedFile(e.target.files[0]);
-                      if (!title) setTitle(e.target.files[0].name.replace(/\.[^/.]+$/, ''));
-                    }
-                  }}
-                />
-                <label htmlFor="exercise-file-input" className="dropzone-label">
-                  <UploadCloud size={36} className="dropzone-icon" />
-                  {uploadedFile ? (
-                    <span className="file-selected-text">
-                      Đã chọn: <strong>{uploadedFile.name}</strong>
-                    </span>
-                  ) : (
-                    <>
-                      <span className="dropzone-title">Kéo thả file đề bài hoặc bấm để chọn</span>
-                      <span className="dropzone-sub">Hỗ trợ PDF, DOCX, XLSX (AI sẽ tự động nhận diện câu hỏi và đáp án)</span>
-                    </>
-                  )}
-                </label>
+              {/* 2 Dropzones: File Đề bài & File Đáp án */}
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px' }}>
+                {/* 1. File Đề bài */}
+                <div className="file-upload-dropzone" style={{ minHeight: '140px', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
+                  <input
+                    type="file"
+                    id="exercise-file-input"
+                    className="hidden-input"
+                    accept=".docx,.pdf"
+                    onChange={(e) => {
+                      if (e.target.files && e.target.files[0]) {
+                        setUploadedFile(e.target.files[0]);
+                        if (!title) setTitle(e.target.files[0].name.replace(/\.[^/.]+$/, ''));
+                      }
+                    }}
+                  />
+                  <label htmlFor="exercise-file-input" className="dropzone-label">
+                    <UploadCloud size={32} className="dropzone-icon" />
+                    {uploadedFile ? (
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginTop: '4px' }}>
+                        <span className="file-selected-text">
+                          <strong>{uploadedFile.name}</strong>
+                        </span>
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            setUploadedFile(null);
+                          }}
+                          style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#EF4444', padding: '2px' }}
+                        >
+                          <X size={14} />
+                        </button>
+                      </div>
+                    ) : (
+                      <>
+                        <span className="dropzone-title">1. File Đề bài (Bắt buộc) *</span>
+                        <span className="dropzone-sub">Hỗ trợ .DOCX, .PDF (chứa câu hỏi & đáp án)</span>
+                      </>
+                    )}
+                  </label>
+                </div>
+
+                {/* 2. File Đáp án riêng (Tùy chọn) */}
+                <div className="file-upload-dropzone" style={{ minHeight: '140px', display: 'flex', flexDirection: 'column', justifyContent: 'center', borderColor: '#E2E8F0' }}>
+                  <input
+                    type="file"
+                    id="answer-file-input"
+                    className="hidden-input"
+                    accept=".docx,.pdf,.xlsx,.xls,.txt"
+                    onChange={(e) => {
+                      if (e.target.files && e.target.files[0]) {
+                        setAnswerFile(e.target.files[0]);
+                      }
+                    }}
+                  />
+                  <label htmlFor="answer-file-input" className="dropzone-label">
+                    <FileCheck size={32} style={{ color: '#10B981', marginBottom: '6px' }} />
+                    {answerFile ? (
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginTop: '4px' }}>
+                        <span style={{ fontSize: '13.5px', color: '#047857', fontWeight: 500 }}>
+                          <strong>{answerFile.name}</strong>
+                        </span>
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            setAnswerFile(null);
+                          }}
+                          style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#EF4444', padding: '2px' }}
+                        >
+                          <X size={14} />
+                        </button>
+                      </div>
+                    ) : (
+                      <>
+                        <span className="dropzone-title">2. File Đáp án riêng (Tùy chọn)</span>
+                        <span className="dropzone-sub">Hỗ trợ .DOCX, .PDF nếu có file đáp án tách rời</span>
+                      </>
+                    )}
+                  </label>
+                </div>
               </div>
 
               {/* Title */}
@@ -697,7 +774,7 @@ export default function CreateExerciseModal({ isOpen, onClose, onCreateSuccess }
                 />
               </div>
 
-              {/* Grade & Subject */}
+              {/* Grade, Subject & Test Code */}
               <div className="form-row-2">
                 <div className="form-field-group">
                   <label className="input-field-label">Khối lớp</label>
@@ -713,19 +790,25 @@ export default function CreateExerciseModal({ isOpen, onClose, onCreateSuccess }
                 </div>
 
                 <div className="form-field-group">
-                  <label className="input-field-label">Môn học</label>
-                  <select 
+                  <label className="input-field-label">Môn giảng dạy</label>
+                  <input
+                    type="text"
                     className="select-input"
-                    value={subject}
-                    onChange={(e) => setSubject(e.target.value)}
-                  >
-                    <option value="math">Toán học</option>
-                    <option value="physics">Vật lý</option>
-                    <option value="chemistry">Hóa học</option>
-                    <option value="english">Tiếng Anh</option>
-                    <option value="it">Tin học</option>
-                    <option value="history">Lịch sử</option>
-                  </select>
+                    value={subjectsList[0]?.subject_name || 'Toán học'}
+                    readOnly
+                    style={{ backgroundColor: '#F3F4F6', color: '#1F2937', fontWeight: 600, cursor: 'default' }}
+                  />
+                </div>
+
+                <div className="form-field-group">
+                  <label className="input-field-label">Mã đề thi (Tùy chọn)</label>
+                  <input
+                    type="text"
+                    className="text-input"
+                    placeholder="VD: 101, 0121, A..."
+                    value={testCode}
+                    onChange={(e) => setTestCode(e.target.value)}
+                  />
                 </div>
               </div>
 
@@ -735,6 +818,7 @@ export default function CreateExerciseModal({ isOpen, onClose, onCreateSuccess }
                   type="button" 
                   className="btn-form-cancel"
                   onClick={() => setCurrentStep('select_method')}
+                  disabled={isSubmitting}
                 >
                   Quay lại
                 </button>
@@ -742,11 +826,15 @@ export default function CreateExerciseModal({ isOpen, onClose, onCreateSuccess }
                   type="submit" 
                   className="btn-form-submit"
                   disabled={isSubmitting}
+                  style={{ display: 'flex', alignItems: 'center', gap: '8px' }}
                 >
                   {isSubmitting ? (
-                    <span>Đang xử lý...</span>
+                    <>
+                      <Loader2 size={16} className="animate-spin" />
+                      <span>Đang bóc tách đề thi...</span>
+                    </>
                   ) : (
-                    <span>Tiếp tục & Hoàn thành</span>
+                    <span>Tải lên & Hoàn thành</span>
                   )}
                 </button>
               </div>

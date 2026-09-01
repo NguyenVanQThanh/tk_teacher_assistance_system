@@ -2,15 +2,22 @@
 # Description: Script to seed the initial database with roles, permissions, and role-permission mappings.
 # Created At: 2026-07-17
 # Created By: Tam Khang
-# Updated At: 2026-07-31
+# Updated At: 2026-09-01
 # Updated By: Tam Khang
 
 import os
+import sys
 import uuid
+from pathlib import Path
+
+# Ensure backend root is in sys.path
+backend_root = str(Path(__file__).resolve().parent.parent.parent)
+if backend_root not in sys.path:
+    sys.path.insert(0, backend_root)
+
+from dotenv import load_dotenv
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
-# pyrefly: ignore [missing-import]
-from dotenv import load_dotenv
 
 from models.base import Base
 from models.models import Role, Permission, RolePermission
@@ -109,9 +116,29 @@ def seed_data():
 
         # 3. Seed RolePermission mapping (Idempotent: check if exists first)
         mappings = {
-            "Admin": ["AUTH_ME_VIEW", "AUTH_PASSWORD_CHANGE", "AUTH_PERM_MANAGE", "ACAD_SUBJECT_MANAGE", "ACAD_SUBJECT_VIEW", "ACAD_CLASS_MANAGE", "ACAD_CLASS_VIEW", "ACAD_ENROLLMENT_MANAGE", "ACAD_ENROLLMENT_VIEW", "ACAD_TEACHER_ASSIGN_MANAGE", "ACAD_TEACHER_ASSIGN_VIEW", "EXE_EXERCISE_MANAGE", "EXE_EXERCISE_VIEW", "EXE_ASSIGNMENT_MANAGE", "EXE_ASSIGNMENT_VIEW", "EXE_ATTEMPT_VIEW", "EXE_QUESTION_IMPORT"],
-            "Teacher": ["AUTH_ME_VIEW", "AUTH_PASSWORD_CHANGE", "EXE_EXERCISE_MANAGE", "EXE_EXERCISE_VIEW", "EXE_ASSIGNMENT_MANAGE", "EXE_ASSIGNMENT_VIEW", "EXE_ATTEMPT_VIEW", "EXE_QUESTION_IMPORT"],
-            "Student": ["AUTH_ME_VIEW", "AUTH_PASSWORD_CHANGE", "EXE_ASSIGNMENT_VIEW", "EXE_ATTEMPT_SUBMIT", "EXE_ATTEMPT_VIEW"]
+            "Admin": [
+                "AUTH_ME_VIEW", "AUTH_PASSWORD_CHANGE", "AUTH_PERM_MANAGE",
+                "ACAD_SUBJECT_MANAGE", "ACAD_SUBJECT_VIEW",
+                "ACAD_CLASS_MANAGE", "ACAD_CLASS_VIEW",
+                "ACAD_ENROLLMENT_MANAGE", "ACAD_ENROLLMENT_VIEW",
+                "ACAD_TEACHER_ASSIGN_MANAGE", "ACAD_TEACHER_ASSIGN_VIEW",
+                "EXE_EXERCISE_MANAGE", "EXE_EXERCISE_VIEW",
+                "EXE_ASSIGNMENT_MANAGE", "EXE_ASSIGNMENT_VIEW",
+                "EXE_ATTEMPT_VIEW", "EXE_QUESTION_IMPORT"
+            ],
+            "Teacher": [
+                "AUTH_ME_VIEW", "AUTH_PASSWORD_CHANGE",
+                "ACAD_CLASS_VIEW", "ACAD_SUBJECT_VIEW",
+                "ACAD_ENROLLMENT_VIEW", "ACAD_TEACHER_ASSIGN_VIEW",
+                "EXE_EXERCISE_MANAGE", "EXE_EXERCISE_VIEW",
+                "EXE_ASSIGNMENT_MANAGE", "EXE_ASSIGNMENT_VIEW",
+                "EXE_ATTEMPT_VIEW", "EXE_QUESTION_IMPORT"
+            ],
+            "Student": [
+                "AUTH_ME_VIEW", "AUTH_PASSWORD_CHANGE",
+                "ACAD_CLASS_VIEW", "ACAD_SUBJECT_VIEW", "ACAD_ENROLLMENT_VIEW",
+                "EXE_ASSIGNMENT_VIEW", "EXE_ATTEMPT_SUBMIT", "EXE_ATTEMPT_VIEW"
+            ]
         }
 
 

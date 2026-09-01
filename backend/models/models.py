@@ -114,6 +114,13 @@ class StudentClass(Base):
         PrimaryKeyConstraint('student_id', 'class_id'),
     )
 
+    student = relationship("User", foreign_keys=[student_id])
+    class_obj = relationship("Class", foreign_keys=[class_id])
+
+    @property
+    def student_name(self):
+        return self.student.full_name if self.student else None
+
 
 class TeacherSubject(Base):
     __tablename__ = 'teacher_subjects'

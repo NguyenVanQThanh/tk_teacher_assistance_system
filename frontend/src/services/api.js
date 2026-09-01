@@ -1,8 +1,8 @@
 // File Name: api.js
-// Description: Centralized Axios API client configuration with token management.
+// Description: Centralized Axios API client configuration with token management and academic service APIs.
 // Created At: 2026-08-30
 // Created By: Tam Khang
-// Updated At: 2026-08-30
+// Updated At: 2026-09-01
 // Updated By: Tam Khang
 
 import axios from 'axios';
@@ -57,4 +57,76 @@ export const authApi = {
   },
 };
 
+export const classesApi = {
+  getClasses: async (params = {}) => {
+    const response = await api.get('/api/v1/classes', { params });
+    return response.data;
+  },
+  getClassDetail: async (classId) => {
+    const response = await api.get(`/api/v1/classes/${classId}`);
+    return response.data;
+  },
+  getStudentsInClass: async (classId, params = {}) => {
+    const response = await api.get(`/api/v1/classes/${classId}/students`, { params });
+    return response.data;
+  },
+  getTeacherSubjects: async (classId, params = {}) => {
+    const response = await api.get(`/api/v1/classes/${classId}/teacher-subjects`, { params });
+    return response.data;
+  },
+};
+
+export const subjectsApi = {
+  getSubjects: async (params = {}) => {
+    const response = await api.get('/api/v1/subjects', { params });
+    return response.data;
+  },
+  getSubjectDetail: async (subjectId) => {
+    const response = await api.get(`/api/v1/subjects/${subjectId}`);
+    return response.data;
+  },
+};
+
+export const exercisesApi = {
+  getExercises: async (params = {}) => {
+    const response = await api.get('/api/v1/exercises', { params });
+    return response.data;
+  },
+  getExerciseDetail: async (exerciseId) => {
+    const response = await api.get(`/api/v1/exercises/${exerciseId}`);
+    return response.data;
+  },
+  createExercise: async (data) => {
+    const response = await api.post('/api/v1/exercises', data);
+    return response.data;
+  },
+  updateExercise: async (exerciseId, data) => {
+    const response = await api.put(`/api/v1/exercises/${exerciseId}`, data);
+    return response.data;
+  },
+  deleteExercise: async (exerciseId) => {
+    await api.delete(`/api/v1/exercises/${exerciseId}`);
+  },
+  exportPdf: async (exerciseId) => {
+    const response = await api.get(`/api/v1/exercises/${exerciseId}/export/pdf`, {
+      responseType: 'blob',
+    });
+    return response.data;
+  },
+  importQuestions: async (exerciseId, formData) => {
+    const response = await api.post(`/api/v1/exercises/${exerciseId}/questions/import`, formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data',
+      },
+    });
+    return response.data;
+  },
+  addQuestion: async (exerciseId, data) => {
+    const response = await api.post(`/api/v1/exercises/${exerciseId}/questions`, data);
+    return response.data;
+  },
+};
+
 export default api;
+
+
