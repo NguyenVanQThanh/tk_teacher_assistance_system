@@ -542,6 +542,7 @@ export default function TeacherHomeroomPage() {
           onClose={() => setSelectedStudent(null)}
           student={selectedStudent}
           classInfo={homeroomClass}
+          isHomeroom={true}
         />
       )}
 

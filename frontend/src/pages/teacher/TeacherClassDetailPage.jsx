@@ -194,6 +194,7 @@ export default function TeacherClassDetailPage() {
         onClose={() => setSelectedStudent(null)}
         student={selectedStudent}
         classInfo={currentClass}
+        isHomeroom={false}
       />
     </div>
   );

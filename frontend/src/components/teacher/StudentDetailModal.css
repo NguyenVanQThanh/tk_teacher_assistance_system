@@ -223,6 +223,29 @@ Updated By: Tam Khang
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.03);
 }
 
+.modal-subject-fixed-pill {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: linear-gradient(135deg, #F5F3FF, #EDE9FE);
+  padding: 6px 14px;
+  border-radius: 9999px;
+  border: 1px solid #DDD6FE;
+  box-shadow: 0 1px 3px rgba(124, 58, 237, 0.08);
+}
+
+.fixed-pill-label {
+  font-size: 12.5px;
+  font-weight: 500;
+  color: #6D28D9;
+}
+
+.fixed-pill-name {
+  font-size: 13px;
+  font-weight: 700;
+  color: #5B21B6;
+}
+
 .filter-box-label {
   font-size: 12.5px;
   font-weight: 600;

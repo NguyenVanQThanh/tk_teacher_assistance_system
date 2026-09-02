@@ -1,11 +1,11 @@
 // File Name: StudentDetailModal.jsx
-// Description: Full-screen modal presenting student performance analytics with multi-axis radar chart for all subjects, paginated assignment history across all subjects, and sortable subject final scores.
+// Description: Full-screen modal presenting student performance analytics with multi-axis radar chart for homeroom classes or 3-axis cognitive competency radar for subject classes.
 // Created At: 2026-08-31
 // Created By: Tam Khang
-// Updated At: 2026-09-01
+// Updated At: 2026-09-02
 // Updated By: Tam Khang
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { 
   X, 
   BookOpen, 
@@ -172,11 +172,25 @@ function DynamicRadarChart({
   );
 }
 
-export default function StudentDetailModal({ isOpen, onClose, student, classInfo }) {
+export default function StudentDetailModal({ 
+  isOpen, 
+  onClose, 
+  student, 
+  classInfo,
+  isHomeroom = classInfo?.roleLabel === 'Lớp chủ nhiệm'
+}) {
   if (!isOpen || !student) return null;
 
-  // 1. Subject filter state for radar charts & assignments ('all' or specific subject)
-  const [selectedSubject, setSelectedSubject] = useState('all');
+  // Determine default subject based on class mode
+  const defaultSubjectId = isHomeroom ? 'all' : (classInfo?.subject || 'math');
+
+  // 1. Subject filter state
+  const [selectedSubject, setSelectedSubject] = useState(defaultSubjectId);
+
+  // Sync selectedSubject when student or classInfo changes
+  useEffect(() => {
+    setSelectedSubject(isHomeroom ? 'all' : (classInfo?.subject || 'math'));
+  }, [isHomeroom, classInfo]);
 
   // 2. Pagination state for both assignment cards
   const [classroomPage, setClassroomPage] = useState(1);
@@ -200,20 +214,23 @@ export default function StudentDetailModal({ isOpen, onClose, student, classInfo
     { id: 'informatics', name: 'Tin học' },
   ];
 
-  const currentSubjectObj = subjectOptions.find(s => s.id === selectedSubject) || subjectOptions[0];
+  const currentSubjectObj = subjectOptions.find(s => s.id === selectedSubject) || 
+    (isHomeroom ? subjectOptions[0] : (subjectOptions.find(s => s.id === (classInfo?.subject || 'math')) || subjectOptions[1]));
+  
   const subjectName = currentSubjectObj.name;
   const className = classInfo?.name || '12A1 - Toán nâng cao';
+  const isAllSubjects = isHomeroom && selectedSubject === 'all';
 
   const initialName = student.name
     ? student.name.split(' ').map(n => n[0]).slice(-2).join('').toUpperCase()
     : 'HS';
 
   // Base score for the current view
-  const baseScore = selectedSubject === 'all' 
+  const baseScore = isAllSubjects 
     ? (student.avgScore || 8.5)
     : (student.subjectScores?.[selectedSubject] || student.avgScore || 8.5);
 
-  // Multi-subject labels and values when 'all' is selected
+  // Multi-subject labels and values when 'all' is selected in homeroom
   const allSubjectRadarLabels = ['Toán', 'Vật lý', 'Hóa học', 'Tiếng Anh', 'Ngữ văn', 'Sinh học', 'Lịch sử', 'Tin học'];
   
   const allSubjectClassroomRadarValues = [
@@ -250,7 +267,7 @@ export default function StudentDetailModal({ isOpen, onClose, student, classInfo
     { name: 'Tin học', classScore: allSubjectClassroomRadarValues[7], aiScore: allSubjectAiRadarValues[7], classDot: 'dot-indigo', aiDot: 'dot-indigo' },
   ], [allSubjectClassroomRadarValues, allSubjectAiRadarValues]);
 
-  // Single-subject 3-criteria values when a specific subject is selected
+  // Single-subject 3-criteria values for Subject classes or single subject view
   const singleSubjectClassroomCriteria = [
     parseFloat((baseScore * 1.02 > 10 ? 9.8 : (baseScore * 1.02)).toFixed(1)),
     parseFloat((baseScore * 0.98).toFixed(1)),
@@ -265,8 +282,8 @@ export default function StudentDetailModal({ isOpen, onClose, student, classInfo
 
   // Specific completion counts & percent
   const classroomScores = {
-    completedCount: selectedSubject === 'all' ? 42 : selectedSubject === 'math' ? 18 : selectedSubject === 'physics' ? 15 : 16,
-    totalCount: selectedSubject === 'all' ? 48 : 20,
+    completedCount: isAllSubjects ? 42 : selectedSubject === 'math' ? 18 : selectedSubject === 'physics' ? 15 : 16,
+    totalCount: isAllSubjects ? 48 : 20,
     avgPercent: Math.round(baseScore * 10),
     recognition: (baseScore * 1.02 > 10 ? 9.8 : (baseScore * 1.02)).toFixed(1),
     comprehension: (baseScore * 0.98).toFixed(1),
@@ -274,7 +291,7 @@ export default function StudentDetailModal({ isOpen, onClose, student, classInfo
   };
 
   const aiScores = {
-    completedCount: selectedSubject === 'all' ? 36 : selectedSubject === 'math' ? 14 : selectedSubject === 'physics' ? 12 : 11,
+    completedCount: isAllSubjects ? 36 : selectedSubject === 'math' ? 14 : selectedSubject === 'physics' ? 12 : 11,
     avgPercent: Math.round(baseScore * 9.7),
     recognition: (baseScore * 0.96).toFixed(1),
     comprehension: (baseScore * 0.92).toFixed(1),
@@ -403,6 +420,33 @@ export default function StudentDetailModal({ isOpen, onClose, student, classInfo
       bestScore: 8.5,
       status: 'Đã hoàn thành',
     },
+    {
+      id: 10,
+      subjectId: 'math',
+      subjectName: 'Toán',
+      badgeColor: '#7C3AED',
+      title: 'Kiểm tra 45p – Khảo sát hàm số và đồ thị',
+      attemptsCount: 1,
+      attemptsDetails: [
+        { attempt: 1, score: 9.2, submittedAt: '05/12/2023 08:00' },
+      ],
+      bestScore: 9.2,
+      status: 'Đã hoàn thành',
+    },
+    {
+      id: 11,
+      subjectId: 'math',
+      subjectName: 'Toán',
+      badgeColor: '#7C3AED',
+      title: 'Luyện tập chuyên đề – Nguyên hàm và Tích phân',
+      attemptsCount: 2,
+      attemptsDetails: [
+        { attempt: 1, score: 8.0, submittedAt: '12/12/2023 19:45' },
+        { attempt: 2, score: 8.8, submittedAt: '13/12/2023 15:30' },
+      ],
+      bestScore: 8.8,
+      status: 'Đã hoàn thành',
+    },
   ];
 
   // Comprehensive AI-Generated Assignments list across all subjects
@@ -517,22 +561,49 @@ export default function StudentDetailModal({ isOpen, onClose, student, classInfo
       bestScore: 8.8,
       status: 'Đã hoàn thành',
     },
+    {
+      id: 9,
+      subjectId: 'math',
+      subjectName: 'Toán',
+      badgeColor: '#7C3AED',
+      title: 'Luyện tập AI – Phương trình mặt phẳng và mặt cầu Oxyz',
+      attemptsCount: 2,
+      attemptsDetails: [
+        { attempt: 1, score: 8.2, submittedAt: '02/12/2023 20:10' },
+        { attempt: 2, score: 9.0, submittedAt: '03/12/2023 16:30' },
+      ],
+      bestScore: 9.0,
+      status: 'Đã hoàn thành',
+    },
+    {
+      id: 10,
+      subjectId: 'math',
+      subjectName: 'Toán',
+      badgeColor: '#7C3AED',
+      title: 'Luyện tập AI – Cực trị hàm số chứa tham số m',
+      attemptsCount: 1,
+      attemptsDetails: [
+        { attempt: 1, score: 8.6, submittedAt: '10/12/2023 21:00' },
+      ],
+      bestScore: 8.6,
+      status: 'Đã hoàn thành',
+    },
   ];
 
   // Filtered assignments based on current subject filter
   const visibleClassroomAssignments = useMemo(() => {
-    if (selectedSubject === 'all') {
+    if (isAllSubjects) {
       return allMasterClassroomAssignments;
     }
     return allMasterClassroomAssignments.filter(item => item.subjectId === selectedSubject);
-  }, [selectedSubject, allMasterClassroomAssignments]);
+  }, [isAllSubjects, selectedSubject, allMasterClassroomAssignments]);
 
   const visibleAiAssignments = useMemo(() => {
-    if (selectedSubject === 'all') {
+    if (isAllSubjects) {
       return allMasterAiAssignments;
     }
     return allMasterAiAssignments.filter(item => item.subjectId === selectedSubject);
-  }, [selectedSubject, allMasterAiAssignments]);
+  }, [isAllSubjects, selectedSubject, allMasterAiAssignments]);
 
   // Paginated slices for Classroom & AI assignments
   const totalClassroomPages = Math.max(1, Math.ceil(visibleClassroomAssignments.length / itemsPerPage));
@@ -548,35 +619,43 @@ export default function StudentDetailModal({ isOpen, onClose, student, classInfo
   );
 
   // 3. Full subject final scores dataset for student with 4 regular assessments
-  const rawSubjectScores = [
-    { id: 'informatics', name: 'Tin học', tx1: 9.5, tx2: 9.5, tx3: 9.5, tx4: 9.6, midterm: 9.8, final: 9.5, avgSubject: 9.6, totalFinal: 9.6, rating: 'Đạt chuẩn giỏi', ratingCode: 'excellent' },
-    { id: 'english', name: 'Tiếng Anh', tx1: 9.0, tx2: 9.5, tx3: 9.2, tx4: 9.0, midterm: 9.6, final: 9.4, avgSubject: 9.4, totalFinal: 9.4, rating: 'Đạt chuẩn giỏi', ratingCode: 'excellent' },
+  const rawSubjectScores = useMemo(() => [
     { id: 'math', name: 'Toán học', tx1: 8.5, tx2: 9.0, tx3: 8.8, tx4: 9.2, midterm: 9.5, final: 8.7, avgSubject: 9.2, totalFinal: 9.2, rating: 'Đạt chuẩn giỏi', ratingCode: 'excellent' },
-    { id: 'civics', name: 'GDCD', tx1: 9.0, tx2: 9.0, tx3: 9.0, tx4: 9.2, midterm: 9.2, final: 9.0, avgSubject: 9.1, totalFinal: 9.1, rating: 'Đạt chuẩn giỏi', ratingCode: 'excellent' },
     { id: 'physics', name: 'Vật lý', tx1: 8.0, tx2: 8.5, tx3: 8.5, tx4: 9.0, midterm: 9.0, final: 8.8, avgSubject: 8.8, totalFinal: 8.8, rating: 'Đạt chuẩn giỏi', ratingCode: 'excellent' },
-    { id: 'history', name: 'Lịch sử', tx1: 8.5, tx2: 8.5, tx3: 8.5, tx4: 8.6, midterm: 8.6, final: 8.8, avgSubject: 8.7, totalFinal: 8.7, rating: 'Đạt chuẩn giỏi', ratingCode: 'excellent' },
     { id: 'chemistry', name: 'Hóa học', tx1: 8.0, tx2: 8.2, tx3: 8.5, tx4: 8.0, midterm: 8.5, final: 8.6, avgSubject: 8.5, totalFinal: 8.5, rating: 'Đạt chuẩn giỏi', ratingCode: 'excellent' },
     { id: 'literature', name: 'Ngữ văn', tx1: 7.5, tx2: 8.0, tx3: 7.8, tx4: 8.0, midterm: 8.2, final: 8.5, avgSubject: 8.2, totalFinal: 8.2, rating: 'Đạt chuẩn giỏi', ratingCode: 'excellent' },
+    { id: 'english', name: 'Tiếng Anh', tx1: 9.0, tx2: 9.5, tx3: 9.2, tx4: 9.0, midterm: 9.6, final: 9.4, avgSubject: 9.4, totalFinal: 9.4, rating: 'Đạt chuẩn giỏi', ratingCode: 'excellent' },
+    { id: 'informatics', name: 'Tin học', tx1: 9.5, tx2: 9.5, tx3: 9.5, tx4: 9.6, midterm: 9.8, final: 9.5, avgSubject: 9.6, totalFinal: 9.6, rating: 'Đạt chuẩn giỏi', ratingCode: 'excellent' },
+    { id: 'civics', name: 'GDCD', tx1: 9.0, tx2: 9.0, tx3: 9.0, tx4: 9.2, midterm: 9.2, final: 9.0, avgSubject: 9.1, totalFinal: 9.1, rating: 'Đạt chuẩn giỏi', ratingCode: 'excellent' },
+    { id: 'history', name: 'Lịch sử', tx1: 8.5, tx2: 8.5, tx3: 8.5, tx4: 8.6, midterm: 8.6, final: 8.8, avgSubject: 8.7, totalFinal: 8.7, rating: 'Đạt chuẩn giỏi', ratingCode: 'excellent' },
     { id: 'biology', name: 'Sinh học', tx1: 8.0, tx2: 8.0, tx3: 8.2, tx4: 8.0, midterm: 8.4, final: 8.2, avgSubject: 8.2, totalFinal: 8.2, rating: 'Đạt chuẩn giỏi', ratingCode: 'excellent' },
     { id: 'geography', name: 'Địa lý', tx1: 7.0, tx2: 7.5, tx3: 7.5, tx4: 8.0, midterm: 8.0, final: 7.8, avgSubject: 7.8, totalFinal: 7.8, rating: 'Đạt chuẩn khá', ratingCode: 'good' },
-  ];
+  ], []);
 
   // Filter & Sort Subject Final Scores
   const filteredAndSortedSubjectScores = useMemo(() => {
-    let list = [...rawSubjectScores];
+    let list = isHomeroom 
+      ? [...rawSubjectScores]
+      : rawSubjectScores.filter(item => item.id === selectedSubject);
 
-    if (scoreRatingFilter !== 'all') {
-      list = list.filter(item => item.ratingCode === scoreRatingFilter);
+    if (list.length === 0) {
+      list = [rawSubjectScores[0]];
     }
 
-    if (scoreSortOrder === 'desc') {
-      list.sort((a, b) => b.totalFinal - a.totalFinal);
-    } else if (scoreSortOrder === 'asc') {
-      list.sort((a, b) => a.totalFinal - b.totalFinal);
+    if (isHomeroom) {
+      if (scoreRatingFilter !== 'all') {
+        list = list.filter(item => item.ratingCode === scoreRatingFilter);
+      }
+
+      if (scoreSortOrder === 'desc') {
+        list.sort((a, b) => b.totalFinal - a.totalFinal);
+      } else if (scoreSortOrder === 'asc') {
+        list.sort((a, b) => a.totalFinal - b.totalFinal);
+      }
     }
 
     return list;
-  }, [rawSubjectScores, scoreSortOrder, scoreRatingFilter]);
+  }, [rawSubjectScores, scoreSortOrder, scoreRatingFilter, isHomeroom, selectedSubject]);
 
   return (
     <div className="student-modal-overlay">
@@ -621,40 +700,49 @@ export default function StudentDetailModal({ isOpen, onClose, student, classInfo
 
         {/* Scrollable Content Body */}
         <div className="student-modal-content">
-          {/* Main Title Section with Subject Filter */}
+          {/* Main Title Section */}
           <div className="modal-title-row">
             <div className="title-text-group">
               <h1 className="modal-page-title">
                 Bảng theo dõi năng lực học sinh: Học kỳ 1, 2023–2024
               </h1>
               <p className="modal-page-subtitle">
-                Chi tiết kết quả làm bài tập, biểu đồ năng lực theo chuẩn kiến thức và bảng điểm {selectedSubject === 'all' ? 'tổng hợp tất cả các môn' : `môn ${subjectName}`}.
+                {isHomeroom && selectedSubject === 'all'
+                  ? 'Chi tiết kết quả làm bài tập, biểu đồ năng lực theo chuẩn kiến thức và bảng điểm tổng hợp tất cả các môn.'
+                  : `Chi tiết kết quả làm bài tập, biểu đồ năng lực theo 3 mức độ nhận thức (Nhận biết, Thông hiểu, Vận dụng) môn ${subjectName}.`}
               </p>
             </div>
 
-            {/* Subject Filter Dropdown for Competency & Assignments */}
-            <div className="modal-subject-filter-box">
-              <span className="filter-box-label">Phân loại theo môn:</span>
-              <div className="subject-select-container">
-                <select 
-                  className="modal-subject-select"
-                  value={selectedSubject}
-                  onChange={(e) => {
-                    setSelectedSubject(e.target.value);
-                    setClassroomPage(1);
-                    setAiPage(1);
-                  }}
-                >
-                  {subjectOptions.map(opt => (
-                    <option key={opt.id} value={opt.id}>{opt.name}</option>
-                  ))}
-                </select>
-                <ChevronDown size={14} className="subject-select-arrow" />
+            {/* Subject Control: Dropdown for Homeroom vs Fixed Badge for Subject Class */}
+            {isHomeroom ? (
+              <div className="modal-subject-filter-box">
+                <span className="filter-box-label">Phân loại theo môn:</span>
+                <div className="subject-select-container">
+                  <select 
+                    className="modal-subject-select"
+                    value={selectedSubject}
+                    onChange={(e) => {
+                      setSelectedSubject(e.target.value);
+                      setClassroomPage(1);
+                      setAiPage(1);
+                    }}
+                  >
+                    {subjectOptions.map(opt => (
+                      <option key={opt.id} value={opt.id}>{opt.name}</option>
+                    ))}
+                  </select>
+                  <ChevronDown size={14} className="subject-select-arrow" />
+                </div>
               </div>
-            </div>
+            ) : (
+              <div className="modal-subject-fixed-pill">
+                <span className="fixed-pill-label">Môn giảng dạy:</span>
+                <span className="fixed-pill-name">{subjectName}</span>
+              </div>
+            )}
           </div>
 
-          {/* Dual Radar Charts Row with Completion Counters (All Subjects or Specific Criteria) */}
+          {/* Dual Radar Charts Row with Completion Counters (All Subjects or 3 Cognitive Criteria) */}
           <div className="radar-charts-grid">
             {/* Radar Card 1: Classroom Assignments */}
             <div className="radar-card">
@@ -666,7 +754,7 @@ export default function StudentDetailModal({ isOpen, onClose, student, classInfo
                   <div className="radar-title-badge-row">
                     <h3 className="radar-card-title">Bài tập trên lớp</h3>
                     <span className="stat-count-badge purple-stat">
-                      {selectedSubject === 'all' 
+                      {isAllSubjects 
                         ? `Tổng đã làm: ${classroomScores.completedCount}/${classroomScores.totalCount} bài`
                         : `Đã làm: ${classroomScores.completedCount}/${classroomScores.totalCount} bài`}
                     </span>
@@ -679,14 +767,14 @@ export default function StudentDetailModal({ isOpen, onClose, student, classInfo
                 <DynamicRadarChart
                   size={270}
                   height={230}
-                  values={selectedSubject === 'all' ? allSubjectClassroomRadarValues : singleSubjectClassroomCriteria}
+                  values={isAllSubjects ? allSubjectClassroomRadarValues : singleSubjectClassroomCriteria}
                   fillColor="rgba(124, 58, 237, 0.2)"
                   strokeColor="#7C3AED"
-                  labels={selectedSubject === 'all' ? allSubjectRadarLabels : ['Nhận biết', 'Thông hiểu', 'Vận dụng']}
+                  labels={isAllSubjects ? allSubjectRadarLabels : ['Nhận biết', 'Thông hiểu', 'Vận dụng']}
                 />
 
                 <div className="radar-breakdown-list">
-                  {selectedSubject === 'all' ? (
+                  {isAllSubjects ? (
                     allSubjectBreakdownList.map((item, idx) => (
                       <div key={`class-subj-${idx}`} className="breakdown-item">
                         <span className={`dot ${item.classDot}`}></span>
@@ -727,7 +815,7 @@ export default function StudentDetailModal({ isOpen, onClose, student, classInfo
                   <div className="radar-title-badge-row">
                     <h3 className="radar-card-title">Bài tập do AI tạo</h3>
                     <span className="stat-count-badge blue-stat">
-                      {selectedSubject === 'all' 
+                      {isAllSubjects 
                         ? `Tổng đã làm: ${aiScores.completedCount} bài tập AI`
                         : `Đã làm: ${aiScores.completedCount} bài tập AI`}
                     </span>
@@ -740,14 +828,14 @@ export default function StudentDetailModal({ isOpen, onClose, student, classInfo
                 <DynamicRadarChart
                   size={270}
                   height={230}
-                  values={selectedSubject === 'all' ? allSubjectAiRadarValues : singleSubjectAiCriteria}
+                  values={isAllSubjects ? allSubjectAiRadarValues : singleSubjectAiCriteria}
                   fillColor="rgba(37, 99, 235, 0.18)"
                   strokeColor="#2563EB"
-                  labels={selectedSubject === 'all' ? allSubjectRadarLabels : ['Nhận biết', 'Thông hiểu', 'Vận dụng']}
+                  labels={isAllSubjects ? allSubjectRadarLabels : ['Nhận biết', 'Thông hiểu', 'Vận dụng']}
                 />
 
                 <div className="radar-breakdown-list">
-                  {selectedSubject === 'all' ? (
+                  {isAllSubjects ? (
                     allSubjectBreakdownList.map((item, idx) => (
                       <div key={`ai-subj-${idx}`} className="breakdown-item">
                         <span className={`dot ${item.aiDot}`}></span>
@@ -779,7 +867,7 @@ export default function StudentDetailModal({ isOpen, onClose, student, classInfo
             </div>
           </div>
 
-          {/* Section 1: Separate Table for Classroom Assignments with Pageable */}
+          {/* Section 1: Separate Table for Classroom Assignments */}
           <div className="academic-scores-card">
             <div className="scores-card-header">
               <div className="scores-header-left">
@@ -789,7 +877,7 @@ export default function StudentDetailModal({ isOpen, onClose, student, classInfo
                   <span className="count-pill purple-pill">{visibleClassroomAssignments.length} bài</span>
                 </div>
                 <span className="scores-card-subtitle">
-                  Theo dõi số lần làm bài và điểm số chi tiết của mỗi lần nộp bài trên lớp {selectedSubject === 'all' ? 'tổng hợp tất cả các môn' : `môn ${subjectName}`}
+                  Theo dõi số lần làm bài và điểm số chi tiết của mỗi lần nộp bài trên lớp {isAllSubjects ? 'tổng hợp tất cả các môn' : `môn ${subjectName}`}
                 </span>
               </div>
             </div>
@@ -799,7 +887,7 @@ export default function StudentDetailModal({ isOpen, onClose, student, classInfo
                 <thead>
                   <tr>
                     <th>Tên bài tập trên lớp</th>
-                    {selectedSubject === 'all' && <th>Môn học</th>}
+                    {isAllSubjects && <th>Môn học</th>}
                     <th>Số lần làm</th>
                     <th>Chi tiết điểm các lần làm</th>
                     <th>Điểm cao nhất</th>
@@ -813,7 +901,7 @@ export default function StudentDetailModal({ isOpen, onClose, student, classInfo
                         <td className="td-subject-name">
                           <strong>{item.title}</strong>
                         </td>
-                        {selectedSubject === 'all' && (
+                        {isAllSubjects && (
                           <td>
                             <span 
                               className="td-subject-badge"
@@ -852,7 +940,7 @@ export default function StudentDetailModal({ isOpen, onClose, student, classInfo
                     ))
                   ) : (
                     <tr>
-                      <td colSpan={selectedSubject === 'all' ? 6 : 5} className="empty-table-cell">
+                      <td colSpan={isAllSubjects ? 6 : 5} className="empty-table-cell">
                         Chưa có dữ liệu bài tập trên lớp cho môn học này.
                       </td>
                     </tr>
@@ -901,7 +989,7 @@ export default function StudentDetailModal({ isOpen, onClose, student, classInfo
             )}
           </div>
 
-          {/* Section 2: Separate Table for AI-Generated Assignments with Pageable */}
+          {/* Section 2: Separate Table for AI-Generated Assignments */}
           <div className="academic-scores-card">
             <div className="scores-card-header">
               <div className="scores-header-left">
@@ -911,7 +999,7 @@ export default function StudentDetailModal({ isOpen, onClose, student, classInfo
                   <span className="count-pill blue-pill">{visibleAiAssignments.length} bài</span>
                 </div>
                 <span className="scores-card-subtitle">
-                  Theo dõi số lần làm bài và điểm số chi tiết của các bài tập tự luyện do AI tạo {selectedSubject === 'all' ? 'tổng hợp tất cả các môn' : `môn ${subjectName}`}
+                  Theo dõi số lần làm bài và điểm số chi tiết của các bài tập tự luyện do AI tạo {isAllSubjects ? 'tổng hợp tất cả các môn' : `môn ${subjectName}`}
                 </span>
               </div>
             </div>
@@ -921,7 +1009,7 @@ export default function StudentDetailModal({ isOpen, onClose, student, classInfo
                 <thead>
                   <tr>
                     <th>Tên bài tập AI</th>
-                    {selectedSubject === 'all' && <th>Môn học</th>}
+                    {isAllSubjects && <th>Môn học</th>}
                     <th>Số lần làm</th>
                     <th>Chi tiết điểm các lần làm</th>
                     <th>Điểm cao nhất</th>
@@ -935,7 +1023,7 @@ export default function StudentDetailModal({ isOpen, onClose, student, classInfo
                         <td className="td-subject-name">
                           <strong>{item.title}</strong>
                         </td>
-                        {selectedSubject === 'all' && (
+                        {isAllSubjects && (
                           <td>
                             <span 
                               className="td-subject-badge"
@@ -974,7 +1062,7 @@ export default function StudentDetailModal({ isOpen, onClose, student, classInfo
                     ))
                   ) : (
                     <tr>
-                      <td colSpan={selectedSubject === 'all' ? 6 : 5} className="empty-table-cell">
+                      <td colSpan={isAllSubjects ? 6 : 5} className="empty-table-cell">
                         Chưa có dữ liệu bài tập AI cho môn học này.
                       </td>
                     </tr>
@@ -1023,7 +1111,7 @@ export default function StudentDetailModal({ isOpen, onClose, student, classInfo
             )}
           </div>
 
-          {/* Section 3: Subject Final Academic Scores Summary Table with High-to-Low Sort Filter */}
+          {/* Section 3: Subject Final Academic Scores Summary Table */}
           <div className="academic-scores-card">
             <div className="scores-card-header">
               <div className="scores-header-left">
@@ -1032,41 +1120,47 @@ export default function StudentDetailModal({ isOpen, onClose, student, classInfo
                   <h3 className="scores-card-title">Bảng điểm trung bình môn học</h3>
                 </div>
                 <span className="scores-card-subtitle">
-                  Học kỳ 1 • Khối 12 • Lớp 12A1 • Tổng cộng {filteredAndSortedSubjectScores.length} môn học
+                  {isHomeroom 
+                    ? `Học kỳ 1 • Khối 12 • ${className} • Tổng cộng ${filteredAndSortedSubjectScores.length} môn học`
+                    : `Học kỳ 1 • ${classInfo?.gradeText || 'Khối 12'} • ${className} • Môn ${subjectName}`}
                 </span>
               </div>
 
               {/* Sorting, Rating Filter & Export Controls */}
               <div className="scores-header-controls">
-                {/* Rating Filter */}
-                <div className="score-control-item">
-                  <Filter size={14} className="control-icon" />
-                  <select 
-                    className="score-filter-select"
-                    value={scoreRatingFilter}
-                    onChange={(e) => setScoreRatingFilter(e.target.value)}
-                  >
-                    <option value="all">Tất cả xếp loại</option>
-                    <option value="excellent">Đạt chuẩn giỏi</option>
-                    <option value="good">Đạt chuẩn khá</option>
-                  </select>
-                  <ChevronDown size={13} className="control-arrow" />
-                </div>
+                {isHomeroom && (
+                  <>
+                    {/* Rating Filter */}
+                    <div className="score-control-item">
+                      <Filter size={14} className="control-icon" />
+                      <select 
+                        className="score-filter-select"
+                        value={scoreRatingFilter}
+                        onChange={(e) => setScoreRatingFilter(e.target.value)}
+                      >
+                        <option value="all">Tất cả xếp loại</option>
+                        <option value="excellent">Đạt chuẩn giỏi</option>
+                        <option value="good">Đạt chuẩn khá</option>
+                      </select>
+                      <ChevronDown size={13} className="control-arrow" />
+                    </div>
 
-                {/* Score Sorting (Cao tới thấp / Thấp tới cao) */}
-                <div className="score-control-item sort-control">
-                  <ArrowUpDown size={14} className="control-icon" />
-                  <select 
-                    className="score-filter-select"
-                    value={scoreSortOrder}
-                    onChange={(e) => setScoreSortOrder(e.target.value)}
-                  >
-                    <option value="desc">Điểm tổng kết: Cao đến thấp</option>
-                    <option value="asc">Điểm tổng kết: Thấp đến cao</option>
-                    <option value="default">Thứ tự môn học mặc định</option>
-                  </select>
-                  <ChevronDown size={13} className="control-arrow" />
-                </div>
+                    {/* Score Sorting */}
+                    <div className="score-control-item sort-control">
+                      <ArrowUpDown size={14} className="control-icon" />
+                      <select 
+                        className="score-filter-select"
+                        value={scoreSortOrder}
+                        onChange={(e) => setScoreSortOrder(e.target.value)}
+                      >
+                        <option value="desc">Điểm tổng kết: Cao đến thấp</option>
+                        <option value="asc">Điểm tổng kết: Thấp đến cao</option>
+                        <option value="default">Thứ tự môn học mặc định</option>
+                      </select>
+                      <ChevronDown size={13} className="control-arrow" />
+                    </div>
+                  </>
+                )}
 
                 {/* Export / Print Transcript Button */}
                 <button
