@@ -17,6 +17,9 @@ import CreateExerciseManualPage from './pages/teacher/CreateExerciseManualPage';
 import TeacherClassesPage from './pages/teacher/TeacherClassesPage';
 import TeacherClassDetailPage from './pages/teacher/TeacherClassDetailPage';
 import TeacherHomeroomPage from './pages/teacher/TeacherHomeroomPage';
+import TeacherGradingPage from './pages/teacher/TeacherGradingPage';
+import TeacherSchedulePage from './pages/teacher/TeacherSchedulePage';
+import TeacherProfilePage from './pages/teacher/TeacherProfilePage';
 
 export default function App() {
   return (
@@ -68,6 +71,36 @@ export default function App() {
             element={
               <ProtectedRoute>
                 <TeacherHomeroomPage />
+              </ProtectedRoute>
+            } 
+          />
+
+          {/* Protected Teacher Grading & Feedback Route */}
+          <Route 
+            path="/teacher/grading" 
+            element={
+              <ProtectedRoute>
+                <TeacherGradingPage />
+              </ProtectedRoute>
+            } 
+          />
+
+          {/* Protected Teacher Teaching Schedule Route */}
+          <Route 
+            path="/teacher/schedule" 
+            element={
+              <ProtectedRoute>
+                <TeacherSchedulePage />
+              </ProtectedRoute>
+            } 
+          />
+
+          {/* Protected Teacher Profile & Security Route */}
+          <Route 
+            path="/teacher/profile" 
+            element={
+              <ProtectedRoute>
+                <TeacherProfilePage />
               </ProtectedRoute>
             } 
           />

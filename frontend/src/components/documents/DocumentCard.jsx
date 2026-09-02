@@ -57,14 +57,20 @@ export default function DocumentCard({ doc, onPreview, onDownload, onEdit, onMor
   };
 
   return (
-    <div className="document-card">
+    <div 
+      className="document-card clickable-card"
+      onClick={() => onPreview && onPreview(doc)}
+    >
       {/* Top Header: Icon & More Options */}
       <div className="doc-card-top">
         {renderTypeIcon()}
         <button 
           type="button" 
           className="doc-more-btn" 
-          onClick={() => onMore && onMore(doc)}
+          onClick={(e) => {
+            e.stopPropagation();
+            onMore && onMore(doc);
+          }}
           aria-label="Tùy chọn khác"
         >
           <MoreVertical size={18} />
@@ -97,7 +103,10 @@ export default function DocumentCard({ doc, onPreview, onDownload, onEdit, onMor
         <button 
           type="button" 
           className="btn-action-preview"
-          onClick={() => onPreview && onPreview(doc)}
+          onClick={(e) => {
+            e.stopPropagation();
+            onPreview && onPreview(doc);
+          }}
         >
           <Eye size={15} />
           <span>Xem</span>
@@ -107,7 +116,10 @@ export default function DocumentCard({ doc, onPreview, onDownload, onEdit, onMor
           <button 
             type="button" 
             className="icon-action-btn"
-            onClick={() => onDownload && onDownload(doc)}
+            onClick={(e) => {
+              e.stopPropagation();
+              onDownload && onDownload(doc);
+            }}
             title="Tải xuống tài liệu"
           >
             <Download size={16} />
@@ -115,7 +127,10 @@ export default function DocumentCard({ doc, onPreview, onDownload, onEdit, onMor
           <button 
             type="button" 
             className="icon-action-btn"
-            onClick={() => onEdit && onEdit(doc)}
+            onClick={(e) => {
+              e.stopPropagation();
+              onEdit && onEdit(doc);
+            }}
             title="Chỉnh sửa thông tin"
           >
             <Edit3 size={16} />

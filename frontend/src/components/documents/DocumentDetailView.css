@@ -1,0 +1,298 @@
+/* File Name: DocumentDetailView.css */
+/* Description: Styles for the Document Detail View matching Image 1 design. */
+/* Created At: 2026-09-01 */
+/* Created By: Tam Khang */
+/* Updated At: 2026-09-01 */
+/* Updated By: Tam Khang */
+
+.doc-detail-view-container {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  max-width: 980px;
+  width: 100%;
+  font-family: 'Be Vietnam Pro', -apple-system, BlinkMacSystemFont, sans-serif;
+  animation: fadeInDoc 0.2s ease-out;
+}
+
+@keyframes fadeInDoc {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* Back Link Button */
+.btn-back-repo {
+  background: none;
+  border: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13.5px;
+  font-weight: 600;
+  color: #334155;
+  cursor: pointer;
+  padding: 0;
+  width: fit-content;
+  transition: color 0.15s ease, transform 0.15s ease;
+}
+
+.btn-back-repo:hover {
+  color: #4F46E5;
+  transform: translateX(-2px);
+}
+
+/* Main Document Card */
+.doc-detail-main-card {
+  background-color: #FFFFFF;
+  border: 1px solid #E2E8F0;
+  border-radius: 16px;
+  padding: 28px 32px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.02);
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+/* Header row with Icon, Info and 3-dots */
+.doc-detail-header-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 20px;
+  position: relative;
+}
+
+.doc-large-type-badge.pdf {
+  width: 76px;
+  height: 76px;
+  background-color: #FFECEB;
+  border-radius: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.pdf-icon-frame {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.doc-header-info-col {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  flex: 1;
+}
+
+.doc-main-title {
+  font-size: 21px;
+  font-weight: 700;
+  color: #0F172A;
+  margin: 0;
+  line-height: 1.35;
+}
+
+.doc-meta-info-grid {
+  display: grid;
+  grid-template-columns: auto auto;
+  column-gap: 36px;
+  row-gap: 8px;
+  font-size: 13.5px;
+}
+
+.meta-info-item {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+
+.meta-icon.text-slate {
+  color: #64748B;
+}
+
+.meta-icon.text-purple {
+  color: #4F46E5;
+}
+
+.meta-label {
+  color: #64748B;
+  font-weight: 500;
+}
+
+.meta-value {
+  color: #1E293B;
+  font-weight: 600;
+}
+
+.meta-value.text-purple-bold {
+  color: #4F46E5;
+  font-weight: 600;
+}
+
+.btn-doc-more-options {
+  background: none;
+  border: none;
+  color: #64748B;
+  cursor: pointer;
+  padding: 4px;
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.15s ease;
+}
+
+.btn-doc-more-options:hover {
+  background-color: #F1F5F9;
+  color: #0F172A;
+}
+
+/* Description Box */
+.doc-description-container {
+  background-color: #F8F7FF;
+  border-radius: 12px;
+  padding: 18px 22px;
+}
+
+.description-heading {
+  font-size: 13.5px;
+  font-weight: 700;
+  color: #0F172A;
+  margin: 0 0 6px 0;
+}
+
+.description-paragraph {
+  font-size: 13.5px;
+  color: #334155;
+  line-height: 1.65;
+  margin: 0;
+}
+
+/* Action Toolbar */
+.doc-actions-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding-top: 4px;
+}
+
+.btn-action-primary {
+  background: #3B2E7E;
+  color: #FFFFFF;
+  border: none;
+  border-radius: 8px;
+  padding: 10px 22px;
+  font-size: 13.5px;
+  font-weight: 600;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  box-shadow: 0 2px 6px rgba(59, 46, 126, 0.2);
+}
+
+.btn-action-primary:hover {
+  background: #2E2365;
+  transform: translateY(-1px);
+}
+
+.btn-action-download {
+  background-color: #EDE9FE;
+  color: #1E1B4B;
+  border: none;
+  border-radius: 8px;
+  padding: 10px 22px;
+  font-size: 13.5px;
+  font-weight: 600;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.btn-action-download:hover {
+  background-color: #DDD6FE;
+}
+
+.btn-action-edit {
+  background-color: #FFFFFF;
+  color: #4F46E5;
+  border: 1px solid #4F46E5;
+  border-radius: 8px;
+  padding: 10px 22px;
+  font-size: 13.5px;
+  font-weight: 600;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin-left: auto;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.btn-action-edit:hover {
+  background-color: #F5F3FF;
+}
+
+/* Metric / Analytics Cards Grid */
+.doc-analytics-cards-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 16px;
+}
+
+.doc-stat-card {
+  background-color: #FFFFFF;
+  border: 1px solid #E2E8F0;
+  border-radius: 14px;
+  padding: 20px 16px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  text-align: center;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.015);
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+.doc-stat-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 14px rgba(0, 0, 0, 0.04);
+}
+
+.stat-icon-wrap {
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.stat-icon-wrap.blue {
+  color: #3B82F6;
+}
+
+.stat-icon-wrap.green {
+  color: #10B981;
+}
+
+.stat-icon-wrap.purple {
+  color: #8B5CF6;
+}
+
+.stat-number {
+  font-size: 22px;
+  font-weight: 800;
+  color: #0F172A;
+  line-height: 1;
+}
+
+.stat-label {
+  font-size: 12.5px;
+  color: #64748B;
+  font-weight: 500;
+}

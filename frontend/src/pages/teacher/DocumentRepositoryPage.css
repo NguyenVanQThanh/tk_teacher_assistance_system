@@ -33,12 +33,13 @@ Updated By: Tam Khang
 
 .doc-repository-main {
   flex: 1;
-  padding: 12px 24px 14px;
+  padding: 16px 28px 20px;
   background-color: #F8F7FA;
   display: flex;
   flex-direction: column;
   box-sizing: border-box;
-  overflow: hidden;
+  overflow-y: auto;
+  overflow-x: hidden;
   height: 100%;
 }
 

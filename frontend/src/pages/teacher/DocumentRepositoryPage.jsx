@@ -12,6 +12,7 @@ import Header from '../../components/common/Header';
 import TeacherSidebar from '../../components/teacher/TeacherSidebar';
 import DocumentFilterBar from '../../components/documents/DocumentFilterBar';
 import DocumentCard from '../../components/documents/DocumentCard';
+import DocumentDetailView from '../../components/documents/DocumentDetailView';
 import UploadDocumentModal from '../../components/documents/UploadDocumentModal';
 import DocumentPreviewModal from '../../components/documents/DocumentPreviewModal';
 import CreateExerciseModal from '../../components/exercises/CreateExerciseModal';
@@ -27,6 +28,7 @@ export default function DocumentRepositoryPage() {
   const [isUploadOpen, setIsUploadOpen] = useState(false);
   const [isCreateExerciseOpen, setIsCreateExerciseOpen] = useState(false);
   const [previewDoc, setPreviewDoc] = useState(null);
+  const [selectedDoc, setSelectedDoc] = useState(null);
 
   const navigate = useNavigate();
 
@@ -42,6 +44,12 @@ export default function DocumentRepositoryPage() {
       subject: 'math',
       authorName: 'GV. Nguyễn Văn A',
       authorInitial: 'NA',
+      folder: 'Toán 12',
+      description: 'Tài liệu tổng hợp các kiến thức trọng tâm học kì 1 môn Toán lớp 12, bao gồm các chuyên đề: Ứng dụng đạo hàm để khảo sát và vẽ đồ thị hàm số, Hàm số lũy thừa, hàm số mũ và hàm số logarit. Kèm theo hệ thống bài tập tự luyện từ cơ bản đến nâng cao có đáp án chi tiết, phù hợp cho học sinh ôn thi THPT Quốc gia.',
+      viewsCount: '1,245',
+      downloadsCount: '342',
+      ratingScore: '4.8/5',
+      ratingsCount: '56'
     },
     {
       id: 2,
@@ -53,6 +61,12 @@ export default function DocumentRepositoryPage() {
       subject: 'physics',
       authorName: 'GV. Trần Thị B',
       authorInitial: 'TB',
+      folder: 'Vật lý 10',
+      description: 'Video bài giảng chi tiết về khái niệm động lượng, định luật bảo toàn động lượng và ứng dụng giải bài toán va chạm đàn hồi.',
+      viewsCount: '980',
+      downloadsCount: '215',
+      ratingScore: '4.9/5',
+      ratingsCount: '42'
     },
     {
       id: 3,
@@ -64,6 +78,12 @@ export default function DocumentRepositoryPage() {
       subject: 'chemistry',
       authorName: 'GV. Nguyễn Văn A',
       authorInitial: 'NA',
+      folder: 'Hóa học 11',
+      description: 'Bảng đặc tả ma trận đề kiểm tra giữa kì 1 môn Hóa học 11 bám sát chương trình GDPT 2018 mới.',
+      viewsCount: '620',
+      downloadsCount: '145',
+      ratingScore: '4.7/5',
+      ratingsCount: '28'
     },
     {
       id: 4,
@@ -75,6 +95,12 @@ export default function DocumentRepositoryPage() {
       subject: 'physics',
       authorName: 'GV. Trần Thị B',
       authorInitial: 'TB',
+      folder: 'Vật lý 10',
+      description: 'Bộ 50 câu hỏi trắc nghiệm và bài tập định lượng chương Chuyển động thẳng đều và chuyển động biến đổi đều.',
+      viewsCount: '850',
+      downloadsCount: '310',
+      ratingScore: '4.8/5',
+      ratingsCount: '35'
     },
     {
       id: 5,
@@ -86,6 +112,12 @@ export default function DocumentRepositoryPage() {
       subject: 'english',
       authorName: 'GV. Nguyễn Văn A',
       authorInitial: 'NA',
+      folder: 'Tiếng Anh 11',
+      description: 'Đề kiểm tra 45 phút Unit 3 Global Success có kèm file nghe MP3 và hướng dẫn chấm chi tiết.',
+      viewsCount: '1,120',
+      downloadsCount: '430',
+      ratingScore: '4.9/5',
+      ratingsCount: '60'
     },
     {
       id: 6,
@@ -97,6 +129,12 @@ export default function DocumentRepositoryPage() {
       subject: 'it',
       authorName: 'GV. Nguyễn Văn A',
       authorInitial: 'NA',
+      folder: 'Tin học 10',
+      description: 'Sổ tay hướng dẫn thực hành lập trình Python từ cơ bản đến cấu trúc điều khiển và mảng 1 chiều.',
+      viewsCount: '790',
+      downloadsCount: '260',
+      ratingScore: '4.8/5',
+      ratingsCount: '31'
     },
   ]);
 
@@ -131,10 +169,13 @@ export default function DocumentRepositoryPage() {
   };
 
   const handleNavSelect = (navId) => {
+    setSelectedDoc(null);
     if (navId === 'dashboard') {
       navigate('/teacher');
     } else if (navId === 'classes') {
       navigate('/teacher/classes');
+    } else if (navId === 'grading') {
+      navigate('/teacher/grading');
     } else if (navId === 'documents') {
       navigate('/teacher/documents');
     } else if (navId === 'exercises') {
@@ -159,101 +200,116 @@ export default function DocumentRepositoryPage() {
 
         {/* Main Content Area */}
         <main className="doc-repository-main">
-          {/* Breadcrumb & Action Row */}
-          <div className="doc-top-bar">
-            <div className="doc-title-group">
-              <nav className="breadcrumb-nav" aria-label="Breadcrumb">
-                <Link to="/teacher" className="breadcrumb-link">Trang chủ</Link>
-                <ChevronRight size={14} className="breadcrumb-separator" />
-                <span className="breadcrumb-current">Kho tài liệu</span>
-              </nav>
-              <h1 className="page-heading">Kho tài liệu</h1>
-            </div>
+          {selectedDoc ? (
+            /* Document Detail View (Image 1) */
+            <DocumentDetailView
+              doc={selectedDoc}
+              onBack={() => setSelectedDoc(null)}
+              onViewDocument={(d) => setPreviewDoc(d)}
+              onDownloadDocument={(d) => alert(`Bắt đầu tải xuống: ${d.title}`)}
+              onEditDocument={(d) => alert(`Chỉnh sửa tài liệu: ${d.title}`)}
+              onMoreOptions={(d) => alert(`Tùy chọn khác cho: ${d.title}`)}
+            />
+          ) : (
+            /* Document List View */
+            <>
+              {/* Breadcrumb & Action Row */}
+              <div className="doc-top-bar">
+                <div className="doc-title-group">
+                  <nav className="breadcrumb-nav" aria-label="Breadcrumb">
+                    <Link to="/teacher" className="breadcrumb-link">Trang chủ</Link>
+                    <ChevronRight size={14} className="breadcrumb-separator" />
+                    <span className="breadcrumb-current">Kho tài liệu</span>
+                  </nav>
+                  <h1 className="page-heading">Kho tài liệu</h1>
+                </div>
 
-            <button 
-              type="button" 
-              className="btn-upload-new"
-              onClick={() => setIsUploadOpen(true)}
-            >
-              <Upload size={16} />
-              <span>Tải lên tài liệu mới</span>
-            </button>
-          </div>
-
-          {/* Filter & Search Toolbar */}
-          <DocumentFilterBar
-            selectedGrade={selectedGrade}
-            onChangeGrade={setSelectedGrade}
-            selectedSubject={selectedSubject}
-            onChangeSubject={setSelectedSubject}
-            selectedType={selectedType}
-            onChangeType={setSelectedType}
-            searchQuery={searchQuery}
-            onChangeSearch={setSearchQuery}
-          />
-
-          {/* Document Cards Grid */}
-          <div className="doc-cards-grid">
-            {filteredDocuments.length > 0 ? (
-              filteredDocuments.map((doc) => (
-                <DocumentCard
-                  key={doc.id}
-                  doc={doc}
-                  onPreview={(d) => setPreviewDoc(d)}
-                  onDownload={(d) => alert(`Bắt đầu tải xuống: ${d.title}`)}
-                  onEdit={(d) => alert(`Chỉnh sửa tài liệu: ${d.title}`)}
-                  onMore={(d) => alert(`Tùy chọn: ${d.title}`)}
-                />
-              ))
-            ) : (
-              <div className="doc-empty-state">
-                <p>Không tìm thấy tài liệu phù hợp với bộ lọc hiện tại.</p>
+                <button 
+                  type="button" 
+                  className="btn-upload-new"
+                  onClick={() => setIsUploadOpen(true)}
+                >
+                  <Upload size={16} />
+                  <span>Tải lên tài liệu mới</span>
+                </button>
               </div>
-            )}
-          </div>
 
-          {/* Bottom Pagination Row */}
-          <div className="doc-pagination-row">
-            <span className="pagination-info">
-              Hiển thị <strong>1</strong> đến <strong>{filteredDocuments.length}</strong> trong số <strong>24</strong> tài liệu
-            </span>
+              {/* Filter & Search Toolbar */}
+              <DocumentFilterBar
+                selectedGrade={selectedGrade}
+                onChangeGrade={setSelectedGrade}
+                selectedSubject={selectedSubject}
+                onChangeSubject={setSelectedSubject}
+                selectedType={selectedType}
+                onChangeType={setSelectedType}
+                searchQuery={searchQuery}
+                onChangeSearch={setSearchQuery}
+              />
 
-            <div className="pagination-controls">
-              <button 
-                type="button" 
-                className="pagination-btn arrow-btn"
-                disabled={currentPage === 1}
-                onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
-              >
-                <ChevronLeft size={16} />
-              </button>
+              {/* Document Cards Grid */}
+              <div className="doc-cards-grid">
+                {filteredDocuments.length > 0 ? (
+                  filteredDocuments.map((doc) => (
+                    <DocumentCard
+                      key={doc.id}
+                      doc={doc}
+                      onPreview={(d) => setSelectedDoc(d)}
+                      onDownload={(d) => alert(`Bắt đầu tải xuống: ${d.title}`)}
+                      onEdit={(d) => alert(`Chỉnh sửa tài liệu: ${d.title}`)}
+                      onMore={(d) => alert(`Tùy chọn: ${d.title}`)}
+                    />
+                  ))
+                ) : (
+                  <div className="doc-empty-state">
+                    <p>Không tìm thấy tài liệu phù hợp với bộ lọc hiện tại.</p>
+                  </div>
+                )}
+              </div>
 
-              <button 
-                type="button" 
-                className={`pagination-btn page-num-btn ${currentPage === 1 ? 'active' : ''}`}
-                onClick={() => setCurrentPage(1)}
-              >
-                1
-              </button>
+              {/* Bottom Pagination Row */}
+              <div className="doc-pagination-row">
+                <span className="pagination-info">
+                  Hiển thị <strong>1</strong> đến <strong>{filteredDocuments.length}</strong> trong số <strong>24</strong> tài liệu
+                </span>
 
-              <button 
-                type="button" 
-                className={`pagination-btn page-num-btn ${currentPage === 2 ? 'active' : ''}`}
-                onClick={() => setCurrentPage(2)}
-              >
-                2
-              </button>
+                <div className="pagination-controls">
+                  <button 
+                    type="button" 
+                    className="pagination-btn arrow-btn"
+                    disabled={currentPage === 1}
+                    onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+                  >
+                    <ChevronLeft size={16} />
+                  </button>
 
-              <button 
-                type="button" 
-                className="pagination-btn arrow-btn"
-                disabled={currentPage === 2}
-                onClick={() => setCurrentPage(prev => prev + 1)}
-              >
-                <ChevronRight size={16} />
-              </button>
-            </div>
-          </div>
+                  <button 
+                    type="button" 
+                    className={`pagination-btn page-num-btn ${currentPage === 1 ? 'active' : ''}`}
+                    onClick={() => setCurrentPage(1)}
+                  >
+                    1
+                  </button>
+
+                  <button 
+                    type="button" 
+                    className={`pagination-btn page-num-btn ${currentPage === 2 ? 'active' : ''}`}
+                    onClick={() => setCurrentPage(2)}
+                  >
+                    2
+                  </button>
+
+                  <button 
+                    type="button" 
+                    className="pagination-btn arrow-btn"
+                    disabled={currentPage === 2}
+                    onClick={() => setCurrentPage(prev => prev + 1)}
+                  >
+                    <ChevronRight size={16} />
+                  </button>
+                </div>
+              </div>
+            </>
+          )}
         </main>
       </div>
 
