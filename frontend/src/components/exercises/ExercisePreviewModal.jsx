@@ -164,6 +164,8 @@ export default function ExercisePreviewModal({ exercise, isOpen, onClose }) {
             questions.map((q, idx) => {
               const optionLabels = ['A', 'B', 'C', 'D', 'E', 'F'];
               const options = q.answer_options || [];
+              const isTrueFalse = q.question_type === 'TrueFalse' || q.part === 'Part2' || (options.length > 0 && /^[a-d]\)/i.test(options[0]?.content || ''));
+              const isShortAnswer = q.question_type === 'ShortAnswer' || q.part === 'Part3' || (options.length === 0 && Boolean(q.correct_answer));
 
               return (
                 <div key={q.question_id || idx} className="question-item-card">
@@ -173,16 +175,28 @@ export default function ExercisePreviewModal({ exercise, isOpen, onClose }) {
                       <div className="q-text">
                         <MathRenderer text={q.content_latex || q.content} />
                       </div>
-                      {q.difficulty && (
-                        <span style={{ display: 'inline-block', marginTop: '4px', fontSize: '11px', padding: '2px 8px', borderRadius: '4px', background: '#EEF2FF', color: '#4F46E5', fontWeight: 500 }}>
-                          Mức độ: {q.difficulty}
-                        </span>
-                      )}
+                      <div style={{ display: 'flex', gap: '6px', marginTop: '6px', alignItems: 'center' }}>
+                        {isTrueFalse && (
+                          <span style={{ fontSize: '11px', padding: '2px 8px', borderRadius: '4px', background: '#FDF2F8', color: '#DB2777', fontWeight: 600 }}>
+                            Trắc nghiệm Đúng/Sai
+                          </span>
+                        )}
+                        {isShortAnswer && (
+                          <span style={{ fontSize: '11px', padding: '2px 8px', borderRadius: '4px', background: '#F0FDF4', color: '#16A34A', fontWeight: 600 }}>
+                            Trả lời ngắn
+                          </span>
+                        )}
+                        {q.difficulty && (
+                          <span style={{ fontSize: '11px', padding: '2px 8px', borderRadius: '4px', background: '#EEF2FF', color: '#4F46E5', fontWeight: 500 }}>
+                            Mức độ: {q.difficulty}
+                          </span>
+                        )}
+                      </div>
                     </div>
                   </div>
 
-                  {/* Multiple Choice Options */}
-                  {options.length > 0 && (
+                  {/* Part 1: Multiple Choice Options */}
+                  {!isTrueFalse && !isShortAnswer && options.length > 0 && (
                     <div className="options-grid">
                       {options.map((opt, optIdx) => {
                         const isCorrect = opt.is_correct || q.correct_answer === optionLabels[optIdx];
@@ -202,6 +216,48 @@ export default function ExercisePreviewModal({ exercise, isOpen, onClose }) {
                           </div>
                         );
                       })}
+                    </div>
+                  )}
+
+                  {/* Part 2: True/False 4 statements */}
+                  {isTrueFalse && options.length > 0 && (
+                    <div className="options-grid true-false-grid">
+                      {options.map((opt, optIdx) => {
+                        const tfLabels = ['a', 'b', 'c', 'd', 'e', 'f'];
+                        const isTrue = opt.is_correct === true || opt.is_correct === 'True' || opt.is_correct === 1;
+                        const labelChar = tfLabels[optIdx] ? `${tfLabels[optIdx]})` : opt.display_order;
+                        const cleanOptText = (opt.content || '').replace(/^[a-f][\.\:\)\s]+\s*/i, '');
+
+                        return (
+                          <div 
+                            key={opt.option_id || optIdx} 
+                            className={`option-item ${isTrue ? 'is-correct' : 'is-incorrect'}`}
+                            style={!isTrue ? { borderColor: '#FED7AA', background: '#FFFDF9' } : {}}
+                          >
+                            <span className="opt-label" style={{ fontWeight: 700 }}>{labelChar}</span>
+                            <span style={{ flex: 1 }}><MathRenderer text={cleanOptText || opt.content} /></span>
+                            {isTrue ? (
+                              <span className="correct-tag" style={{ background: '#ECFDF5', color: '#059669', borderColor: '#A7F3D0' }}>
+                                <Check size={12} /> Đúng
+                              </span>
+                            ) : (
+                              <span className="correct-tag" style={{ background: '#FEF2F2', color: '#DC2626', borderColor: '#FECACA' }}>
+                                <X size={12} /> Sai
+                              </span>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+
+                  {/* Part 3: Short Answer Box */}
+                  {isShortAnswer && (
+                    <div style={{ marginTop: '12px', padding: '12px 16px', background: '#F9FAFB', border: '1px dashed #CBD5E1', borderRadius: '8px', display: 'flex', alignItems: 'center', gap: '10px' }}>
+                      <span style={{ fontWeight: 600, color: '#475569', fontSize: '13px' }}>Đáp án:</span>
+                      <span style={{ fontWeight: 700, color: '#4D308D', fontSize: '14px', background: '#EDE9FE', padding: '3px 12px', borderRadius: '6px', border: '1px solid #DDD6FE' }}>
+                        {q.correct_answer || '(Chưa có đáp án)'}
+                      </span>
                     </div>
                   )}
                 </div>
