@@ -1,42 +1,67 @@
 // File Name: TeacherSidebar.jsx
-// Description: Sidebar navigation component for Teacher role with dynamic route support.
+// Description: Synchronized sidebar navigation component for Teacher role with dynamic route awareness.
 // Created At: 2026-08-30
 // Created By: Tam Khang
-// Updated At: 2026-09-01
+// Updated At: 2026-09-02
 // Updated By: Tam Khang
 
 import React from 'react';
 import { 
-  LayoutDashboard, 
+  LayoutGrid, 
   GraduationCap, 
-  Users, 
+  Users,
   Star, 
   FolderOpen, 
-  BookOpen, 
+  ClipboardList, 
   Calendar, 
   Settings, 
   Plus 
 } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import './TeacherSidebar.css';
 
 export default function TeacherSidebar({ 
-  activeNav = 'dashboard', 
+  activeNav, 
   onSelectNav, 
   onCreateAction,
-  createButtonText = 'Tạo bài tập'
+  createButtonText = 'Tạo bài tập mới'
 }) {
   const { user } = useAuth();
   const navigate = useNavigate();
-  const displayName = user?.full_name ? `GV. ${user.full_name}` : 'GV. Nguyễn Văn A';
-  const initial = user?.full_name ? user.full_name.split(' ').map(n => n[0]).slice(-2).join('').toUpperCase() : 'NA';
+  const location = useLocation();
+
+  const displayName = user?.full_name ? `GV. ${user.full_name}` : 'GV. Sample Teacher (Thầy Nguyễn Văn A)';
+  const initial = user?.full_name ? user.full_name.split(' ').map(n => n[0]).slice(-2).join('').toUpperCase() : 'VA';
+
+  // Automatically determine active navigation item from URL pathname if not explicitly passed
+  let currentActive = activeNav;
+  if (!currentActive) {
+    const p = location.pathname;
+    if (p === '/' || p === '/teacher') {
+      currentActive = 'dashboard';
+    } else if (p.startsWith('/teacher/classes')) {
+      currentActive = 'classes';
+    } else if (p.startsWith('/teacher/homeroom')) {
+      currentActive = 'homeroom';
+    } else if (p.startsWith('/teacher/grading')) {
+      currentActive = 'grading';
+    } else if (p.startsWith('/teacher/documents')) {
+      currentActive = 'documents';
+    } else if (p.startsWith('/teacher/exercises')) {
+      currentActive = 'exercises';
+    } else if (p.startsWith('/teacher/schedule')) {
+      currentActive = 'schedule';
+    } else if (p.startsWith('/teacher/profile')) {
+      currentActive = 'settings';
+    } else {
+      currentActive = 'dashboard';
+    }
+  }
 
   const handleCreateClick = () => {
     if (onCreateAction) {
       onCreateAction();
-    } else if (activeNav === 'classes') {
-      alert('Tạo lớp học mới');
     } else {
       navigate('/teacher/exercises');
     }
@@ -47,7 +72,7 @@ export default function TeacherSidebar({
       onSelectNav(navId);
     }
     
-    // Always route if not overridden or handled
+    // Synchronized hyperlinks across the entire system
     if (navId === 'dashboard') {
       navigate('/teacher');
     } else if (navId === 'classes') {
@@ -62,16 +87,18 @@ export default function TeacherSidebar({
       navigate('/teacher/exercises');
     } else if (navId === 'schedule') {
       navigate('/teacher/schedule');
+    } else if (navId === 'settings') {
+      navigate('/teacher/profile');
     }
   };
 
   const menuItems = [
-    { id: 'dashboard', label: 'Bảng điều khiển', icon: LayoutDashboard },
+    { id: 'dashboard', label: 'Bảng điều khiển', icon: LayoutGrid },
     { id: 'classes', label: 'Lớp học của tôi', icon: GraduationCap },
     { id: 'homeroom', label: 'Lớp chủ nhiệm', icon: Users },
     { id: 'grading', label: 'Chấm bài & Phản hồi', icon: Star },
     { id: 'documents', label: 'Kho tài liệu', icon: FolderOpen },
-    { id: 'exercises', label: 'Kho bài tập', icon: BookOpen },
+    { id: 'exercises', label: 'Kho bài tập', icon: ClipboardList },
     { id: 'schedule', label: 'Lịch giảng dạy', icon: Calendar }
   ];
 
@@ -79,13 +106,24 @@ export default function TeacherSidebar({
     <aside className="teacher-sidebar">
       {/* Teacher Profile Section */}
       <div className="sidebar-profile-card">
-        <div className="avatar-wrapper">
+        <div 
+          className="avatar-wrapper" 
+          onClick={() => navigate('/teacher/profile')} 
+          title="Xem thông tin cá nhân"
+        >
           <div className="teacher-avatar">
             <span className="avatar-text">{initial}</span>
           </div>
         </div>
-        <h3 className="teacher-name">{displayName}</h3>
-        <p className="teacher-school">{user?.role === 'Teacher' ? 'Giáo viên bộ môn' : 'Trường THPT Chuyên'}</p>
+        <h3 
+          className="teacher-name" 
+          onClick={() => navigate('/teacher/profile')}
+          style={{ cursor: 'pointer' }}
+          title="Xem thông tin cá nhân"
+        >
+          {displayName}
+        </h3>
+        <p className="teacher-school">Trường THPT Chuyên</p>
       </div>
 
       {/* Create Action Button */}
@@ -95,7 +133,7 @@ export default function TeacherSidebar({
         onClick={handleCreateClick}
         title={createButtonText}
       >
-        <Plus size={18} strokeWidth={2.5} />
+        <Plus size={17} strokeWidth={2.5} />
         <span>{createButtonText}</span>
       </button>
 
@@ -103,21 +141,31 @@ export default function TeacherSidebar({
       <nav className="sidebar-nav">
         {menuItems.map((item) => {
           const Icon = item.icon;
-          const isActive = activeNav === item.id;
+          const isActive = currentActive === item.id;
           return (
             <button
               key={item.id}
               className={`nav-item-btn ${isActive ? 'active' : ''}`}
               onClick={() => handleItemClick(item.id)}
             >
-              <Icon size={19} className="nav-icon" />
+              <Icon size={18} className="nav-icon" />
               <span className="nav-label">{item.label}</span>
             </button>
           );
         })}
       </nav>
+
+      {/* Bottom Settings Link */}
+      <div className="sidebar-bottom-actions">
+        <button
+          type="button"
+          className={`nav-item-btn bottom-setting-btn ${currentActive === 'settings' ? 'active' : ''}`}
+          onClick={() => handleItemClick('settings')}
+        >
+          <Settings size={18} className="nav-icon" />
+          <span className="nav-label">Cài đặt</span>
+        </button>
+      </div>
     </aside>
   );
 }
-
-

@@ -17,8 +17,6 @@ import {
   Loader2
 } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
-import Header from '../../components/common/Header';
-import TeacherSidebar from '../../components/teacher/TeacherSidebar';
 import { exercisesApi, subjectsApi } from '../../services/api';
 import './CreateExerciseManualPage.css';
 
@@ -304,26 +302,7 @@ export default function CreateExerciseManualPage() {
   };
 
   return (
-    <div className="create-manual-page-layout">
-      {/* Top Header */}
-      <Header onToggleSidebar={() => setShowSidebar(!showSidebar)} />
-
-      <div className="create-manual-body">
-        {/* Left Sidebar */}
-        {showSidebar && (
-          <TeacherSidebar 
-            activeNav="exercises" 
-            onSelectNav={(id) => {
-              if (id === 'dashboard') navigate('/teacher');
-              else if (id === 'classes') navigate('/teacher/classes');
-              else if (id === 'documents') navigate('/teacher/documents');
-              else if (id === 'exercises') navigate('/teacher/exercises');
-            }} 
-          />
-        )}
-
-        {/* Main Form Content */}
-        <main className="create-manual-main">
+    <div className="create-manual-main">
           {/* Breadcrumb & Title */}
           <div className="manual-top-header">
             <nav className="breadcrumb-nav">
@@ -750,8 +729,6 @@ export default function CreateExerciseManualPage() {
               )}
             </button>
           </div>
-        </main>
-      </div>
     </div>
   );
 }

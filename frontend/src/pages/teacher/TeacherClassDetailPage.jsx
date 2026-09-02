@@ -14,8 +14,6 @@ import {
   AlertCircle
 } from 'lucide-react';
 import { Link, useParams, useNavigate } from 'react-router-dom';
-import Header from '../../components/common/Header';
-import TeacherSidebar from '../../components/teacher/TeacherSidebar';
 import StudentDetailModal from '../../components/teacher/StudentDetailModal';
 import { classesApi } from '../../services/api';
 import './TeacherClassDetailPage.css';
@@ -132,23 +130,7 @@ export default function TeacherClassDetailPage() {
   };
 
   return (
-    <div className="class-detail-layout">
-      {/* Top Header */}
-      <Header onToggleSidebar={() => setShowSidebar(!showSidebar)} />
-
-      <div className="class-detail-body">
-        {/* Left Sidebar */}
-        {showSidebar && (
-          <TeacherSidebar 
-            activeNav="classes" 
-            onSelectNav={handleNavSelect}
-            createButtonText="Tạo lớp học mới"
-            onCreateAction={() => alert('Vui lòng liên hệ Quản trị viên để tạo thêm lớp mới.')}
-          />
-        )}
-
-        {/* Main Content Area */}
-        <main className="class-detail-main">
+    <div className="class-detail-main">
           {/* Breadcrumb & Title Section */}
           <div className="class-detail-header-section">
             <nav className="breadcrumb-nav" aria-label="Breadcrumb">
@@ -250,8 +232,6 @@ export default function TeacherClassDetailPage() {
               )}
             </div>
           )}
-        </main>
-      </div>
 
       {/* Full-screen Student Performance Analytics Modal */}
       {selectedStudent && (

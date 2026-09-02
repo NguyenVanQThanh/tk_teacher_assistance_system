@@ -1,9 +1,9 @@
 /*
 File Name: TeacherSidebar.css
-Description: Compact styling for Teacher Sidebar to fit within 100vh viewport without scrolling.
+Description: Compact styling for Teacher Sidebar with profile section, create button, nav links and bottom settings action.
 Created At: 2026-08-30
 Created By: Tam Khang
-Updated At: 2026-08-31
+Updated At: 2026-09-02
 Updated By: Tam Khang
 */
 
@@ -193,3 +193,21 @@ Updated By: Tam Khang
   height: 17px;
 }
 
+/* Bottom Setting Action */
+.sidebar-bottom-actions {
+  margin-top: auto;
+  padding: 8px 6px 4px;
+  border-top: 1px solid #EBE8F0;
+  display: flex;
+  flex-direction: column;
+  flex-shrink: 0;
+}
+
+.bottom-setting-btn {
+  color: #64748B;
+}
+
+.bottom-setting-btn:hover {
+  background-color: #EDE4FC;
+  color: #4D308D;
+}

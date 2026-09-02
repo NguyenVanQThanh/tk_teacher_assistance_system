@@ -1,14 +1,15 @@
 // File Name: App.jsx
-// Description: Main application router with AuthProvider, ProtectedRoute guards, and Exercise Creation views.
+// Description: Main application router with AuthProvider, ProtectedRoute, and unified TeacherLayout wrapper.
 // Created At: 2026-08-30
 // Created By: Tam Khang
-// Updated At: 2026-08-31
+// Updated At: 2026-09-02
 // Updated By: Tam Khang
 
 import React from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider } from './context/AuthContext';
 import ProtectedRoute from './components/common/ProtectedRoute';
+import TeacherLayout from './components/layout/TeacherLayout';
 import LoginPage from './pages/LoginPage';
 import TeacherDashboard from './pages/teacher/TeacherDashboard';
 import DocumentRepositoryPage from './pages/teacher/DocumentRepositoryPage';
@@ -29,111 +30,26 @@ export default function App() {
           {/* Public Login Route */}
           <Route path="/login" element={<LoginPage />} />
 
-          {/* Protected Teacher Dashboard Routes */}
-          <Route 
-            path="/" 
+          {/* Protected Teacher Module Routes with Shared Persistent TeacherLayout */}
+          <Route
             element={
               <ProtectedRoute>
-                <TeacherDashboard />
+                <TeacherLayout />
               </ProtectedRoute>
-            } 
-          />
-          <Route 
-            path="/teacher" 
-            element={
-              <ProtectedRoute>
-                <TeacherDashboard />
-              </ProtectedRoute>
-            } 
-          />
-
-          {/* Protected Teacher Classes Routes */}
-          <Route 
-            path="/teacher/classes" 
-            element={
-              <ProtectedRoute>
-                <TeacherClassesPage />
-              </ProtectedRoute>
-            } 
-          />
-          <Route 
-            path="/teacher/classes/:classId" 
-            element={
-              <ProtectedRoute>
-                <TeacherClassDetailPage />
-              </ProtectedRoute>
-            } 
-          />
-
-          {/* Protected Teacher Homeroom Route */}
-          <Route 
-            path="/teacher/homeroom" 
-            element={
-              <ProtectedRoute>
-                <TeacherHomeroomPage />
-              </ProtectedRoute>
-            } 
-          />
-
-          {/* Protected Teacher Grading & Feedback Route */}
-          <Route 
-            path="/teacher/grading" 
-            element={
-              <ProtectedRoute>
-                <TeacherGradingPage />
-              </ProtectedRoute>
-            } 
-          />
-
-          {/* Protected Teacher Teaching Schedule Route */}
-          <Route 
-            path="/teacher/schedule" 
-            element={
-              <ProtectedRoute>
-                <TeacherSchedulePage />
-              </ProtectedRoute>
-            } 
-          />
-
-          {/* Protected Teacher Profile & Security Route */}
-          <Route 
-            path="/teacher/profile" 
-            element={
-              <ProtectedRoute>
-                <TeacherProfilePage />
-              </ProtectedRoute>
-            } 
-          />
-
-          {/* Protected Teacher Document Repository Route */}
-          <Route 
-            path="/teacher/documents" 
-            element={
-              <ProtectedRoute>
-                <DocumentRepositoryPage />
-              </ProtectedRoute>
-            } 
-          />
-
-          {/* Protected Teacher Exercise Repository Route */}
-          <Route 
-            path="/teacher/exercises" 
-            element={
-              <ProtectedRoute>
-                <ExerciseRepositoryPage />
-              </ProtectedRoute>
-            } 
-          />
-
-          {/* Protected Direct Exercise Creation Page */}
-          <Route 
-            path="/teacher/exercises/create-manual" 
-            element={
-              <ProtectedRoute>
-                <CreateExerciseManualPage />
-              </ProtectedRoute>
-            } 
-          />
+            }
+          >
+            <Route path="/" element={<TeacherDashboard />} />
+            <Route path="/teacher" element={<TeacherDashboard />} />
+            <Route path="/teacher/classes" element={<TeacherClassesPage />} />
+            <Route path="/teacher/classes/:classId" element={<TeacherClassDetailPage />} />
+            <Route path="/teacher/homeroom" element={<TeacherHomeroomPage />} />
+            <Route path="/teacher/grading" element={<TeacherGradingPage />} />
+            <Route path="/teacher/schedule" element={<TeacherSchedulePage />} />
+            <Route path="/teacher/profile" element={<TeacherProfilePage />} />
+            <Route path="/teacher/documents" element={<DocumentRepositoryPage />} />
+            <Route path="/teacher/exercises" element={<ExerciseRepositoryPage />} />
+            <Route path="/teacher/exercises/create-manual" element={<CreateExerciseManualPage />} />
+          </Route>
 
           {/* Catch-all Fallback */}
           <Route path="*" element={<Navigate to="/" replace />} />
@@ -142,4 +58,3 @@ export default function App() {
     </AuthProvider>
   );
 }
-

@@ -30,8 +30,6 @@ import {
   XCircle,
   AlertCircle
 } from 'lucide-react';
-import Header from '../../components/common/Header';
-import TeacherSidebar from '../../components/teacher/TeacherSidebar';
 import { useAuth } from '../../context/AuthContext';
 import './TeacherProfilePage.css';
 
@@ -144,15 +142,7 @@ export default function TeacherProfilePage() {
   const initial = profileForm.fullName ? profileForm.fullName.split(' ').map(n => n[0]).slice(-2).join('').toUpperCase() : 'GV';
 
   return (
-    <div className="teacher-profile-layout">
-      {/* Sidebar navigation */}
-      <TeacherSidebar activeNav="" />
-
-      {/* Main Content Area */}
-      <div className="teacher-profile-main">
-        <Header />
-
-        <div className="profile-content-container">
+    <div className="profile-content-container">
           {/* Toast Notification */}
           {toastMessage && (
             <div className="profile-toast-alert">
@@ -582,7 +572,5 @@ export default function TeacherProfilePage() {
             </div>
           )}
         </div>
-      </div>
-    </div>
   );
 }

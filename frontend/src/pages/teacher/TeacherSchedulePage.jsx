@@ -1,8 +1,8 @@
 // File Name: TeacherSchedulePage.jsx
-// Description: Teaching Schedule page with month calendar grid, daily class timelines, notes/reminders, and add schedule modal.
+// Description: Teaching Schedule interface with interactive calendar, urgency color bars, equal-sized grid cells, horizontal urgency legend, and detailed daily timeline.
 // Created At: 2026-09-01
 // Created By: Tam Khang
-// Updated At: 2026-09-01
+// Updated At: 2026-09-02
 // Updated By: Tam Khang
 
 import React, { useState, useMemo } from 'react';
@@ -12,9 +12,7 @@ import {
   Plus, 
   Clock, 
   MapPin, 
-  Pin, 
   Calendar as CalendarIcon, 
-  Users, 
   BookOpen, 
   CheckCircle2, 
   Sparkles, 
@@ -23,16 +21,13 @@ import {
   Trash2,
   AlertCircle
 } from 'lucide-react';
-import Header from '../../components/common/Header';
-import TeacherSidebar from '../../components/teacher/TeacherSidebar';
 import './TeacherSchedulePage.css';
 
 export default function TeacherSchedulePage() {
-  // State for filters
+  // State for filters (Grade only)
   const [selectedGrade, setSelectedGrade] = useState('all');
-  const [selectedSubject, setSelectedSubject] = useState('all');
 
-  // State for selected calendar day (default: Oct 15, 2023 as shown in image)
+  // State for selected calendar day (default: Oct 15, 2023)
   const [currentYear, setCurrentYear] = useState(2023);
   const [currentMonth, setCurrentMonth] = useState(9); // 0-indexed, 9 = October
   const [selectedDay, setSelectedDay] = useState(15);
@@ -53,13 +48,21 @@ export default function TeacherSchedulePage() {
     title: 'Toán nâng cao',
     className: '12A1',
     grade: '12',
-    subject: 'math',
     startTime: '07:30',
     endTime: '09:00',
     room: 'Phòng 302',
-    type: 'teaching', // 'teaching' | 'ai' | 'meeting'
+    urgency: 'teaching', // 'critical' | 'high' | 'teaching' | 'ai' | 'meeting'
     date: 15
   });
+
+  // Urgency configuration dictionary
+  const urgencyConfig = {
+    critical: { label: 'Khẩn cấp / Kiểm tra', color: '#EF4444', badgeBg: '#FEE2E2', badgeText: '#DC2626' },
+    high: { label: 'Ưu tiên cao', color: '#F59E0B', badgeBg: '#FEF3C7', badgeText: '#D97706' },
+    teaching: { label: 'Lịch giảng dạy', color: '#3B82F6', badgeBg: '#EFF6FF', badgeText: '#2563EB' },
+    ai: { label: 'Luyện tập AI', color: '#10B981', badgeBg: '#D1FAE5', badgeText: '#059669' },
+    meeting: { label: 'Họp khoa / Sự kiện', color: '#8B5CF6', badgeBg: '#F5F3FF', badgeText: '#7C3AED' }
+  };
 
   // Mock schedule database
   const [scheduleList, setScheduleList] = useState([
@@ -72,14 +75,13 @@ export default function TeacherSchedulePage() {
       title: 'Toán nâng cao',
       className: '12A1',
       grade: '12',
-      subject: 'math',
       startTime: '07:30',
       endTime: '09:00',
       room: 'Phòng 302',
+      urgency: 'teaching',
       accentColor: '#3B82F6',
-      badgeColor: '#F3E8FF',
-      badgeTextColor: '#7C3AED',
-      type: 'teaching'
+      badgeColor: '#EFF6FF',
+      badgeTextColor: '#2563EB'
     },
     {
       id: 2,
@@ -89,14 +91,13 @@ export default function TeacherSchedulePage() {
       title: 'Toán cơ bản',
       className: '10A3',
       grade: '10',
-      subject: 'math',
       startTime: '09:15',
       endTime: '10:45',
       room: 'Phòng 101',
-      accentColor: '#EC4899',
-      badgeColor: '#FCE7F3',
-      badgeTextColor: '#DB2777',
-      type: 'teaching'
+      urgency: 'high',
+      accentColor: '#F59E0B',
+      badgeColor: '#FEF3C7',
+      badgeTextColor: '#D97706'
     },
     {
       id: 3,
@@ -106,14 +107,13 @@ export default function TeacherSchedulePage() {
       title: 'Luyện tập AI',
       className: '11B2',
       grade: '11',
-      subject: 'math',
       startTime: '14:00',
       endTime: '15:30',
       room: 'Phòng 405',
-      accentColor: '#6366F1',
-      badgeColor: '#EDE9FE',
-      badgeTextColor: '#6D28D9',
-      type: 'ai'
+      urgency: 'ai',
+      accentColor: '#10B981',
+      badgeColor: '#D1FAE5',
+      badgeTextColor: '#059669'
     },
     // October 3
     {
@@ -124,14 +124,13 @@ export default function TeacherSchedulePage() {
       title: 'Hình học không gian',
       className: '11A1',
       grade: '11',
-      subject: 'math',
       startTime: '08:00',
       endTime: '09:30',
       room: 'Phòng 204',
+      urgency: 'teaching',
       accentColor: '#3B82F6',
       badgeColor: '#EFF6FF',
-      badgeTextColor: '#2563EB',
-      type: 'teaching'
+      badgeTextColor: '#2563EB'
     },
     // October 5
     {
@@ -142,15 +141,13 @@ export default function TeacherSchedulePage() {
       title: 'Họp khoa Toán - Tin',
       className: 'Tổ bộ môn',
       grade: 'all',
-      subject: 'math',
       startTime: '14:00',
       endTime: '16:00',
       room: 'Phòng Hội đồng',
-      accentColor: '#7C3AED',
+      urgency: 'meeting',
+      accentColor: '#8B5CF6',
       badgeColor: '#F5F3FF',
-      badgeTextColor: '#7C3AED',
-      type: 'meeting',
-      isDepartmentMeeting: true
+      badgeTextColor: '#7C3AED'
     },
     // October 19
     {
@@ -161,15 +158,13 @@ export default function TeacherSchedulePage() {
       title: 'Kiểm tra 1 tiết Đại số',
       className: '10A1',
       grade: '10',
-      subject: 'math',
       startTime: '07:30',
       endTime: '08:15',
       room: 'Phòng 102',
+      urgency: 'critical',
       accentColor: '#EF4444',
       badgeColor: '#FEE2E2',
-      badgeTextColor: '#DC2626',
-      type: 'teaching',
-      hasAlertDot: true
+      badgeTextColor: '#DC2626'
     }
   ]);
 
@@ -180,57 +175,48 @@ export default function TeacherSchedulePage() {
 
   // Calendar matrix calculation for current Month
   const calendarCells = useMemo(() => {
-    // Days in October 2023: 31 days. Oct 1 is Sunday (CN).
-    // In Vietnam standard (T2, T3, T4, T5, T6, T7, CN):
-    // T2=1, T3=2, T4=3, T5=4, T6=5, T7=6, CN=7 (0 in JS Date)
-    
-    // For October 2023:
-    // Sep 25, 26, 27, 28, 29, 30 are padding from Sep
-    // Oct 1 to Oct 31
-    // Nov 1, 2, 3, 4, 5 padding
-    const firstDay = new Date(currentYear, currentMonth, 1).getDay(); // 0 is Sun
-    const shift = firstDay === 0 ? 6 : firstDay - 1; // 6 padding days before Oct 1
-
+    const firstDayIndex = new Date(currentYear, currentMonth, 1).getDay();
+    const leadingOffset = firstDayIndex === 0 ? 6 : firstDayIndex - 1;
     const daysInCurrentMonth = new Date(currentYear, currentMonth + 1, 0).getDate();
-    const daysInPrevMonth = new Date(currentYear, currentMonth, 0).getDate();
+    const prevMonthDaysCount = new Date(currentYear, currentMonth, 0).getDate();
 
     const cells = [];
 
-    // Prev month padding
-    for (let i = shift - 1; i >= 0; i--) {
+    // 1. Previous month trailing days
+    for (let i = leadingOffset - 1; i >= 0; i--) {
       cells.push({
-        day: daysInPrevMonth - i,
+        day: prevMonthDaysCount - i,
+        month: currentMonth === 0 ? 11 : currentMonth - 1,
+        year: currentMonth === 0 ? currentYear - 1 : currentYear,
         isCurrentMonth: false,
-        month: currentMonth - 1,
-        year: currentYear
       });
     }
 
-    // Current month days
+    // 2. Current month days
     for (let d = 1; d <= daysInCurrentMonth; d++) {
       cells.push({
         day: d,
-        isCurrentMonth: true,
         month: currentMonth,
-        year: currentYear
+        year: currentYear,
+        isCurrentMonth: true,
       });
     }
 
-    // Next month padding (make standard 35 or 42 cells)
-    const remaining = 35 - cells.length > 0 ? 35 - cells.length : (42 - cells.length > 0 ? 42 - cells.length : 0);
-    for (let n = 1; n <= remaining; n++) {
+    // 3. Next month leading days to complete grid (multiples of 7)
+    const totalCells = Math.ceil(cells.length / 7) * 7;
+    const remaining = totalCells - cells.length;
+    for (let nextDay = 1; nextDay <= remaining; nextDay++) {
       cells.push({
-        day: n,
+        day: nextDay,
+        month: currentMonth === 11 ? 0 : currentMonth + 1,
+        year: currentMonth === 11 ? currentYear + 1 : currentYear,
         isCurrentMonth: false,
-        month: currentMonth + 1,
-        year: currentYear
       });
     }
 
     return cells;
   }, [currentYear, currentMonth]);
 
-  // Navigate months
   const handlePrevMonth = () => {
     if (currentMonth === 0) {
       setCurrentMonth(11);
@@ -243,7 +229,7 @@ export default function TeacherSchedulePage() {
   const handleNextMonth = () => {
     if (currentMonth === 11) {
       setCurrentMonth(0);
-      setCurrentYear(prev => prev + 1);
+      setCurrentYear(prev => prev - 1);
     } else {
       setCurrentMonth(prev => prev + 1);
     }
@@ -264,12 +250,9 @@ export default function TeacherSchedulePage() {
       if (selectedGrade !== 'all' && item.grade !== selectedGrade && item.grade !== 'all') {
         return false;
       }
-      if (selectedSubject !== 'all' && item.subject !== selectedSubject) {
-        return false;
-      }
       return true;
     });
-  }, [scheduleList, currentYear, currentMonth, selectedDay, selectedGrade, selectedSubject]);
+  }, [scheduleList, currentYear, currentMonth, selectedDay, selectedGrade]);
 
   // Add new note
   const handleAddNote = (e) => {
@@ -294,6 +277,8 @@ export default function TeacherSchedulePage() {
   const handleCreateSchedule = (e) => {
     e.preventDefault();
     const classNameDisplay = newScheduleForm.className?.trim() || '';
+    const urgencyData = urgencyConfig[newScheduleForm.urgency] || urgencyConfig.teaching;
+
     const newEntry = {
       id: Date.now(),
       year: currentYear,
@@ -302,14 +287,13 @@ export default function TeacherSchedulePage() {
       title: newScheduleForm.title,
       className: classNameDisplay,
       grade: newScheduleForm.grade || 'all',
-      subject: newScheduleForm.subject || 'all',
       startTime: newScheduleForm.startTime,
       endTime: newScheduleForm.endTime,
-      room: '',
-      accentColor: newScheduleForm.type === 'ai' ? '#6366F1' : (newScheduleForm.type === 'meeting' ? '#7C3AED' : '#3B82F6'),
-      badgeColor: newScheduleForm.type === 'ai' ? '#EDE9FE' : (newScheduleForm.type === 'meeting' ? '#F5F3FF' : '#EFF6FF'),
-      badgeTextColor: newScheduleForm.type === 'ai' ? '#6D28D9' : (newScheduleForm.type === 'meeting' ? '#7C3AED' : '#2563EB'),
-      type: newScheduleForm.type
+      room: newScheduleForm.room || 'Phòng học',
+      urgency: newScheduleForm.urgency,
+      accentColor: urgencyData.color,
+      badgeColor: urgencyData.badgeBg,
+      badgeTextColor: urgencyData.badgeText
     };
 
     setScheduleList(prev => [...prev, newEntry]);
@@ -321,221 +305,198 @@ export default function TeacherSchedulePage() {
   };
 
   return (
-    <div className="teacher-schedule-layout">
-      {/* Sidebar navigation */}
-      <TeacherSidebar activeNav="schedule" />
+    <div className="teacher-schedule-page-wrapper">
+      <div className="schedule-content-container">
+        {/* Toast Notification */}
+        {toastMessage && (
+          <div className="schedule-toast-alert">
+            <CheckCircle2 size={16} />
+            <span>{toastMessage}</span>
+          </div>
+        )}
 
-      {/* Main Content Area */}
-      <div className="teacher-schedule-main">
-        <Header />
+        {/* Top Breadcrumb & Page Title */}
+        <div className="schedule-page-header">
+          <div className="schedule-breadcrumb">
+            <span className="crumb-root">Trang chủ</span>
+            <span className="crumb-sep">›</span>
+            <span className="crumb-current">Lịch giảng dạy</span>
+          </div>
+          <h1 className="schedule-main-title">Lịch giảng dạy</h1>
+        </div>
 
-        <div className="schedule-content-container">
-          {/* Toast Notification */}
-          {toastMessage && (
-            <div className="schedule-toast-alert">
-              <CheckCircle2 size={16} />
-              <span>{toastMessage}</span>
+        {/* Horizontal Urgency Level Legend Bar */}
+        <div className="schedule-legend-horizontal-card">
+          <span className="legend-main-title">Mức độ ưu tiên / Khẩn cấp:</span>
+          <div className="legend-items-horizontal">
+            <div className="legend-chip">
+              <span className="legend-chip-dot" style={{ backgroundColor: '#EF4444' }} />
+              <span className="legend-chip-text">Khẩn cấp (Kiểm tra / Thi)</span>
             </div>
-          )}
-
-          {/* Top Breadcrumb & Page Title */}
-          <div className="schedule-page-header">
-            <div className="schedule-breadcrumb">
-              <span className="crumb-root">Trang chủ</span>
-              <span className="crumb-sep">›</span>
-              <span className="crumb-current">Lịch giảng dạy</span>
+            <div className="legend-chip">
+              <span className="legend-chip-dot" style={{ backgroundColor: '#F59E0B' }} />
+              <span className="legend-chip-text">Ưu tiên cao (Lưu ý)</span>
             </div>
-            <h1 className="schedule-main-title">Lịch giảng dạy</h1>
+            <div className="legend-chip">
+              <span className="legend-chip-dot" style={{ backgroundColor: '#3B82F6' }} />
+              <span className="legend-chip-text">Lịch giảng dạy</span>
+            </div>
+            <div className="legend-chip">
+              <span className="legend-chip-dot" style={{ backgroundColor: '#10B981' }} />
+              <span className="legend-chip-text">Luyện tập AI / Hoạt động</span>
+            </div>
+            <div className="legend-chip">
+              <span className="legend-chip-dot" style={{ backgroundColor: '#8B5CF6' }} />
+              <span className="legend-chip-text">Họp khoa / Sự kiện</span>
+            </div>
+          </div>
+        </div>
+
+        {/* Filter Bar (Grade only) & Add Schedule Action */}
+        <div className="schedule-filter-bar">
+          <div className="filter-select-group">
+            {/* Filter Grade */}
+            <div className="custom-select-wrapper">
+              <select 
+                value={selectedGrade} 
+                onChange={(e) => setSelectedGrade(e.target.value)}
+                className="filter-select-input"
+              >
+                <option value="all">Tất cả khối lớp</option>
+                <option value="10">Khối 10</option>
+                <option value="11">Khối 11</option>
+                <option value="12">Khối 12</option>
+              </select>
+            </div>
           </div>
 
-          {/* Filter Bar & Add Schedule Action */}
-          <div className="schedule-filter-bar">
-            <div className="filter-select-group">
-              {/* Filter Grade */}
-              <div className="custom-select-wrapper">
-                <select 
-                  value={selectedGrade} 
-                  onChange={(e) => setSelectedGrade(e.target.value)}
-                  className="filter-select-input"
-                >
-                  <option value="all">Tất cả khối lớp</option>
-                  <option value="10">Khối 10</option>
-                  <option value="11">Khối 11</option>
-                  <option value="12">Khối 12</option>
-                </select>
-              </div>
+          <button 
+            type="button" 
+            className="btn-add-schedule-primary"
+            onClick={() => setIsAddModalOpen(true)}
+          >
+            <Plus size={18} strokeWidth={2.5} />
+            <span>Thêm lịch mới</span>
+          </button>
+        </div>
 
-              {/* Filter Subject */}
-              <div className="custom-select-wrapper">
-                <select 
-                  value={selectedSubject} 
-                  onChange={(e) => setSelectedSubject(e.target.value)}
-                  className="filter-select-input"
-                >
-                  <option value="all">Tất cả môn học</option>
-                  <option value="math">Toán học</option>
-                  <option value="physics">Vật lý</option>
-                  <option value="chemistry">Hóa học</option>
-                  <option value="literature">Ngữ văn</option>
-                  <option value="english">Tiếng Anh</option>
-                </select>
-              </div>
-            </div>
-
-            <button 
-              type="button" 
-              className="btn-add-schedule-primary"
-              onClick={() => setIsAddModalOpen(true)}
-            >
-              <Plus size={18} strokeWidth={2.5} />
-              <span>Thêm lịch mới</span>
-            </button>
-          </div>
-
-          {/* Main 2-Column Schedule Grid */}
-          <div className="schedule-grid-layout">
-            {/* Left Column: Interactive Month Calendar */}
-            <div className="calendar-grid-card">
-              {/* Month Header & Controls */}
-              <div className="calendar-header-row">
-                <div className="month-picker-wrap">
-                  <span className="month-title-text">
-                    {monthNames[currentMonth]}, {currentYear}
-                  </span>
-                  <div className="month-nav-arrows">
-                    <button 
-                      type="button" 
-                      className="nav-arrow-btn" 
-                      onClick={handlePrevMonth}
-                      title="Tháng trước"
-                    >
-                      <ChevronLeft size={16} />
-                    </button>
-                    <button 
-                      type="button" 
-                      className="nav-arrow-btn" 
-                      onClick={handleNextMonth}
-                      title="Tháng sau"
-                    >
-                      <ChevronRight size={16} />
-                    </button>
-                  </div>
+        {/* Main 2-Column Schedule Grid */}
+        <div className="schedule-grid-layout">
+          {/* Left Column: Interactive Month Calendar */}
+          <div className="calendar-grid-card">
+            {/* Month Header & Controls */}
+            <div className="calendar-header-row">
+              <div className="month-picker-wrap">
+                <span className="month-title-text">
+                  {monthNames[currentMonth]}, {currentYear}
+                </span>
+                <div className="month-nav-arrows">
+                  <button 
+                    type="button" 
+                    className="nav-arrow-btn" 
+                    onClick={handlePrevMonth}
+                    title="Tháng trước"
+                  >
+                    <ChevronLeft size={16} />
+                  </button>
+                  <button 
+                    type="button" 
+                    className="nav-arrow-btn" 
+                    onClick={handleNextMonth}
+                    title="Tháng sau"
+                  >
+                    <ChevronRight size={16} />
+                  </button>
                 </div>
-
-                <button 
-                  type="button" 
-                  className="btn-today-pill" 
-                  onClick={handleGoToday}
-                >
-                  Hôm nay
-                </button>
               </div>
 
-              {/* Weekday Header */}
-              <div className="calendar-weekdays-row">
-                <span className="weekday-col">T2</span>
-                <span className="weekday-col">T3</span>
-                <span className="weekday-col">T4</span>
-                <span className="weekday-col">T5</span>
-                <span className="weekday-col">T6</span>
-                <span className="weekday-col weekend-col">T7</span>
-                <span className="weekday-col weekend-col">CN</span>
-              </div>
+              <button 
+                type="button" 
+                className="btn-today-pill" 
+                onClick={handleGoToday}
+              >
+                Hôm nay
+              </button>
+            </div>
 
-              {/* Days Grid */}
-              <div className="calendar-month-days-grid">
-                {calendarCells.map((cell, idx) => {
-                  const isWeekend = (idx % 7 === 5) || (idx % 7 === 6);
-                  const isSelected = cell.isCurrentMonth && cell.day === selectedDay;
+            {/* Weekday Header */}
+            <div className="calendar-weekdays-row">
+              <span className="weekday-col">T2</span>
+              <span className="weekday-col">T3</span>
+              <span className="weekday-col">T4</span>
+              <span className="weekday-col">T5</span>
+              <span className="weekday-col">T6</span>
+              <span className="weekday-col weekend-col">T7</span>
+              <span className="weekday-col weekend-col">CN</span>
+            </div>
 
-                  // Find events for this cell
-                  const cellEvents = scheduleList.filter(
-                    s => s.year === cell.year && s.month === cell.month && s.day === cell.day
-                  );
+            {/* Days Grid - All cells strictly equal sized */}
+            <div className="calendar-month-days-grid">
+              {calendarCells.map((cell, idx) => {
+                const isWeekend = (idx % 7 === 5) || (idx % 7 === 6);
+                const isSelected = cell.isCurrentMonth && cell.day === selectedDay;
 
-                  const isDay3 = cell.isCurrentMonth && cell.day === 3;
-                  const isDay5 = cell.isCurrentMonth && cell.day === 5;
-                  const isDay15 = cell.isCurrentMonth && cell.day === 15;
-                  const isDay19 = cell.isCurrentMonth && cell.day === 19;
+                // Find events for this cell
+                const cellEvents = scheduleList.filter(
+                  s => s.year === cell.year && s.month === cell.month && s.day === cell.day
+                );
 
-                  return (
-                    <div 
-                      key={idx}
-                      className={`calendar-day-cell ${!cell.isCurrentMonth ? 'other-month' : ''} ${isWeekend ? 'weekend-cell' : ''} ${isSelected ? 'selected-day-cell' : ''}`}
-                      onClick={() => {
-                        if (cell.isCurrentMonth) {
-                          setSelectedDay(cell.day);
-                        }
-                      }}
-                    >
-                      {/* Day Number / Active Circle Badge */}
-                      <div className="day-header-number">
-                        {isSelected ? (
-                          <span className="selected-day-badge">{cell.day}</span>
-                        ) : (
-                          <span className="day-number-text">{cell.day}</span>
-                        )}
-                      </div>
-
-                      {/* Day 3 blue dot */}
-                      {isDay3 && (
-                        <div className="day-dot-indicator dot-blue" />
-                      )}
-
-                      {/* Day 5: Họp khoa badge */}
-                      {isDay5 && (
-                        <div className="day-pill-event-badge purple">
-                          Họp khoa
-                        </div>
-                      )}
-
-                      {/* Day 15: 2 Schedule Bars (as in screenshot) */}
-                      {isDay15 && (
-                        <div className="day-event-bars-stack">
-                          <div className="event-bar bar-purple" />
-                          <div className="event-bar bar-blue" />
-                        </div>
-                      )}
-
-                      {/* Day 19 red dot */}
-                      {isDay19 && (
-                        <div className="day-dot-indicator dot-red" />
-                      )}
-
-                      {/* Additional dynamic event badges if created */}
-                      {cell.isCurrentMonth && !isDay3 && !isDay5 && !isDay15 && !isDay19 && cellEvents.length > 0 && (
-                        <div className="day-event-bars-stack">
-                          {cellEvents.slice(0, 2).map((ev, evIdx) => (
-                            <div 
-                              key={evIdx} 
-                              className="event-bar" 
-                              style={{ backgroundColor: ev.accentColor }} 
-                            />
-                          ))}
-                        </div>
+                return (
+                  <div 
+                    key={idx}
+                    className={`calendar-day-cell ${!cell.isCurrentMonth ? 'other-month' : ''} ${isWeekend ? 'weekend-cell' : ''} ${isSelected ? 'selected-day-cell' : ''}`}
+                    onClick={() => {
+                      if (cell.isCurrentMonth) {
+                        setSelectedDay(cell.day);
+                      }
+                    }}
+                  >
+                    {/* Day Number / Active Circle Badge */}
+                    <div className="day-header-number">
+                      {isSelected ? (
+                        <span className="selected-day-badge">{cell.day}</span>
+                      ) : (
+                        <span className="day-number-text">{cell.day}</span>
                       )}
                     </div>
-                  );
-                })}
-              </div>
+
+                    {/* Urgency Color Bars Indicator */}
+                    {cell.isCurrentMonth && cellEvents.length > 0 && (
+                      <div className="day-urgency-bars-stack">
+                        {cellEvents.map((ev, evIdx) => (
+                          <div 
+                            key={evIdx} 
+                            className="day-urgency-bar" 
+                            style={{ backgroundColor: ev.accentColor || '#3B82F6' }}
+                            title={`${ev.title} (${ev.startTime} - ${ev.endTime})`}
+                          />
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
             </div>
+          </div>
 
-            {/* Right Column: Daily Schedule Details & Notes */}
-            <div className="schedule-side-panel">
-              {/* Daily Schedule Card */}
-              <div className="daily-schedule-card">
-                <div className="daily-schedule-header">
-                  <h3 className="daily-title">
-                    {selectedDay === 15 ? 'Lịch dạy hôm nay' : `Lịch dạy ngày ${selectedDay}`}
-                  </h3>
-                  <span className="date-badge-pill">
-                    {selectedDay} Thg {currentMonth + 1}
-                  </span>
-                </div>
+          {/* Right Column: Daily Schedule Details & Notes */}
+          <div className="schedule-side-panel">
+            {/* Daily Schedule Card */}
+            <div className="daily-schedule-card">
+              <div className="daily-schedule-header">
+                <h3 className="daily-title">
+                  {selectedDay === 15 ? 'Lịch dạy hôm nay' : `Lịch dạy ngày ${selectedDay}`}
+                </h3>
+                <span className="date-badge-pill">
+                  {selectedDay} Thg {currentMonth + 1}
+                </span>
+              </div>
 
-                <div className="daily-schedule-items-list">
-                  {dailySchedules.length > 0 ? (
-                    dailySchedules.map((item) => (
+              <div className="daily-schedule-items-list">
+                {dailySchedules.length > 0 ? (
+                  dailySchedules.map((item) => {
+                    const urgencyInfo = urgencyConfig[item.urgency] || urgencyConfig.teaching;
+                    return (
                       <div 
                         key={item.id}
                         className="schedule-item-card"
@@ -543,17 +504,22 @@ export default function TeacherSchedulePage() {
                       >
                         <div className="item-top-row">
                           <h4 className="item-title">{item.title}</h4>
-                          {item.className && (
+                          <div className="item-badges-group">
+                            {item.className && (
+                              <span className="item-class-badge">
+                                {item.className}
+                              </span>
+                            )}
                             <span 
-                              className="item-class-badge"
+                              className="item-urgency-badge"
                               style={{ 
-                                backgroundColor: item.badgeColor, 
-                                color: item.badgeTextColor 
+                                backgroundColor: item.badgeColor || urgencyInfo.badgeBg, 
+                                color: item.badgeTextColor || urgencyInfo.badgeText 
                               }}
                             >
-                              {item.className}
+                              {urgencyInfo.label}
                             </span>
-                          )}
+                          </div>
                         </div>
 
                         <div className="item-details-row">
@@ -569,60 +535,65 @@ export default function TeacherSchedulePage() {
                           )}
                         </div>
                       </div>
-                    ))
-                  ) : (
-                    <div className="no-schedules-box">
-                      <CalendarIcon size={28} className="text-gray-400" />
-                      <p className="no-schedule-text">Không có lịch giảng dạy trong ngày này.</p>
-                      <button 
-                        type="button" 
-                        className="btn-quick-add"
-                        onClick={() => {
-                          setNewScheduleForm(prev => ({ ...prev, date: selectedDay }));
-                          setIsAddModalOpen(true);
-                        }}
-                      >
-                        + Thêm lịch cho ngày {selectedDay}
-                      </button>
-                    </div>
-                  )}
-                </div>
+                    );
+                  })
+                ) : (
+                  <div className="no-schedules-box">
+                    <CalendarIcon size={28} className="text-gray-400" />
+                    <p className="no-schedule-text">Không có lịch giảng dạy trong ngày này.</p>
+                    <button 
+                      type="button" 
+                      className="btn-quick-add"
+                      onClick={() => {
+                        setNewScheduleForm(prev => ({ ...prev, date: selectedDay }));
+                        setIsAddModalOpen(true);
+                      }}
+                    >
+                      <Plus size={14} />
+                      <span>Thêm lịch cho ngày {selectedDay}</span>
+                    </button>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Notes & Reminders Widget */}
+            <div className="notes-card-widget">
+              <div className="notes-card-header">
+                <h4 className="notes-heading">Ghi chú & Nhắc nhở</h4>
+                <span className="notes-counter">{notes.length}</span>
               </div>
 
-              {/* Notes & Reminders Card */}
-              <div className="notes-reminders-card">
-                <div className="notes-header">
-                  <Pin size={16} className="text-purple-accent" />
-                  <h3 className="notes-title">Ghi chú & Nhắc nhở</h3>
-                </div>
+              {/* Add note inline form */}
+              <form onSubmit={handleAddNote} className="add-note-inline-form">
+                <input 
+                  type="text" 
+                  value={newNoteInput}
+                  onChange={(e) => setNewNoteInput(e.target.value)}
+                  placeholder="Thêm ghi chú nhanh..."
+                  className="input-note-text"
+                />
+                <button type="submit" className="btn-add-note-inline" title="Thêm ghi chú">
+                  <Plus size={16} />
+                </button>
+              </form>
 
-                <form onSubmit={handleAddNote} className="add-note-form">
-                  <input
-                    type="text"
-                    value={newNoteInput}
-                    onChange={(e) => setNewNoteInput(e.target.value)}
-                    placeholder="Thêm ghi chú cho ngày hôm nay..."
-                    className="note-text-input"
-                  />
-                </form>
-
-                {/* Notes List */}
-                <div className="notes-items-list">
-                  {notes.map((note) => (
-                    <div key={note.id} className="single-note-item">
-                      <div className="note-bullet" />
-                      <span className="note-text">{note.text}</span>
-                      <button 
-                        type="button" 
-                        className="btn-delete-note"
-                        onClick={() => handleDeleteNote(note.id)}
-                        title="Xóa ghi chú"
-                      >
-                        <Trash2 size={12} />
-                      </button>
-                    </div>
-                  ))}
-                </div>
+              {/* Notes List */}
+              <div className="notes-items-list">
+                {notes.map((note) => (
+                  <div key={note.id} className="single-note-item">
+                    <div className="note-bullet" />
+                    <span className="note-text">{note.text}</span>
+                    <button 
+                      type="button" 
+                      className="btn-delete-note"
+                      onClick={() => handleDeleteNote(note.id)}
+                      title="Xóa ghi chú"
+                    >
+                      <Trash2 size={12} />
+                    </button>
+                  </div>
+                ))}
               </div>
             </div>
           </div>
@@ -656,7 +627,7 @@ export default function TeacherSchedulePage() {
                   value={newScheduleForm.title}
                   onChange={(e) => setNewScheduleForm({ ...newScheduleForm, title: e.target.value })}
                   className="form-input-text"
-                  placeholder="Ví dụ: Toán nâng cao, Luyện tập AI..."
+                  placeholder="Ví dụ: Toán nâng cao, Kiểm tra Đại số..."
                 />
               </div>
 
@@ -668,20 +639,22 @@ export default function TeacherSchedulePage() {
                     value={newScheduleForm.className}
                     onChange={(e) => setNewScheduleForm({ ...newScheduleForm, className: e.target.value })}
                     className="form-input-text"
-                    placeholder="Ví dụ: 12A1, 10A3 hoặc để trống..."
+                    placeholder="Ví dụ: 12A1, 10A3..."
                   />
                 </div>
 
                 <div className="form-field-group">
-                  <label className="field-label">Loại lịch</label>
+                  <label className="field-label">Mức độ ưu tiên / Loại lịch</label>
                   <select 
-                    value={newScheduleForm.type}
-                    onChange={(e) => setNewScheduleForm({ ...newScheduleForm, type: e.target.value })}
+                    value={newScheduleForm.urgency}
+                    onChange={(e) => setNewScheduleForm({ ...newScheduleForm, urgency: e.target.value })}
                     className="form-input-text"
                   >
-                    <option value="teaching">Giảng dạy chính khóa</option>
-                    <option value="ai">Luyện tập AI</option>
-                    <option value="meeting">Họp khoa / Chuyên môn</option>
+                    <option value="critical">🔴 Khẩn cấp (Kiểm tra / Thi cử)</option>
+                    <option value="high">🟠 Ưu tiên cao (Lưu ý / Hạn nộp)</option>
+                    <option value="teaching">🔵 Lịch giảng dạy chính khóa</option>
+                    <option value="ai">🟢 Luyện tập AI / Hoạt động</option>
+                    <option value="meeting">🟣 Họp khoa / Sự kiện</option>
                   </select>
                 </div>
               </div>
@@ -721,6 +694,17 @@ export default function TeacherSchedulePage() {
                     className="form-input-text"
                   />
                 </div>
+              </div>
+
+              <div className="form-field-group">
+                <label className="field-label">Phòng học <span className="field-optional-tag">(Tùy chọn)</span></label>
+                <input 
+                  type="text" 
+                  value={newScheduleForm.room}
+                  onChange={(e) => setNewScheduleForm({ ...newScheduleForm, room: e.target.value })}
+                  className="form-input-text"
+                  placeholder="Ví dụ: Phòng 302, Phòng Hội đồng..."
+                />
               </div>
 
               <div className="modal-actions-footer">

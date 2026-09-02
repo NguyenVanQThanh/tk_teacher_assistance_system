@@ -24,8 +24,6 @@ import {
   Printer
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
-import Header from '../../components/common/Header';
-import TeacherSidebar from '../../components/teacher/TeacherSidebar';
 import StudentDetailModal from '../../components/teacher/StudentDetailModal';
 import EditStudentInfoModal from '../../components/teacher/EditStudentInfoModal';
 import EditStudentGradesModal from '../../components/teacher/EditStudentGradesModal';
@@ -259,22 +257,7 @@ export default function TeacherHomeroomPage() {
   };
 
   return (
-    <div className="homeroom-layout">
-      {/* Top Global Header */}
-      <Header onToggleSidebar={() => setShowSidebar(!showSidebar)} />
-
-      <div className="homeroom-body">
-        {/* Left Teacher Sidebar */}
-        {showSidebar && (
-          <TeacherSidebar 
-            activeNav="homeroom" 
-            createButtonText="Tạo bài giảng mới"
-            onCreateAction={() => alert('Tạo bài giảng mới')}
-          />
-        )}
-
-        {/* Main Content Area */}
-        <main className="homeroom-main">
+    <div className="homeroom-main">
           {/* Breadcrumb Navigation */}
           <nav className="homeroom-breadcrumb" aria-label="Breadcrumb">
             <Link to="/teacher" className="breadcrumb-link">Trang chủ</Link>
@@ -532,8 +515,6 @@ export default function TeacherHomeroomPage() {
               </table>
             </div>
           </div>
-        </main>
-      </div>
 
       {/* Student Analytics & Detail Modal */}
       {selectedStudent && (

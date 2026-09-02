@@ -8,8 +8,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { ChevronRight, Plus, ChevronLeft, Loader2, AlertCircle } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
-import Header from '../../components/common/Header';
-import TeacherSidebar from '../../components/teacher/TeacherSidebar';
 import ExerciseFilterBar from '../../components/exercises/ExerciseFilterBar';
 import ExerciseCard from '../../components/exercises/ExerciseCard';
 import CreateExerciseModal from '../../components/exercises/CreateExerciseModal';
@@ -185,22 +183,7 @@ export default function ExerciseRepositoryPage() {
   };
 
   return (
-    <div className="exercise-repository-layout">
-      {/* Top Global Header */}
-      <Header onToggleSidebar={() => setShowSidebar(!showSidebar)} />
-
-      <div className="exercise-repository-body">
-        {/* Left Teacher Sidebar */}
-        {showSidebar && (
-          <TeacherSidebar 
-            activeNav="exercises" 
-            onSelectNav={handleNavSelect} 
-            onCreateExercise={() => setIsCreateOpen(true)}
-          />
-        )}
-
-        {/* Main Content Area */}
-        <main className="exercise-repository-main">
+    <div className="exercise-repository-main">
           {/* Top Row: Breadcrumb, Title & Create Button */}
           <div className="exercise-top-bar">
             <div className="exercise-title-group">
@@ -310,8 +293,6 @@ export default function ExerciseRepositoryPage() {
               </div>
             </div>
           )}
-        </main>
-      </div>
 
       {/* Create Exercise Modal */}
       <CreateExerciseModal

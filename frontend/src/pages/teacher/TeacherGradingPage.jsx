@@ -22,8 +22,6 @@ import {
   FileSpreadsheet,
   Check
 } from 'lucide-react';
-import Header from '../../components/common/Header';
-import TeacherSidebar from '../../components/teacher/TeacherSidebar';
 import GradingFeedbackModal from '../../components/teacher/GradingFeedbackModal';
 import './TeacherGradingPage.css';
 
@@ -550,21 +548,7 @@ export default function TeacherGradingPage() {
   };
 
   return (
-    <div className="teacher-grading-layout">
-      {/* Top Header */}
-      <Header onToggleSidebar={() => setShowSidebar(!showSidebar)} />
-
-      <div className="grading-main-container">
-        {/* Sidebar */}
-        {showSidebar && (
-          <TeacherSidebar 
-            activeNav="grading" 
-            createButtonText="Tạo lớp học mới"
-          />
-        )}
-
-        {/* Content Area */}
-        <main className="grading-content-area">
+    <div className="grading-content-area">
           {/* Toast Notification */}
           {toastMessage && (
             <div className="grading-toast">
@@ -955,8 +939,6 @@ export default function TeacherGradingPage() {
               </div>
             </div>
           </div>
-        </main>
-      </div>
 
       {/* Interactive Grading and Feedback Modal */}
       <GradingFeedbackModal

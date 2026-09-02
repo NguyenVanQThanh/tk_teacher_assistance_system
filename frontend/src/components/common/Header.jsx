@@ -1,23 +1,20 @@
 // File Name: Header.jsx
-// Description: Top global navigation header with search, notifications popup, and rich user account profile dropdown.
+// Description: Top global navigation header with brand logo, notifications popup, and rich user account profile dropdown.
 // Created At: 2026-08-30
 // Created By: Tam Khang
-// Updated At: 2026-09-01
+// Updated At: 2026-09-02
 // Updated By: Tam Khang
 
 import React, { useState, useRef, useEffect } from 'react';
 import { 
   Menu, 
-  Search, 
   Bell, 
   HelpCircle, 
   User, 
   LogOut, 
-  Settings, 
   Shield, 
   Mail, 
   Building2, 
-  CheckCircle,
   ChevronRight
 } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
@@ -67,25 +64,17 @@ export default function Header({ onToggleSidebar }) {
     <>
       <header className="main-header">
         <div className="header-left">
-          <button className="icon-btn menu-toggle" onClick={onToggleSidebar} aria-label="Toggle menu">
-            <Menu size={20} />
-          </button>
+          {onToggleSidebar && (
+            <button className="icon-btn menu-toggle" onClick={onToggleSidebar} aria-label="Toggle menu">
+              <Menu size={20} />
+            </button>
+          )}
           <Link to="/teacher" className="brand-logo-link">
             <span className="brand-text">Academic Clarity</span>
           </Link>
         </div>
 
         <div className="header-right">
-          {/* Search Bar */}
-          <div className="header-search-box">
-            <Search size={16} className="search-icon" />
-            <input 
-              type="text" 
-              placeholder="Tìm kiếm..." 
-              className="search-input" 
-            />
-          </div>
-
           {/* Notifications Popover */}
           <div style={{ position: 'relative' }} ref={notifRef}>
             <button 

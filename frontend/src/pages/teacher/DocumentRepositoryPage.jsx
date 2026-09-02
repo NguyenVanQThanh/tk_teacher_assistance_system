@@ -8,8 +8,6 @@
 import React, { useState, useMemo } from 'react';
 import { ChevronRight, Upload, ChevronLeft } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
-import Header from '../../components/common/Header';
-import TeacherSidebar from '../../components/teacher/TeacherSidebar';
 import DocumentFilterBar from '../../components/documents/DocumentFilterBar';
 import DocumentCard from '../../components/documents/DocumentCard';
 import DocumentDetailView from '../../components/documents/DocumentDetailView';
@@ -184,22 +182,7 @@ export default function DocumentRepositoryPage() {
   };
 
   return (
-    <div className="doc-repository-layout">
-      {/* Top Global Header */}
-      <Header onToggleSidebar={() => setShowSidebar(!showSidebar)} />
-
-      <div className="doc-repository-body">
-        {/* Left Teacher Sidebar */}
-        {showSidebar && (
-          <TeacherSidebar 
-            activeNav="documents" 
-            onSelectNav={handleNavSelect} 
-            onCreateExercise={() => setIsCreateExerciseOpen(true)}
-          />
-        )}
-
-        {/* Main Content Area */}
-        <main className="doc-repository-main">
+    <div className="doc-repository-main">
           {selectedDoc ? (
             /* Document Detail View (Image 1) */
             <DocumentDetailView
@@ -310,8 +293,6 @@ export default function DocumentRepositoryPage() {
               </div>
             </>
           )}
-        </main>
-      </div>
 
       {/* Upload Document Modal */}
       <UploadDocumentModal
