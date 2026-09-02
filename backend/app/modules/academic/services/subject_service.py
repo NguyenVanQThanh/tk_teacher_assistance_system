@@ -61,7 +61,17 @@ class SubjectService:
         """
         if current_user:
             role_name = get_user_role_name(db, current_user)
-            if role_name == "Student":
+            if role_name == "Teacher":
+                from app.modules.academic.repository import TeacherAssignmentRepository
+                assignments = TeacherAssignmentRepository.filter_teacher_assignments(
+                    db, teacher_id=current_user.user_id
+                )
+                subject_ids = list(set(a.subject_id for a in assignments))
+                if subject_ids:
+                    return SubjectRepository.filter_subjects(
+                        db, subject_ids=subject_ids, status=status_val
+                    )
+            elif role_name == "Student":
                 accessible_class_ids = get_accessible_class_ids(db, current_user, role_name)
                 if accessible_class_ids is not None:
                     # Find subject_ids from teacher assignments of enrolled classes

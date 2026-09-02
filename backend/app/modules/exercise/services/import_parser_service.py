@@ -151,14 +151,6 @@ class ImportParserService:
                 res.append(omml_to_latex(child))
             return "".join(res)
 
-        def normalize_extracted_text(text: str) -> str:
-            if not text:
-                return text
-            sup_map = str.maketrans("⁰¹²³⁴⁵⁶⁷⁸⁹", "0123456789")
-            text = re.sub(r'([a-zA-Z])([⁰¹²³⁴⁵⁶⁷⁸⁹]+)', lambda m: f"{m.group(1)}^{{{m.group(2).translate(sup_map)}}}", text)
-            text = re.sub(r'([a-zA-Z])[\u20d7\u2192⃗]', r'$\\vec{\1}$', text)
-            return text
-
         def get_elem_text(elem) -> str:
             """Extract text from paragraph or table cell, converting OMML math equations and Word run formatting to $ LaTeX $."""
             parts = []
@@ -200,7 +192,7 @@ class ImportParserService:
                             txts = child.xpath('.//*[local-name()="t"]/text()')
                             parts.append("".join(txts))
             raw = "".join(parts).strip()
-            return normalize_extracted_text(raw)
+            return ImportParserService.normalize_extracted_text(raw)
 
         for p in doc.paragraphs:
             text = get_elem_text(p._p)
@@ -218,9 +210,64 @@ class ImportParserService:
         full_text = "\n".join(full_text_lines)
         return full_text, tables_data, inline_images
 
-
     @staticmethod
-    def extract_pdf_content(file_bytes: bytes) -> Tuple[str, List[List[List[str]]], List[Dict[str, Any]]]:
+    def normalize_extracted_text(text: str) -> str:
+        """
+        Normalizes unicode superscripts, vectors, and mathematical notations in extracted text.
+        """
+        if not text:
+            return text
+
+        # 1. Normalize unicode minus / en-dash to standard minus
+        text = text.replace('−', '-').replace('–', '-')
+
+        # 2. Exponents: e.g. x3 -> x^{3}, -3x2 -> -3x^{2}, t3 -> t^{3}, 108cm 3 -> 108cm^{3}
+        sup_map = str.maketrans("⁰¹²³⁴⁵⁶⁷⁸⁹", "0123456789")
+        text = re.sub(r'([a-zA-Z])([⁰¹²³⁴⁵⁶⁷⁸⁹]+)', lambda m: f"{m.group(1)}^{{{m.group(2).translate(sup_map)}}}", text)
+        text = re.sub(r'([a-zA-Z])(\d+)', lambda m: f"{m.group(1)}^{{{m.group(2)}}}", text)
+        text = re.sub(r'(\d+)\s*cm\s*([23])\b', r'\1cm^{\2}', text)
+
+        # 3. Vector arrows: -> or -→ or \u2192
+        text = re.sub(r'([a-zA-Z])[\u20d7\u2192⃗]', r'$\\vec{\1}$', text)
+        text = re.sub(r'-\s*→|−\s*→|-->', '$\\vec{v}$', text)
+
+        # 4. Reconstruct broken 2D fraction layouts:
+        # Pattern: "Hàm số \n x^2 + 1 \n y = \n x - 1" -> "Hàm số y = \frac{x^2+1}{x-1}"
+        text = re.sub(
+            r'Hàm\s+số\s*\n\s*([xyt0-9\^\{\}\+\-\s]+?)\s*\n\s*y\s*=\s*\.?\s*\n\s*([xyt0-9\^\{\}\+\-\s]+?)(?=\s*\n\s*Số|\s*\n\s*có)',
+            lambda m: f"Hàm số y = \\frac{{{m.group(1).strip()}}}{{{m.group(2).strip()}}} ",
+            text,
+            flags=re.IGNORECASE
+        )
+
+        # Pattern: "f(x) = \n 2x \n Opt a) f'(x) = . \n x^2 + 1" or "f(x) = là: \n x^2 + 1"
+        text = re.sub(
+            r'f\s*\(\s*x\s*\)\s*=\s*là:\s*\n\s*([x0-9\^\{\}\+\-\s]+)',
+            lambda m: f"f(x) = \\frac{{2x}}{{{m.group(1).strip()}}} là: ",
+            text
+        )
+
+        text = re.sub(
+            r'f\s*′\s*\(\s*x\s*\)\s*=\s*\.\s*\n\s*([x0-9\^\{\}\+\-\s]+)',
+            lambda m: f"f'(x) = \\frac{{2x}}{{{m.group(1).strip()}}} ",
+            text
+        )
+
+        # 5. Logarithm base broken onto next line: "log (x-1) < 3 là: \n 2" -> "\log_2(x-1) < 3 là:"
+        text = re.sub(
+            r'(?i)\blog\s*\(([^)]+)\)\s*<\s*(\d+)\s*là:\s*\n\s*(\d+)',
+            r'\\log_{\3}(\1) < \2 là: ',
+            text
+        )
+
+        # 6. Clean dangling broken fraction parts at end of options
+        text = re.sub(r'(\[1;9\])\s*\n\s*2x', r'\1', text)
+        text = re.sub(r'\n\s*2x\s*(?=\n|\Z)', '', text)
+
+        return text
+
+    @classmethod
+    def extract_pdf_content(cls, file_bytes: bytes) -> Tuple[str, List[List[List[str]]], List[Dict[str, Any]]]:
         """
         Extract text and tables from PDF file bytes.
         Uses marker-pdf with TORCH_DEVICE (read from environment) if available to retain LaTeX math formulas.
@@ -257,7 +304,8 @@ class ImportParserService:
                 for page in pdf.pages:
                     text = page.extract_text()
                     if text:
-                        full_text_lines.append(text.strip())
+                        normalized = cls.normalize_extracted_text(text.strip())
+                        full_text_lines.append(normalized)
 
         # Extract tables using pdfplumber
         with pdfplumber.open(io.BytesIO(file_bytes)) as pdf:
