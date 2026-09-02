@@ -111,7 +111,9 @@ export default function ExercisePreviewModal({ exercise, isOpen, onClose }) {
     }, 1200);
   };
 
-  const questions = exerciseDetail?.questions || [];
+  const questions = (exerciseDetail?.questions || [])
+    .slice()
+    .sort((a, b) => (a.display_order || 0) - (b.display_order || 0));
   const questionCountText = `${questions.length || exercise.total_questions || 0} câu hỏi`;
   const durationText = exerciseDetail?.ai_metadata?.duration || exercise.duration;
 
@@ -173,7 +175,7 @@ export default function ExercisePreviewModal({ exercise, isOpen, onClose }) {
                     <span className="q-number">Câu {q.display_order || idx + 1}:</span>
                     <div style={{ flex: 1 }}>
                       <div className="q-text">
-                        <MathRenderer text={q.content_latex || q.content} />
+                        <MathRenderer text={q.content || q.content_latex} />
                       </div>
                       <div style={{ display: 'flex', gap: '6px', marginTop: '6px', alignItems: 'center' }}>
                         {isTrueFalse && (

@@ -15,6 +15,7 @@ from models.models import User
 from app.modules.auth.dependencies import require_perm, get_current_user
 from app.modules.exercise.schemas import (
     ExerciseCreate, ExerciseUpdate, ExerciseOut,
+    PaginatedExerciseOut, CursorPaginatedExerciseOut,
     QuestionCreate, QuestionOut, AnswerOptionCreate
 )
 from app.modules.exercise.services.exercise_service import ExerciseService
@@ -55,18 +56,30 @@ def create_exercise(
 
 @router.get(
     "",
-    response_model=List[ExerciseOut],
+    response_model=CursorPaginatedExerciseOut,
     dependencies=[Depends(require_perm("EXE_EXERCISE_VIEW"))]
 )
 def list_exercises(
     subject_id: Optional[UUID] = Query(None, description="Filter by subject ID"),
+    search: Optional[str] = Query(None, description="Search exercises by title"),
+    cursor: Optional[str] = Query(None, description="Keyset pagination cursor token"),
+    direction: str = Query("next", description="Pagination direction: next or prev"),
+    page_size: int = Query(6, ge=1, le=100, description="Page size (default 6)"),
     service: ExerciseService = Depends(get_exercise_service),
     current_user: User = Depends(get_current_user)
 ):
     """
-    List exercises within the user's teaching scope. Requires EXE_EXERCISE_VIEW permission.
+    List exercises within the user's teaching scope with Keyset / Cursor-based pagination (zero OFFSET).
+    Requires EXE_EXERCISE_VIEW permission.
     """
-    return service.list_exercises(current_user, subject_id=subject_id)
+    return service.list_exercises(
+        current_user,
+        subject_id=subject_id,
+        search=search,
+        cursor=cursor,
+        direction=direction,
+        page_size=page_size
+    )
 
 
 @router.get(
@@ -234,16 +247,22 @@ async def import_questions(
 
     # 4. Clear old questions of this exercise before re-importing
     existing_exercise = exercise_service.get_exercise_detail(current_user, exercise_id)
-    if existing_exercise.questions:
+    if existing_exercise and existing_exercise.questions:
         for old_q in existing_exercise.questions:
             old_q.status = "DELETED"
-        get_db_session = question_service.db
-        get_db_session.flush()
+        question_service.db.commit()
 
-    # 5. Insert newly imported questions in transaction
+    # 5. Sort questions strictly by Part and question_number before inserting into database
+    sorted_questions = sorted(
+        parse_result.questions,
+        key=lambda q: (
+            1 if q.part == "Part1" else 2 if q.part == "Part2" else 3 if q.part == "Part3" else 4,
+            q.question_number or 0
+        )
+    )
+
     created_questions = []
-    for parsed_q in parse_result.questions:
-
+    for idx, parsed_q in enumerate(sorted_questions, start=1):
         options_create = [
             AnswerOptionCreate(
                 content=opt.content,
@@ -262,7 +281,7 @@ async def import_questions(
             question_type=parsed_q.question_type,
             difficulty=parsed_q.difficulty,
             correct_answer=parsed_q.correct_answer,
-            display_order=parsed_q.question_number,
+            display_order=idx,
             image_url=parsed_q.image_url,
             answer_options=options_create if options_create else None
         )

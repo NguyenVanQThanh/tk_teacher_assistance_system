@@ -208,6 +208,27 @@ class ExerciseOut(BaseModel):
     model_config = {"from_attributes": True}
 
 
+class PaginatedExerciseOut(BaseModel):
+    items: List[ExerciseOut]
+    total: int
+    page: int
+    page_size: int
+    total_pages: int
+
+    model_config = {"from_attributes": True}
+
+
+class CursorPaginatedExerciseOut(BaseModel):
+    items: List[ExerciseOut]
+    page_size: int
+    next_cursor: Optional[str] = None
+    prev_cursor: Optional[str] = None
+    has_more: bool
+    total: int
+
+    model_config = {"from_attributes": True}
+
+
 class AssignmentCreate(BaseModel):
     exercise_id: UUID = Field(..., description="Exercise UUID")
     due_at: datetime = Field(..., description="Assignment due date")

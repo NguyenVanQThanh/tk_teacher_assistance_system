@@ -24,7 +24,8 @@ import {
   Search,
   FolderOpen,
   Loader2,
-  FileCheck
+  FileCheck,
+  Lock
 } from 'lucide-react';
 import { exercisesApi, subjectsApi } from '../../services/api';
 import './CreateExerciseModal.css';
@@ -44,6 +45,8 @@ export default function CreateExerciseModal({ isOpen, onClose, onCreateSuccess }
   const [testCode, setTestCode] = useState('');
 
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [progressPercent, setProgressPercent] = useState(0);
+  const [progressStage, setProgressStage] = useState('');
   const [errorMsg, setErrorMsg] = useState('');
   const [subjectsList, setSubjectsList] = useState([]);
 
@@ -90,29 +93,24 @@ export default function CreateExerciseModal({ isOpen, onClose, onCreateSuccess }
       }
     }
     loadSubjects();
+    document.addEventListener('mousedown', handleClickOutside);
     return () => {
       isMounted = false;
+      document.removeEventListener('mousedown', handleClickOutside);
     };
   }, []);
 
   // Close document dropdown when clicking outside
-  useEffect(() => {
-    function handleClickOutside(event) {
-      if (docDropdownRef.current && !docDropdownRef.current.contains(event.target)) {
-        setIsDocDropdownOpen(false);
-      }
+  function handleClickOutside(event) {
+    if (docDropdownRef.current && !docDropdownRef.current.contains(event.target)) {
+      setIsDocDropdownOpen(false);
     }
-    if (isDocDropdownOpen) {
-      document.addEventListener('mousedown', handleClickOutside);
-    }
-    return () => {
-      document.removeEventListener('mousedown', handleClickOutside);
-    };
-  }, [isDocDropdownOpen]);
+  }
 
   if (!isOpen) return null;
 
   const handleClose = () => {
+    if (isSubmitting) return; // Prevent closing while processing OCR
     setCurrentStep('select_method');
     setTitle('');
     setAiPrompt('');
@@ -125,6 +123,9 @@ export default function CreateExerciseModal({ isOpen, onClose, onCreateSuccess }
       shortAnswer: { recognize: 0, understand: 0, apply: 0 }
     });
     setSelectedDocIds([]);
+    setIsDocDropdownOpen(false);
+    setProgressPercent(0);
+    setProgressStage('');
     setErrorMsg('');
     setIsSubmitting(false);
     onClose();
@@ -151,31 +152,20 @@ export default function CreateExerciseModal({ isOpen, onClose, onCreateSuccess }
     }));
   };
 
-  const toggleDocumentSelection = (docId) => {
-    setSelectedDocIds((prev) => 
-      prev.includes(docId) 
-        ? prev.filter((id) => id !== docId)
-        : [...prev, docId]
-    );
+  const calculateTotalQuestions = () => {
+    let total = 0;
+    Object.keys(questionCounts).forEach((cat) => {
+      Object.keys(questionCounts[cat]).forEach((lvl) => {
+        total += questionCounts[cat][lvl];
+      });
+    });
+    return total;
   };
-
-  const removeSelectedDocument = (docId, e) => {
-    e.stopPropagation();
-    setSelectedDocIds((prev) => prev.filter((id) => id !== docId));
-  };
-
-  const filteredDocs = availableDocuments.filter((doc) =>
-    doc.title.toLowerCase().includes(docSearchQuery.toLowerCase().trim()) ||
-    doc.tag.toLowerCase().includes(docSearchQuery.toLowerCase().trim())
-  );
 
   const handleStartAiGeneration = (e) => {
     e.preventDefault();
 
-    const totalQuestions = 
-      Object.values(questionCounts.mcq).reduce((a, b) => a + b, 0) +
-      Object.values(questionCounts.tf).reduce((a, b) => a + b, 0) +
-      Object.values(questionCounts.shortAnswer).reduce((a, b) => a + b, 0);
+    const totalQuestions = calculateTotalQuestions();
 
     if (totalQuestions === 0 && !aiPrompt.trim()) {
       setErrorMsg('Vui lòng thiết lập số lượng câu hỏi hoặc nhập mô tả yêu cầu.');
@@ -226,9 +216,32 @@ export default function CreateExerciseModal({ isOpen, onClose, onCreateSuccess }
       return;
     }
 
+    let progressTimer = null;
     try {
       setIsSubmitting(true);
       setErrorMsg('');
+      setProgressPercent(8);
+      setProgressStage('Đang khởi tạo tác vụ và tải tài liệu lên máy chủ...');
+
+      // Dynamic progress ticker with friendly teacher-oriented stages
+      progressTimer = setInterval(() => {
+        setProgressPercent((prev) => {
+          if (prev < 25) {
+            setProgressStage('Đang đọc file và chuẩn bị các trang đề thi sắc nét...');
+            return prev + 3;
+          } else if (prev < 68) {
+            setProgressStage('Đang đọc kỹ từng câu hỏi, hình vẽ & công thức Toán học...');
+            return prev + 2;
+          } else if (prev < 88) {
+            setProgressStage('Đang đối chiếu bảng đáp án và hoàn thiện đề thi...');
+            return prev + 1;
+          } else if (prev < 96) {
+            setProgressStage('Đang lưu bài tập vào kho tài nguyên của Thầy/Cô...');
+            return prev + 0.5;
+          }
+          return prev;
+        });
+      }, 280);
 
       const finalTitle = title.trim() || uploadedFile.name.replace(/\.[^/.]+$/, '');
       const targetSubjectId = subjectsList.length > 0 ? subjectsList[0].subject_id : subject;
@@ -244,7 +257,7 @@ export default function CreateExerciseModal({ isOpen, onClose, onCreateSuccess }
         },
       });
 
-      // Step 2: Upload file(s) to bulk import & parse questions
+      // Step 2: Upload file(s) to bulk import & parse questions with Gemini Vision
       const formData = new FormData();
       formData.append('question_file', uploadedFile);
       if (answerFile) {
@@ -255,6 +268,12 @@ export default function CreateExerciseModal({ isOpen, onClose, onCreateSuccess }
       }
 
       const importedQuestions = await exercisesApi.importQuestions(newEx.exercise_id, formData);
+
+      if (progressTimer) clearInterval(progressTimer);
+      setProgressPercent(100);
+      setProgressStage('Bóc tách hoàn tất! Đang mở bài tập cho Thầy/Cô...');
+
+      await new Promise(r => setTimeout(r, 600));
 
       const createdExercise = {
         id: newEx.exercise_id,
@@ -276,9 +295,13 @@ export default function CreateExerciseModal({ isOpen, onClose, onCreateSuccess }
       }
       handleClose();
     } catch (err) {
+      if (progressTimer) clearInterval(progressTimer);
       setErrorMsg(err.response?.data?.detail?.message || 'Có lỗi xảy ra khi tải lên và bóc tách câu hỏi từ file.');
     } finally {
+      if (progressTimer) clearInterval(progressTimer);
       setIsSubmitting(false);
+      setProgressPercent(0);
+      setProgressStage('');
     }
   };
 
@@ -287,7 +310,43 @@ export default function CreateExerciseModal({ isOpen, onClose, onCreateSuccess }
       <div 
         className={`creation-modal-wrapper ${currentStep === 'ai' ? 'modal-ai-mode' : ''}`} 
         onClick={(e) => e.stopPropagation()}
+        style={{ position: 'relative' }}
       >
+        {/* ================= FULL MODAL OCR PROCESSING OVERLAY (SCREEN LOCK) ================= */}
+        {isSubmitting && (
+          <div className="modal-ocr-loading-overlay">
+            <div className="ocr-loading-icon-wrapper">
+              <div className="ocr-loading-spinner" />
+              <Sparkles className="ocr-loading-sparkle" size={32} />
+            </div>
+
+            <div className="ocr-progress-percent-display">
+              {Math.min(100, Math.floor(progressPercent))}%
+            </div>
+
+            <h3 className="ocr-loading-heading">
+              Đang bóc tách và chuẩn hóa đề thi
+            </h3>
+
+            <div className="ocr-progress-bar-container">
+              <div className="ocr-progress-track">
+                <div 
+                  className="ocr-progress-fill" 
+                  style={{ width: `${Math.min(100, Math.floor(progressPercent))}%` }} 
+                />
+              </div>
+            </div>
+
+            <p className="ocr-stage-description">
+              {progressStage}
+            </p>
+
+            <div className="ocr-lock-banner">
+              <span>☕ Thầy/Cô đợi xíu nhé, hệ thống đang xử lý bài tập và tạm khóa màn hình để tránh gián đoạn dữ liệu ạ.</span>
+            </div>
+          </div>
+        )}
+
         {/* ================= STEP 1: METHOD SELECTION ================= */}
         {currentStep === 'select_method' && (
           <div className="method-selection-view">

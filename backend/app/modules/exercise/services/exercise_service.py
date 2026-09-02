@@ -5,7 +5,7 @@
 # Updated At: 2026-07-31
 # Updated By: Tam Khang
 
-from typing import List, Optional
+from typing import List, Optional, Dict, Any
 from uuid import UUID
 from fastapi import HTTPException, status
 from sqlalchemy.orm import Session
@@ -65,23 +65,67 @@ class ExerciseService:
         )
         return self.repo.create(exercise)
 
-    def list_exercises(self, current_user: User, subject_id: Optional[UUID] = None) -> List[Exercise]:
+    def list_exercises(
+        self,
+        current_user: User,
+        subject_id: Optional[UUID] = None,
+        search: Optional[str] = None,
+        cursor: Optional[str] = None,
+        direction: str = "next",
+        page_size: int = 6
+    ) -> Dict[str, Any]:
         role_name = get_user_role_name(self.db, current_user)
         
         if role_name == "Admin":
             if subject_id:
-                return self.repo.list_exercises(subject_ids=[subject_id], status='ACTIVE')
-            return self.repo.list_exercises(status='ACTIVE')
-        
-        # For Teacher: restrict to created_by OR teacher_subjects
-        active_subject_ids = self._get_teacher_active_subject_ids(current_user.user_id)
-        if subject_id:
-            if subject_id not in active_subject_ids:
-                # Can only see if created by self for that subject
-                return self.repo.list_exercises(created_by=current_user.user_id, subject_ids=[subject_id], status='ACTIVE')
-            return self.repo.list_exercises(subject_ids=[subject_id], status='ACTIVE')
-        
-        return self.repo.list_exercises(created_by=current_user.user_id, subject_ids=active_subject_ids, status='ACTIVE')
+                return self.repo.list_exercises(
+                    subject_ids=[subject_id],
+                    status='ACTIVE',
+                    search=search,
+                    cursor=cursor,
+                    direction=direction,
+                    page_size=page_size
+                )
+            return self.repo.list_exercises(
+                status='ACTIVE',
+                search=search,
+                cursor=cursor,
+                direction=direction,
+                page_size=page_size
+            )
+        else:
+            # For Teacher: restrict to created_by OR teacher_subjects
+            active_subject_ids = self._get_teacher_active_subject_ids(current_user.user_id)
+            if subject_id:
+                if subject_id not in active_subject_ids:
+                    # Can only see if created by self for that subject
+                    return self.repo.list_exercises(
+                        created_by=current_user.user_id,
+                        subject_ids=[subject_id],
+                        status='ACTIVE',
+                        search=search,
+                        cursor=cursor,
+                        direction=direction,
+                        page_size=page_size
+                    )
+                return self.repo.list_exercises(
+                    subject_ids=[subject_id],
+                    status='ACTIVE',
+                    search=search,
+                    cursor=cursor,
+                    direction=direction,
+                    page_size=page_size
+                )
+
+            return self.repo.list_exercises(
+                created_by=current_user.user_id,
+                subject_ids=active_subject_ids,
+                status='ACTIVE',
+                search=search,
+                cursor=cursor,
+                direction=direction,
+                page_size=page_size
+            )
 
     def get_exercise_detail(self, current_user: User, exercise_id: UUID) -> Exercise:
         role_name = get_user_role_name(self.db, current_user)
