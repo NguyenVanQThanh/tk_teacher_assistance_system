@@ -2,16 +2,25 @@
 File Name: env.py
 Description: Alembic migration environment configuration.
 Created At: 2026-07-04
-Created By: Nguyen-Thai-Tam-Khang
-Updated At: 2026-07-07
-Updated By: Nguyen-Thai-Tam-Khang
+Created By: Tam Khang
+Updated At: 2026-09-02
+Updated By: Tam Khang
 """
+import sys
+import os
 from logging.config import fileConfig
+from dotenv import load_dotenv
 
 from sqlalchemy import engine_from_config
 from sqlalchemy import pool
 
 from alembic import context
+
+# Ensure Alembic finds the root directory of the project
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+
+# Load environment variables from .env
+load_dotenv(os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '.env')))
 
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.
@@ -22,21 +31,24 @@ config = context.config
 if config.config_file_name is not None:
     fileConfig(config.config_file_name)
 
+# Dynamic DB URL configuration from environment
+db_url = os.environ.get("DATABASE_URL")
+if not db_url:
+    db_user = os.environ.get("DB_USERNAME")
+    db_pass = os.environ.get("DB_PASSWORD")
+    db_host = os.environ.get("DB_HOST", "localhost")
+    db_port = os.environ.get("DB_PORT", "5432")
+    db_name = os.environ.get("DB_NAME")
+    if db_user and db_pass and db_name:
+        db_url = f"postgresql://{db_user}:{db_pass}@{db_host}:{db_port}/{db_name}"
+
+if db_url:
+    config.set_main_option("sqlalchemy.url", db_url)
+
 # add your model's MetaData object here
 # for 'autogenerate' support
-# from myapp import mymodel
-# target_metadata = mymodel.Base.metadata
-import sys
-import os
-
-# Ensure Alembic finds the root directory of the project
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
-# Import Base and all model classes
+import models.models  # noqa: F401
 from models.base import Base
-from models.models import (
-    User, Permission, RolePermission, UserPermission, 
-    Subject, Class, StudentClass, TeacherSubject, Document, Role
-)
 
 # Assign metadata for Alembic detection
 target_metadata = Base.metadata

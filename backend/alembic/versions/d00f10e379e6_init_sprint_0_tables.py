@@ -2,9 +2,9 @@
 File Name: d00f10e379e6_init_sprint_0_tables.py
 Description: Initial migration for Sprint 0 tables including users, roles, permissions, subjects, classes, and documents.
 Created At: 2026-07-04
-Created By: Nguyen-Thai-Tam-Khang
-Updated At: 2026-07-17
-Updated By: Nguyen-Thai-Tam-Khang
+Created By: Tam Khang
+Updated At: 2026-09-02
+Updated By: Tam Khang
 
 Revision ID: d00f10e379e6
 Revises: None
@@ -52,7 +52,6 @@ def upgrade() -> None:
     sa.Column('subject_id', sa.UUID(), nullable=False),
     sa.Column('subject_name', sa.String(length=100), nullable=False),
     sa.Column('description', sa.Text(), nullable=True),
-    sa.Column('is_deleted', sa.Boolean(), server_default=sa.text('false'), nullable=False),
     sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=True),
     sa.Column('updated_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=True),
     sa.PrimaryKeyConstraint('subject_id'),
@@ -87,7 +86,6 @@ def upgrade() -> None:
     sa.Column('class_name', sa.String(length=50), nullable=False),
     sa.Column('homeroom_teacher_id', sa.UUID(), nullable=True),
     sa.Column('academic_year', sa.String(length=20), nullable=True),
-    sa.Column('is_deleted', sa.Boolean(), server_default=sa.text('false'), nullable=False),
     sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=True),
     sa.Column('updated_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=True),
     sa.ForeignKeyConstraint(['homeroom_teacher_id'], ['users.user_id'], ondelete='SET NULL'),
@@ -124,7 +122,6 @@ def upgrade() -> None:
     sa.Column('student_id', sa.UUID(), nullable=False),
     sa.Column('class_id', sa.UUID(), nullable=False),
     sa.Column('student_code', sa.String(length=50), nullable=True),
-    sa.Column('is_deleted', sa.Boolean(), server_default=sa.text('false'), nullable=False),
     sa.ForeignKeyConstraint(['class_id'], ['classes.class_id'], ondelete='CASCADE'),
     sa.ForeignKeyConstraint(['student_id'], ['users.user_id'], ondelete='CASCADE'),
     sa.PrimaryKeyConstraint('student_id', 'class_id'),
@@ -134,7 +131,6 @@ def upgrade() -> None:
     sa.Column('teacher_id', sa.UUID(), nullable=False),
     sa.Column('class_id', sa.UUID(), nullable=False),
     sa.Column('subject_id', sa.UUID(), nullable=False),
-    sa.Column('is_deleted', sa.Boolean(), server_default=sa.text('false'), nullable=False),
     sa.ForeignKeyConstraint(['class_id'], ['classes.class_id'], ondelete='CASCADE'),
     sa.ForeignKeyConstraint(['subject_id'], ['subjects.subject_id'], ondelete='CASCADE'),
     sa.ForeignKeyConstraint(['teacher_id'], ['users.user_id'], ondelete='CASCADE'),

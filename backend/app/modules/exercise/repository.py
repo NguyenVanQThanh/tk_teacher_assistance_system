@@ -5,8 +5,12 @@
 # Updated At: 2026-07-31
 # Updated By: Tam Khang
 
-from typing import List, Optional, Any
+from typing import List, Optional, Any, Tuple, Dict
 from uuid import UUID
+from datetime import datetime
+import base64
+from fastapi import HTTPException, status
+from sqlalchemy import and_, or_
 from sqlalchemy.orm import Session, joinedload
 from models.models import Exercise, Question, AnswerOption, ClassAssignment, StudentExerciseAttempt
 
@@ -17,6 +21,25 @@ class ExerciseRepository:
 
     def __init__(self, db: Session):
         self.db = db
+
+    @staticmethod
+    def encode_cursor(created_at: datetime, exercise_id: UUID) -> str:
+        """Encodes created_at and exercise_id into URL-safe base64 cursor token."""
+        token = f"{created_at.isoformat()}|{str(exercise_id)}"
+        return base64.urlsafe_b64encode(token.encode("utf-8")).decode("utf-8")
+
+    @staticmethod
+    def decode_cursor(cursor_str: str) -> Tuple[datetime, UUID]:
+        """Decodes URL-safe base64 cursor token into created_at and exercise_id."""
+        try:
+            raw = base64.urlsafe_b64decode(cursor_str.encode("utf-8")).decode("utf-8")
+            dt_str, id_str = raw.split("|", 1)
+            return datetime.fromisoformat(dt_str), UUID(id_str)
+        except Exception:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail={"code": "ERR-EXE-INVALID_CURSOR", "message": "Invalid pagination cursor."}
+            )
 
     def create(self, exercise: Exercise) -> Exercise:
         """Create a new Exercise record in the database."""
@@ -39,25 +62,94 @@ class ExerciseRepository:
         self,
         subject_ids: Optional[List[UUID]] = None,
         created_by: Optional[UUID] = None,
-        status: Optional[str] = "ACTIVE"
-    ) -> List[Exercise]:
-        """List exercises filtered by status, subject IDs, or creator UUID."""
-        query = self.db.query(Exercise).options(
-            joinedload(Exercise.questions).joinedload(Question.answer_options)
-        )
+        status: Optional[str] = "ACTIVE",
+        search: Optional[str] = None,
+        cursor: Optional[str] = None,
+        direction: str = "next",
+        page_size: int = 6,
+    ) -> Dict[str, Any]:
+        """
+        List exercises using Keyset / Cursor-based Pagination (zero OFFSET) for O(1) query performance.
+        Keyset tuple: (created_at DESC, exercise_id DESC)
+        """
+        base_query = self.db.query(Exercise)
         if status is not None:
-            query = query.filter(Exercise.status == status)
+            base_query = base_query.filter(Exercise.status == status)
         
         if created_by and subject_ids is not None:
-            query = query.filter(
+            base_query = base_query.filter(
                 (Exercise.created_by == created_by) | (Exercise.subject_id.in_(subject_ids))
             )
         elif created_by:
-            query = query.filter(Exercise.created_by == created_by)
+            base_query = base_query.filter(Exercise.created_by == created_by)
         elif subject_ids is not None:
-            query = query.filter(Exercise.subject_id.in_(subject_ids))
-            
-        return query.order_by(Exercise.created_at.desc()).all()
+            base_query = base_query.filter(Exercise.subject_id.in_(subject_ids))
+
+        if search:
+            search_clean = search.strip()
+            if search_clean:
+                base_query = base_query.filter(Exercise.title.ilike(f"%{search_clean}%"))
+
+        total = base_query.count()
+
+        item_query = base_query.options(
+            joinedload(Exercise.questions).joinedload(Question.answer_options)
+        )
+
+        # Apply Keyset cursor condition (ZERO OFFSET)
+        if cursor:
+            cursor_dt, cursor_id = self.decode_cursor(cursor)
+            if direction == "prev":
+                # Moving backwards (newer items)
+                item_query = item_query.filter(
+                    or_(
+                        Exercise.created_at > cursor_dt,
+                        and_(Exercise.created_at == cursor_dt, Exercise.exercise_id > cursor_id)
+                    )
+                ).order_by(Exercise.created_at.asc(), Exercise.exercise_id.asc())
+            else:
+                # Moving forwards (older items)
+                item_query = item_query.filter(
+                    or_(
+                        Exercise.created_at < cursor_dt,
+                        and_(Exercise.created_at == cursor_dt, Exercise.exercise_id < cursor_id)
+                    )
+                ).order_by(Exercise.created_at.desc(), Exercise.exercise_id.desc())
+        else:
+            item_query = item_query.order_by(Exercise.created_at.desc(), Exercise.exercise_id.desc())
+
+        # Fetch page_size + 1 items to check has_more without an extra count query
+        fetched_items = item_query.limit(page_size + 1).all()
+
+        if direction == "prev":
+            fetched_items.reverse()
+
+        has_more = len(fetched_items) > page_size
+        items = fetched_items[:page_size]
+
+        next_cursor = None
+        prev_cursor = None
+
+        if items:
+            if has_more and direction == "next":
+                last_item = items[-1]
+                next_cursor = self.encode_cursor(last_item.created_at, last_item.exercise_id)
+            elif cursor and direction == "prev":
+                last_item = items[-1]
+                next_cursor = self.encode_cursor(last_item.created_at, last_item.exercise_id)
+
+            first_item = items[0]
+            if cursor or direction == "prev":
+                prev_cursor = self.encode_cursor(first_item.created_at, first_item.exercise_id)
+
+        return {
+            "items": items,
+            "page_size": page_size,
+            "next_cursor": next_cursor,
+            "prev_cursor": prev_cursor,
+            "has_more": has_more,
+            "total": total
+        }
 
     def update(self, exercise: Exercise, title: Optional[str] = None, ai_metadata: Optional[dict] = None) -> Exercise:
         """Update title or AI metadata of an Exercise."""

@@ -2,7 +2,7 @@
 # Description: Service for extracting text/images and parsing question templates and answer keys (Docx/PDF).
 # Created At: 2026-08-09
 # Created By: Tam Khang
-# Updated At: 2026-08-12
+# Updated At: 2026-09-02
 # Updated By: Tam Khang
 
 import os
@@ -11,8 +11,11 @@ import io
 import uuid
 from typing import List, Optional, Dict, Any, Tuple
 from dataclasses import dataclass, field
+import logging
 import docx
 import pdfplumber
+
+logger = logging.getLogger("smartlms.exercise.parser")
 
 from app.modules.exercise.schemas import QuestionTypeEnum, DifficultyEnum
 
@@ -213,7 +216,8 @@ class ImportParserService:
     @staticmethod
     def normalize_extracted_text(text: str) -> str:
         """
-        Normalizes unicode superscripts, vectors, and mathematical notations in extracted text.
+        Normalizes unicode superscripts, vectors, and mathematical notations in extracted text,
+        wrapping standard math formulas and equations in LaTeX $...$ delimiters.
         """
         if not text:
             return text
@@ -228,35 +232,34 @@ class ImportParserService:
         text = re.sub(r'(\d+)\s*cm\s*([23])\b', r'\1cm^{\2}', text)
 
         # 3. Vector arrows: -> or -→ or \u2192
-        text = re.sub(r'([a-zA-Z])[\u20d7\u2192⃗]', r'$\\vec{\1}$', text)
-        text = re.sub(r'-\s*→|−\s*→|-->', '$\\vec{v}$', text)
+        text = re.sub(r'([a-zA-Z])[\u20d7\u2192⃗]', r'\\vec{\1}', text)
+        text = re.sub(r'[\u20d7\u2192⃗]([a-zA-Z])', r'\\vec{\1}', text)
+        text = re.sub(r'-\s*→|−\s*→|-->', r'\\vec{v}', text)
 
         # 4. Reconstruct broken 2D fraction layouts:
-        # Pattern: "Hàm số \n x^2 + 1 \n y = \n x - 1" -> "Hàm số y = \frac{x^2+1}{x-1}"
         text = re.sub(
-            r'Hàm\s+số\s*\n\s*([xyt0-9\^\{\}\+\-\s]+?)\s*\n\s*y\s*=\s*\.?\s*\n\s*([xyt0-9\^\{\}\+\-\s]+?)(?=\s*\n\s*Số|\s*\n\s*có)',
-            lambda m: f"Hàm số y = \\frac{{{m.group(1).strip()}}}{{{m.group(2).strip()}}} ",
+            r'Hàm\s+số\s*\n\s*([xyt0-9\^\{\}\+\-\s]+?)\s*\n\s*y\s*=\s*\.?\s*\n\s*([xyt0-9\^\{\}\+\-\s]+?)(?=\s*\n\s*Số|\s*\n\s*có|\s*\n\s*Đồ)',
+            lambda m: f"Hàm số $y = \\frac{{{m.group(1).strip()}}}{{{m.group(2).strip()}}}$ ",
             text,
             flags=re.IGNORECASE
         )
 
-        # Pattern: "f(x) = \n 2x \n Opt a) f'(x) = . \n x^2 + 1" or "f(x) = là: \n x^2 + 1"
         text = re.sub(
             r'f\s*\(\s*x\s*\)\s*=\s*là:\s*\n\s*([x0-9\^\{\}\+\-\s]+)',
-            lambda m: f"f(x) = \\frac{{2x}}{{{m.group(1).strip()}}} là: ",
+            lambda m: f"$f(x) = \\frac{{2x}}{{{m.group(1).strip()}}}$ là: ",
             text
         )
 
         text = re.sub(
             r'f\s*′\s*\(\s*x\s*\)\s*=\s*\.\s*\n\s*([x0-9\^\{\}\+\-\s]+)',
-            lambda m: f"f'(x) = \\frac{{2x}}{{{m.group(1).strip()}}} ",
+            lambda m: f"$f'(x) = \\frac{{2x}}{{{m.group(1).strip()}}}$ ",
             text
         )
 
-        # 5. Logarithm base broken onto next line: "log (x-1) < 3 là: \n 2" -> "\log_2(x-1) < 3 là:"
+        # 5. Logarithm base broken onto next line: "log (x-1) < 3 là: \n 2" -> "$\log_{2}(x-1) < 3$ là:"
         text = re.sub(
             r'(?i)\blog\s*\(([^)]+)\)\s*<\s*(\d+)\s*là:\s*\n\s*(\d+)',
-            r'\\log_{\3}(\1) < \2 là: ',
+            r'$\\log_{\3}(\1) < \2$ là: ',
             text
         )
 
@@ -331,8 +334,39 @@ class ImportParserService:
     ) -> ParseResult:
         """
         Main entry point to parse question document and optional separate answer key.
+        Integrates GeminiVisionParserService as top-priority AI OCR for PDFs with automatic fallback.
         """
         is_pdf = filename.lower().endswith(".pdf")
+
+        # 1. Try Gemini Multimodal Vision API first if available and file is PDF
+        if is_pdf:
+            try:
+                from app.modules.exercise.services.gemini_vision_parser_service import GeminiVisionParserService
+                if GeminiVisionParserService.is_available():
+                    logger.info("Using Google Gemini Multimodal Vision API for PDF OCR...")
+                    gemini_result = GeminiVisionParserService.parse_pdf_document(file_bytes, test_code=test_code)
+                    if gemini_result.questions and not gemini_result.errors:
+                        # If a separate answer key file was uploaded, merge answer keys
+                        if answer_file_bytes and answer_filename:
+                            if answer_filename.lower().endswith(".pdf"):
+                                ans_text, ans_tables, _ = cls.extract_pdf_content(answer_file_bytes)
+                            else:
+                                ans_text, ans_tables, _ = cls.extract_docx_content(answer_file_bytes)
+                            
+                            if ans_text or ans_tables:
+                                parsed_answers = cls.parse_answer_keys(ans_text, ans_tables, test_code)
+                                if parsed_answers:
+                                    merged_q, merge_errs = cls.merge_questions_and_answers(gemini_result.questions, parsed_answers)
+                                    if merged_q:
+                                        return ParseResult(questions=merged_q, errors=[])
+
+                        return gemini_result
+                    else:
+                        logger.warning(f"Gemini OCR did not return questions ({gemini_result.errors}). Falling back to local parser.")
+            except Exception as e:
+                logger.warning(f"Gemini Vision Parser encountered an error: {e}. Falling back to local parser.")
+
+        # 2. Local Fallback Parser (pdfplumber / docx + regex)
         if is_pdf:
             q_text, q_tables, q_images = cls.extract_pdf_content(file_bytes)
         else:
