@@ -1,8 +1,8 @@
 // File Name: Header.jsx
-// Description: Top global navigation header with brand logo, notifications popup, and rich user account profile dropdown.
+// Description: Global persistent Header component for Teacher role with notifications, profile popover, and Q&A discussion modal.
 // Created At: 2026-08-30
 // Created By: Tam Khang
-// Updated At: 2026-09-02
+// Updated At: 2026-09-13
 // Updated By: Tam Khang
 
 import React, { useState, useRef, useEffect } from 'react';
@@ -19,8 +19,11 @@ import {
 } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
+import { getTeacherProfileDefaults } from '../../utils/teacherSubjectHelper';
 import NotificationDropdown from './NotificationDropdown';
 import TeacherProfileModal from '../teacher/TeacherProfileModal';
+import QADiscussionModal from './QADiscussionModal';
+import AllNotificationsModal from './AllNotificationsModal';
 import './Header.css';
 
 export default function Header({ onToggleSidebar }) {
@@ -29,6 +32,8 @@ export default function Header({ onToggleSidebar }) {
   const [showNotifications, setShowNotifications] = useState(false);
   const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
   const [modalInitialTab, setModalInitialTab] = useState('profile');
+  const [isQAModalOpen, setIsQAModalOpen] = useState(false);
+  const [isAllNotifsModalOpen, setIsAllNotifsModalOpen] = useState(false);
   const navigate = useNavigate();
 
   const notifRef = useRef(null);
@@ -55,9 +60,10 @@ export default function Header({ onToggleSidebar }) {
     navigate('/login');
   };
 
+  const teacherDefaults = getTeacherProfileDefaults(user);
   const displayName = user?.full_name ? `GV. ${user.full_name}` : 'GV. Giáo viên Mẫu';
   const displayEmail = user?.email || 'giaovien.mau@eduglobal.edu.vn';
-  const displayRole = user?.role === 'Teacher' ? 'Giáo viên bộ môn Toán - Tin' : 'Giáo viên Chủ nhiệm';
+  const displayRole = teacherDefaults.position;
   const initial = user?.full_name ? user.full_name.split(' ').map(n => n[0]).slice(-2).join('').toUpperCase() : 'GM';
 
   return (
@@ -96,12 +102,21 @@ export default function Header({ onToggleSidebar }) {
                 right: '-40px',
                 zIndex: 100
               }}>
-                <NotificationDropdown onClose={() => setShowNotifications(false)} />
+                <NotificationDropdown 
+                  onClose={() => setShowNotifications(false)} 
+                  onOpenQA={() => setIsQAModalOpen(true)}
+                  onOpenAllNotifs={() => setIsAllNotifsModalOpen(true)}
+                />
               </div>
             )}
           </div>
 
-          <button className="icon-btn" aria-label="Help">
+          <button 
+            className="icon-btn" 
+            aria-label="Help"
+            title="Giải đáp thắc mắc học sinh"
+            onClick={() => setIsQAModalOpen(true)}
+          >
             <HelpCircle size={19} />
           </button>
 
@@ -200,6 +215,22 @@ export default function Header({ onToggleSidebar }) {
         isOpen={isProfileModalOpen}
         onClose={() => setIsProfileModalOpen(false)}
         defaultTab={modalInitialTab}
+      />
+
+      {/* Interactive Q&A Discussion Modal */}
+      <QADiscussionModal
+        isOpen={isQAModalOpen}
+        onClose={() => setIsQAModalOpen(false)}
+      />
+
+      {/* Fullscreen All Notifications Modal Dialog */}
+      <AllNotificationsModal
+        isOpen={isAllNotifsModalOpen}
+        onClose={() => setIsAllNotifsModalOpen(false)}
+        onOpenQA={() => {
+          setIsAllNotifsModalOpen(false);
+          setIsQAModalOpen(true);
+        }}
       />
     </>
   );

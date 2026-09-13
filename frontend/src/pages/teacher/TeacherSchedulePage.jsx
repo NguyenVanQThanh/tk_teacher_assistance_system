@@ -2,7 +2,7 @@
 // Description: Teaching Schedule interface with interactive calendar, urgency color bars, equal-sized grid cells, horizontal urgency legend, and detailed daily timeline.
 // Created At: 2026-09-01
 // Created By: Tam Khang
-// Updated At: 2026-09-02
+// Updated At: 2026-09-13
 // Updated By: Tam Khang
 
 import React, { useState, useMemo } from 'react';
@@ -560,8 +560,10 @@ export default function TeacherSchedulePage() {
             {/* Notes & Reminders Widget */}
             <div className="notes-card-widget">
               <div className="notes-card-header">
-                <h4 className="notes-heading">Ghi chú & Nhắc nhở</h4>
-                <span className="notes-counter">{notes.length}</span>
+                <div className="notes-header-left">
+                  <h4 className="notes-heading">Ghi chú & Nhắc nhở</h4>
+                  <span className="notes-counter">{notes.length}</span>
+                </div>
               </div>
 
               {/* Add note inline form */}

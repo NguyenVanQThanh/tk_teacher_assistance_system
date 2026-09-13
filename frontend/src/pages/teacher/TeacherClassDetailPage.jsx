@@ -15,11 +15,14 @@ import {
 } from 'lucide-react';
 import { Link, useParams, useNavigate } from 'react-router-dom';
 import StudentDetailModal from '../../components/teacher/StudentDetailModal';
-import { classesApi } from '../../services/api';
+import { classesApi, subjectsApi } from '../../services/api';
+import { useAuth } from '../../context/AuthContext';
+import { getTeacherSubjectInfo, getSubjectIdByName } from '../../utils/teacherSubjectHelper';
 import './TeacherClassDetailPage.css';
 
 export default function TeacherClassDetailPage() {
   const { classId } = useParams();
+  const { user } = useAuth();
   const [showSidebar, setShowSidebar] = useState(true);
   const [searchStudent, setSearchStudent] = useState('');
   const [showAll, setShowAll] = useState(false);
@@ -40,35 +43,64 @@ export default function TeacherClassDetailPage() {
         setLoading(true);
         setError(null);
 
-        // Fetch class detail and students list concurrently
-        const [classRes, studentsRes] = await Promise.allSettled([
+        // Fetch class detail, teacher subjects, subjects list, and students concurrently
+        const [classRes, studentsRes, teacherAssignRes, subjectsRes] = await Promise.allSettled([
           classesApi.getClassDetail(classId),
-          classesApi.getStudentsInClass(classId)
+          classesApi.getStudentsInClass(classId),
+          classesApi.getTeacherSubjects(classId).catch(() => []),
+          subjectsApi.getSubjects().catch(() => [])
         ]);
 
         if (!isMounted) return;
 
+        // Resolve teacher's subject for this class
+        let teacherSubjName = '';
+        let teacherSubjId = '';
+
+        if (teacherAssignRes.status === 'fulfilled' && Array.isArray(teacherAssignRes.value) && user?.user_id) {
+          const myAssign = teacherAssignRes.value.find(a => a.teacher_id === user.user_id);
+          if (myAssign && subjectsRes.status === 'fulfilled' && Array.isArray(subjectsRes.value)) {
+            const foundSub = subjectsRes.value.find(s => s.subject_id === myAssign.subject_id);
+            if (foundSub) {
+              teacherSubjName = foundSub.subject_name;
+              teacherSubjId = getSubjectIdByName(foundSub.subject_name);
+            }
+          }
+        }
+
+        // Fallback to profile-based subject helper if not found in assignments
+        if (!teacherSubjName) {
+          const profileSubj = getTeacherSubjectInfo(user);
+          teacherSubjName = profileSubj.subjectName;
+          teacherSubjId = profileSubj.subjectId;
+        }
+
         if (classRes.status === 'fulfilled' && classRes.value) {
           const rawCls = classRes.value;
           const gradeMatch = rawCls.class_name ? rawCls.class_name.match(/\b(10|11|12)\b/) : null;
-          const grade = gradeMatch ? gradeMatch[1] : '12';
+          const grade = gradeMatch ? gradeMatch[1] : '11';
 
           setClassInfo({
             id: rawCls.class_id,
             name: rawCls.class_name,
-            subjectName: rawCls.class_name.includes('Lý') ? 'Vật lý' : 'Toán học',
+            subject: teacherSubjId,
+            subjectName: teacherSubjName,
             gradeText: `Khối ${grade}`,
             term: rawCls.school_year ? `Năm học ${rawCls.school_year}` : 'Kì 1, 2023–2024',
             currentStudents: 0,
             maxStudents: 45,
           });
         } else {
-          // If fallback for demo mock class IDs (like '12a1')
+          // Fallback for demo mock class IDs (like '12a1', '11b2')
+          const gradeMatch = classId ? classId.match(/\b(10|11|12)\b/) : null;
+          const grade = gradeMatch ? gradeMatch[1] : '11';
+
           setClassInfo({
             id: classId,
             name: `Lớp ${classId.toUpperCase()}`,
-            subjectName: 'Toán học',
-            gradeText: 'Khối 12',
+            subject: teacherSubjId,
+            subjectName: teacherSubjName,
+            gradeText: `Khối ${grade}`,
             term: 'Kì 1, 2023–2024',
             currentStudents: 0,
             maxStudents: 45,
@@ -104,7 +136,7 @@ export default function TeacherClassDetailPage() {
     return () => {
       isMounted = false;
     };
-  }, [classId]);
+  }, [classId, user]);
 
   const filteredStudents = useMemo(() => {
     let list = students;

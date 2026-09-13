@@ -1,22 +1,28 @@
 // File Name: NotificationDropdown.jsx
-// Description: Notification dropdown popover matching Academic Clarity design specifications.
+// Description: Interactive notification popover matching the exact visual mockup design with Q&A and fullscreen notification dialog callback.
 // Created At: 2026-08-30
 // Created By: Tam Khang
-// Updated At: 2026-08-30
+// Updated At: 2026-09-13
 // Updated By: Tam Khang
 
 import React, { useState } from 'react';
-import { MessageSquare, Settings, CheckSquare } from 'lucide-react';
+import { MessageSquare, Settings, FileText } from 'lucide-react';
+import { useAuth } from '../../context/AuthContext';
 import './NotificationDropdown.css';
 
-export default function NotificationDropdown({ onClose }) {
-  const [notifications, setNotifications] = useState([
+export default function NotificationDropdown({ onClose, onOpenQA, onOpenAllNotifs, initialNotifications }) {
+  const { user } = useAuth();
+  const isTeacher = user?.role !== 'Student';
+
+  const defaultItems = [
     {
       id: 1,
       type: 'qa',
       title: 'Giải đáp thắc mắc',
-      content: 'Học sinh Lê Minh đã yêu cầu giải đáp thắc mắc về bài tập Hóa học.',
-      time: '15 phút trước',
+      content: isTeacher 
+        ? 'Học sinh Hoàng Anh đã gửi câu hỏi thắc mắc về bài tập Toán 12A1.' 
+        : 'Giáo viên đã phản hồi câu hỏi của bạn về bài tập Toán.',
+      time: '2 phút trước',
       unread: true,
       icon: MessageSquare,
       iconTheme: 'purple',
@@ -25,7 +31,7 @@ export default function NotificationDropdown({ onClose }) {
       id: 2,
       type: 'system',
       title: 'Bảo trì hệ thống',
-      content: 'Hệ thống: Lịch bảo trì định kỳ vào 23:00 tối nay.',
+      content: 'Hệ thống sẽ bảo trì định kỳ vào lúc 23:00 tối nay.',
       time: '1 giờ trước',
       unread: false,
       icon: Settings,
@@ -33,25 +39,33 @@ export default function NotificationDropdown({ onClose }) {
     },
     {
       id: 3,
-      type: 'submission',
-      title: 'Bài nộp mới',
-      content: 'Trần Thị B đã nộp bài Đề thi thử Hóa học #2.',
+      type: 'activity',
+      title: isTeacher ? 'Bài tập đã nộp' : 'Hoạt động học tập',
+      content: isTeacher 
+        ? 'Có 15 học sinh lớp 12A1 vừa hoàn thành bài tập trắc nghiệm Toán.' 
+        : 'Bạn có bài tập tạo sinh mới trong môn Tiếng Anh.',
       time: '3 giờ trước',
-      unread: false,
-      icon: CheckSquare,
-      iconTheme: 'blue',
+      unread: true,
+      icon: FileText,
+      iconTheme: 'purple',
     },
-  ]);
+  ];
+
+  const [notifications, setNotifications] = useState(initialNotifications || defaultItems);
 
   const handleMarkAllRead = (e) => {
     e.stopPropagation();
     setNotifications(prev => prev.map(n => ({ ...n, unread: false })));
   };
 
-  const handleItemClick = (id) => {
+  const handleItemClick = (item) => {
     setNotifications(prev =>
-      prev.map(n => (n.id === id ? { ...n, unread: false } : n))
+      prev.map(n => (n.id === item.id ? { ...n, unread: false } : n))
     );
+    if (item.type === 'qa' && onOpenQA) {
+      if (onClose) onClose();
+      onOpenQA();
+    }
   };
 
   return (
@@ -76,11 +90,11 @@ export default function NotificationDropdown({ onClose }) {
             <div
               key={item.id}
               className={`notif-item ${item.unread ? 'is-unread' : ''}`}
-              onClick={() => handleItemClick(item.id)}
+              onClick={() => handleItemClick(item)}
             >
               {/* Icon Container */}
               <div className={`notif-icon-circle ${item.iconTheme}`}>
-                <IconComponent size={20} strokeWidth={2} />
+                <IconComponent size={18} strokeWidth={2} />
               </div>
 
               {/* Text info */}
@@ -99,7 +113,14 @@ export default function NotificationDropdown({ onClose }) {
 
       {/* Footer */}
       <div className="notif-footer">
-        <button type="button" className="btn-view-all-notifs">
+        <button 
+          type="button" 
+          className="btn-view-all-notifs"
+          onClick={() => {
+            if (onClose) onClose();
+            if (onOpenAllNotifs) onOpenAllNotifs();
+          }}
+        >
           Xem tất cả thông báo
         </button>
       </div>

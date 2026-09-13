@@ -1,19 +1,24 @@
 // File Name: RecentSubmissionsTable.jsx
-// Description: Component listing recent student exercise submissions.
+// Description: Component listing recent student exercise submissions matching the visual dashboard mockup.
 // Created At: 2026-08-30
 // Created By: Tam Khang
-// Updated At: 2026-08-30
+// Updated At: 2026-09-07
 // Updated By: Tam Khang
 
 import React from 'react';
+import { useNavigate } from 'react-router-dom';
 import './RecentSubmissionsTable.css';
 
 export default function RecentSubmissionsTable({ onGradeSubmission }) {
+  const navigate = useNavigate();
+
   const submissions = [
     {
       id: 1,
       studentName: 'Trần Thị B',
       avatarInitial: 'TB',
+      avatarBg: '#E0E7FF',
+      avatarColor: '#4338CA',
       exerciseTitle: 'Đề thi thử Hóa học #2',
       submittedTime: '10 phút trước',
       status: 'submitted',
@@ -23,6 +28,8 @@ export default function RecentSubmissionsTable({ onGradeSubmission }) {
       id: 2,
       studentName: 'Lê Văn C',
       avatarInitial: 'LC',
+      avatarBg: '#FEF3C7',
+      avatarColor: '#D97706',
       exerciseTitle: 'Bài tập Toán Hình học',
       submittedTime: '1 giờ trước',
       status: 'late',
@@ -32,17 +39,10 @@ export default function RecentSubmissionsTable({ onGradeSubmission }) {
       id: 3,
       studentName: 'Phạm Hương D',
       avatarInitial: 'PD',
+      avatarBg: '#FCE7F3',
+      avatarColor: '#DB2777',
       exerciseTitle: 'Tiểu luận Lịch sử',
       submittedTime: 'Hôm qua, 15:30',
-      status: 'submitted',
-      statusLabel: 'Đã nộp',
-    },
-    {
-      id: 4,
-      studentName: 'Nguyễn Hoàng Long',
-      avatarInitial: 'NL',
-      exerciseTitle: 'Kiểm tra 15 phút Vật Lí',
-      submittedTime: 'Hôm qua, 11:20',
       status: 'submitted',
       statusLabel: 'Đã nộp',
     },
@@ -52,7 +52,13 @@ export default function RecentSubmissionsTable({ onGradeSubmission }) {
     <div className="recent-submissions-card">
       <div className="submissions-header">
         <h2 className="submissions-title">Bài nộp gần đây</h2>
-        <a href="#view-all" className="view-all-link">Xem tất cả</a>
+        <button 
+          type="button" 
+          className="view-all-link-btn"
+          onClick={() => navigate('/teacher/grading')}
+        >
+          Xem tất cả
+        </button>
       </div>
 
       <div className="table-responsive">
@@ -71,7 +77,10 @@ export default function RecentSubmissionsTable({ onGradeSubmission }) {
               <tr key={item.id}>
                 <td>
                   <div className="student-cell">
-                    <div className={`student-avatar-mini ${item.id}`}>
+                    <div 
+                      className="student-avatar-mini"
+                      style={{ backgroundColor: item.avatarBg, color: item.avatarColor }}
+                    >
                       {item.avatarInitial}
                     </div>
                     <span className="student-name">{item.studentName}</span>
@@ -86,8 +95,9 @@ export default function RecentSubmissionsTable({ onGradeSubmission }) {
                 </td>
                 <td>
                   <button 
+                    type="button"
                     className="btn-action-grade"
-                    onClick={() => onGradeSubmission && onGradeSubmission(item.id)}
+                    onClick={() => onGradeSubmission ? onGradeSubmission(item.id) : navigate('/teacher/grading')}
                   >
                     Chấm bài
                   </button>

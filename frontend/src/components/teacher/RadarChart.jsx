@@ -13,6 +13,7 @@ export default function RadarChart({
   classData = [8.5, 7.0, 9.0, 8.0, 6.5, 8.8],
   averageData = [6.5, 6.0, 7.5, 7.0, 7.0, 6.5],
   maxScore = 10,
+  classNameLabel = 'Lớp 12A1'
 }) {
   const center = size / 2;
   const radius = size * 0.35;
@@ -168,7 +169,7 @@ export default function RadarChart({
       <div style={{ display: 'flex', gap: '20px', marginTop: '10px', fontSize: '12px', color: '#64748b' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
           <span style={{ width: '10px', height: '10px', borderRadius: '50%', backgroundColor: '#7c3aed' }}></span>
-          <span style={{ fontWeight: 600, color: '#475569' }}>Lớp 12A1</span>
+          <span style={{ fontWeight: 600, color: '#475569' }}>{classNameLabel}</span>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
           <span style={{ width: '10px', height: '10px', borderRadius: '50%', backgroundColor: '#3b82f6' }}></span>

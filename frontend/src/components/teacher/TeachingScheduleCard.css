@@ -11,14 +11,17 @@ Updated By: Tam Khang
   background-color: #FFFFFF;
   border-radius: 12px;
   border: 1px solid #EBE8F0;
-  padding: 14px 18px;
+  padding: 18px 20px;
   box-sizing: border-box;
   display: flex;
   flex-direction: column;
-  height: 100%;
-  max-height: 100%;
-  min-height: 0;
   font-family: 'Be Vietnam Pro', sans-serif;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.02);
+  transition: transform 0.25s ease, box-shadow 0.25s ease;
+}
+
+.teaching-schedule-card:hover {
+  box-shadow: 0 6px 16px rgba(77, 48, 141, 0.06);
 }
 
 .schedule-header {

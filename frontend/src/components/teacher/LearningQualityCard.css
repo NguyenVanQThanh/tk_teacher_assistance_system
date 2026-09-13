@@ -1,54 +1,53 @@
 /*
 File Name: LearningQualityCard.css
-Description: Stylesheet for LearningQualityCard with expanded proportions and single-screen fit.
+Description: Stylesheet for LearningQualityCard with side-by-side radar chart and feedback notes panel.
 Created At: 2026-08-30
 Created By: Tam Khang
-Updated At: 2026-08-30
+Updated At: 2026-09-07
 Updated By: Tam Khang
 */
 
 .learning-quality-card {
   background-color: #FFFFFF;
-  border-radius: 12px;
+  border-radius: 16px;
   border: 1px solid #EBE8F0;
-  padding: 16px 20px;
+  padding: 20px 24px;
   box-sizing: border-box;
-  flex: 1.25;
   display: flex;
   flex-direction: column;
-  min-height: 0;
-  font-family: 'Be Vietnam Pro', sans-serif;
-  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.02);
-  transition: transform 0.25s ease, box-shadow 0.25s ease;
+  font-family: 'Be Vietnam Pro', -apple-system, BlinkMacSystemFont, sans-serif;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.02);
+  transition: box-shadow 0.2s ease;
 }
 
 .learning-quality-card:hover {
-  box-shadow: 0 8px 20px rgba(77, 48, 141, 0.06);
+  box-shadow: 0 6px 18px rgba(77, 48, 141, 0.05);
 }
 
 .card-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  margin-bottom: 8px;
-  height: 22px;
+  margin-bottom: 16px;
   flex-shrink: 0;
 }
 
 .card-title {
-  font-size: 17px;
-  font-weight: 700;
-  color: #1D1928;
-  line-height: 22px;
+  font-size: 18px;
+  font-weight: 800;
+  color: #1E1B4B;
+  line-height: 1.3;
+  margin: 0;
+  letter-spacing: -0.2px;
 }
 
 .icon-more-btn {
   background: transparent;
   border: none;
-  color: #4D308D;
+  color: #94A3B8;
   cursor: pointer;
-  padding: 2px;
-  border-radius: 4px;
+  padding: 6px;
+  border-radius: 6px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -57,66 +56,74 @@ Updated By: Tam Khang
 
 .icon-more-btn:hover {
   background-color: #F8F1FF;
+  color: #4D308D;
 }
 
+/* Two-pane side-by-side layout inside card */
 .quality-content-layout {
-  display: flex;
-  align-items: center;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
   gap: 20px;
-  flex: 1;
-  min-height: 0;
+  align-items: center;
 }
 
-.radar-wrapper {
-  flex: 1;
+.quality-chart-pane {
   display: flex;
   align-items: center;
   justify-content: center;
-  min-width: 250px;
-  height: 100%;
+  min-width: 0;
 }
 
-.observations-box {
-  flex: 1.15;
-  background-color: #F8F7FA;
-  border: 1px solid #EBE8F0;
-  border-radius: 10px;
-  padding: 12px 16px;
-  display: flex;
-  flex-direction: column;
+.quality-notes-pane {
+  background-color: #F8F9FA;
+  border-radius: 14px;
+  padding: 18px 20px;
   box-sizing: border-box;
-  justify-content: center;
-}
-
-.observations-title {
-  font-size: 13.5px;
-  font-weight: 700;
-  color: #1D1928;
-  line-height: 18px;
-  margin-bottom: 8px;
-}
-
-.observations-list {
-  list-style: none;
   display: flex;
   flex-direction: column;
-  gap: 7px;
+  gap: 12px;
 }
 
-.observation-item {
+.notes-pane-heading {
+  font-size: 14.5px;
+  font-weight: 700;
+  color: #1E293B;
+  margin: 0;
+}
+
+.notes-bullets-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.notes-bullet-item {
   display: flex;
   align-items: flex-start;
-  gap: 8px;
-  font-size: 12px;
-  line-height: 16px;
-  color: #1D1928;
+  gap: 10px;
+  font-size: 12.5px;
+  line-height: 1.5;
+  color: #334155;
 }
 
 .bullet-dot {
-  width: 5.5px;
-  height: 5.5px;
+  width: 6px;
+  height: 6px;
   border-radius: 50%;
-  background-color: #4D308D;
-  margin-top: 5px;
+  background-color: #7C3AED;
+  margin-top: 6px;
   flex-shrink: 0;
+}
+
+.bullet-text {
+  flex: 1;
+}
+
+@media (max-width: 900px) {
+  .quality-content-layout {
+    grid-template-columns: 1fr;
+  }
 }

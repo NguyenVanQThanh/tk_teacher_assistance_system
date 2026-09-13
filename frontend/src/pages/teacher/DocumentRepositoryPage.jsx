@@ -1,18 +1,29 @@
 // File Name: DocumentRepositoryPage.jsx
-// Description: Teacher Document Repository Page featuring filtering, search, pagination, and upload modal.
+// Description: Teacher Document Repository Page featuring filtering, search, pagination, centered toast notifications, and soft delete.
 // Created At: 2026-08-30
 // Created By: Tam Khang
-// Updated At: 2026-08-30
+// Updated At: 2026-09-12
 // Updated By: Tam Khang
 
-import React, { useState, useMemo } from 'react';
-import { ChevronRight, Upload, ChevronLeft } from 'lucide-react';
+import React, { useState, useMemo, useRef } from 'react';
+import { 
+  ChevronRight, 
+  Upload, 
+  ChevronLeft, 
+  CheckCircle2, 
+  AlertCircle, 
+  AlertTriangle,
+  Info, 
+  X,
+  Trash2
+} from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
 import DocumentFilterBar from '../../components/documents/DocumentFilterBar';
 import DocumentCard from '../../components/documents/DocumentCard';
 import DocumentDetailView from '../../components/documents/DocumentDetailView';
 import UploadDocumentModal from '../../components/documents/UploadDocumentModal';
 import DocumentPreviewModal from '../../components/documents/DocumentPreviewModal';
+import EditDocumentModal from '../../components/documents/EditDocumentModal';
 import CreateExerciseModal from '../../components/exercises/CreateExerciseModal';
 import './DocumentRepositoryPage.css';
 
@@ -27,6 +38,22 @@ export default function DocumentRepositoryPage() {
   const [isCreateExerciseOpen, setIsCreateExerciseOpen] = useState(false);
   const [previewDoc, setPreviewDoc] = useState(null);
   const [selectedDoc, setSelectedDoc] = useState(null);
+  const [editingDoc, setEditingDoc] = useState(null);
+
+  // Centered Confirmation Dialog & Toast States
+  const [deleteConfirmDoc, setDeleteConfirmDoc] = useState(null);
+  const [toast, setToast] = useState(null);
+  const toastTimeoutRef = useRef(null);
+
+  const showToast = (message, type = 'info', title = '') => {
+    if (toastTimeoutRef.current) {
+      clearTimeout(toastTimeoutRef.current);
+    }
+    setToast({ message, type, title });
+    toastTimeoutRef.current = setTimeout(() => {
+      setToast(null);
+    }, 2800);
+  };
 
   const navigate = useNavigate();
 
@@ -164,6 +191,28 @@ export default function DocumentRepositoryPage() {
 
   const handleUploadSuccess = (newDoc) => {
     setDocuments((prev) => [newDoc, ...prev]);
+    showToast(`Đã tải lên tài liệu "${newDoc.title}" thành công!`, 'success', 'Tải lên hoàn tất');
+  };
+
+  const handleSaveEditedDoc = (updatedDoc) => {
+    setDocuments((prev) => prev.map((d) => (d.id === updatedDoc.id ? updatedDoc : d)));
+    if (selectedDoc && selectedDoc.id === updatedDoc.id) {
+      setSelectedDoc(updatedDoc);
+    }
+    showToast(`Đã cập nhật thông tin tài liệu "${updatedDoc.title}" thành công!`, 'success', 'Cập nhật thành công');
+  };
+
+  const requestDeleteDocument = (doc) => {
+    setDeleteConfirmDoc(doc);
+  };
+
+  const confirmDeleteDocument = () => {
+    if (!deleteConfirmDoc) return;
+    const doc = deleteConfirmDoc;
+    setDeleteConfirmDoc(null);
+    // Soft Delete Policy: filter out from active view list and show confirmation toast
+    setDocuments((prev) => prev.filter((d) => d.id !== doc.id));
+    showToast(`Đã xóa tài liệu "${doc.title}" thành công!`, 'success', 'Xóa tài liệu');
   };
 
   const handleNavSelect = (navId) => {
@@ -189,9 +238,9 @@ export default function DocumentRepositoryPage() {
               doc={selectedDoc}
               onBack={() => setSelectedDoc(null)}
               onViewDocument={(d) => setPreviewDoc(d)}
-              onDownloadDocument={(d) => alert(`Bắt đầu tải xuống: ${d.title}`)}
-              onEditDocument={(d) => alert(`Chỉnh sửa tài liệu: ${d.title}`)}
-              onMoreOptions={(d) => alert(`Tùy chọn khác cho: ${d.title}`)}
+              onDownloadDocument={(d) => showToast(`Bắt đầu tải xuống: ${d.title}`, 'info', 'Tải xuống')}
+              onEditDocument={(d) => setEditingDoc(d)}
+              onMoreOptions={(d) => showToast(`Tùy chọn khác cho: ${d.title}`, 'info', 'Tùy chọn')}
             />
           ) : (
             /* Document List View */
@@ -237,9 +286,10 @@ export default function DocumentRepositoryPage() {
                       key={doc.id}
                       doc={doc}
                       onPreview={(d) => setSelectedDoc(d)}
-                      onDownload={(d) => alert(`Bắt đầu tải xuống: ${d.title}`)}
-                      onEdit={(d) => alert(`Chỉnh sửa tài liệu: ${d.title}`)}
-                      onMore={(d) => alert(`Tùy chọn: ${d.title}`)}
+                      onDownload={(d) => showToast(`Bắt đầu tải xuống: ${d.title}`, 'info', 'Tải tài liệu')}
+                      onEdit={(d) => setEditingDoc(d)}
+                      onDelete={(d) => requestDeleteDocument(d)}
+                      onMore={(d) => requestDeleteDocument(d)}
                     />
                   ))
                 ) : (
@@ -306,6 +356,7 @@ export default function DocumentRepositoryPage() {
         doc={previewDoc}
         isOpen={!!previewDoc}
         onClose={() => setPreviewDoc(null)}
+        onDownload={(d) => showToast(`Bắt đầu tải xuống: ${d.title}`, 'info', 'Tải tài liệu')}
       />
 
       {/* Create Exercise Modal */}
@@ -313,10 +364,84 @@ export default function DocumentRepositoryPage() {
         isOpen={isCreateExerciseOpen}
         onClose={() => setIsCreateExerciseOpen(false)}
         onCreateSuccess={(newEx) => {
-          alert(`Đã tạo thành công bài tập: ${newEx.title}`);
+          showToast(`Đã tạo thành công bài tập: ${newEx.title}`, 'success', 'Tạo bài tập');
           navigate('/teacher/exercises');
         }}
       />
+
+      {/* Full-screen Edit Document Dialog Modal */}
+      <EditDocumentModal
+        isOpen={!!editingDoc}
+        doc={editingDoc}
+        onClose={() => setEditingDoc(null)}
+        onSave={handleSaveEditedDoc}
+      />
+
+      {/* ============================================================ */}
+      {/* CENTERED DELETE CONFIRMATION MODAL */}
+      {/* ============================================================ */}
+      {deleteConfirmDoc && (
+        <div className="center-confirm-overlay" onClick={() => setDeleteConfirmDoc(null)}>
+          <div className="center-confirm-card" onClick={(e) => e.stopPropagation()}>
+            <div className="confirm-icon-badge">
+              <AlertTriangle size={26} />
+            </div>
+            <div className="confirm-content-col">
+              <h3 className="confirm-title-text">Xác nhận xóa tài liệu</h3>
+              <p className="confirm-message-text">
+                Bạn có chắc chắn muốn xóa tài liệu <strong>"{deleteConfirmDoc.title}"</strong> không? Hành động này sẽ chuyển trạng thái tài liệu sang đã xóa (xóa mềm).
+              </p>
+            </div>
+            <div className="confirm-actions-row">
+              <button 
+                type="button" 
+                className="btn-confirm-cancel"
+                onClick={() => setDeleteConfirmDoc(null)}
+              >
+                Hủy bỏ
+              </button>
+              <button 
+                type="button" 
+                className="btn-confirm-delete"
+                onClick={confirmDeleteDocument}
+              >
+                <Trash2 size={15} />
+                <span>Xác nhận xóa</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ============================================================ */}
+      {/* CENTERED TOAST NOTIFICATION MODAL */}
+      {/* ============================================================ */}
+      {toast && (
+        <div className="center-toast-overlay" onClick={() => setToast(null)}>
+          <div 
+            className={`center-toast-card toast-type-${toast.type || 'info'}`}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="toast-icon-badge">
+              {toast.type === 'success' && <CheckCircle2 size={24} />}
+              {toast.type === 'error' && <AlertCircle size={24} />}
+              {toast.type === 'info' && <Info size={24} />}
+            </div>
+            <div className="toast-content-col">
+              {toast.title && <h4 className="toast-title-text">{toast.title}</h4>}
+              <p className="toast-message-text">{toast.message}</p>
+            </div>
+            <button 
+              type="button" 
+              className="toast-close-btn"
+              onClick={() => setToast(null)}
+              aria-label="Đóng thông báo"
+            >
+              <X size={16} />
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

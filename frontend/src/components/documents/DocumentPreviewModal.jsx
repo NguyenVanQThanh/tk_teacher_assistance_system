@@ -2,7 +2,7 @@
 // Description: Full-featured interactive Document Reader displaying detailed file contents, formulas, multi-page syllabus, exercises, zoom, search, and page navigation.
 // Created At: 2026-08-30
 // Created By: Tam Khang
-// Updated At: 2026-09-01
+// Updated At: 2026-09-13
 // Updated By: Tam Khang
 
 import React, { useState } from 'react';
@@ -25,7 +25,7 @@ import {
 } from 'lucide-react';
 import './DocumentPreviewModal.css';
 
-export default function DocumentPreviewModal({ doc, isOpen, onClose }) {
+export default function DocumentPreviewModal({ doc, isOpen, onClose, onDownload }) {
   if (!isOpen || !doc) return null;
 
   const [currentPage, setCurrentPage] = useState(1);
@@ -86,7 +86,7 @@ export default function DocumentPreviewModal({ doc, isOpen, onClose }) {
                   <div className="table-row">
                     <div className="col-idx">1</div>
                     <div className="col-topic"><strong>Ứng dụng đạo hàm để khảo sát và vẽ đồ thị hàm số</strong></div>
-                    <div className="col-level">Nhận biết - Thông hiểu - Vận dụng - VDC</div>
+                    <div className="col-level">Nhận biết - Thông hiểu - Vận dụng</div>
                     <div className="col-rate">45%</div>
                   </div>
                   <div className="table-row">
@@ -98,7 +98,7 @@ export default function DocumentPreviewModal({ doc, isOpen, onClose }) {
                   <div className="table-row">
                     <div className="col-idx">3</div>
                     <div className="col-topic"><strong>Khối đa diện và thể tích khối đa diện (Hình học 12)</strong></div>
-                    <div className="col-level">Nhận biết - Thông hiểu - Vận dụng cao</div>
+                    <div className="col-level">Nhận biết - Thông hiểu - Vận dụng</div>
                     <div className="col-rate">25%</div>
                   </div>
                 </div>
@@ -346,7 +346,7 @@ export default function DocumentPreviewModal({ doc, isOpen, onClose }) {
             <button 
               type="button" 
               className="btn-reader-action"
-              onClick={() => alert(`Bắt đầu tải xuống file gốc: ${doc.title}`)}
+              onClick={() => onDownload ? onDownload(doc) : null}
               title="Tải xuống tệp tin"
             >
               <Download size={15} />

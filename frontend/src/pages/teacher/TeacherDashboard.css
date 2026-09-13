@@ -1,216 +1,215 @@
 /*
 File Name: TeacherDashboard.css
-Description: Single-screen Dashboard layout fitted to 100vh with no vertical scrollbar.
+Description: Modern, responsive styles for Teacher Dashboard matching the exact visual mockup.
 Created At: 2026-08-30
 Created By: Tam Khang
-Updated At: 2026-08-30
+Updated At: 2026-09-07
 Updated By: Tam Khang
 */
 
-.teacher-dashboard-layout {
-  height: 100vh;
-  max-height: 100vh;
-  overflow: hidden;
+.teacher-dashboard-container {
   display: flex;
   flex-direction: column;
-  background-color: #F8F7FA;
-  font-family: 'Be Vietnam Pro', sans-serif;
-  animation: pageFadeIn 0.35s ease-out;
+  padding: 24px 32px 40px;
+  background-color: #F8F9FA;
+  min-height: calc(100vh - 64px);
+  box-sizing: border-box;
+  font-family: 'Be Vietnam Pro', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  animation: pageFadeIn 0.3s ease-out;
 }
 
 @keyframes pageFadeIn {
   from {
     opacity: 0;
+    transform: translateY(6px);
   }
   to {
     opacity: 1;
+    transform: translateY(0);
   }
 }
 
-.dashboard-body {
-  display: flex;
-  flex: 1;
-  height: calc(100vh - 64px);
-  max-height: calc(100vh - 64px);
-  overflow: hidden;
-}
-
-.dashboard-main-content {
-  flex: 1;
-  padding: 16px 20px;
-  background-color: #F8F7FA;
-  display: flex;
-  flex-direction: column;
-  height: 100%;
-  max-height: 100%;
-  box-sizing: border-box;
-  overflow: hidden;
-}
-
-/* Welcome hero & Metric summary row */
-.dashboard-hero-row {
+/* Top Banner Row */
+.dashboard-top-banner-row {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 20px;
-  margin-bottom: 14px;
-  flex-shrink: 0;
-  animation: fadeInUp 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  gap: 24px;
+  margin-bottom: 24px;
 }
 
-.welcome-banner {
-  flex: 1;
+.dashboard-greeting-block {
   display: flex;
   flex-direction: column;
-  justify-content: center;
+  gap: 4px;
 }
 
-.welcome-title {
-  font-size: 24px;
-  font-weight: 700;
-  color: #1D1928;
-  line-height: 30px;
-  margin-bottom: 2px;
-  display: flex;
-  align-items: center;
-  gap: 6px;
+.dashboard-greeting-title {
+  font-size: 26px;
+  font-weight: 800;
+  color: #1E1B4B;
+  letter-spacing: -0.5px;
+  margin: 0;
+  line-height: 1.25;
 }
 
-.wave-emoji {
+.greeting-wave {
   display: inline-block;
-  animation: waveAnim 2.5s infinite ease-in-out;
   transform-origin: 70% 70%;
+  animation: waveHand 2s ease-in-out infinite;
 }
 
-@keyframes waveAnim {
-  0%, 100% { transform: rotate(0deg); }
-  20%, 60% { transform: rotate(14deg); }
-  40%, 80% { transform: rotate(-8deg); }
+@keyframes waveHand {
+  0% { transform: rotate(0deg); }
+  10% { transform: rotate(14deg); }
+  20% { transform: rotate(-8deg); }
+  30% { transform: rotate(14deg); }
+  40% { transform: rotate(-4deg); }
+  50% { transform: rotate(10deg); }
+  60% { transform: rotate(0deg); }
+  100% { transform: rotate(0deg); }
 }
 
-.welcome-subtitle {
-  font-size: 13px;
-  font-weight: 400;
-  line-height: 18px;
-  color: #494551;
+.dashboard-greeting-subtitle {
+  font-size: 13.5px;
+  color: #64748B;
+  margin: 0;
+  line-height: 1.5;
 }
 
-/* Summary metrics group */
-.summary-metrics-group {
+/* 2 Quick Stat Cards on Right of Top Banner */
+.dashboard-quick-stats-row {
   display: flex;
-  gap: 12px;
   align-items: center;
+  gap: 16px;
+  flex-shrink: 0;
 }
 
-.metric-card {
-  width: 220px;
-  height: 64px;
+.quick-stat-box {
   background-color: #FFFFFF;
   border: 1px solid #EBE8F0;
-  border-radius: 10px;
-  padding: 10px 14px;
-  box-sizing: border-box;
+  border-radius: 14px;
+  padding: 12px 18px;
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.02);
-  transition: transform 0.25s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.25s cubic-bezier(0.16, 1, 0.3, 1), border-color 0.25s ease;
+  gap: 24px;
+  min-width: 180px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.02);
+  cursor: pointer;
+  transition: transform 0.2s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.2s ease, border-color 0.2s ease;
+  box-sizing: border-box;
 }
 
-.metric-card:hover {
+.quick-stat-box:hover {
   transform: translateY(-2px);
-  box-shadow: 0 8px 18px rgba(77, 48, 141, 0.08);
+  box-shadow: 0 6px 16px rgba(77, 48, 141, 0.06);
   border-color: #DDD4EC;
 }
 
-.metric-info {
+.quick-stat-box.accent-red {
+  border-left: 4px solid #EF4444;
+}
+
+.quick-stat-info {
   display: flex;
   flex-direction: column;
   gap: 2px;
 }
 
-.metric-label {
-  font-size: 11px;
-  font-weight: 600;
-  line-height: 14px;
-  color: #494551;
-  letter-spacing: 0.2px;
+.quick-stat-label {
+  font-size: 10.5px;
+  font-weight: 700;
+  color: #64748B;
+  letter-spacing: 0.5px;
   text-transform: uppercase;
 }
 
-.metric-value {
-  font-size: 20px;
-  font-weight: 700;
-  line-height: 24px;
-  color: #1D1928;
+.quick-stat-value {
+  font-size: 24px;
+  font-weight: 800;
+  color: #0F172A;
+  line-height: 1.1;
+  letter-spacing: -0.5px;
 }
 
-.metric-icon-box {
+.quick-stat-icon-wrapper {
   width: 40px;
   height: 40px;
-  border-radius: 9999px;
+  border-radius: 10px;
   display: flex;
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
-  transition: transform 0.25s ease;
 }
 
-.metric-card:hover .metric-icon-box {
-  transform: scale(1.06);
+.quick-stat-icon-wrapper.bg-red {
+  background-color: #FEE2E2;
 }
 
-.metric-icon-box.red-box {
-  background-color: #FFDAD6;
-}
-
-.icon-red {
-  color: #BA1A1A;
-}
-
-.metric-icon-box.blue-box {
+.quick-stat-icon-wrapper.bg-blue {
   background-color: #EFF6FF;
 }
 
-.icon-blue {
-  color: #4486F4;
+.stat-icon-red {
+  color: #DC2626;
 }
 
-/* Main Dashboard Grid */
-.dashboard-grid {
+.stat-icon-blue {
+  color: #2563EB;
+}
+
+/* Two-Column Grid Content Layout */
+.dashboard-content-layout {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 320px;
-  gap: 16px;
-  align-items: stretch;
-  flex: 1;
-  min-height: 0; /* Important for flex child overflow */
-  max-height: calc(100% - 78px);
+  grid-template-columns: minmax(0, 1.85fr) minmax(310px, 1.05fr);
+  gap: 24px;
+  align-items: start;
 }
 
-.grid-left-col {
+/* Left Column */
+.dashboard-left-column {
   display: flex;
   flex-direction: column;
-  gap: 16px;
-  min-height: 0;
-  height: 100%;
-  animation: fadeInUp 0.45s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  gap: 24px;
 }
 
-.grid-right-col {
+/* Right Column */
+.dashboard-right-column {
   display: flex;
   flex-direction: column;
-  min-height: 0;
-  height: 100%;
-  animation: fadeInUp 0.55s cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }
 
-@keyframes fadeInUp {
-  from {
-    opacity: 0;
-    transform: translateY(10px);
+/* Responsive Breakpoints */
+@media (max-width: 1100px) {
+  .dashboard-top-banner-row {
+    flex-direction: column;
+    align-items: flex-start;
   }
-  to {
-    opacity: 1;
-    transform: translateY(0);
+
+  .dashboard-quick-stats-row {
+    width: 100%;
+  }
+
+  .quick-stat-box {
+    flex: 1;
+  }
+
+  .dashboard-content-layout {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 768px) {
+  .teacher-dashboard-container {
+    padding: 16px;
+  }
+
+  .dashboard-quick-stats-row {
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  .quick-stat-box {
+    width: 100%;
   }
 }

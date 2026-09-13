@@ -3,7 +3,7 @@ File Name: CreateExerciseModal.css
 Description: Stylesheet for Exercise Creation Modal supporting 3-Card Selection, AI Exercise Generation with Multi-Select Dropdown, and File Upload.
 Created At: 2026-08-30
 Created By: Tam Khang
-Updated At: 2026-08-30
+Updated At: 2026-09-13
 Updated By: Tam Khang
 */
 
@@ -220,10 +220,11 @@ Updated By: Tam Khang
 }
 
 .ai-section-title {
-  font-size: 15px;
+  font-size: 14.5px;
   font-weight: 700;
-  color: #4D308D;
+  color: #581C87;
   letter-spacing: -0.1px;
+  font-family: 'Be Vietnam Pro', -apple-system, BlinkMacSystemFont, sans-serif;
 }
 
 /* 3-Card Question Matrix */
@@ -249,10 +250,11 @@ Updated By: Tam Khang
 }
 
 .ai-matrix-card-title {
-  font-size: 14px;
+  font-size: 13.5px;
   font-weight: 700;
-  color: #1D1928;
+  color: #1E293B;
   margin: 0 0 14px 0;
+  font-family: 'Be Vietnam Pro', -apple-system, BlinkMacSystemFont, sans-serif;
 }
 
 .ai-matrix-inputs-row {
@@ -271,101 +273,118 @@ Updated By: Tam Khang
 .ai-matrix-input-label {
   font-size: 10.5px;
   font-weight: 700;
-  color: #8E8B99;
-  letter-spacing: 0.2px;
+  color: #64748B;
+  letter-spacing: 0.3px;
   text-align: center;
   white-space: nowrap;
+  font-family: 'Be Vietnam Pro', -apple-system, BlinkMacSystemFont, sans-serif;
 }
 
 .ai-matrix-number-input {
   width: 100%;
-  height: 36px;
+  height: 38px;
   background-color: #FFFFFF;
-  border: 1px solid #D8D2E6;
-  border-radius: 6px;
+  border: 1.5px solid #E2E8F0;
+  border-radius: 8px;
   text-align: center;
   font-size: 14px;
-  font-weight: 600;
-  color: #1D1928;
+  font-weight: 700;
+  color: #0F172A;
   outline: none;
-  font-family: inherit;
+  font-family: 'Be Vietnam Pro', -apple-system, BlinkMacSystemFont, sans-serif;
   box-sizing: border-box;
   transition: all 0.2s ease;
 }
 
 .ai-matrix-number-input:focus {
-  border-color: #6549A6;
-  box-shadow: 0 0 0 3px rgba(101, 73, 166, 0.12);
+  border-color: #7C3AED;
+  box-shadow: 0 0 0 3px rgba(124, 58, 237, 0.12);
 }
 
-/* ================= MULTI-SELECT DOCUMENT DROPDOWN ================= */
-.doc-select-dropdown-container {
+/* ================= DOCUMENT SELECT CUSTOM WRAPPER ================= */
+.doc-select-custom-wrapper {
   position: relative;
   width: 100%;
 }
 
-.doc-select-trigger {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 11px 16px;
-  background-color: #FFFFFF;
+.doc-select-input-box {
+  min-height: 44px;
+  padding: 8px 14px;
+  background-color: #FAF9FE;
   border: 1.5px solid #DDD6EC;
   border-radius: 10px;
   cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
   transition: all 0.2s ease;
   user-select: none;
+  box-sizing: border-box;
 }
 
-.doc-select-trigger:hover {
-  border-color: #6549A6;
-  background-color: #FAF8FF;
+.doc-select-input-box:hover {
+  border-color: #7C3AED;
+  background-color: #FFFFFF;
 }
 
-.doc-select-trigger.active {
-  border-color: #6549A6;
-  box-shadow: 0 0 0 3px rgba(101, 73, 166, 0.12);
-}
-
-.doc-trigger-left {
+.doc-tags-container {
   display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
   align-items: center;
-  gap: 10px;
+  flex: 1;
 }
 
-.doc-trigger-icon {
-  color: #6549A6;
-}
-
-.doc-trigger-text {
+.placeholder-text {
   font-size: 13.5px;
-  color: #4B5563;
+  color: #64748B;
   font-weight: 500;
+  font-family: 'Be Vietnam Pro', -apple-system, BlinkMacSystemFont, sans-serif;
 }
 
-.doc-trigger-right {
-  display: flex;
+.selected-doc-tag {
+  display: inline-flex;
   align-items: center;
-  gap: 8px;
+  gap: 6px;
+  background-color: #EDE9FE;
+  color: #5B21B6;
+  padding: 4px 8px;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  font-family: 'Be Vietnam Pro', -apple-system, BlinkMacSystemFont, sans-serif;
 }
 
-.doc-selected-count-badge {
-  background-color: #6549A6;
-  color: #FFFFFF;
-  font-size: 11.5px;
-  font-weight: 700;
-  padding: 2px 8px;
-  border-radius: 12px;
+.doc-tag-title {
+  max-width: 280px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
-.doc-chevron-icon {
-  color: #6B7280;
+.btn-remove-tag {
+  background: none;
+  border: none;
+  color: #7C3AED;
+  cursor: pointer;
+  padding: 1px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  transition: all 0.15s ease;
+}
+
+.btn-remove-tag:hover {
+  background-color: #FEE2E2;
+  color: #DC2626;
+}
+
+.arrow-icon {
+  color: #64748B;
+  flex-shrink: 0;
   transition: transform 0.2s ease;
-}
-
-.doc-chevron-icon.rotate {
-  transform: rotate(180deg);
-  color: #6549A6;
 }
 
 /* Dropdown Menu Popover */
@@ -375,9 +394,9 @@ Updated By: Tam Khang
   left: 0;
   right: 0;
   background-color: #FFFFFF;
-  border: 1px solid #E5E0F0;
+  border: 1px solid #E2E8F0;
   border-radius: 12px;
-  box-shadow: 0 12px 32px rgba(46, 30, 84, 0.16);
+  box-shadow: 0 12px 32px rgba(15, 23, 42, 0.16);
   z-index: 100;
   max-height: 280px;
   overflow: hidden;
@@ -402,41 +421,26 @@ Updated By: Tam Khang
   align-items: center;
   gap: 8px;
   padding: 10px 14px;
-  border-bottom: 1px solid #F1EEF8;
-  background-color: #FAF9FE;
+  border-bottom: 1px solid #F1F5F9;
+  background-color: #F8FAFC;
 }
 
 .doc-search-icon {
-  color: #6B7280;
+  color: #64748B;
+  flex-shrink: 0;
 }
 
-.doc-search-input {
+.doc-search-box input {
   flex: 1;
   border: none;
   outline: none;
   background: transparent;
   font-size: 13px;
-  color: #1D1928;
-  font-family: inherit;
+  color: #0F172A;
+  font-family: 'Be Vietnam Pro', -apple-system, BlinkMacSystemFont, sans-serif;
 }
 
-.btn-clear-doc-search {
-  background: none;
-  border: none;
-  color: #9CA3AF;
-  cursor: pointer;
-  padding: 2px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: 4px;
-}
-
-.btn-clear-doc-search:hover {
-  color: #1D1928;
-}
-
-.doc-options-list {
+.doc-list-scroll {
   padding: 6px 8px;
   overflow-y: auto;
   max-height: 220px;
@@ -445,29 +449,29 @@ Updated By: Tam Khang
   gap: 4px;
 }
 
-.doc-option-item {
+.doc-list-item {
   display: flex;
   align-items: center;
   gap: 10px;
-  padding: 9px 12px;
+  padding: 8px 12px;
   border-radius: 8px;
   cursor: pointer;
   transition: all 0.15s ease;
 }
 
-.doc-option-item:hover {
-  background-color: #F4EFFD;
+.doc-list-item:hover {
+  background-color: #F5EEFF;
 }
 
-.doc-option-item.selected {
-  background-color: #EDE4FC;
+.doc-list-item.selected {
+  background-color: #EDE9FE;
 }
 
-.doc-option-checkbox {
+.doc-checkbox {
   width: 18px;
   height: 18px;
   border-radius: 4px;
-  border: 1.5px solid #C4BED4;
+  border: 1.5px solid #CBD5E1;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -476,197 +480,135 @@ Updated By: Tam Khang
   transition: all 0.2s ease;
 }
 
-.doc-option-checkbox.checked {
-  background-color: #6549A6;
-  border-color: #6549A6;
+.doc-list-item.selected .doc-checkbox {
+  background-color: #7C3AED;
+  border-color: #7C3AED;
   color: #FFFFFF;
 }
 
-.doc-option-icon {
-  color: #6549A6;
-  flex-shrink: 0;
+.check-mark {
+  color: #FFFFFF;
 }
 
-.doc-option-info {
+.doc-item-info {
   display: flex;
   flex-direction: column;
   gap: 2px;
+  min-width: 0;
   flex: 1;
 }
 
-.doc-option-title {
+.doc-item-title {
   font-size: 13px;
   font-weight: 600;
-  color: #1D1928;
+  color: #0F172A;
+  font-family: 'Be Vietnam Pro', -apple-system, BlinkMacSystemFont, sans-serif;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
-.doc-option-meta {
+.doc-item-badges {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 6px;
 }
 
-.doc-tag-badge {
+.doc-type-badge {
   font-size: 10.5px;
   font-weight: 600;
-  color: #6549A6;
+  color: #6D28D9;
   background-color: #FAF5FF;
+  border: 1px solid #E9D5FF;
   padding: 1px 6px;
   border-radius: 4px;
-  border: 1px solid #E9D5FF;
 }
 
 .doc-size-text {
   font-size: 11px;
-  color: #8E8B99;
+  color: #64748B;
+  font-family: 'Be Vietnam Pro', sans-serif;
 }
 
-.doc-options-empty {
+.empty-docs-text {
   padding: 16px;
   text-align: center;
   font-size: 13px;
-  color: #8E8B99;
-}
-
-/* ================= SELECTED OUTSIDE CHIPS ================= */
-.ai-selected-docs-wrapper {
-  margin-top: 2px;
-}
-
-.ai-docs-chips-grid {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 10px;
-}
-
-.ai-doc-chip {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  padding: 8px 14px;
-  background-color: #FFFFFF;
-  border: 1px solid #DDD6EC;
-  border-radius: 8px;
-  cursor: pointer;
-  user-select: none;
-  transition: all 0.2s ease;
-}
-
-.ai-doc-chip.selected {
-  border-color: #6549A6;
-  background-color: #F8F5FF;
-}
-
-.ai-doc-chip.chip-removable {
-  padding: 6px 10px 6px 12px;
-}
-
-.ai-chip-doc-icon {
-  color: #6549A6;
-  flex-shrink: 0;
-}
-
-.ai-chip-title {
-  font-size: 13px;
-  font-weight: 600;
-  color: #1D1928;
-}
-
-.btn-remove-chip {
-  background: none;
-  border: none;
-  color: #716D7C;
-  cursor: pointer;
-  padding: 2px;
-  border-radius: 50%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  transition: all 0.2s ease;
-  margin-left: 2px;
-}
-
-.btn-remove-chip:hover {
-  background-color: #FEE2E2;
-  color: #DC2626;
-}
-
-.ai-docs-help-text {
-  font-size: 12px;
-  color: #716D7C;
-  margin: 2px 0 0 0;
-  font-style: normal;
+  color: #94A3B8;
+  font-family: 'Be Vietnam Pro', sans-serif;
 }
 
 /* ================= PROMPT TEXTAREA ================= */
-.ai-prompt-input-wrapper {
+.ai-prompt-textarea {
   width: 100%;
-}
-
-.ai-prompt-custom-textarea {
-  width: 100%;
-  min-height: 86px;
-  padding: 14px 16px;
-  background-color: #FFFFFF;
-  border: 1px solid #DDD6EC;
+  min-height: 88px;
+  padding: 12px 16px;
+  background-color: #FAF9FE;
+  border: 1.5px solid #DDD6EC;
   border-radius: 10px;
   font-size: 13.5px;
-  color: #1D1928;
-  font-family: inherit;
-  line-height: 1.5;
+  color: #0F172A;
+  font-family: 'Be Vietnam Pro', -apple-system, BlinkMacSystemFont, sans-serif;
+  line-height: 1.55;
   outline: none;
   resize: vertical;
   box-sizing: border-box;
   transition: all 0.2s ease;
 }
 
-.ai-prompt-custom-textarea:focus {
-  border-color: #6549A6;
-  box-shadow: 0 0 0 3px rgba(101, 73, 166, 0.12);
+.ai-prompt-textarea:hover {
+  border-color: #7C3AED;
+  background-color: #FFFFFF;
 }
 
-.ai-prompt-custom-textarea::placeholder {
-  color: #9CA3AF;
+.ai-prompt-textarea:focus {
+  border-color: #7C3AED;
+  background-color: #FFFFFF;
+  box-shadow: 0 0 0 3px rgba(124, 58, 237, 0.12);
 }
 
-/* Start AI Generate Primary Button */
-.btn-start-ai-generate {
+.ai-prompt-textarea::placeholder {
+  color: #94A3B8;
+  font-family: 'Be Vietnam Pro', -apple-system, BlinkMacSystemFont, sans-serif;
+}
+
+/* Action Bar & Gradient Button */
+.ai-action-bar {
+  padding: 4px 32px 14px;
+}
+
+.btn-create-exercise-gradient {
   width: 100%;
   height: 48px;
   border: none;
-  background: #6549A6;
-  background: linear-gradient(90deg, #6549A6 0%, #7D49A6 100%);
+  background: linear-gradient(135deg, #6D28D9 0%, #5B21B6 100%);
   color: #FFFFFF;
-  font-size: 15px;
-  font-weight: 600;
-  font-family: inherit;
+  font-size: 14.5px;
+  font-weight: 700;
+  font-family: 'Be Vietnam Pro', -apple-system, BlinkMacSystemFont, sans-serif;
   border-radius: 10px;
   cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 10px;
-  box-shadow: 0 4px 14px rgba(101, 73, 166, 0.28);
+  gap: 8px;
+  box-shadow: 0 4px 14px rgba(109, 40, 217, 0.28);
   transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
-  margin-top: 4px;
 }
 
-.btn-start-ai-generate:hover:not(:disabled) {
+.btn-create-exercise-gradient:hover:not(:disabled) {
+  background: linear-gradient(135deg, #5B21B6 0%, #4C1D95 100%);
   transform: translateY(-1px);
-  box-shadow: 0 6px 20px rgba(101, 73, 166, 0.38);
+  box-shadow: 0 6px 20px rgba(109, 40, 217, 0.38);
 }
 
-.btn-start-ai-generate:active:not(:disabled) {
+.btn-create-exercise-gradient:active:not(:disabled) {
   transform: scale(0.99);
 }
 
-.btn-start-ai-generate:disabled {
+.btn-create-exercise-gradient:disabled {
   opacity: 0.7;
   cursor: not-allowed;
-}
-
-.sparkle-btn-icon {
-  color: #FFFFFF;
 }
 
 /* Bottom Footer for AI View */
@@ -674,46 +616,47 @@ Updated By: Tam Khang
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 16px 32px 24px;
+  padding: 14px 32px 22px;
+  border-top: 1px solid #F1F5F9;
 }
 
 .btn-ai-back {
-  display: flex;
+  display: inline-flex;
   align-items: center;
-  gap: 8px;
+  gap: 6px;
   background: none;
   border: none;
-  color: #494551;
-  font-size: 14px;
-  font-weight: 500;
-  font-family: inherit;
+  color: #475569;
+  font-size: 13.5px;
+  font-weight: 600;
+  font-family: 'Be Vietnam Pro', -apple-system, BlinkMacSystemFont, sans-serif;
   cursor: pointer;
-  padding: 6px 8px;
+  padding: 6px 10px;
   border-radius: 6px;
-  transition: all 0.2s ease;
+  transition: all 0.15s ease;
 }
 
 .btn-ai-back:hover {
-  color: #1D1928;
-  background-color: #F1F3F7;
+  color: #0F172A;
+  background-color: #F1F5F9;
 }
 
 .btn-ai-cancel {
   background: none;
   border: none;
-  color: #494551;
-  font-size: 14px;
-  font-weight: 500;
-  font-family: inherit;
+  color: #475569;
+  font-size: 13.5px;
+  font-weight: 600;
+  font-family: 'Be Vietnam Pro', -apple-system, BlinkMacSystemFont, sans-serif;
   cursor: pointer;
-  padding: 6px 12px;
+  padding: 6px 14px;
   border-radius: 6px;
-  transition: all 0.2s ease;
+  transition: all 0.15s ease;
 }
 
 .btn-ai-cancel:hover {
-  color: #1D1928;
-  background-color: #F1F3F7;
+  color: #0F172A;
+  background-color: #F1F5F9;
 }
 
 /* ================= STEP 2: UPLOAD DETAIL FORM ================= */

@@ -7,9 +7,11 @@
 
 import React from 'react';
 import { ChevronLeft, ChevronRight, Clock, MapPin } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 import './TeachingScheduleCard.css';
 
 export default function TeachingScheduleCard() {
+  const navigate = useNavigate();
   const scheduleItems = [
     {
       id: 'sch-1',
@@ -85,7 +87,11 @@ export default function TeachingScheduleCard() {
         ))}
       </div>
 
-      <button className="btn-view-full-schedule">
+      <button 
+        type="button" 
+        className="btn-view-full-schedule"
+        onClick={() => navigate('/teacher/schedule')}
+      >
         Xem lịch đầy đủ
       </button>
     </div>

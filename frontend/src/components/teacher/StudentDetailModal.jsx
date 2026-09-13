@@ -21,6 +21,7 @@ import {
   Printer
 } from 'lucide-react';
 import StudentTranscriptPrintModal from './StudentTranscriptPrintModal';
+import { getSubjectIdByName } from '../../utils/teacherSubjectHelper';
 import './StudentDetailModal.css';
 
 // Dynamic N-axis SVG Radar Chart Component (supports 3-criteria or 8-subject radar)
@@ -181,27 +182,6 @@ export default function StudentDetailModal({
 }) {
   if (!isOpen || !student) return null;
 
-  // Determine default subject based on class mode
-  const defaultSubjectId = isHomeroom ? 'all' : (classInfo?.subject || 'math');
-
-  // 1. Subject filter state
-  const [selectedSubject, setSelectedSubject] = useState(defaultSubjectId);
-
-  // Sync selectedSubject when student or classInfo changes
-  useEffect(() => {
-    setSelectedSubject(isHomeroom ? 'all' : (classInfo?.subject || 'math'));
-  }, [isHomeroom, classInfo]);
-
-  // 2. Pagination state for both assignment cards
-  const [classroomPage, setClassroomPage] = useState(1);
-  const [aiPage, setAiPage] = useState(1);
-  const itemsPerPage = 3;
-
-  // 3. Sorting & Filtering state for Subject Final Scores Table
-  const [scoreSortOrder, setScoreSortOrder] = useState('desc'); // 'desc' (cao đến thấp), 'asc', 'default'
-  const [scoreRatingFilter, setScoreRatingFilter] = useState('all');
-  const [showPrintModal, setShowPrintModal] = useState(false);
-
   const subjectOptions = [
     { id: 'all', name: 'Tất cả các môn' },
     { id: 'math', name: 'Toán học' },
@@ -214,8 +194,40 @@ export default function StudentDetailModal({
     { id: 'informatics', name: 'Tin học' },
   ];
 
+  // Resolve subject id safely from classInfo
+  const resolvedClassSubjectId = useMemo(() => {
+    if (classInfo?.subject && subjectOptions.some(s => s.id === classInfo.subject)) {
+      return classInfo.subject;
+    }
+    if (classInfo?.subjectName) {
+      return getSubjectIdByName(classInfo.subjectName);
+    }
+    return 'math';
+  }, [classInfo]);
+
+  // Determine default subject based on class mode
+  const defaultSubjectId = isHomeroom ? 'all' : resolvedClassSubjectId;
+
+  // 1. Subject filter state
+  const [selectedSubject, setSelectedSubject] = useState(defaultSubjectId);
+
+  // Sync selectedSubject when student or classInfo changes
+  useEffect(() => {
+    setSelectedSubject(isHomeroom ? 'all' : resolvedClassSubjectId);
+  }, [isHomeroom, resolvedClassSubjectId]);
+
+  // 2. Pagination state for both assignment cards
+  const [classroomPage, setClassroomPage] = useState(1);
+  const [aiPage, setAiPage] = useState(1);
+  const itemsPerPage = 3;
+
+  // 3. Sorting & Filtering state for Subject Final Scores Table
+  const [scoreSortOrder, setScoreSortOrder] = useState('desc'); // 'desc' (cao đến thấp), 'asc', 'default'
+  const [scoreRatingFilter, setScoreRatingFilter] = useState('all');
+  const [showPrintModal, setShowPrintModal] = useState(false);
+
   const currentSubjectObj = subjectOptions.find(s => s.id === selectedSubject) || 
-    (isHomeroom ? subjectOptions[0] : (subjectOptions.find(s => s.id === (classInfo?.subject || 'math')) || subjectOptions[1]));
+    (isHomeroom ? subjectOptions[0] : (subjectOptions.find(s => s.id === resolvedClassSubjectId) || subjectOptions[1]));
   
   const subjectName = currentSubjectObj.name;
   const className = classInfo?.name || '12A1 - Toán nâng cao';

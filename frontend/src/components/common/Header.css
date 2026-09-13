@@ -45,44 +45,6 @@ Updated By: Tam Khang
   gap: 12px;
 }
 
-.header-search-box {
-  position: relative;
-  display: flex;
-  align-items: center;
-  margin-right: 4px;
-}
-
-.search-icon {
-  position: absolute;
-  left: 12px;
-  color: #494551;
-  pointer-events: none;
-}
-
-.search-input {
-  width: 256px;
-  height: 34px;
-  padding: 7px 16px 7px 36px;
-  background-color: #F8F1FF;
-  border: 1px solid #EBE8F0;
-  border-radius: 9999px;
-  font-size: 14px;
-  color: #1D1928;
-  outline: none;
-  font-family: inherit;
-  transition: all 0.2s ease;
-}
-
-.search-input::placeholder {
-  color: #6B7280;
-}
-
-.search-input:focus {
-  background-color: #FFFFFF;
-  border-color: #4D308D;
-  box-shadow: 0 0 0 3px rgba(77, 48, 141, 0.1);
-}
-
 .icon-btn {
   width: 36px;
   height: 36px;

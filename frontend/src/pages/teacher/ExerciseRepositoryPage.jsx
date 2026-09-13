@@ -1,17 +1,29 @@
 // File Name: ExerciseRepositoryPage.jsx
-// Description: Teacher Exercise Repository Page connected to backend RESTful APIs with Cursor-based Keyset Pagination (zero OFFSET, max 6 items/page), search, real questions preview, PDF export, and soft deletion.
+// Description: Teacher Exercise Repository Page connected to backend RESTful APIs with Cursor-based Keyset Pagination, centered delete confirmation modal, and toast notifications.
 // Created At: 2026-08-30
 // Created By: Tam Khang
-// Updated At: 2026-09-02
+// Updated At: 2026-09-12
 // Updated By: Tam Khang
 
-import React, { useState, useEffect, useCallback } from 'react';
-import { ChevronRight, Plus, ChevronLeft, Loader2, AlertCircle } from 'lucide-react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
+import { 
+  ChevronRight, 
+  Plus, 
+  ChevronLeft, 
+  Loader2, 
+  AlertCircle, 
+  AlertTriangle, 
+  CheckCircle2, 
+  Info, 
+  X, 
+  Trash2 
+} from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
 import ExerciseFilterBar from '../../components/exercises/ExerciseFilterBar';
 import ExerciseCard from '../../components/exercises/ExerciseCard';
 import CreateExerciseModal from '../../components/exercises/CreateExerciseModal';
 import ExercisePreviewModal from '../../components/exercises/ExercisePreviewModal';
+import EditDocumentModal from '../../components/documents/EditDocumentModal';
 import { exercisesApi, subjectsApi } from '../../services/api';
 import './ExerciseRepositoryPage.css';
 
@@ -33,6 +45,27 @@ export default function ExerciseRepositoryPage() {
 
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [previewExercise, setPreviewExercise] = useState(null);
+  const [editingExercise, setEditingExercise] = useState(null);
+
+  // Centered Delete Confirmation & Toast states
+  const [deleteConfirmTarget, setDeleteConfirmTarget] = useState(null);
+  const [toast, setToast] = useState(null);
+  const toastTimeoutRef = useRef(null);
+
+  const showToast = (message, type = 'info', title = '') => {
+    if (toastTimeoutRef.current) {
+      clearTimeout(toastTimeoutRef.current);
+    }
+    setToast({ message, type, title });
+    toastTimeoutRef.current = setTimeout(() => {
+      setToast(null);
+    }, 2800);
+  };
+
+  const handleSaveEditedExercise = (updated) => {
+    setExercises((prev) => prev.map((ex) => (ex.id === updated.id ? { ...ex, ...updated } : ex)));
+    showToast(`Đã lưu và cập nhật nội dung "${updated.title}" thành công!`, 'success', 'Cập nhật thành công');
+  };
 
   const [exercises, setExercises] = useState([]);
   const [subjectsList, setSubjectsList] = useState([]);
@@ -220,21 +253,27 @@ export default function ExerciseRepositoryPage() {
       link.click();
       link.remove();
       window.URL.revokeObjectURL(url);
+      showToast(`Đã xuất file PDF cho "${exercise.title}" thành công!`, 'success', 'Tải đề bài');
     } catch (err) {
-      alert('Không thể xuất file PDF cho bài tập này.');
+      showToast('Không thể xuất file PDF cho bài tập này.', 'error', 'Lỗi xuất file');
     }
   };
 
-  const handleDeleteExercise = async (exercise) => {
-    if (window.confirm(`Bạn có chắc chắn muốn xóa bài tập "${exercise.title}"?`)) {
-      try {
-        await exercisesApi.deleteExercise(exercise.id);
-        const currentCursor = cursorHistory[currentPage - 1] || null;
-        loadExercises(currentCursor, 'next', currentPage);
-        alert('Đã xóa thành công bài tập.');
-      } catch (err) {
-        alert('Không thể xóa bài tập này.');
-      }
+  const requestDeleteExercise = (exercise) => {
+    setDeleteConfirmTarget(exercise);
+  };
+
+  const confirmDeleteExercise = async () => {
+    if (!deleteConfirmTarget) return;
+    const exercise = deleteConfirmTarget;
+    setDeleteConfirmTarget(null);
+    try {
+      await exercisesApi.deleteExercise(exercise.id);
+      const currentCursor = cursorHistory[currentPage - 1] || null;
+      loadExercises(currentCursor, 'next', currentPage);
+      showToast(`Đã xóa thành công bài tập "${exercise.title}".`, 'success', 'Xóa thành công');
+    } catch (err) {
+      showToast('Không thể xóa bài tập này.', 'error', 'Lỗi xóa bài tập');
     }
   };
 
@@ -315,10 +354,11 @@ export default function ExerciseRepositoryPage() {
                     key={exercise.id}
                     exercise={exercise}
                     onPreview={(item) => setPreviewExercise(item)}
-                    onEdit={(item) => alert(`Chỉnh sửa bài tập: ${item.title}`)}
+                    onEdit={(item) => setEditingExercise(item)}
                     onShare={(item) => setPreviewExercise(item)}
                     onDownload={(item) => handleDownloadPdf(item)}
-                    onMore={(item) => handleDeleteExercise(item)}
+                    onDelete={(item) => requestDeleteExercise(item)}
+                    onMore={(item) => requestDeleteExercise(item)}
                   />
                 ))
               ) : (
@@ -384,6 +424,80 @@ export default function ExerciseRepositoryPage() {
         isOpen={!!previewExercise}
         onClose={() => setPreviewExercise(null)}
       />
+
+      {/* Edit Exercise / Document Modal Matching Image 1 */}
+      <EditDocumentModal
+        isOpen={!!editingExercise}
+        doc={editingExercise}
+        onClose={() => setEditingExercise(null)}
+        onSave={handleSaveEditedExercise}
+      />
+
+      {/* ============================================================ */}
+      {/* CENTERED DELETE CONFIRMATION MODAL */}
+      {/* ============================================================ */}
+      {deleteConfirmTarget && (
+        <div className="center-confirm-overlay" onClick={() => setDeleteConfirmTarget(null)}>
+          <div className="center-confirm-card" onClick={(e) => e.stopPropagation()}>
+            <div className="confirm-icon-badge">
+              <AlertTriangle size={26} />
+            </div>
+            <div className="confirm-content-col">
+              <h3 className="confirm-title-text">Xác nhận xóa bài tập</h3>
+              <p className="confirm-message-text">
+                Bạn có chắc chắn muốn xóa bài tập <strong>"{deleteConfirmTarget.title}"</strong> không? Hành động này sẽ chuyển trạng thái bài tập sang đã xóa (xóa mềm).
+              </p>
+            </div>
+            <div className="confirm-actions-row">
+              <button 
+                type="button" 
+                className="btn-confirm-cancel"
+                onClick={() => setDeleteConfirmTarget(null)}
+              >
+                Hủy bỏ
+              </button>
+              <button 
+                type="button" 
+                className="btn-confirm-delete"
+                onClick={confirmDeleteExercise}
+              >
+                <Trash2 size={15} />
+                <span>Xác nhận xóa</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ============================================================ */}
+      {/* CENTERED TOAST NOTIFICATION MODAL */}
+      {/* ============================================================ */}
+      {toast && (
+        <div className="center-toast-overlay" onClick={() => setToast(null)}>
+          <div 
+            className={`center-toast-card toast-type-${toast.type || 'info'}`}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="toast-icon-badge">
+              {toast.type === 'success' && <CheckCircle2 size={24} />}
+              {toast.type === 'error' && <AlertCircle size={24} />}
+              {toast.type === 'info' && <Info size={24} />}
+            </div>
+            <div className="toast-content-col">
+              {toast.title && <h4 className="toast-title-text">{toast.title}</h4>}
+              <p className="toast-message-text">{toast.message}</p>
+            </div>
+            <button 
+              type="button" 
+              className="toast-close-btn"
+              onClick={() => setToast(null)}
+              aria-label="Đóng thông báo"
+            >
+              <X size={16} />
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

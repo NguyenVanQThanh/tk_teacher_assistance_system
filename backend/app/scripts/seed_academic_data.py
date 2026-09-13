@@ -168,24 +168,24 @@ def seed_academic_sample_data():
         # 10A3: Homeroom is Cô Mai (0999000005)
         classes_data = [
             {
-                "name": "12A1 - Toán nâng cao",
+                "name": "12A1",
                 "school_year": "2023-2024",
                 "homeroom_phone": "0999000002"
             },
             {
-                "name": "11B2 - Vật lý cơ bản",
+                "name": "11B2",
                 "school_year": "2023-2024",
                 "homeroom_phone": "0999000004"
             },
             {
-                "name": "10A3 - Toán cơ bản",
+                "name": "10A3",
                 "school_year": "2023-2024",
                 "homeroom_phone": "0999000005"
             }
         ]
         classes_dict = {}
         for c_info in classes_data:
-            cls = session.query(Class).filter(Class.class_name == c_info["name"]).first()
+            cls = session.query(Class).filter(Class.class_name == c_info["name"], Class.status != "DELETED").first()
             homeroom_user = teachers_dict[c_info["homeroom_phone"]]
             if not cls:
                 cls = Class(
@@ -208,26 +208,15 @@ def seed_academic_sample_data():
         session.commit()
 
         print("--- [5] Seeding Teacher-Subject Assignments ---")
-        # Sample Teacher teaches:
-        # - Math at 12A1 (Homeroom + Subject)
-        # - Math at 11B2 (Subject Teacher)
-        # - Math at 10A3 (Subject Teacher)
-        # Thầy An teaches:
-        # - Physics at 11B2 & Physics at 12A1
-        # Cô Mai teaches:
-        # - Chemistry at 10A3 & Chemistry at 11B2
         assignments_plan = [
-            ("0999000002", "12A1 - Toán nâng cao", "Toán học"),
-            ("0999000002", "11B2 - Vật lý cơ bản", "Toán học"),
-            ("0999000002", "10A3 - Toán cơ bản", "Toán học"),
-            ("0999000004", "11B2 - Vật lý cơ bản", "Vật lý"),
-            ("0999000004", "12A1 - Toán nâng cao", "Vật lý"),
-            ("0999000005", "10A3 - Toán cơ bản", "Hóa học"),
-            ("0999000005", "11B2 - Vật lý cơ bản", "Hóa học"),
-            ("0999000006", "12A1 - Toán nâng cao", "Tiếng Anh"),
-            ("0999000006", "11B2 - Vật lý cơ bản", "Tiếng Anh"),
-            ("0999000007", "12A1 - Toán nâng cao", "Ngữ văn"),
-            ("0999000007", "10A3 - Toán cơ bản", "Ngữ văn"),
+            ("0999000004", "11B2", "Vật lý"),
+            ("0999000004", "12A1", "Vật lý"),
+            ("0999000005", "10A3", "Hóa học"),
+            ("0999000005", "11B2", "Hóa học"),
+            ("0999000006", "12A1", "Tiếng Anh"),
+            ("0999000006", "11B2", "Tiếng Anh"),
+            ("0999000007", "12A1", "Ngữ văn"),
+            ("0999000007", "10A3", "Ngữ văn"),
         ]
         for t_phone, c_name, s_name in assignments_plan:
             teacher = teachers_dict[t_phone]
@@ -274,9 +263,9 @@ def seed_academic_sample_data():
         ]
 
         class_distribution = (
-            [("12A1 - Toán nâng cao", "HS12")] * 20 +
-            [("11B2 - Vật lý cơ bản", "HS11")] * 18 +
-            [("10A3 - Toán cơ bản", "HS10")] * 17
+            [("12A1", "HS12")] * 20 +
+            [("11B2", "HS11")] * 18 +
+            [("10A3", "HS10")] * 17
         )
 
         for idx, (name, (class_name, code_prefix)) in enumerate(zip(student_names, class_distribution), start=1):

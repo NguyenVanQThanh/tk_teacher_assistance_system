@@ -20,6 +20,8 @@ import {
 } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
 import { classesApi, subjectsApi } from '../../services/api';
+import { useAuth } from '../../context/AuthContext';
+import { getTeacherSubjectInfo } from '../../utils/teacherSubjectHelper';
 import './TeacherClassesPage.css';
 
 export default function TeacherClassesPage() {
@@ -32,6 +34,7 @@ export default function TeacherClassesPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
+  const { user } = useAuth();
   const navigate = useNavigate();
 
   // Color themes for card banner rotation
@@ -64,14 +67,30 @@ export default function TeacherClassesPage() {
         }
         setSubjectsList(subjectsData);
 
-        // Fetch students count for each class in parallel
+        // Fetch students count and teacher-subject assignment for each class in parallel
         const enrichedClasses = await Promise.all(
           classesData.map(async (cls, index) => {
             let studentCount = 0;
+            let assignedSubjectName = '';
+
             try {
-              const students = await classesApi.getStudentsInClass(cls.class_id);
+              const [students, teacherAssignments] = await Promise.all([
+                classesApi.getStudentsInClass(cls.class_id).catch(() => []),
+                classesApi.getTeacherSubjects(cls.class_id).catch(() => [])
+              ]);
+
               if (Array.isArray(students)) {
                 studentCount = students.length;
+              }
+
+              if (Array.isArray(teacherAssignments) && user?.user_id) {
+                const myAssign = teacherAssignments.find(a => a.teacher_id === user.user_id);
+                if (myAssign) {
+                  const foundSub = subjectsData.find(s => s.subject_id === myAssign.subject_id);
+                  if (foundSub) {
+                    assignedSubjectName = foundSub.subject_name;
+                  }
+                }
               }
             } catch {
               studentCount = 0;
@@ -81,19 +100,17 @@ export default function TeacherClassesPage() {
             const gradeMatch = cls.class_name.match(/\b(10|11|12)\b/);
             const grade = gradeMatch ? gradeMatch[1] : '12';
 
-            // Extract or assign subject name
-            let subjectName = 'Toán học';
-            let iconType = 'sigma';
+            const defaultSubject = getTeacherSubjectInfo(user).subjectName;
+            const subjectName = assignedSubjectName || defaultSubject;
+            const lowerSub = subjectName.toLowerCase();
+            let iconType = 'book';
 
-            if (cls.class_name.toLowerCase().includes('lý') || cls.class_name.toLowerCase().includes('vật lý') || cls.class_name.toLowerCase().includes('physics')) {
-              subjectName = 'Vật lý';
-              iconType = 'flask';
-            } else if (cls.class_name.toLowerCase().includes('hóa') || cls.class_name.toLowerCase().includes('chemistry')) {
-              subjectName = 'Hóa học';
-              iconType = 'flask';
-            } else if (cls.class_name.toLowerCase().includes('toán') || cls.class_name.toLowerCase().includes('math')) {
-              subjectName = 'Toán học';
+            if (lowerSub.includes('toán') || lowerSub.includes('math')) {
               iconType = 'sigma';
+            } else if (lowerSub.includes('lý') || lowerSub.includes('hóa') || lowerSub.includes('sinh')) {
+              iconType = 'flask';
+            } else if (lowerSub.includes('anh') || lowerSub.includes('văn') || lowerSub.includes('sử') || lowerSub.includes('địa')) {
+              iconType = 'book';
             } else {
               iconType = 'grid';
             }
@@ -135,6 +152,10 @@ export default function TeacherClassesPage() {
       isMounted = false;
     };
   }, []);
+
+  const teacherSubjects = useMemo(() => {
+    return Array.from(new Set(classesList.map(c => c.subjectName).filter(s => s && s !== 'Bộ môn')));
+  }, [classesList]);
 
   const filteredClasses = useMemo(() => {
     return classesList.filter((item) => {
@@ -225,30 +246,24 @@ export default function TeacherClassesPage() {
               </select>
               <ChevronDown size={15} className="classes-select-arrow" />
             </div>
-            {/* Subject Filter */}
-            <div className="classes-select-wrapper">
-              <select
-                className="classes-select"
-                value={selectedSubject}
-                onChange={(e) => setSelectedSubject(e.target.value)}
-              >
-                <option value="all">Tất cả môn học</option>
-                {subjectsList.length > 0 ? (
-                  subjectsList.map((s) => (
-                    <option key={s.subject_id} value={s.subject_name}>
-                      {s.subject_name}
+            {/* Subject Filter (Only shown if teacher teaches more than 1 subject) */}
+            {teacherSubjects.length > 1 && (
+              <div className="classes-select-wrapper">
+                <select
+                  className="classes-select"
+                  value={selectedSubject}
+                  onChange={(e) => setSelectedSubject(e.target.value)}
+                >
+                  <option value="all">Tất cả môn học</option>
+                  {teacherSubjects.map((s) => (
+                    <option key={s} value={s}>
+                      {s}
                     </option>
-                  ))
-                ) : (
-                  <>
-                    <option value="math">Toán học</option>
-                    <option value="physics">Vật lý</option>
-                    <option value="chemistry">Hóa học</option>
-                  </>
-                )}
-              </select>
-              <ChevronDown size={15} className="classes-select-arrow" />
-            </div>
+                  ))}
+                </select>
+                <ChevronDown size={15} className="classes-select-arrow" />
+              </div>
+            )}
           </div>
 
           {/* Error Alert */}

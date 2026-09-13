@@ -1,0 +1,125 @@
+/*
+File Name: SubjectTeacherDashboard.css
+Description: Specialized styling for Subject Teacher Dashboard featuring schedule calendar, pending grading, and daily schedule details.
+Created At: 2026-09-07
+Created By: Tam Khang
+Updated At: 2026-09-07
+Updated By: Tam Khang
+*/
+
+.subject-dashboard-container {
+  display: flex;
+  flex-direction: column;
+  padding: 24px 32px 40px;
+  background-color: #F8F9FA;
+  min-height: calc(100vh - 64px);
+  box-sizing: border-box;
+  font-family: 'Be Vietnam Pro', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  animation: pageFadeIn 0.3s ease-out;
+}
+
+/* Page Header & Greeting */
+.subject-dashboard-header {
+  margin-bottom: 24px;
+}
+
+.subject-dashboard-breadcrumbs {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  font-weight: 500;
+  margin-bottom: 8px;
+}
+
+.subject-breadcrumb-link {
+  color: #64748B;
+  text-decoration: none;
+  transition: color 0.15s ease;
+}
+
+.subject-breadcrumb-link:hover {
+  color: #4D308D;
+}
+
+.subject-breadcrumb-slash {
+  color: #CBD5E1;
+}
+
+.subject-breadcrumb-current {
+  color: #1E293B;
+  font-weight: 600;
+}
+
+.subject-dashboard-title {
+  font-size: 26px;
+  font-weight: 800;
+  color: #1E1B4B;
+  letter-spacing: -0.5px;
+  margin: 0 0 4px 0;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.subject-greeting-wave {
+  display: inline-block;
+  animation: waveAnimation 1.8s infinite ease-in-out;
+  transform-origin: 70% 70%;
+}
+
+@keyframes waveAnimation {
+  0%, 100% { transform: rotate(0deg); }
+  20%, 60% { transform: rotate(14deg); }
+  40%, 80% { transform: rotate(-10deg); }
+}
+
+.subject-dashboard-subtitle {
+  font-size: 13.5px;
+  color: #64748B;
+  margin: 0;
+  line-height: 1.5;
+}
+
+/* Two Column Layout */
+.subject-dashboard-content-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1.85fr) minmax(320px, 1.05fr);
+  gap: 24px;
+  align-items: start;
+}
+
+.subject-dashboard-left-column {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+.subject-dashboard-bottom-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 24px;
+}
+
+.subject-dashboard-right-column {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
+@media (max-width: 1100px) {
+  .subject-dashboard-content-layout {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 768px) {
+  .subject-dashboard-container {
+    padding: 16px;
+  }
+
+  .subject-dashboard-bottom-row {
+    grid-template-columns: 1fr;
+    gap: 16px;
+  }
+}

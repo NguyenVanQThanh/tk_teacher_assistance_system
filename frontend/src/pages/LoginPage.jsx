@@ -2,7 +2,7 @@
 // Description: Split-screen Login Page component connected to backend authentication API.
 // Created At: 2026-08-30
 // Created By: Tam Khang
-// Updated At: 2026-08-30
+// Updated At: 2026-09-13
 // Updated By: Tam Khang
 
 import React, { useState, useEffect } from 'react';
@@ -90,7 +90,9 @@ export default function LoginPage() {
       setSuccessMsg(`Đăng nhập thành công! Chào mừng ${result.user?.full_name || 'bạn'}. Đang chuyển hướng...`);
       
       setTimeout(() => {
-        const fromPath = location.state?.from?.pathname || '/teacher';
+        const userRole = result.user?.role || '';
+        const defaultPath = userRole === 'Student' ? '/student' : '/teacher';
+        const fromPath = location.state?.from?.pathname || defaultPath;
         navigate(fromPath, { replace: true });
       }, 500);
     } catch (err) {
@@ -166,7 +168,7 @@ export default function LoginPage() {
             </div>
             <div className="iso-footer-pills">
               <span className="iso-pill pill-green">Hoàn thành</span>
-              <span className="iso-pill pill-blue">Độ khó: Vận dụng cao</span>
+              <span className="iso-pill pill-blue">Độ khó: Vận dụng</span>
             </div>
           </div>
 

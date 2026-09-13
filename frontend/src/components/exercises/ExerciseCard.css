@@ -68,17 +68,29 @@ Updated By: Tam Khang
   border: none;
   color: #8C8894;
   cursor: pointer;
-  padding: 2px;
+  padding: 4px;
   border-radius: 6px;
   display: flex;
   align-items: center;
   justify-content: center;
-  transition: all 0.2s ease;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 .exercise-more-btn:hover {
   background-color: #F8F1FF;
   color: #4D308D;
+}
+
+.exercise-close-btn {
+  color: #9CA3AF;
+  width: 26px;
+  height: 26px;
+}
+
+.exercise-close-btn:hover {
+  background-color: #FEE2E2;
+  color: #EF4444;
+  transform: scale(1.08);
 }
 
 /* Title */

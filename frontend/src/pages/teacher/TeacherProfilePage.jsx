@@ -31,12 +31,15 @@ import {
   AlertCircle
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
+import { getTeacherProfileDefaults } from '../../utils/teacherSubjectHelper';
 import './TeacherProfilePage.css';
 
 export default function TeacherProfilePage() {
   const { user } = useAuth();
   const [searchParams, setSearchParams] = useSearchParams();
   const navigate = useNavigate();
+
+  const profileDefaults = getTeacherProfileDefaults(user);
 
   // Active tab: 'profile' (Hồ sơ & Thông tin cá nhân) or 'security' (Bảo mật & Đổi mật khẩu)
   const initialTab = searchParams.get('tab') === 'security' ? 'security' : 'profile';
@@ -69,15 +72,32 @@ export default function TeacherProfilePage() {
     dob: '1985-08-15',
     citizenId: '001085012345',
     email: user?.email || 'giaovien.mau@eduglobal.edu.vn',
-    phone: '0912 345 678',
+    phone: user?.phone || '0912 345 678',
     address: 'Số 144 Xuân Thủy, Cầu Giấy, Hà Nội',
     school: 'Trường THPT Chuyên',
-    department: 'Tổ Toán - Tin học',
-    position: 'Giáo viên bộ môn Toán • Chủ nhiệm 12A1',
-    degree: 'Thạc sĩ Sư phạm Toán học',
+    department: profileDefaults.department,
+    position: profileDefaults.position,
+    degree: profileDefaults.degree,
     startYear: '2015',
-    teacherCode: 'GV-2023-089'
+    teacherCode: profileDefaults.teacherCode
   });
+
+  // Re-sync profile form when user context changes
+  useEffect(() => {
+    if (user) {
+      const defs = getTeacherProfileDefaults(user);
+      setProfileForm(prev => ({
+        ...prev,
+        fullName: user.full_name || prev.fullName,
+        email: user.email || prev.email,
+        phone: user.phone || prev.phone,
+        department: defs.department,
+        position: defs.position,
+        degree: defs.degree,
+        teacherCode: defs.teacherCode
+      }));
+    }
+  }, [user]);
 
   // --- Security & Password State ---
   const [passwordForm, setPasswordForm] = useState({

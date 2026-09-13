@@ -2,7 +2,7 @@
 /* Description: Stylesheet for the Teaching Schedule interface with responsive calendar grid and schedule timelines */
 /* Created At: 2026-09-01 */
 /* Created By: Tam Khang */
-/* Updated At: 2026-09-01 */
+/* Updated At: 2026-09-13 */
 /* Updated By: Tam Khang */
 
 .teacher-schedule-page-wrapper {
@@ -356,7 +356,7 @@
   justify-content: flex-start;
 }
 
-.day-number-text {
+.calendar-day-cell .day-number-text {
   font-size: 13px;
   font-weight: 600;
   color: #334155;
@@ -540,81 +540,150 @@
   margin-top: 4px;
 }
 
-/* Notes & Reminders Card */
+/* Notes & Reminders Card Widget */
+.notes-card-widget,
 .notes-reminders-card {
   background-color: #FFFFFF;
   border: 1px solid #E2E8F0;
   border-radius: 16px;
   padding: 18px 20px;
   box-shadow: 0 4px 20px -2px rgba(0, 0, 0, 0.04);
+  font-family: 'Be Vietnam Pro', -apple-system, BlinkMacSystemFont, sans-serif;
 }
 
+.notes-card-header,
 .notes-header {
   display: flex;
   align-items: center;
-  gap: 6px;
+  justify-content: space-between;
   margin-bottom: 14px;
 }
 
-.text-purple-accent {
-  color: #7C3AED;
+.notes-header-left {
+  display: flex;
+  align-items: center;
+  gap: 8px;
 }
 
+.notes-heading,
 .notes-title {
-  font-size: 14.5px;
-  font-weight: 800;
+  font-size: 15px;
+  font-weight: 700;
   color: #0F172A;
   margin: 0;
+  font-family: 'Be Vietnam Pro', -apple-system, BlinkMacSystemFont, sans-serif;
 }
 
+.notes-counter {
+  background-color: #EDE9FE;
+  color: #6D28D9;
+  font-size: 11.5px;
+  font-weight: 700;
+  padding: 2px 8px;
+  border-radius: 9999px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-family: 'Be Vietnam Pro', sans-serif;
+}
+
+.add-note-inline-form,
 .add-note-form {
-  margin-bottom: 12px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background-color: #F8FAFC;
+  border: 1.5px solid #E2E8F0;
+  border-radius: 8px;
+  padding: 4px 6px 4px 12px;
+  margin-bottom: 14px;
+  transition: all 0.2s ease;
 }
 
+.add-note-inline-form:focus-within,
+.add-note-form:focus-within {
+  background-color: #FFFFFF;
+  border-color: #7C3AED;
+  box-shadow: 0 0 0 3px rgba(124, 58, 237, 0.1);
+}
+
+.input-note-text,
 .note-text-input {
-  width: 100%;
-  box-sizing: border-box;
+  flex: 1;
   border: none;
   outline: none;
-  font-size: 12.5px;
-  color: #334155;
-  padding: 8px 0;
-  border-bottom: 1px dashed #CBD5E1;
-  font-family: inherit;
-  transition: border-color 0.15s;
+  background: transparent;
+  font-size: 13px;
+  color: #1E293B;
+  font-family: 'Be Vietnam Pro', -apple-system, BlinkMacSystemFont, sans-serif;
+  font-weight: 500;
 }
 
-.note-text-input:focus {
-  border-bottom-color: #7C3AED;
+.input-note-text::placeholder,
+.note-text-input::placeholder {
+  color: #94A3B8;
+  font-family: 'Be Vietnam Pro', sans-serif;
+}
+
+.btn-add-note-inline {
+  width: 28px;
+  height: 28px;
+  border-radius: 6px;
+  background-color: #7C3AED;
+  border: none;
+  color: #FFFFFF;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  flex-shrink: 0;
+}
+
+.btn-add-note-inline:hover {
+  background-color: #6D28D9;
+  transform: scale(1.05);
+}
+
+.btn-add-note-inline:active {
+  transform: scale(0.95);
 }
 
 .notes-items-list {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 6px;
 }
 
 .single-note-item {
   display: flex;
   align-items: flex-start;
-  gap: 8px;
-  padding: 4px 0;
-  font-size: 12px;
-  color: #475569;
-  line-height: 1.4;
+  gap: 10px;
+  padding: 8px 10px;
+  border-radius: 8px;
+  transition: all 0.15s ease;
+}
+
+.single-note-item:hover {
+  background-color: #F8FAFC;
 }
 
 .note-bullet {
-  width: 5px;
-  height: 5px;
+  width: 6px;
+  height: 6px;
   border-radius: 50%;
   background-color: #7C3AED;
-  margin-top: 6px;
+  margin-top: 7px;
   flex-shrink: 0;
 }
 
 .note-text {
   flex: 1;
+  font-size: 13px;
+  color: #334155;
+  line-height: 1.5;
+  font-family: 'Be Vietnam Pro', -apple-system, BlinkMacSystemFont, sans-serif;
+  font-weight: 500;
 }
 
 .btn-delete-note {
@@ -622,17 +691,20 @@
   background: transparent;
   color: #94A3B8;
   cursor: pointer;
-  padding: 2px;
-  border-radius: 4px;
+  padding: 4px;
+  border-radius: 6px;
   display: flex;
   align-items: center;
   justify-content: center;
-  transition: all 0.12s;
+  transition: all 0.15s ease;
+  opacity: 0.6;
+  margin-top: 2px;
 }
 
 .btn-delete-note:hover {
   color: #EF4444;
   background-color: #FEE2E2;
+  opacity: 1;
 }
 
 /* Add Schedule Modal */

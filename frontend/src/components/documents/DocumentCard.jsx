@@ -2,7 +2,7 @@
 // Description: Reusable card component for displaying educational documents and learning materials.
 // Created At: 2026-08-30
 // Created By: Tam Khang
-// Updated At: 2026-08-30
+// Updated At: 2026-09-12
 // Updated By: Tam Khang
 
 import React from 'react';
@@ -10,7 +10,7 @@ import {
   FileText, 
   Video, 
   FileCode, 
-  MoreVertical, 
+  X, 
   Eye, 
   Download, 
   Edit3, 
@@ -18,7 +18,7 @@ import {
 } from 'lucide-react';
 import './DocumentCard.css';
 
-export default function DocumentCard({ doc, onPreview, onDownload, onEdit, onMore }) {
+export default function DocumentCard({ doc, onPreview, onDownload, onEdit, onMore, onDelete, onRemove }) {
   // Determine icon and color scheme based on file type
   const renderTypeIcon = () => {
     switch (doc.fileType?.toLowerCase()) {
@@ -61,19 +61,26 @@ export default function DocumentCard({ doc, onPreview, onDownload, onEdit, onMor
       className="document-card clickable-card"
       onClick={() => onPreview && onPreview(doc)}
     >
-      {/* Top Header: Icon & More Options */}
+      {/* Top Header: Icon & Close / Delete Button */}
       <div className="doc-card-top">
         {renderTypeIcon()}
         <button 
           type="button" 
-          className="doc-more-btn" 
+          className="doc-more-btn doc-close-btn" 
           onClick={(e) => {
             e.stopPropagation();
-            onMore && onMore(doc);
+            if (onDelete) {
+              onDelete(doc);
+            } else if (onRemove) {
+              onRemove(doc);
+            } else if (onMore) {
+              onMore(doc);
+            }
           }}
-          aria-label="Tùy chọn khác"
+          aria-label="Xóa tài liệu"
+          title="Xóa tài liệu"
         >
-          <MoreVertical size={18} />
+          <X size={17} strokeWidth={2.2} />
         </button>
       </div>
 

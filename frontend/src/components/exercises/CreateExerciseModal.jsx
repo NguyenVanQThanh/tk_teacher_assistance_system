@@ -2,7 +2,7 @@
 // Description: Multi-method Exercise Creation Modal supporting Direct Manual, Multi-file Upload (Question File & Separate Answer Key), and AI Generation.
 // Created At: 2026-08-30
 // Created By: Tam Khang
-// Updated At: 2026-09-01
+// Updated At: 2026-09-13
 // Updated By: Tam Khang
 
 import React, { useState, useRef, useEffect } from 'react';

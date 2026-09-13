@@ -19,6 +19,7 @@ import {
 } from 'lucide-react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
+import { getTeacherProfileDefaults } from '../../utils/teacherSubjectHelper';
 import './TeacherSidebar.css';
 
 export default function TeacherSidebar({ 
@@ -92,10 +93,13 @@ export default function TeacherSidebar({
     }
   };
 
+  const teacherDefaults = getTeacherProfileDefaults(user);
+  const isHomeroomTeacher = user?.role === 'HomeroomTeacher' || user?.is_homeroom_teacher || teacherDefaults.isHomeroom;
+
   const menuItems = [
     { id: 'dashboard', label: 'Bảng điều khiển', icon: LayoutGrid },
     { id: 'classes', label: 'Lớp học của tôi', icon: GraduationCap },
-    { id: 'homeroom', label: 'Lớp chủ nhiệm', icon: Users },
+    ...(isHomeroomTeacher ? [{ id: 'homeroom', label: 'Lớp chủ nhiệm', icon: Users }] : []),
     { id: 'grading', label: 'Chấm bài & Phản hồi', icon: Star },
     { id: 'documents', label: 'Kho tài liệu', icon: FolderOpen },
     { id: 'exercises', label: 'Kho bài tập', icon: ClipboardList },

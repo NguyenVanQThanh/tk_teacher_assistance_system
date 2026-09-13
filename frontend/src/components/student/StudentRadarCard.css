@@ -1,0 +1,57 @@
+/*
+File Name: StudentRadarCard.css
+Description: Styling for student radar analytics card with center total badge.
+Created At: 2026-09-07
+Created By: Tam Khang
+Updated At: 2026-09-07
+Updated By: Tam Khang
+*/
+
+.student-radar-card {
+  background-color: #FFFFFF;
+  border-radius: 16px;
+  border: 1px solid #EBE8F0;
+  padding: 20px 24px;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.02);
+  transition: box-shadow 0.2s ease;
+  height: 100%;
+}
+
+.student-radar-card:hover {
+  box-shadow: 0 6px 18px rgba(77, 48, 141, 0.05);
+}
+
+.radar-card-title {
+  font-size: 17px;
+  font-weight: 800;
+  color: #1E1B4B;
+  margin: 0 0 8px 0;
+  letter-spacing: -0.2px;
+}
+
+.radar-chart-wrapper {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex: 1;
+  position: relative;
+  min-height: 220px;
+}
+
+.radar-subject-axis-group {
+  transition: all 0.2s ease;
+}
+
+.radar-subject-axis-group:hover text {
+  fill: #7C3AED !important;
+  font-weight: 800 !important;
+  transform-origin: center;
+}
+
+.radar-subject-axis-group:hover line {
+  stroke: #7C3AED !important;
+  stroke-width: 2 !important;
+}

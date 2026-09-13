@@ -2,7 +2,7 @@
 // Description: Reusable card component for exercises, quizzes, homework, and test materials.
 // Created At: 2026-08-30
 // Created By: Tam Khang
-// Updated At: 2026-08-30
+// Updated At: 2026-09-12
 // Updated By: Tam Khang
 
 import React from 'react';
@@ -12,7 +12,7 @@ import {
   Clock, 
   Calendar, 
   ListOrdered, 
-  MoreVertical, 
+  X, 
   Eye, 
   Edit3, 
   Share2, 
@@ -20,7 +20,7 @@ import {
 } from 'lucide-react';
 import './ExerciseCard.css';
 
-export default function ExerciseCard({ exercise, onPreview, onEdit, onShare, onDownload, onMore }) {
+export default function ExerciseCard({ exercise, onPreview, onEdit, onShare, onDownload, onMore, onDelete }) {
   const isQuiz = exercise.type === 'quiz' || exercise.type === 'test';
 
   return (
@@ -36,11 +36,15 @@ export default function ExerciseCard({ exercise, onPreview, onEdit, onShare, onD
         </div>
         <button 
           type="button" 
-          className="exercise-more-btn"
-          onClick={() => onMore && onMore(exercise)}
-          aria-label="Tùy chọn khác"
+          className="exercise-more-btn exercise-close-btn"
+          onClick={() => {
+            if (onDelete) onDelete(exercise);
+            else if (onMore) onMore(exercise);
+          }}
+          aria-label="Xóa bài tập"
+          title="Xóa bài tập"
         >
-          <MoreVertical size={18} />
+          <X size={17} strokeWidth={2.2} />
         </button>
       </div>
 
