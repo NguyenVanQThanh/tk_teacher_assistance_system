@@ -1,102 +1,273 @@
 File Name: business_overview.md
-Description: Tong hop nghiep vu (business) tu SRS v1.0 va anh xa theo tung sprint trien khai
+Description: Tong hop nghiep vu (business), toan bo so do luong quy trinh hoat dong (Mermaid workflows) va anh xa sprint tu SRS den thuc te trien khai
 Created At: 2026-07-18
-Created By: AI Agent
-Updated At: 2026-07-18
-Updated By: AI Agent
+Created By: Tam Khang
+Updated At: 2026-09-18
+Updated By: Tam Khang
 
-# Tổng quan nghiệp vụ — SmartLMS
+# Tổng quan Nghiệp vụ & Quy trình Luồng hoạt động (Workflows) — SmartLMS
 
-> Nguồn: `docs/HỆ THỐNG QUẢN LÍ BÀI TẬP KẾT HỢP PHÂN TÍCH HÀNH VI.pdf` (SRS v1.0, BA soạn 17/06/2026).
-> Mục đích tài liệu: tổng hợp toàn bộ business requirement trong SRS và ánh xạ (map) từng yêu cầu vào đúng sprint triển khai, để đối chiếu ngược khi viết feature spec hoặc audit phạm vi.
+> Nguồn: `docs/HỆ THỐNG QUẢN LÍ BÀI TẬP KẾT HỢP PHÂN TÍCH HÀNH VI.pdf` (SRS v1.0) kết hợp cùng hệ thống thực tế qua các Sprint (S0, S1, S2, S3, S4).  
+> Mục đích tài liệu: Tổng hợp toàn bộ quy chuẩn nghiệp vụ (Business Requirements), các Use Case chính và chuẩn hóa 100% các sơ đồ luồng quy trình (Workflows) dưới dạng Mermaid để làm căn cứ phát triển, kiểm thử và bàn giao.
 
 ---
 
-## 1. Bối cảnh & vấn đề nghiệp vụ (từ SRS §1.1)
+## 1. Bối cảnh & Vấn đề Nghiệp vụ (SRS §1.1)
 
-| # | Vấn đề hiện tại | Hệ quả |
+| # | Vấn đề thực tế | Hệ quả nghiệp vụ | Giải pháp SmartLMS |
+|---|---|---|---|
+| 1 | Giáo viên không kiểm soát được tần suất và hành vi làm bài tại nhà của học sinh | Chỉ thấy kết quả cuối, không biết thời lượng làm bài thực tế, có dồn sát giờ (last-minute submission) hay không | Tự động ghi vết thời gian làm bài thực tế (`start_time`, `end_time`, `total_time_seconds`) và cảnh báo nộp bài sát giờ |
+| 2 | Thiếu công cụ trực quan hóa năng lực học tập | Giáo viên & học sinh thiếu biểu đồ đa chiều để đánh giá điểm mạnh — yếu — tiến độ | Biểu đồ mạng nhện trực quan hóa năng lực và nhận xét về khả năng học tập của học sinh |
+| 3 | Áp lực biên soạn bài tập, đề kiểm tra đa dạng | Soạn đề thủ công, gõ công thức Toán LaTeX, cắt dán đồ thị/hình vẽ tốn nhiều công sức | Tích hợp **AI Gemini Multimodal Vision OCR** tự động bóc tách đề thi PDF/Ảnh sang LaTeX và sinh câu hỏi chuẩn |
+| 4 | Khó khăn khi áp dụng cấu trúc đề mới của Bộ GD&ĐT | Cấu trúc đề thi mới (gồm 3 phần: Trắc nghiệm, Đúng/Sai 4 ý, Trả lời ngắn) khó tổ chức và chấm thủ công | Chuẩn hóa đầy đủ 3 dạng câu hỏi trên giao diện tạo đề và phòng thi trực tuyến của học sinh |
+
+---
+
+## 2. Mục tiêu Chiến lược (SRS §1.3)
+
+1. **Đo lường chi tiết hành vi học tập**: Ghi nhận thời gian bắt đầu, thời gian nộp bài, tần suất làm bài, phát hiện các trường hợp nộp bài sát giờ.
+2. **Trực quan hóa năng lực lớp học**: Báo cáo đa chiều qua biểu đồ mạng nhện giúp giáo viên nắm bắt nhanh tình hình học tập.
+3. **Đánh giá năng lực học tập của học sinh**: Cung cấp dữ liệu tự đánh giá và nhận xét về khả năng học tập của học sinh (hệ thống cung cấp nhận xét về năng lực học tập, không thể gợi ý lộ trình học chi tiết).
+4. **Tối ưu hóa nguồn lực biên soạn**: Kết hợp biên soạn thủ công linh hoạt và ứng dụng AI nhận diện, bóc tách đề thi thông minh từ tài liệu giáo viên.
+
+---
+
+## 3. Phạm vi Chức năng & Sơ đồ Luồng Quy trình (Mermaid Workflows)
+
+### 3.1. Phân hệ 1 — Tracking (Quản lý & Theo dõi Hành vi Làm bài)
+- **Chức năng**: Ghi vết thời gian làm bài (bắt đầu/nộp bài), giám sát tần suất làm bài trực tuyến, cảnh báo tiến độ nộp bài và nộp bài sát giờ.
+- **Luồng nghiệp vụ**: Hệ thống tự động ghi nhận thời điểm bắt đầu (`start_time`), thời điểm nộp (`end_time`) và đo tổng thời gian học sinh thực sự tương tác làm bài (`total_time_seconds`).
+- **Đầu ra**: Biểu đồ tần suất truy cập theo giờ/ngày của từng học sinh, danh sách cảnh báo nộp bài sát giờ (last-minute submission).
+- **Vai trò chính**: Giáo viên (tiêu thụ dữ liệu phân tích), Học sinh (nguồn phát sinh sự kiện làm bài).
+
+```mermaid
+graph TD
+    A[Học sinh bắt đầu bài thi] --> B[Ghi nhận start_time]
+    B --> C[Tương tác làm bài: MCQ, Đúng/Sai, Điền số]
+    C --> D[Học sinh bấm nộp bài hoặc hệ thống tự động nộp khi hết giờ]
+    D --> E[Ghi nhận end_time & tính toán total_time_seconds]
+    E --> F[Bộ phân tích hành vi học tập]
+    F --> G[Biểu đồ tần suất truy cập theo giờ/ngày]
+    F --> H[Phát hiện & cảnh báo nộp bài sát giờ last-minute]
+```
+
+---
+
+### 3.2. Phân hệ 2 — Exercise Core & AI OCR (Ngân hàng Bài tập & Bóc tách Đề thi bằng AI)
+- **Chức năng**: Quản lý kho học liệu, biên soạn bài tập theo cấu trúc 3 phần chuẩn Bộ GD&ĐT, bóc tách đề thi thông minh bằng AI Gemini Vision OCR, phê duyệt và giao bài tập cho lớp.
+- **Luồng nghiệp vụ**:
+  1. *Soạn đề thủ công*: Giáo viên nhập thông tin chung, tạo câu hỏi theo chuẩn 3 phần mới của Bộ GD&ĐT (Phần I: Trắc nghiệm 4 lựa chọn, Phần II: Đúng/Sai 4 ý con a-b-c-d, Phần III: Trả lời ngắn/điền số), hỗ trợ công thức Toán học chuẩn `$LaTeX$`, gắn tag mức độ nhận thức (Nhận biết, Thông hiểu, Vận dụng).
+  2. *Bóc tách qua AI Gemini Multimodal Vision*: Giáo viên upload file PDF hoặc ảnh đề thi Toán/KHTN. AI tự động quét, bóc tách công thức LaTeX, nhận diện bảng biến thiên, đồ thị, hình học, tách 3 phần câu hỏi và đáp án đúng.
+  3. Giáo viên rà soát, tinh chỉnh trước khi lưu vào ngân hàng đề hoặc giao bài cho lớp kèm hạn nộp (`due_at`).
+- **Đầu ra**: Bộ bài tập hoàn chỉnh lưu vào kho học liệu, xuất bản đề thi dạng PDF hoặc phân bổ tới các lớp học sinh.
+
+```mermaid
+graph TD
+    GV[Giáo viên] --> ModeChoice{Chọn phương thức tạo đề}
+    
+    ModeChoice -- Soạn thủ công --> M1[Nhập thông tin chung & thời lượng]
+    M1 --> M2[Thêm câu hỏi theo 3 phần: Phần I MCQ, Phần II Đúng/Sai, Phần III Điền số]
+    M2 --> M3[Nhập công thức Toán LaTeX & Mức độ nhận thức]
+    M3 --> SaveEx[Lưu vào Ngân hàng bài tập]
+    
+    ModeChoice -- Tải đề PDF/Ảnh qua AI --> AI1[Upload file PDF hoặc Ảnh đề thi Toán/KHTN]
+    AI1 --> AI2[Gemini Multimodal Vision quét & phân tích]
+    AI2 --> AI3[Tự động bóc tách LaTeX, bảng biến thiên, đồ thị & tách đáp án]
+    AI3 --> AI4[Giáo viên rà soát & chỉnh sửa trực quan]
+    AI4 --> SaveEx
+
+    SaveEx --> AssignAction[Giao bài tập cho Lớp học kèm hạn nộp due_at]
+    SaveEx --> ExportAction[Xuất bản đề thi ra file PDF]
+```
+
+---
+
+### 3.3. Phân hệ 3 — Teacher Dashboard (Dashboard Phân tích cho Giáo viên)
+- **Chức năng**: Thống kê năng lực tổng quan của lớp, phân tích chi tiết hành vi cá nhân, báo cáo phổ điểm và dạng bài hay sai.
+- **Luồng nghiệp vụ**:
+  - **Biểu đồ mạng nhện** thể hiện năng lực và mức độ nắm vững kiến thức của lớp học.
+  - Danh sách học sinh có dấu hiệu sa sút tần suất làm bài hoặc nộp sát giờ (last-minute submission).
+  - Khuyến nghị sư phạm dựa trên vùng kiến thức lớp đang có tỷ lệ làm sai cao.
+  - Hỗ trợ 2 góc nhìn chuyên biệt: Giáo viên bộ môn (`SubjectTeacherDashboard`) và Giáo viên chủ nhiệm (`HomeroomTeacherDashboard`).
+- **Đầu ra**: Báo cáo trực quan hóa năng lực định kỳ (xuất PDF/Excel).
+
+```mermaid
+graph TD
+    ClassData[Dữ liệu nộp bài & kết quả của các lớp] --> AnalyticsCore[Bộ xử lý phân tích sư phạm]
+    AnalyticsCore --> RoleView{Chọn góc nhìn quản lý}
+    
+    RoleView -- Giáo viên Bộ môn --> SubjectDash[SubjectTeacherDashboard]
+    SubjectDash --> S1[Phổ điểm theo từng bài tập]
+    SubjectDash --> S2[Biểu đồ mạng nhện đánh giá năng lực lớp]
+    SubjectDash --> S3[Thống kê các dạng bài và câu hỏi hay làm sai]
+    
+    RoleView -- Giáo viên Chủ nhiệm --> HomeroomDash[HomeroomTeacherDashboard]
+    HomeroomDash --> H1[Sĩ số & thông tin hồ sơ học sinh lớp chủ nhiệm]
+    HomeroomDash --> H2[Theo dõi chuyên cần & tổng quan học lực cả lớp]
+    HomeroomDash --> H3[Danh sách học sinh nộp bài sát giờ hoặc cần hỗ trợ]
+```
+
+---
+
+### 3.4. Phân hệ 4 — Student Dashboard (Dashboard Tự đánh giá cho Học sinh)
+- **Chức năng**: Xem số liệu học tập cá nhân theo môn, theo dõi tiến độ hoàn thành bài tập, nhận xét về khả năng học tập của học sinh.
+- **Luồng nghiệp vụ**:
+  - Học sinh theo dõi tổng số bài đã làm, tỷ lệ chính xác, thời gian hoàn thành theo từng môn.
+  - Hệ thống cung cấp **nhận xét về khả năng học tập của học sinh** dựa trên dữ liệu phân tích năng lực (hệ thống chỉ đưa ra nhận xét, đánh giá năng lực học tập, không thể gợi ý lộ trình học chi tiết).
+  - Tích hợp công cụ sinh đề tự luyện tập AI cá nhân hóa giúp học sinh tự củng cố kiến thức theo chủ đề.
+- **Đầu ra**: Biểu đồ mạng nhện (Radar Chart) thể hiện năng lực đa môn và nhận xét năng lực học tập.
+
+```mermaid
+graph TD
+    StudentHistory[Lịch sử làm bài của học sinh] --> EvalEngine[Hệ thống tổng hợp năng lực học sinh]
+    EvalEngine --> Rad1[Biểu đồ mạng nhện Radar Chart đa môn]
+    EvalEngine --> Rad2[Thống kê số bài hoàn thành & tỷ lệ chính xác]
+    EvalEngine --> Rad3[Nhận xét về khả năng học tập của học sinh]
+    
+    Rad3 --> SelfEval[Học sinh xác định vùng kiến thức cần bổ trợ]
+    SelfEval --> OpenModal[Mở AI Practice Generator Modal]
+    OpenModal --> GenEx[AI sinh bộ đề tự luyện tập theo chủ đề đã chọn]
+    GenEx --> Practice[Học sinh tiến hành tự luyện tập củng cố kiến thức]
+```
+
+---
+
+### 3.5. Các Luồng Tương tác Hệ thống Cốt lõi (System Interaction Workflows)
+
+#### A. Luồng Quản lý Tài khoản & Phân quyền (Auth & Dynamic RBAC Workflow)
+
+```mermaid
+sequenceDiagram
+    autonumber
+    actor User as Người dùng (GV / HS / Admin)
+    participant UI as Giao diện Đăng nhập (FE)
+    participant Auth as AuthService (BE)
+    participant DB as PostgreSQL
+
+    User->>UI: Nhập Email hoặc Số điện thoại + Mật khẩu
+    UI->>Auth: POST /api/v1/auth/login
+    Auth->>DB: Truy vấn User theo Email/Phone
+    DB-->>Auth: Trả thông tin User + password_hash + status
+    Auth->>Auth: Kiểm tra mật khẩu (bcrypt verify) & status == 'ACTIVE'
+    Auth->>DB: Tải Role, RolePermission & UserPermission (allow/deny override)
+    DB-->>Auth: Danh sách permissions hợp nhất
+    Auth-->>UI: Trả JWT Access Token + User Info (Role, Full Name)
+    
+    alt Role là Giáo viên (Teacher)
+        UI->>User: Điều hướng vào Teacher Portal (/teacher) qua TeacherLayout
+    else Role là Học sinh (Student)
+        UI->>User: Điều hướng vào Student Portal (/student) qua StudentLayout
+    end
+```
+
+#### B. Luồng Tổ chức Đào tạo & Phân công Giảng dạy (Academic Org Workflow)
+
+```mermaid
+sequenceDiagram
+    autonumber
+    actor Admin as BGH / Quản trị viên
+    participant Sys as Hệ thống SmartLMS
+    actor Teacher as Giáo viên
+    actor Student as Học sinh
+
+    Admin->>Sys: Khai báo Môn học (Subject) & Lớp học (Class)
+    Admin->>Sys: Phân công GV chủ nhiệm (homeroom_teacher_id)
+    Admin->>Sys: Phân công Giảng dạy: Gán GV + Môn + Lớp (TeacherSubject)
+    Admin->>Sys: Ghi danh Học sinh vào Lớp (StudentClass, mã học sinh)
+    Note over Sys: RBAC Data Scoping kích hoạt
+    Teacher->>Sys: Xem danh sách lớp & học sinh được phân công phụ trách
+    Note over Teacher,Sys: GV CHỈ xem và giao bài cho lớp mình dạy
+    Student->>Sys: Xem thông tin lớp & các môn học đang theo học
+```
+
+#### C. Luồng Khảo thí Trực tuyến & Chấm bài 3 Trạng thái (Assessment, Submission & Grading Workflow)
+
+```mermaid
+sequenceDiagram
+    autonumber
+    actor Student as Học sinh
+    participant App as Giao diện Khảo thí (FE)
+    participant API as Backend API
+    actor Teacher as Giáo viên
+
+    Student->>App: Mở bài tập được giao (vào chế độ Fullscreen Exam)
+    App->>API: POST /api/v1/assignments/{id}/attempts (Bắt đầu làm bài)
+    API-->>App: Trả attempt_id & ghi nhận start_time
+    Note over App: Đồng hồ đếm ngược kích hoạt, khóa điều hướng
+    Student->>App: Làm Phần I (MCQ), Phần II (Đúng/Sai), Phần III (Điền số qua Numpad ảo)
+    Note over App: Tự động lưu tiến độ vào LocalStorage & Component State
+    Student->>App: Nhấn Nộp bài (hoặc tự động nộp khi hết giờ làm)
+    App->>API: PUT /api/v1/attempts/{id}/submit (detailed_results, total_time_seconds)
+    API->>API: Tự động chấm trắc nghiệm Phần I & Phần II (score sơ bộ)
+    API-->>App: Trả kết quả điểm số sơ bộ & xác nhận hoàn tất
+    
+    Note over Teacher,API: Quy trình chấm & phê duyệt của Giáo viên
+    Teacher->>API: Mở danh sách bài nộp (TeacherGradingPage)
+    Teacher->>API: Lọc trạng thái: pending_grading (Chờ chấm)
+    Teacher->>API: Chấm điểm câu hỏi tự luận/điền số, nhập feedback nhận xét
+    Teacher->>API: Chuyển trạng thái -> pending_review (Chờ duyệt)
+    Teacher->>API: Phê duyệt điểm số cuối cùng -> approved (Đã duyệt)
+```
+
+---
+
+## 4. Yêu cầu Phi chức năng & Ràng buộc Hệ thống (NFRs)
+
+| Nhóm | Tiêu chuẩn kỹ thuật | Triển khai thực tế trong hệ thống |
 |---|---|---|
-| 1 | GV không kiểm soát được tần suất học thực tế của HS ở nhà | Chỉ thấy bài nộp cuối cùng, không biết HS học trong bao lâu, có dồn sát giờ không |
-| 2 | Thiếu công cụ trực quan hóa năng lực | GV & HS không có biểu đồ/đa chiều để đánh giá điểm mạnh — yếu — tiến độ |
-| 3 | Áp lực biên soạn bài tập cá nhân hóa | Tạo bộ đề đa dạng, bám sát bài giảng tốn nhiều thời gian công sức GV |
-
-## 2. Mục tiêu chiến lược (SRS §1.3)
-
-1. Đo lường chi tiết hành vi học tập (thời gian, tần suất).
-2. Trực quan hóa năng lực lớp học (báo cáo, biểu đồ).
-3. Thúc đẩy năng lực tự học của học sinh (dữ liệu tự đánh giá + lộ trình riêng).
-4. Tối ưu hóa nguồn lực biên soạn (AI tạo sinh bài tập từ tài liệu GV).
+| **Bảo mật & Phân quyền (Security & RBAC)** | Mã hóa toàn bộ dữ liệu cá nhân & kết quả học tập. Phân quyền RBAC nghiêm ngặt | Mọi endpoint đều kiểm tra quyền; Học sinh không xem được dữ liệu hành vi của học sinh khác; Giáo viên chỉ quản lý học sinh thuộc lớp mình phụ trách. |
+| **Xóa dữ liệu (Data Policy)** | **Tuyệt đối không xóa cứng (Hard Delete)** | 100% nghiệp vụ xóa áp dụng cơ chế **Soft Delete** (`status = 'DELETED'`), bảo toàn toàn vẹn dữ liệu lịch sử và quan hệ khóa ngoại. |
+| **Giao diện & Trải nghiệm (UX/UI)** | Tối giản, trực quan, responsive | Giao diện React 18, biểu đồ mạng nhện trực quan, hỗ trợ hiển thị mượt mà công thức Toán học `$LaTeX$` (qua MathJax/KaTeX), phân trang con trỏ (Keyset Cursor Pagination) tối ưu trải nghiệm người dùng. |
 
 ---
 
-## 3. Phạm vi chức năng — 4 phân hệ nghiệp vụ (SRS §2)
+## 5. Ánh xạ Nghiệp vụ → Sprint & Hiện trạng Triển khai Chi tiết
 
-### 3.1. Module 1 — Tracking (Quản lý & theo dõi hành vi làm bài)
-- **Chức năng**: ghi vết thời gian làm bài (bắt đầu/tạm dừng/nộp), giám sát tần suất trực tuyến, cảnh báo tiến độ nộp bài.
-- **Luồng nghiệp vụ**: hệ thống tự động ghi thời điểm bắt đầu/tạm dừng/nộp; đo tổng thời gian HS thực sự tương tác với giao diện câu hỏi.
-- **Đầu ra**: chỉ số thời gian làm bài trung bình, biểu đồ tần suất truy cập theo giờ/ngày của từng HS.
-- **Vai trò chính**: Giáo viên (người tiêu thụ dữ liệu), Học sinh (nguồn phát sinh sự kiện).
+Sơ đồ phụ thuộc kỹ thuật và lộ trình thực thi giữa các Sprint trong hệ thống:
 
-### 3.2. Module 2 — AI Generation (Tạo sinh bài tập bằng AI)
-- **Chức năng**: tải lên tài liệu kiến thức nền tảng, cấu hình tiêu chí bài tập, phê duyệt/biên tập câu hỏi AI tạo ra.
-- **Luồng nghiệp vụ**:
-  1. GV tải lên tài liệu (PDF, Word, giáo án, hoặc nhập text).
-  2. Chọn cấu hình: số lượng câu hỏi, dạng bài (trắc nghiệm / tự luận ngắn), độ khó (Nhận biết / Thông hiểu / Vận dụng).
-  3. AI phân tích tài liệu và sinh bộ bài tập mẫu.
-  4. GV chỉnh sửa/duyệt trước khi giao bài.
-- **Đầu ra**: bộ bài tập hoàn chỉnh lưu vào kho học liệu.
-- **Ràng buộc phi chức năng**: AI phải trả kết quả ≤ 15–30 giây với tài liệu dưới 20 trang.
+```mermaid
+graph LR
+    S0[Sprint 0: Foundation & Auth] --> S1[Sprint 1: Academic Org]
+    S0 --> S2[Sprint 2: Bài tập lõi & Khảo thí]
+    S1 --> S2
+    S2 --> S3[Sprint 3: AI Gemini Vision OCR & Keyset Pagination]
+    S2 --> S4[Sprint 4: Advanced Dashboards & Analytics]
+    S3 --> S4
+    S4 --> S5[Sprint 5: Detailed Behavior Tracking]
+    S4 --> S6[Sprint 6: AI Personalized Learning Support]
 
-### 3.3. Module 3 — Teacher Dashboard (Dashboard phân tích cho giáo viên)
-- **Chức năng**: thống kê năng lực tổng quan của lớp, phân tích chi tiết hành vi cá nhân, báo cáo phổ điểm & dạng bài hay sai.
-- **Luồng nghiệp vụ**:
-  - Biểu đồ cột/đường phổ điểm lớp học.
-  - Danh sách HS có dấu hiệu sa sút tần suất làm bài hoặc nộp sát giờ (last-minute submission).
-  - Khuyến nghị sư phạm dựa trên vùng kiến thức lớp đang hổng.
-- **Đầu ra**: báo cáo trực quan hóa năng lực định kỳ (xuất PDF/Excel).
-- **Ràng buộc phi chức năng**: dashboard tải < 3 giây với dữ liệu 1 lớp (~50 HS).
+    classDef done fill:#10b981,stroke:#059669,stroke-width:2px,color:#ffffff;
+    classDef inprog fill:#3b82f6,stroke:#1d4ed8,stroke-width:2px,color:#ffffff;
+    classDef planned fill:#64748b,stroke:#334155,stroke-width:1px,color:#ffffff;
 
-### 3.4. Module 4 — Student Dashboard (Dashboard tự đánh giá cho học sinh)
-- **Chức năng**: xem số liệu học tập cá nhân theo môn, theo dõi tiến độ hoàn thành mục tiêu, gợi ý lộ trình học tập riêng.
-- **Luồng nghiệp vụ**:
-  - HS theo dõi tổng số bài đã làm, tỷ lệ chính xác, thời gian phân bổ theo môn.
-  - Hệ thống gợi ý vùng kiến thức cần bổ sung dựa trên dữ liệu phân tích năng lực.
-  - HS thiết lập mục tiêu điểm số → hệ thống điều hướng bài tập ôn luyện.
-- **Đầu ra**: biểu đồ Radar (mạng nhện) thể hiện năng lực đa môn + gợi ý lộ trình học.
+    class S0,S1,S2,S3 done;
+    class S4 inprog;
+    class S5,S6 planned;
+```
 
-## 4. Yêu cầu phi chức năng (SRS §3)
-
-| Nhóm | Yêu cầu |
-|---|---|
-| Bảo mật (Security) | Mã hóa toàn bộ dữ liệu cá nhân & kết quả học tập. RBAC nghiêm ngặt: HS không xem được dữ liệu hành vi của HS khác; GV chỉ quản lý HS thuộc lớp mình phụ trách. |
-| Hiệu năng (Performance) | AI tạo bài ≤ 15–30s (tài liệu < 20 trang). Dashboard tải < 3s (lớp ~50 HS). |
-| UX/UI | Dashboard tối giản, trực quan (biểu đồ cột/tròn/radar), responsive (desktop + mobile). |
-
----
-
-## 5. Ánh xạ Business → Sprint
-
-Đối chiếu 4 phân hệ SRS với lộ trình sprint hiện tại trong [README.md](../../README.md#7-lộ-trình-sprint). Sprint 0/1/2 là hạ tầng kỹ thuật & nghiệp vụ nền (không có trong 4 module SRS gốc nhưng là điều kiện tiên quyết); Sprint 3–6 ánh xạ trực tiếp 1-1 với 4 module SRS.
-
-| Sprint | Tên | Nguồn gốc | Nghiệp vụ SRS liên quan | Trạng thái |
+| Sprint | Phân hệ nghiệp vụ | Specs & Tasks liên quan | Phạm vi triển khai kỹ thuật & nghiệp vụ thực tế | Trạng thái |
 |---|---|---|---|---|
-| **S0** | Foundation & Auth | Hạ tầng kỹ thuật (không thuộc 4 module SRS) | NFR Bảo mật/RBAC (§3) — tiền đề phân quyền cho toàn bộ 4 module | ✅ Hoàn thành |
-| **S1** | Academic Org (môn học, lớp, ghi danh, phân công GV) | Hạ tầng nghiệp vụ (không thuộc 4 module SRS) | Điều kiện tiên quyết cho "GV chỉ quản lý HS thuộc lớp mình phụ trách" (§3 Security) | Chưa bắt đầu |
-| **S2** | Bài tập lõi (câu hỏi, giao bài, làm & chấm điểm) | Hạ tầng dữ liệu cho Module 1 & 2 | Nền dữ liệu `exercises`/`questions`/`student_exercise_attempts` — điều kiện để Tracking (M1) và AI Generation (M2) có dữ liệu để vận hành | Chưa bắt đầu |
-| **S3** | Tracking | **Module 1 — Tracking** | Ghi vết thời gian làm bài, giám sát tần suất, cảnh báo tiến độ nộp bài (SRS §2, dòng 1) | Chưa bắt đầu |
-| **S4** | AI Generation | **Module 2 — AI Generation** | Upload tài liệu, cấu hình tiêu chí, AI sinh đề, GV duyệt/biên tập (SRS §2, dòng 2) | Chưa bắt đầu |
-| **S5** | Teacher Dashboard | **Module 3 — Teacher Dashboard** | Phổ điểm lớp, phân tích hành vi cá nhân, khuyến nghị sư phạm, xuất báo cáo (SRS §2, dòng 3) | Chưa bắt đầu |
-| **S6** | Student Dashboard | **Module 4 — Student Dashboard** | Số liệu theo môn, mục tiêu điểm số, gợi ý lộ trình, biểu đồ radar (SRS §2, dòng 4) | Chưa bắt đầu |
+| **Sprint 0** | Foundation & Auth (Hạ tầng kỹ thuật & Bảo mật) | [f_fnd_01_spec.md](specs/f_fnd_01_spec.md)<br>[f_auth_01_spec.md](specs/f_auth_01_spec.md) | Dựng khung Backend FastAPI, kết nối PostgreSQL qua SQLAlchemy 2.0 & Alembic, Docker hóa toàn bộ hệ thống (BE, FE, DB). Thiết kế mô hình RBAC động (`roles`, `users`, `permissions`, `role_permissions`, `user_permissions`), cơ chế xác thực JWT, bảo vệ endpoint theo permission code (`require_perm`) và chuẩn hóa error envelope. | ✅ Hoàn thành (`done`) |
+| **Sprint 1** | Academic Org (Cơ cấu tổ chức đào tạo) | [f_acad_01_subjects_spec.md](specs/f_acad_01_subjects_spec.md)<br>[f_acad_02_classes_spec.md](specs/f_acad_02_classes_spec.md)<br>[f_acad_03_enrollment_spec.md](specs/f_acad_03_enrollment_spec.md)<br>[f_acad_04_teacher_assignment_spec.md](specs/f_acad_04_teacher_assignment_spec.md) | Xây dựng nghiệp vụ CRUD, Soft Delete & Khôi phục (Restore) danh mục môn học (`subjects`), lớp học (`classes`), ghi danh học sinh (`student_class`), phân công chuyên môn giáo viên (`teacher_subjects`) và gán giáo viên chủ nhiệm (`homeroom_teacher_id`). Thiết lập cơ chế **RBAC Data Scoping** (Giáo viên chỉ được thao tác với lớp và môn học mình phụ trách). | ✅ Hoàn thành (`done`) |
+| **Sprint 2** | Bài tập lõi & Khảo thí (Exercise Core & Assessment) | [f_exe_01_exercises_spec.md](specs/f_exe_01_exercises_spec.md)<br>[f_exe_02_assignments_spec.md](specs/f_exe_02_assignments_spec.md)<br>[f_exe_03_submission_spec.md](specs/f_exe_03_submission_spec.md)<br>[f_exe_04_grading_spec.md](specs/f_exe_04_grading_spec.md)<br>[f_exe_05_question_import_spec.md](specs/f_exe_05_question_import_spec.md) | • **Soạn đề**: Ngân hàng đề thi & câu hỏi hỗ trợ cấu trúc 3 phần mới của Bộ GD&ĐT (Phần I: Trắc nghiệm ABCD, Phần II: Đúng/Sai 4 ý, Phần III: Trả lời ngắn/điền số; hỗ trợ công thức Toán `$LaTeX$`).<br>• **Giao bài**: Giao bài tập cho lớp (`class_assignments`) kèm thời hạn nộp (`due_at`).<br>• **Khảo thí trực tuyến**: Giao diện học sinh làm bài thi toàn màn hình (Standalone Fullscreen Exam), đồng hồ đếm ngược, bàn phím số ảo on-screen numpad helper.<br>• **Chấm bài**: Tự động chấm điểm trắc nghiệm khách quan; quy trình 3 trạng thái chấm điểm của giáo viên (`pending_grading` $\rightarrow$ `pending_review` $\rightarrow$ `approved`).<br>• **Import & Xuất bản**: Import câu hỏi từ file docx/pdf theo mẫu chuẩn và xuất đề thi ra file PDF. | ✅ Hoàn thành (`done`) |
+| **Sprint 3** | AI Gemini Vision OCR & Keyset Pagination | [f_exe_06_gemini_vision_ocr_spec.md](specs/f_exe_06_gemini_vision_ocr_spec.md) | • Tích hợp **Google Gemini Multimodal Vision API (`gemini-1.5-flash` / `gemini-1.5-pro`)** kết hợp thư viện `pypdfium2` render ảnh trang đề thi 300 DPI.<br>• Tự động nhận diện và bóc tách đề thi Toán học/KHTN phức tạp thành các câu hỏi kèm công thức chuẩn LaTeX, đồ thị, bảng biến thiên và tự động gắn đáp án đúng.<br>• Triển khai cơ chế phân trang con trỏ (Keyset Cursor Pagination) tối ưu hiệu năng duyệt ngân hàng bài tập lớn. | ✅ Hoàn thành (`done` / `ready to test`) |
+| **Sprint 4** | Advanced Dashboards & Analytics (Phân hệ Dashboard & Trực quan hóa Năng lực) | `SubjectTeacherDashboard`<br>`HomeroomTeacherDashboard`<br>`StudentDashboard` | • **Teacher Dashboard**: Hỗ trợ 2 góc nhìn quản lý gồm Giáo viên bộ môn (theo dõi phổ điểm, tỷ lệ hoàn thành theo bài tập/lớp) và Giáo viên chủ nhiệm (theo dõi tổng quan chuyên cần, học lực cả lớp).<br>• **Student Dashboard**: Tích hợp thời khóa biểu học tập tương tác, hiển thị **biểu đồ mạng nhện** (Radar Chart) đa môn và đưa ra nhận xét về khả năng học tập của học sinh (không gợi ý lộ trình học chi tiết).<br>• **AI Practice Generator Modal**: Học sinh có thể tự chọn chủ đề để AI sinh đề tự luyện tập. | 🔄 Đang hoàn thiện (`in progress`) |
+| **Sprint 5** | Detailed Behavior Tracking (Theo dõi Chuyên sâu Hành vi Làm bài) | SRS Module 1 — Tracking | • Mở rộng theo dõi chi tiết hành vi làm bài của học sinh: ghi nhận thời gian dừng/tương tác ở từng câu hỏi cụ thể, giám sát tần suất làm bài trực tuyến theo thời gian trong ngày.<br>• Cảnh báo học sinh có thói quen dồn bài nộp sát giờ (last-minute submissions / cramming) và phân tích các dạng bài hay làm sai để giáo viên điều chỉnh bài giảng. | 📋 Kế hoạch tiếp theo (`planning`) |
+| **Sprint 6** | AI Personalized Learning Support (Hỗ trợ Cá nhân hóa Học tập bằng AI) | SRS Module 2 — AI Generation nâng cao | • Nâng cấp AI tạo sinh câu hỏi từ tài liệu giáo án tự do của giáo viên.<br>• Hệ thống dựa trên dữ liệu đánh giá năng lực học tập để tự động đề xuất các bài tập tự luyện bổ trợ tương ứng với vùng kiến thức học sinh còn yếu. | 📋 Kế hoạch tiếp theo (`planning`) |
 
-### Ghi chú ánh xạ
-- **S0–S2** không xuất hiện trực tiếp trong bảng 4-module của SRS §2, nhưng là hạ tầng bắt buộc: SRS giả định đã có tài khoản (RBAC), cơ cấu tổ chức (lớp/môn/ghi danh), và dữ liệu bài tập/câu hỏi trước khi Tracking hay AI Generation có ý nghĩa.
-- **NFR hiệu năng** (AI ≤ 15–30s, dashboard < 3s) áp dụng trực tiếp cho S4 (AI Generation) và S5–S6 (Dashboard) — cần đưa vào Acceptance Criteria (PART A) và benchmark test (PART D) của các spec tương ứng.
-- **NFR bảo mật/RBAC** ("HS không xem dữ liệu hành vi của HS khác", "GV chỉ quản lý lớp mình") đã được đặt nền ở S0 (permission-based RBAC) nhưng cần enforcement cụ thể ở tầng data-access khi triển khai S3 (Tracking) và S5 (Teacher Dashboard) — ví dụ: filter theo `teacher_subjects`/`student_class`.
-- Nếu muốn đổi thứ tự hoặc gộp sprint (vd gộp S1+S2), cập nhật đồng thời bảng "Lộ trình Sprint" ở [README.md §7](../../README.md#7-lộ-trình-sprint) để hai tài liệu không lệch nhau.
+### Ghi chú Tổng kết Ánh xạ
+1. **Hạ tầng nền tảng (S0 — S2)**: Mặc dù không xuất hiện trực tiếp trong bảng 4 module của SRS v1.0 gốc, Sprint 0 đến Sprint 2 là điều kiện tiên quyết bắt buộc. Chúng cung cấp nền tảng bảo mật (RBAC), dữ liệu tổ chức (lớp, môn, giáo viên, học sinh) và hệ thống bài tập/khảo thí trực tuyến để các tính năng Tracking và Phân tích có dữ liệu vận hành.
+2. **Chuẩn hóa Khảo thí & AI OCR (S2 — S3)**: Hệ thống đã hoàn thiện việc chuyển đổi số đề thi theo định dạng mới của Bộ GD&ĐT và đột phá trong việc bóc tách đề thi Toán học tự động qua AI Gemini Vision OCR.
+3. **Phân tích Năng lực & Nhận xét (S4 — S6)**: Sử dụng biểu đồ mạng nhện làm công cụ trực quan hóa năng lực trung tâm; hệ thống tập trung vào việc đưa ra **nhận xét, đánh giá về khả năng học tập của học sinh** dựa trên dữ liệu làm bài thực tế, không đưa ra gợi ý lộ trình học chi tiết.
 
-## 6. Tham chiếu
+---
 
-- SRS gốc: [docs/HỆ THỐNG QUẢN LÍ BÀI TẬP KẾT HỢP PHÂN TÍCH HÀNH VI.pdf](../HỆ%20THỐNG%20QUẢN%20LÍ%20BÀI%20TẬP%20KẾT%20HỢP%20PHÂN%20TÍCH%20HÀNH%20VI.pdf)
-- Lộ trình sprint: [README.md §7](../../README.md#7-lộ-trình-sprint)
-- Chi tiết Sprint 0: [sprint_0_overview.md](sprints/sprint_0_overview.md)
-- ERD tham chiếu: [docs/base_sql_erd.sql](../base_sql_erd.sql)
+## 6. Danh mục Tài liệu Tham chiếu
+
+- **SRS gốc**: [docs/HỆ THỐNG QUẢN LÍ BÀI TẬP KẾT HỢP PHÂN TÍCH HÀNH VI.pdf](../HỆ%20THỐNG%20QUẢN%20LÍ%20BÀI%20TẬP%20KẾT%20HỢP%20PHÂN%20TÍCH%20HÀNH%20VI.pdf)
+- **Kiến trúc hệ thống**: [docs/architecture.md](../architecture.md)
+- **Mô hình Dữ liệu ORM**: [backend/models/models.py](../../backend/models/models.py)
+- **Chi tiết Sprint 0**: [sprint_0_overview.md](sprints/sprint_0_overview.md)
+- **Chi tiết Sprint 1**: [sprint_1_overview.md](sprints/sprint_1_overview.md)
+- **Chi tiết Sprint 2**: [sprint_2_overview.md](sprints/sprint_2_overview.md)
+- **Đặc tả AI Gemini Vision OCR**: [f_exe_06_gemini_vision_ocr_spec.md](specs/f_exe_06_gemini_vision_ocr_spec.md)
