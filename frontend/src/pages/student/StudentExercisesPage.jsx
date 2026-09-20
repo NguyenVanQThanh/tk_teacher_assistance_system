@@ -5,7 +5,7 @@
 // Updated At: 2026-09-13
 // Updated By: Tam Khang
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { 
   HelpCircle, 
@@ -17,27 +17,29 @@ import {
   Calendar, 
   ListChecks, 
   ChevronLeft, 
-  ChevronRight,
-  Lock,
-  Award,
-  Sparkles,
-  Bot,
-  Wand2,
-  X,
-  Plus,
-  Minus,
-  CheckCircle2,
-  Layers,
-  BrainCircuit,
-  MessageSquare,
-  Flame,
-  SendHorizontal,
-  Sliders,
-  Check,
-  Zap,
-  ArrowRight,
-  RotateCcw
+  ChevronRight, 
+  Lock, 
+  Award, 
+  Sparkles, 
+  Bot, 
+  Wand2, 
+  X, 
+  Plus, 
+  Minus, 
+  CheckCircle2, 
+  Layers, 
+  BrainCircuit, 
+  MessageSquare, 
+  Flame, 
+  SendHorizontal, 
+  Sliders, 
+  Check, 
+  Zap, 
+  ArrowRight, 
+  RotateCcw,
+  Loader2
 } from 'lucide-react';
+import { classesApi, assignmentsApi, attemptsApi, subjectsApi } from '../../services/api';
 import './StudentExercisesPage.css';
 
 export default function StudentExercisesPage() {
@@ -47,6 +49,10 @@ export default function StudentExercisesPage() {
   const [selectedExerciseDetail, setSelectedExerciseDetail] = useState(null);
   const [selectedAttemptId, setSelectedAttemptId] = useState(2); // Default to attempt 2 (highest result)
   const [currentPage, setCurrentPage] = useState(1);
+  const [backendAssignments, setBackendAssignments] = useState([]);
+  const [backendAttempts, setBackendAttempts] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [localAiExercisesTrigger, setLocalAiExercisesTrigger] = useState(0);
 
   // Dynamic Attempts dataset reflecting each completion with detailed analytics
   const attemptsData = useMemo(() => [
@@ -97,7 +103,8 @@ export default function StudentExercisesPage() {
   const currentAttempt = useMemo(() => {
     return attemptsData.find(a => a.id === selectedAttemptId) || attemptsData[1];
   }, [attemptsData, selectedAttemptId]);
-  const defaultSeeds = [
+
+  const defaultSeeds = useMemo(() => [
     {
       id: 1,
       type: 'quiz',
@@ -162,7 +169,85 @@ export default function StudentExercisesPage() {
       status: 'uncompleted',
       statusLabel: 'Chưa làm'
     }
-  ];
+  ], []);
+
+  // Fetch real backend assignments and attempts for student
+  useEffect(() => {
+    let isMounted = true;
+    async function loadData() {
+      try {
+        setLoading(true);
+        const [classesRes, attemptsRes] = await Promise.allSettled([
+          classesApi.getClasses().catch(() => []),
+          attemptsApi.getAttempts().catch(() => []),
+        ]);
+
+        const studentAttempts = attemptsRes.status === 'fulfilled' && Array.isArray(attemptsRes.value) ? attemptsRes.value : [];
+        if (isMounted) {
+          setBackendAttempts(studentAttempts);
+        }
+
+        const enrolledClasses = classesRes.status === 'fulfilled' && Array.isArray(classesRes.value) ? classesRes.value : [];
+
+        const assignmentsPromises = enrolledClasses.map(cls =>
+          assignmentsApi.getClassAssignments(cls.class_id).catch(() => [])
+        );
+        const assignmentsResponses = await Promise.allSettled(assignmentsPromises);
+
+        const allAssigned = [];
+        assignmentsResponses.forEach((res, idx) => {
+          if (res.status === 'fulfilled' && Array.isArray(res.value)) {
+            const cls = enrolledClasses[idx];
+            res.value.forEach(a => {
+              const myAttempt = studentAttempts.find(att => att.assignment_id === a.assignment_id);
+              const isFinished = Boolean(myAttempt && myAttempt.is_finished);
+
+              const due = a.due_at ? new Date(a.due_at) : null;
+              const formattedDue = due ? due.toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric' }) : 'Không có';
+              const isToday = due ? new Date().toDateString() === due.toDateString() : false;
+
+              allAssigned.push({
+                id: a.assignment_id,
+                assignment_id: a.assignment_id,
+                exercise_id: a.exercise_id,
+                class_id: a.class_id,
+                className: cls?.class_name || 'Lớp học',
+                type: 'quiz',
+                category: 'exam',
+                categoryLabel: 'Bài tập trên lớp',
+                title: a.exercise_title || 'Bài tập được giao',
+                teacher: 'Giáo viên bộ môn',
+                subject: cls?.class_name?.includes('Lý') ? 'Vật lý' : cls?.class_name?.includes('Hóa') ? 'Hóa học' : 'Toán học',
+                questionsCount: a.total_questions ? `${a.total_questions} câu hỏi` : 'Đề thi trắc nghiệm',
+                duration: '45 phút',
+                deadline: formattedDue,
+                isToday,
+                status: isFinished ? 'completed' : 'uncompleted',
+                statusLabel: isFinished ? 'Đã nộp bài' : 'Chưa làm',
+                attempt: myAttempt,
+                isRealBackend: true,
+              });
+            });
+          }
+        });
+
+        if (isMounted) {
+          setBackendAssignments(allAssigned);
+        }
+      } catch (err) {
+        console.error('Failed to load student assignments:', err);
+      } finally {
+        if (isMounted) {
+          setLoading(false);
+        }
+      }
+    }
+    loadData();
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
 
   // Safe icon helper that always returns a valid Lucide component even after JSON parsing
   const getAssignmentIcon = (item) => {
@@ -174,21 +259,25 @@ export default function StudentExercisesPage() {
     return FileText;
   };
 
-  // Initialize assignments list combining saved AI exercises from localStorage + defaults
-  const [assignmentsList, setAssignmentsList] = useState(() => {
+  // Combine backend assignments, saved AI exercises from localStorage, and default seeds
+  const assignmentsList = useMemo(() => {
+    let localAiList = [];
     try {
       const saved = localStorage.getItem('tk_student_ai_exercises');
       if (saved) {
         const parsed = JSON.parse(saved);
         if (Array.isArray(parsed) && parsed.length > 0) {
-          return [...parsed, ...defaultSeeds];
+          localAiList = parsed;
         }
       }
     } catch (e) {
       console.error(e);
     }
+    if (backendAssignments.length > 0 || localAiList.length > 0) {
+      return [...backendAssignments, ...localAiList];
+    }
     return defaultSeeds;
-  });
+  }, [backendAssignments, defaultSeeds, localAiExercisesTrigger]);
 
   // AI Generator Modal States
   const [isAiModalOpen, setIsAiModalOpen] = useState(false);
@@ -296,7 +385,7 @@ export default function StudentExercisesPage() {
         console.error('Error saving AI exercise to localStorage:', e);
       }
 
-      setAssignmentsList(prev => [newExercise, ...prev]);
+      setLocalAiExercisesTrigger(prev => prev + 1);
       setGeneratedExerciseId(newId);
       setIsGenerating(false);
       setGenerationStep(4); // Completed stage
@@ -317,7 +406,18 @@ export default function StudentExercisesPage() {
   });
 
   const handleStartExercise = (item) => {
-    navigate(`/student/exercises/${item.id}/taking`);
+    if (item.isRealBackend) {
+      navigate(`/student/exercises/${item.exercise_id}/taking`, {
+        state: {
+          assignmentId: item.assignment_id,
+          exerciseId: item.exercise_id,
+          classId: item.class_id,
+          title: item.title
+        }
+      });
+    } else {
+      navigate(`/student/exercises/${item.id}/taking`);
+    }
   };
 
   const handleCardClick = (item) => {

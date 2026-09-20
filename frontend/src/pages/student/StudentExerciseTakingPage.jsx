@@ -2,7 +2,7 @@
 // Description: Interactive student examination interface supporting 3 question types: Multiple Choice (4 options), True/False (4 sub-items), and Short Answer (with on-screen numpad helper).
 // Created At: 2026-09-07
 // Created By: Tam Khang
-// Updated At: 2026-09-12
+// Updated At: 2026-09-20
 // Updated By: Tam Khang
 
 import React, { useState, useEffect, useMemo } from 'react';
@@ -25,17 +25,32 @@ import {
   X,
   ShieldAlert,
   Eye,
-  Lock
+  Lock,
+  Loader2
 } from 'lucide-react';
-import { useNavigate, Link, useParams } from 'react-router-dom';
+import { useNavigate, Link, useParams, useLocation } from 'react-router-dom';
+import { exercisesApi, attemptsApi } from '../../services/api';
+import MathRenderer from '../../components/common/MathRenderer';
 import './StudentExerciseTakingPage.css';
 
 export default function StudentExerciseTakingPage() {
   const navigate = useNavigate();
+  const location = useLocation();
   const { exerciseId } = useParams();
   const currentExamId = exerciseId || '1';
 
-  // Exercise / Exam Metadata
+  const stateAssignmentId = location.state?.assignmentId;
+  const stateExerciseId = location.state?.exerciseId || exerciseId;
+
+  // Real Backend Data States
+  const [backendExercise, setBackendExercise] = useState(null);
+  const [backendQuestions, setBackendQuestions] = useState([]);
+  const [attemptId, setAttemptId] = useState(null);
+  const [isLoadingBackend, setIsLoadingBackend] = useState(false);
+  const [backendError, setBackendError] = useState(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // Exercise / Exam Metadata from localStorage (for AI generated practice fallback)
   const savedAiExercise = useMemo(() => {
     try {
       const saved = localStorage.getItem('tk_student_ai_exercises');
@@ -54,7 +69,192 @@ export default function StudentExerciseTakingPage() {
   const isChemistry = currentExamId === '4' || Boolean(savedAiExercise && savedAiExercise.subject === 'Hóa học');
   const isAiExercise = Boolean(savedAiExercise);
 
+  // Helper to normalize any backend question_type (MultipleChoice, TrueFalse, ShortAnswer, etc.)
+  const normalizeQType = (typeStr) => {
+    const clean = String(typeStr || '').replace(/[^a-zA-Z]/g, '').toUpperCase();
+    if (clean.includes('TRUEFALSE') || clean.includes('DUNGSAI')) return 'TRUE_FALSE';
+    if (clean.includes('SHORTANSWER') || clean.includes('TRALOI') || clean.includes('NGAN') || clean.includes('FILL') || clean.includes('NUMERIC')) return 'SHORT_ANSWER';
+    return 'MULTIPLE_CHOICE';
+  };
+
+  // Initialize Backend Exam and Attempt
+  useEffect(() => {
+    let isMounted = true;
+    async function initExam() {
+      const isUuid = (id) => typeof id === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id);
+
+      const targetExerciseId = stateExerciseId || exerciseId;
+      const targetAssignmentId = stateAssignmentId;
+
+      if (isUuid(targetExerciseId) || isUuid(targetAssignmentId)) {
+        try {
+          setIsLoadingBackend(true);
+
+          let sortedQ = [];
+          // 1. Fetch exercise detail from backend
+          if (isUuid(targetExerciseId)) {
+            const exerciseData = await exercisesApi.getExerciseDetail(targetExerciseId);
+            if (isMounted && exerciseData) {
+              setBackendExercise(exerciseData);
+              if (exerciseData.questions && exerciseData.questions.length > 0) {
+                sortedQ = [...exerciseData.questions].sort((a, b) => (a.display_order || 0) - (b.display_order || 0));
+                setBackendQuestions(sortedQ);
+              }
+            }
+          }
+
+          // 2. Fetch existing attempt from DB (matching assignmentId or exerciseId) or start attempt
+          try {
+            const myAttempts = await attemptsApi.getAttempts();
+            const attemptList = Array.isArray(myAttempts) ? myAttempts : [];
+            const matchingAttempts = attemptList.filter(a => 
+              (targetAssignmentId && String(a.assignment_id).toLowerCase() === String(targetAssignmentId).toLowerCase()) || 
+              (targetExerciseId && String(a.exercise_id).toLowerCase() === String(targetExerciseId).toLowerCase())
+            );
+
+            // Prioritize finished attempt (completed exam cannot be retaken)
+            const finishedAttempt = matchingAttempts.find(a => a.is_finished);
+            const matchedAttempt = finishedAttempt || matchingAttempts[0];
+
+            if (matchedAttempt && matchedAttempt.is_finished) {
+              let fullAttempt = matchedAttempt;
+              try {
+                const detailAtt = await attemptsApi.getAttemptDetail(matchedAttempt.attempt_id);
+                if (detailAtt) fullAttempt = detailAtt;
+              } catch (e) {
+                console.warn('Could not fetch full attempt detail:', e);
+              }
+
+              if (isMounted) {
+                setAttemptId(fullAttempt.attempt_id);
+                setIsExamSubmitted(true);
+                setIsReadOnlyReview(true);
+
+                // Show actual exam duration instead of countdown timer
+                if (fullAttempt.total_time_seconds != null) {
+                  setTimeLeft(fullAttempt.total_time_seconds);
+                }
+                
+                // Reconstruct student answers from DB detailed_results
+                const restored = {};
+                if (fullAttempt.detailed_results?.questions && sortedQ.length > 0) {
+                  fullAttempt.detailed_results.questions.forEach(qRes => {
+                    const qIdx = sortedQ.findIndex(q => String(q.question_id).toLowerCase() === String(qRes.question_id).toLowerCase());
+                    if (qIdx !== -1) {
+                      const targetQ = sortedQ[qIdx];
+                      const normType = normalizeQType(targetQ.question_type);
+                      if (normType === 'MULTIPLE_CHOICE') {
+                        if (qRes.student_answer_option_id) {
+                          const letters = ['A', 'B', 'C', 'D', 'E', 'F'];
+                          const optIdx = (targetQ.answer_options || []).findIndex(opt => String(opt.option_id).toLowerCase() === String(qRes.student_answer_option_id).toLowerCase());
+                          if (optIdx !== -1) {
+                            restored[qIdx] = letters[optIdx] || 'A';
+                          }
+                        }
+                      } else if (normType === 'SHORT_ANSWER') {
+                        restored[qIdx] = (qRes.student_answer_text !== null && qRes.student_answer_text !== undefined) 
+                          ? String(qRes.student_answer_text).replace(/\./g, ',') 
+                          : '';
+                      } else if (normType === 'TRUE_FALSE') {
+                        if (qRes.student_answer_text) {
+                          const tfObj = {};
+                          qRes.student_answer_text.split(';').forEach(pair => {
+                            const [k, v] = pair.split(':');
+                            if (k) tfObj[k.trim()] = v === 'true';
+                          });
+                          restored[qIdx] = tfObj;
+                        }
+                      }
+                    }
+                  });
+                }
+                setAnswers(restored);
+
+                // Count actually answered questions for review display
+                const restoredCount = Object.keys(restored).filter(k => {
+                  const v = restored[k];
+                  if (v === undefined || v === null) return false;
+                  if (typeof v === 'string') return v.trim().length > 0;
+                  if (typeof v === 'object') return Object.keys(v).length > 0;
+                  return false;
+                }).length;
+
+                const subData = {
+                  submittedAt: fullAttempt.end_time || fullAttempt.created_at,
+                  formattedTime: fullAttempt.end_time 
+                    ? new Date(fullAttempt.end_time).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' }) + ' · ' + new Date(fullAttempt.end_time).toLocaleDateString('vi-VN')
+                    : 'Đã nộp trước đó',
+                  score: fullAttempt.score !== null && fullAttempt.score !== undefined ? Number(fullAttempt.score).toFixed(2) : null,
+                  isExam: true,
+                  title: backendExercise?.title || location.state?.title || 'Bài thi trực tuyến',
+                  attemptId: fullAttempt.attempt_id,
+                  savedAnswers: restored,
+                  totalTimeSeconds: fullAttempt.total_time_seconds || null,
+                  answeredCount: restoredCount
+                };
+                setSubmissionResult(subData);
+
+                try {
+                  localStorage.setItem(`tk_exam_submitted_${currentExamId}`, JSON.stringify(subData));
+                } catch (e) {
+                  console.warn('Could not cache submission:', e);
+                }
+              }
+            } else if (matchedAttempt && !matchedAttempt.is_finished) {
+              if (isMounted) {
+                setAttemptId(matchedAttempt.attempt_id);
+              }
+            } else if (isUuid(targetAssignmentId)) {
+              const startRes = await attemptsApi.startAttempt(targetAssignmentId);
+              if (isMounted && startRes?.attempt_id) {
+                setAttemptId(startRes.attempt_id);
+              }
+            }
+          } catch (attErr) {
+            console.warn('Attempt lookup/start fallback:', attErr);
+          }
+        } catch (err) {
+          console.error('Failed to initialize backend exam:', err);
+          if (isMounted) {
+            setBackendError(err.response?.data?.detail?.message || 'Không thể tải đề thi từ hệ thống.');
+          }
+        } finally {
+          if (isMounted) {
+            setIsLoadingBackend(false);
+          }
+        }
+      }
+    }
+
+    initExam();
+    return () => {
+      isMounted = false;
+    };
+  }, [exerciseId, stateAssignmentId, stateExerciseId]);
+
   const exerciseInfo = useMemo(() => {
+    if (backendExercise) {
+      const qList = backendQuestions;
+      const p1 = qList.filter(q => normalizeQType(q.question_type) === 'MULTIPLE_CHOICE').length;
+      const p2 = qList.filter(q => normalizeQType(q.question_type) === 'TRUE_FALSE').length;
+      const p3 = qList.filter(q => normalizeQType(q.question_type) === 'SHORT_ANSWER').length;
+      return {
+        id: backendExercise.exercise_id,
+        title: backendExercise.title || location.state?.title || 'Đề thi trực tuyến',
+        subject: 'Môn học',
+        category: 'exam',
+        categoryLabel: 'Bài thi chính thức',
+        teacher: 'Giáo viên bộ môn',
+        totalQuestions: qList.length || 40,
+        part1Count: p1,
+        part2Count: p2,
+        part3Count: p3,
+        durationMinutes: 45,
+        isExam: true,
+        isBackend: true
+      };
+    }
+
     if (savedAiExercise) {
       const p1 = savedAiExercise.part1Count || 15;
       const p2 = savedAiExercise.part2Count || 5;
@@ -107,7 +307,7 @@ export default function StudentExerciseTakingPage() {
       durationMinutes: 45,
       isExam: true
     };
-  }, [savedAiExercise, isChemistry]);
+  }, [backendExercise, backendQuestions, savedAiExercise, isChemistry, location.state]);
 
   const totalQuestions = exerciseInfo.totalQuestions;
 
@@ -115,26 +315,12 @@ export default function StudentExerciseTakingPage() {
   const [currentQuestionIdx, setCurrentQuestionIdx] = useState(0);
   
   // Dynamic answers dictionary
-  const [answers, setAnswers] = useState(
-    isChemistry 
-      ? { 0: 'A', 1: 'A', 2: 'A', 3: 'A', 15: { a: true, b: false, c: true, d: false } }
-      : {
-          0: 'A', 1: 'B', 2: 'C', 3: 'A', 4: 'B',
-          5: 'C', 6: 'D', 7: 'A', 8: 'B', 9: 'C',
-          10: 'D', 11: 'A', 12: 'B', 13: 'C', 14: 'D',
-          15: { a: true, b: true, c: false, d: true },
-          22: { a: true, b: false }
-        }
-  );
+  const [answers, setAnswers] = useState({});
 
-  const [flaggedQuestions, setFlaggedQuestions] = useState(isChemistry ? { 15: true } : { 15: true });
-  const [timeLeft, setTimeLeft] = useState(exerciseInfo.durationMinutes * 60 + 12);
+  const [flaggedQuestions, setFlaggedQuestions] = useState({});
+  const [timeLeft, setTimeLeft] = useState(exerciseInfo.durationMinutes * 60);
   const [filterMode, setFilterMode] = useState('all'); // 'all', 'flagged'
 
-  // Submission & Exam Lock States
-  const [isSubmitModalOpen, setIsSubmitModalOpen] = useState(false);
-  const [isReadOnlyReview, setIsReadOnlyReview] = useState(false);
-  
   // Check if exam/exercise is already submitted in localStorage
   const savedSubmission = useMemo(() => {
     try {
@@ -145,8 +331,23 @@ export default function StudentExerciseTakingPage() {
     }
   }, [currentExamId]);
 
+  // Submission & Exam Lock States
+  const [isSubmitModalOpen, setIsSubmitModalOpen] = useState(false);
+  const [isReadOnlyReview, setIsReadOnlyReview] = useState(Boolean(savedSubmission));
   const [isExamSubmitted, setIsExamSubmitted] = useState(Boolean(savedSubmission));
   const [submissionResult, setSubmissionResult] = useState(savedSubmission);
+
+  // Restore student answers when in review mode
+  useEffect(() => {
+    if (savedSubmission?.savedAnswers && Object.keys(savedSubmission.savedAnswers).length > 0) {
+      setAnswers(savedSubmission.savedAnswers);
+      setIsReadOnlyReview(true);
+    }
+    // Restore actual exam duration for review mode timer
+    if (savedSubmission?.totalTimeSeconds != null) {
+      setTimeLeft(savedSubmission.totalTimeSeconds);
+    }
+  }, [savedSubmission]);
 
   // Timer countdown (only active when exam is not submitted)
   useEffect(() => {
@@ -199,25 +400,20 @@ export default function StudentExerciseTakingPage() {
   // Clean and validate Short Answer (Max 4 chars, decimal comma only)
   const cleanShortAnswer = (val) => {
     if (!val) return '';
-    // Auto-convert dot to comma
     let formatted = String(val).replace(/\./g, ',');
-    // Allow only digits, leading minus, and comma
     formatted = formatted.replace(/[^0-9,-]/g, '');
 
-    // Ensure minus is only at index 0
     const isNegative = formatted.startsWith('-');
     formatted = formatted.replace(/-/g, '');
     if (isNegative) {
       formatted = '-' + formatted;
     }
 
-    // Ensure only one comma
     const commaIndex = formatted.indexOf(',');
     if (commaIndex !== -1) {
       formatted = formatted.substring(0, commaIndex + 1) + formatted.substring(commaIndex + 1).replace(/,/g, '');
     }
 
-    // Strict 4 characters maximum
     return formatted.slice(0, 4);
   };
 
@@ -305,8 +501,90 @@ export default function StudentExerciseTakingPage() {
     setIsSubmitModalOpen(true);
   };
 
-  // Confirm final submission
-  const handleConfirmSubmit = () => {
+  // Confirm final submission (with Backend API support when attemptId is active)
+  const handleConfirmSubmit = async () => {
+    if (attemptId) {
+      try {
+        setIsSubmitting(true);
+        const submitAnswers = [];
+
+        backendQuestions.forEach((q, idx) => {
+          const userAns = answers[idx];
+          if (userAns !== undefined && userAns !== null) {
+            const qType = normalizeQType(q.question_type);
+            if (qType === 'SHORT_ANSWER') {
+              if (typeof userAns === 'string' && userAns.trim()) {
+                submitAnswers.push({
+                  question_id: q.question_id,
+                  answer_text: userAns.trim().replace(/,/g, '.')
+                });
+              }
+            } else if (qType === 'TRUE_FALSE') {
+              if (typeof userAns === 'object') {
+                const tfSummary = Object.entries(userAns).map(([k, v]) => `${k}:${v}`).join(';');
+                submitAnswers.push({
+                  question_id: q.question_id,
+                  answer_text: tfSummary
+                });
+              }
+            } else {
+              const selectedLetter = userAns;
+              const optIdx = ['A', 'B', 'C', 'D'].indexOf(selectedLetter);
+              const matchedOpt = optIdx !== -1 && q.answer_options ? q.answer_options[optIdx] : null;
+              if (matchedOpt) {
+                submitAnswers.push({
+                  question_id: q.question_id,
+                  answer_option_id: matchedOpt.option_id
+                });
+              } else if (typeof userAns === 'string') {
+                submitAnswers.push({
+                  question_id: q.question_id,
+                  answer_text: userAns
+                });
+              }
+            }
+          }
+        });
+
+        const submitRes = await attemptsApi.submitAttempt(attemptId, { answers: submitAnswers });
+        const score = submitRes?.score !== undefined && submitRes?.score !== null 
+          ? Number(submitRes.score).toFixed(2) 
+          : ((answeredCount / totalQuestions) * 10).toFixed(2);
+
+        const resultData = {
+          submittedAt: new Date().toISOString(),
+          formattedTime: new Date().toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' }) + ' · ' + new Date().toLocaleDateString('vi-VN'),
+          answeredCount,
+          unansweredCount,
+          flaggedCount,
+          totalQuestions,
+          score,
+          isExam: exerciseInfo.isExam,
+          title: exerciseInfo.title,
+          attemptId: submitRes?.attempt_id || attemptId,
+          savedAnswers: { ...answers }
+        };
+
+        try {
+          localStorage.setItem(`tk_exam_submitted_${currentExamId}`, JSON.stringify(resultData));
+        } catch (e) {
+          console.error('Failed to save state', e);
+        }
+
+        setSubmissionResult(resultData);
+        setIsExamSubmitted(true);
+        setIsReadOnlyReview(true);
+        setIsSubmitModalOpen(false);
+      } catch (err) {
+        console.error('Submit attempt failed:', err);
+        alert(err.response?.data?.detail?.message || 'Có lỗi xảy ra khi nộp bài. Vui lòng thử lại.');
+      } finally {
+        setIsSubmitting(false);
+      }
+      return;
+    }
+
+    // Local / AI practice exercise fallback submit
     const calculatedScore = ((answeredCount / totalQuestions) * 10).toFixed(2);
     const resultData = {
       submittedAt: new Date().toISOString(),
@@ -317,7 +595,8 @@ export default function StudentExerciseTakingPage() {
       totalQuestions,
       score: calculatedScore,
       isExam: exerciseInfo.isExam,
-      title: exerciseInfo.title
+      title: exerciseInfo.title,
+      savedAnswers: { ...answers }
     };
 
     try {
@@ -328,6 +607,7 @@ export default function StudentExerciseTakingPage() {
 
     setSubmissionResult(resultData);
     setIsExamSubmitted(true);
+    setIsReadOnlyReview(true);
     setIsSubmitModalOpen(false);
   };
 
@@ -347,9 +627,76 @@ export default function StudentExerciseTakingPage() {
     setCurrentQuestionIdx(0);
   };
 
-  // Question Dataset (Dynamic for Chemistry vs Math)
+  // Question Dataset (Dynamic for Backend API vs Chemistry vs Math)
   const questionData = useMemo(() => {
     const qNum = currentQuestionIdx + 1;
+
+    // 0. BACKEND LIVE QUESTIONS (When connected to real backend API)
+    if (backendQuestions.length > 0 && backendQuestions[currentQuestionIdx]) {
+      const bQ = backendQuestions[currentQuestionIdx];
+      const normalizedType = normalizeQType(bQ.question_type);
+      let qType = 'single_choice';
+      let partLabel = 'Phần I: Trắc nghiệm 4 lựa chọn';
+
+      if (normalizedType === 'TRUE_FALSE') {
+        qType = 'true_false';
+        partLabel = 'Phần II: Trắc nghiệm Đúng/Sai';
+      } else if (normalizedType === 'SHORT_ANSWER') {
+        qType = 'short_answer';
+        partLabel = 'Phần III: Trả lời ngắn';
+      }
+
+      if (qType === 'single_choice') {
+        const letters = ['A', 'B', 'C', 'D', 'E', 'F'];
+        const options = (bQ.answer_options && bQ.answer_options.length > 0)
+          ? bQ.answer_options.map((opt, oIdx) => ({
+              key: letters[oIdx] || String(oIdx + 1),
+              text: opt.content,
+              optionId: opt.option_id
+            }))
+          : [
+              { key: 'A', text: 'Phương án A' },
+              { key: 'B', text: 'Phương án B' },
+              { key: 'C', text: 'Phương án C' },
+              { key: 'D', text: 'Phương án D' }
+            ];
+        return {
+          part: partLabel,
+          number: qNum,
+          type: 'single_choice',
+          statement: bQ.content || 'Nội dung câu hỏi',
+          options
+        };
+      } else if (qType === 'true_false') {
+        const letters = ['a', 'b', 'c', 'd'];
+        const items = (bQ.answer_options && bQ.answer_options.length > 0)
+          ? bQ.answer_options.map((opt, oIdx) => ({
+              key: letters[oIdx] || String(oIdx + 1),
+              text: opt.content,
+              optionId: opt.option_id
+            }))
+          : [
+              { key: 'a', text: 'Mệnh đề a' },
+              { key: 'b', text: 'Mệnh đề b' },
+              { key: 'c', text: 'Mệnh đề c' },
+              { key: 'd', text: 'Mệnh đề d' }
+            ];
+        return {
+          part: partLabel,
+          number: qNum,
+          type: 'true_false',
+          statement: bQ.content || 'Nội dung câu hỏi Đúng/Sai',
+          items
+        };
+      } else {
+        return {
+          part: partLabel,
+          number: qNum,
+          type: 'short_answer',
+          statement: bQ.content || 'Nội dung câu hỏi trả lời ngắn'
+        };
+      }
+    }
 
     // CHEMISTRY 12 DATASET (Este & Lipit)
     if (isChemistry) {
@@ -766,7 +1113,16 @@ export default function StudentExerciseTakingPage() {
       statement: sItem.text,
       diagram: sItem.diagram
     };
-  }, [currentQuestionIdx, isChemistry, exerciseInfo]);
+  }, [currentQuestionIdx, isChemistry, exerciseInfo, backendQuestions]);
+
+  if (isLoadingBackend) {
+    return (
+      <div className="exercise-taking-container" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100vh', background: '#F8FAFC' }}>
+        <Loader2 size={40} className="animate-spin" style={{ animation: 'spin 1s linear infinite', color: '#2563EB', marginBottom: '16px' }} />
+        <p style={{ color: '#475569', fontSize: '15px', fontWeight: 500 }}>Đang tải đề thi và phiên làm bài...</p>
+      </div>
+    );
+  }
 
   return (
     <div className="exercise-taking-container">
@@ -781,9 +1137,9 @@ export default function StudentExerciseTakingPage() {
         </div>
 
         <div className="exam-nav-right">
-          <div className="exam-timer-pill">
+          <div className={`exam-timer-pill ${isExamSubmitted ? 'timer-finished' : ''}`}>
             <Clock size={16} className="timer-icon" />
-            <span>{formatTimer(timeLeft)}</span>
+            <span>{isExamSubmitted ? `Đã làm: ${formatTimer(timeLeft)}` : formatTimer(timeLeft)}</span>
           </div>
           <button type="button" className="exam-icon-btn" aria-label="Help" title="Hướng dẫn làm bài">
             <HelpCircle size={20} />
@@ -855,84 +1211,90 @@ export default function StudentExerciseTakingPage() {
               /* Question Groups */
               <div className="palette-sections-list">
                 {/* Group 1: Trắc nghiệm 4 lựa chọn */}
-                <div className="palette-section-group">
-                  <span className="palette-section-label">Trắc nghiệm 4 lựa chọn</span>
-                  <div className="palette-buttons-grid">
-                    {Array.from({ length: exerciseInfo.part1Count }, (_, i) => {
-                      const qNum = i + 1;
-                      const isAns = isQuestionAnswered(i);
-                      const isFlagged = Boolean(flaggedQuestions[i]);
-                      const isActive = currentQuestionIdx === i;
-                      const isDimmed = filterMode === 'flagged' && !isFlagged;
-                      return (
-                        <button
-                          key={qNum}
-                          type="button"
-                          className={`palette-num-btn ${isActive ? 'active' : ''} ${isAns ? 'answered' : ''} ${isFlagged ? 'flagged' : ''} ${isDimmed ? 'dimmed' : ''}`}
-                          onClick={() => setCurrentQuestionIdx(i)}
-                          title={`Câu ${qNum}${isFlagged ? ' (Đã gắn cờ)' : ''}${isAns ? ' (Đã trả lời)' : ''}`}
-                        >
-                          {qNum}
-                          {isAns && !isActive && <span className="answered-dot" />}
-                        </button>
-                      );
-                    })}
+                {exerciseInfo.part1Count > 0 && (
+                  <div className="palette-section-group">
+                    <span className="palette-section-label">Trắc nghiệm 4 lựa chọn ({exerciseInfo.part1Count})</span>
+                    <div className="palette-buttons-grid">
+                      {Array.from({ length: exerciseInfo.part1Count }, (_, i) => {
+                        const qNum = i + 1;
+                        const isAns = isQuestionAnswered(i);
+                        const isFlagged = Boolean(flaggedQuestions[i]);
+                        const isActive = currentQuestionIdx === i;
+                        const isDimmed = filterMode === 'flagged' && !isFlagged;
+                        return (
+                          <button
+                            key={qNum}
+                            type="button"
+                            className={`palette-num-btn ${isActive ? 'active' : ''} ${isAns ? 'answered' : ''} ${isFlagged ? 'flagged' : ''} ${isDimmed ? 'dimmed' : ''}`}
+                            onClick={() => setCurrentQuestionIdx(i)}
+                            title={`Câu ${qNum}${isFlagged ? ' (Đã gắn cờ)' : ''}${isAns ? ' (Đã trả lời)' : ''}`}
+                          >
+                            {qNum}
+                            {isAns && !isActive && <span className="answered-dot" />}
+                          </button>
+                        );
+                      })}
+                    </div>
                   </div>
-                </div>
+                )}
 
                 {/* Group 2: Trắc nghiệm Đúng/Sai */}
-                <div className="palette-section-group">
-                  <span className="palette-section-label">Trắc nghiệm Đúng/Sai</span>
-                  <div className="palette-buttons-grid">
-                    {Array.from({ length: exerciseInfo.part2Count }, (_, i) => {
-                      const qIdx = i + exerciseInfo.part1Count;
-                      const qNum = qIdx + 1;
-                      const isAns = isQuestionAnswered(qIdx);
-                      const isFlagged = Boolean(flaggedQuestions[qIdx]);
-                      const isActive = currentQuestionIdx === qIdx;
-                      const isDimmed = filterMode === 'flagged' && !isFlagged;
-                      return (
-                        <button
-                          key={qNum}
-                          type="button"
-                          className={`palette-num-btn ${isActive ? 'active' : ''} ${isAns ? 'answered' : ''} ${isFlagged ? 'flagged' : ''} ${isDimmed ? 'dimmed' : ''}`}
-                          onClick={() => setCurrentQuestionIdx(qIdx)}
-                          title={`Câu ${qNum}${isFlagged ? ' (Đã gắn cờ)' : ''}${isAns ? ' (Đã trả lời)' : ''}`}
-                        >
-                          {qNum}
-                          {isAns && !isActive && <span className="answered-dot" />}
-                        </button>
-                      );
-                    })}
+                {exerciseInfo.part2Count > 0 && (
+                  <div className="palette-section-group">
+                    <span className="palette-section-label">Trắc nghiệm Đúng/Sai ({exerciseInfo.part2Count})</span>
+                    <div className="palette-buttons-grid">
+                      {Array.from({ length: exerciseInfo.part2Count }, (_, i) => {
+                        const qIdx = i + exerciseInfo.part1Count;
+                        const qNum = qIdx + 1;
+                        const isAns = isQuestionAnswered(qIdx);
+                        const isFlagged = Boolean(flaggedQuestions[qIdx]);
+                        const isActive = currentQuestionIdx === qIdx;
+                        const isDimmed = filterMode === 'flagged' && !isFlagged;
+                        return (
+                          <button
+                            key={qNum}
+                            type="button"
+                            className={`palette-num-btn ${isActive ? 'active' : ''} ${isAns ? 'answered' : ''} ${isFlagged ? 'flagged' : ''} ${isDimmed ? 'dimmed' : ''}`}
+                            onClick={() => setCurrentQuestionIdx(qIdx)}
+                            title={`Câu ${qNum}${isFlagged ? ' (Đã gắn cờ)' : ''}${isAns ? ' (Đã trả lời)' : ''}`}
+                          >
+                            {qNum}
+                            {isAns && !isActive && <span className="answered-dot" />}
+                          </button>
+                        );
+                      })}
+                    </div>
                   </div>
-                </div>
+                )}
 
                 {/* Group 3: Trả lời ngắn */}
-                <div className="palette-section-group">
-                  <span className="palette-section-label">Trả lời ngắn</span>
-                  <div className="palette-buttons-grid">
-                    {Array.from({ length: exerciseInfo.part3Count }, (_, i) => {
-                      const qIdx = i + exerciseInfo.part1Count + exerciseInfo.part2Count;
-                      const qNum = qIdx + 1;
-                      const isAns = isQuestionAnswered(qIdx);
-                      const isFlagged = Boolean(flaggedQuestions[qIdx]);
-                      const isActive = currentQuestionIdx === qIdx;
-                      const isDimmed = filterMode === 'flagged' && !isFlagged;
-                      return (
-                        <button
-                          key={qNum}
-                          type="button"
-                          className={`palette-num-btn ${isActive ? 'active' : ''} ${isAns ? 'answered' : ''} ${isFlagged ? 'flagged' : ''} ${isDimmed ? 'dimmed' : ''}`}
-                          onClick={() => setCurrentQuestionIdx(qIdx)}
-                          title={`Câu ${qNum}${isFlagged ? ' (Đã gắn cờ)' : ''}${isAns ? ' (Đã trả lời)' : ''}`}
-                        >
-                          {qNum}
-                          {isAns && !isActive && <span className="answered-dot" />}
-                        </button>
-                      );
-                    })}
+                {exerciseInfo.part3Count > 0 && (
+                  <div className="palette-section-group">
+                    <span className="palette-section-label">Trả lời ngắn ({exerciseInfo.part3Count})</span>
+                    <div className="palette-buttons-grid">
+                      {Array.from({ length: exerciseInfo.part3Count }, (_, i) => {
+                        const qIdx = i + exerciseInfo.part1Count + exerciseInfo.part2Count;
+                        const qNum = qIdx + 1;
+                        const isAns = isQuestionAnswered(qIdx);
+                        const isFlagged = Boolean(flaggedQuestions[qIdx]);
+                        const isActive = currentQuestionIdx === qIdx;
+                        const isDimmed = filterMode === 'flagged' && !isFlagged;
+                        return (
+                          <button
+                            key={qNum}
+                            type="button"
+                            className={`palette-num-btn ${isActive ? 'active' : ''} ${isAns ? 'answered' : ''} ${isFlagged ? 'flagged' : ''} ${isDimmed ? 'dimmed' : ''}`}
+                            onClick={() => setCurrentQuestionIdx(qIdx)}
+                            title={`Câu ${qNum}${isFlagged ? ' (Đã gắn cờ)' : ''}${isAns ? ' (Đã trả lời)' : ''}`}
+                          >
+                            {qNum}
+                            {isAns && !isActive && <span className="answered-dot" />}
+                          </button>
+                        );
+                      })}
+                    </div>
                   </div>
-                </div>
+                )}
               </div>
             )}
           </div>
@@ -940,8 +1302,10 @@ export default function StudentExerciseTakingPage() {
           {/* Submit Button on Sidebar Bottom */}
           <button 
             type="button" 
-            className={`btn-submit-exam-sidebar ${isExamSubmitted && exerciseInfo.isExam ? 'submitted-locked' : ''}`}
-            onClick={isExamSubmitted ? () => setIsReadOnlyReview(false) : handleOpenSubmitModal}
+            disabled={isExamSubmitted}
+            className={`btn-submit-exam-sidebar ${isExamSubmitted ? 'submitted-locked' : ''}`}
+            onClick={!isExamSubmitted ? handleOpenSubmitModal : undefined}
+            title={isExamSubmitted ? 'Bài đã được nộp thành công' : undefined}
           >
             {isExamSubmitted ? (
               exerciseInfo.isExam ? (
@@ -975,14 +1339,28 @@ export default function StudentExerciseTakingPage() {
                   <strong>{exerciseInfo.isExam ? 'Chế độ xem lại bài thi:' : 'Chế độ xem lại bài tập:'}</strong> {exerciseInfo.isExam ? `Đã nộp thành công lúc ${submissionResult?.formattedTime || 'trước đó'}. Bài thi này không cho phép làm lại.` : `Đã nộp lúc ${submissionResult?.formattedTime || 'trước đó'}. Bạn có thể bấm "Làm lại bài tập" bất cứ lúc nào.`}
                 </span>
               </div>
-              <button 
-                type="button" 
-                className="btn-exit-review-badge"
-                onClick={() => navigate('/student/exercises')}
-              >
-                <span>Về Kho bài tập</span>
-                <ArrowRight size={14} />
-              </button>
+              <div style={{ display: 'flex', gap: '8px' }}>
+                {!exerciseInfo.isExam && (
+                  <button 
+                    type="button" 
+                    className="btn-exit-review-badge"
+                    style={{ background: '#F1F5F9', color: '#334155' }}
+                    onClick={handleRetakeExercise}
+                    title="Xóa lượt thi cũ để làm lại bài"
+                  >
+                    <RotateCcw size={14} />
+                    <span>Làm lại bài</span>
+                  </button>
+                )}
+                <button 
+                  type="button" 
+                  className="btn-exit-review-badge"
+                  onClick={() => navigate('/student/exercises')}
+                >
+                  <span>Về Kho bài tập</span>
+                  <ArrowRight size={14} />
+                </button>
+              </div>
             </div>
           )}
 
@@ -1009,9 +1387,9 @@ export default function StudentExerciseTakingPage() {
             </div>
 
             {/* Question Statement */}
-            <p className="question-statement-text">
-              {questionData.statement}
-            </p>
+            <div className="question-statement-text">
+              <MathRenderer text={questionData.statement} />
+            </div>
 
             {/* Dynamic Diagram */}
             {questionData.diagram ? (
@@ -1034,7 +1412,9 @@ export default function StudentExerciseTakingPage() {
                         onClick={() => !isReadOnlyReview && handleSelectOption(currentQuestionIdx, opt.key)}
                       >
                         <div className="option-letter-badge">{opt.key}</div>
-                        <span className="option-content-text">{opt.text}</span>
+                        <span className="option-content-text">
+                          <MathRenderer text={opt.text} />
+                        </span>
                       </div>
                     );
                   })}
@@ -1062,7 +1442,9 @@ export default function StudentExerciseTakingPage() {
                       <div key={item.key} className={`tf-item-row ${currentTFState !== undefined ? 'has-answer' : ''}`}>
                         <div className="tf-item-content">
                           <span className="tf-sub-key-badge">{item.key})</span>
-                          <span className="tf-sub-text">{item.text}</span>
+                          <span className="tf-sub-text">
+                            <MathRenderer text={item.text} />
+                          </span>
                         </div>
 
                         <div className="tf-toggle-actions">

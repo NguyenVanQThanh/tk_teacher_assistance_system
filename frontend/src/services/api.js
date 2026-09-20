@@ -168,6 +168,10 @@ export const attemptsApi = {
     const response = await api.get(`/api/v1/attempts/${attemptId}`);
     return response.data;
   },
+  getAttempt: async (attemptId) => {
+    const response = await api.get(`/api/v1/attempts/${attemptId}`);
+    return response.data;
+  },
   startAttempt: async (assignmentId) => {
     const response = await api.post(`/api/v1/assignments/${assignmentId}/attempts`);
     return response.data;

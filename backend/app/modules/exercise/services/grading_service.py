@@ -71,14 +71,31 @@ class GradingService:
                     "pending_manual_grade": False
                 })
 
+            elif q.question_type == 'TrueFalse':
+                student_text = ans.answer_text if ans else None
+                # student_text format: "a:true;b:false;c:true;d:false"
+                question_results.append({
+                    "question_id": str(q.question_id),
+                    "question_type": "TrueFalse",
+                    "student_answer_text": student_text,
+                    "is_correct": None,
+                    "pending_manual_grade": False
+                })
+
             elif q.question_type == 'ShortAnswer':
                 student_text = ans.answer_text if ans else None
+                is_correct = None
+                if student_text and q.correct_answer:
+                    norm_student = str(student_text).strip().replace(',', '.')
+                    norm_correct = str(q.correct_answer).strip().replace(',', '.')
+                    is_correct = norm_student == norm_correct
+
                 question_results.append({
                     "question_id": str(q.question_id),
                     "question_type": "ShortAnswer",
                     "student_answer_text": student_text,
-                    "is_correct": None,
-                    "pending_manual_grade": True
+                    "is_correct": is_correct,
+                    "pending_manual_grade": is_correct is None
                 })
 
         final_score = round(earned_points, 2) if total_mc_count > 0 else None

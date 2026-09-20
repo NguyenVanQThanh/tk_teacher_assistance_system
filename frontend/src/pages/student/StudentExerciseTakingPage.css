@@ -86,6 +86,16 @@ Updated By: Tam Khang
   color: #2563EB;
 }
 
+.exam-timer-pill.timer-finished {
+  background-color: #F0FDF4;
+  border-color: #86EFAC;
+  color: #166534;
+}
+
+.exam-timer-pill.timer-finished .timer-icon {
+  color: #16A34A;
+}
+
 .exam-icon-btn {
   width: 36px;
   height: 36px;
@@ -339,9 +349,9 @@ Updated By: Tam Khang
 }
 
 .palette-num-btn.answered {
-  border-color: #10B981;
-  color: #047857;
-  background-color: #F0FDF4;
+  border-color: #7C3AED;
+  color: #5B21B6;
+  background-color: #F5F3FF;
   font-weight: 700;
 }
 
@@ -401,7 +411,7 @@ Updated By: Tam Khang
   width: 4px;
   height: 4px;
   border-radius: 50%;
-  background-color: #10B981;
+  background-color: #7C3AED;
 }
 
 .btn-submit-exam-sidebar {

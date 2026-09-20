@@ -137,7 +137,7 @@ def seed_data():
             "Student": [
                 "AUTH_ME_VIEW", "AUTH_PASSWORD_CHANGE",
                 "ACAD_CLASS_VIEW", "ACAD_SUBJECT_VIEW", "ACAD_ENROLLMENT_VIEW",
-                "EXE_ASSIGNMENT_VIEW", "EXE_ATTEMPT_SUBMIT", "EXE_ATTEMPT_VIEW"
+                "EXE_EXERCISE_VIEW", "EXE_ASSIGNMENT_VIEW", "EXE_ATTEMPT_SUBMIT", "EXE_ATTEMPT_VIEW"
             ]
         }
 
