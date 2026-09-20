@@ -2,14 +2,13 @@
 // Description: Student daily study schedule and personal study notes widget matching Image 2 mockup.
 // Created At: 2026-09-13
 // Created By: Tam Khang
-// Updated At: 2026-09-13
+// Updated At: 2026-09-20
 // Updated By: Tam Khang
 
 import React, { useState } from 'react';
 import { 
   Plus, 
   Clock, 
-  MapPin, 
   Trash2,
   Calendar,
   Sparkles,
@@ -28,8 +27,7 @@ const STUDENT_DAILY_SCHEDULES = {
         classTag: '12A1',
         badgeTag: 'Tiết 1 – 2',
         badgeClass: 'badge-blue',
-        time: '07:30 – 09:00',
-        room: 'Phòng 302'
+        time: '07:30 – 09:00'
       },
       {
         id: 2,
@@ -38,8 +36,7 @@ const STUDENT_DAILY_SCHEDULES = {
         classTag: '12A1',
         badgeTag: 'Ưu tiên cao',
         badgeClass: 'badge-orange',
-        time: '09:15 – 10:45',
-        room: 'Phòng 101'
+        time: '09:15 – 10:45'
       },
       {
         id: 3,
@@ -48,8 +45,7 @@ const STUDENT_DAILY_SCHEDULES = {
         classTag: 'Tự học',
         badgeTag: 'Luyện tập AI',
         badgeClass: 'badge-green',
-        time: '14:00 – 15:30',
-        room: 'Phòng 405'
+        time: '14:00 – 15:30'
       }
     ],
     notes: [
@@ -67,8 +63,7 @@ const STUDENT_DAILY_SCHEDULES = {
         classTag: '12A1',
         badgeTag: 'Tiết 1 – 2',
         badgeClass: 'badge-blue',
-        time: '07:30 – 09:00',
-        room: 'Phòng 204'
+        time: '07:30 – 09:00'
       },
       {
         id: 2,
@@ -77,8 +72,7 @@ const STUDENT_DAILY_SCHEDULES = {
         classTag: '12A1',
         badgeTag: 'Tiết 3 – 4',
         badgeClass: 'badge-green',
-        time: '09:15 – 10:45',
-        room: 'Phòng 305'
+        time: '09:15 – 10:45'
       },
       {
         id: 3,
@@ -87,8 +81,7 @@ const STUDENT_DAILY_SCHEDULES = {
         classTag: '12A1',
         badgeTag: 'Hoạt động ngoại khóa',
         badgeClass: 'badge-orange',
-        time: '14:30 – 16:00',
-        room: 'Hội trường A'
+        time: '14:30 – 16:00'
       }
     ],
     notes: [
@@ -105,8 +98,7 @@ const STUDENT_DAILY_SCHEDULES = {
         classTag: 'Cá nhân',
         badgeTag: 'Tự học cuối tuần',
         badgeClass: 'badge-green',
-        time: '08:30 – 10:30',
-        room: 'Phòng học online'
+        time: '08:30 – 10:30'
       },
       {
         id: 2,
@@ -115,8 +107,7 @@ const STUDENT_DAILY_SCHEDULES = {
         classTag: 'SmartLMS',
         badgeTag: 'Rèn luyện AI',
         badgeClass: 'badge-blue',
-        time: '15:00 – 17:00',
-        room: 'Hệ thống SmartLMS'
+        time: '15:00 – 17:00'
       }
     ],
     notes: [
@@ -133,8 +124,7 @@ const STUDENT_DAILY_SCHEDULES = {
         classTag: '12A1',
         badgeTag: 'Tiết 1 – 2',
         badgeClass: 'badge-blue',
-        time: '07:30 – 09:00',
-        room: 'Phòng 302'
+        time: '07:30 – 09:00'
       },
       {
         id: 2,
@@ -143,8 +133,7 @@ const STUDENT_DAILY_SCHEDULES = {
         classTag: '12A1',
         badgeTag: 'Ưu tiên cao',
         badgeClass: 'badge-orange',
-        time: '09:15 – 10:45',
-        room: 'Phòng máy 102'
+        time: '09:15 – 10:45'
       },
       {
         id: 3,
@@ -153,8 +142,7 @@ const STUDENT_DAILY_SCHEDULES = {
         classTag: '12A1',
         badgeTag: 'Luyện tập AI',
         badgeClass: 'badge-green',
-        time: '14:00 – 15:30',
-        room: 'Phòng 405'
+        time: '14:00 – 15:30'
       }
     ],
     notes: [
@@ -179,8 +167,7 @@ export default function StudentScheduleDetailCard({
         classTag: '12A1',
         badgeTag: 'Tiết 1 – 2',
         badgeClass: 'badge-blue',
-        time: '07:30 – 09:00',
-        room: 'Phòng 302'
+        time: '07:30 – 09:00'
       },
       {
         id: 2,
@@ -189,8 +176,7 @@ export default function StudentScheduleDetailCard({
         classTag: '12A1',
         badgeTag: 'Tiết 3 – 4',
         badgeClass: 'badge-orange',
-        time: '09:15 – 10:45',
-        room: 'Phòng 201'
+        time: '09:15 – 10:45'
       },
       {
         id: 3,
@@ -199,8 +185,7 @@ export default function StudentScheduleDetailCard({
         classTag: 'Tự học',
         badgeTag: 'Luyện tập AI',
         badgeClass: 'badge-green',
-        time: '14:00 – 15:30',
-        room: 'Phòng 405'
+        time: '14:00 – 15:30'
       }
     ],
     notes: [
@@ -258,15 +243,17 @@ export default function StudentScheduleDetailCard({
         <div className="schedule-today-header">
           <h3 className="schedule-today-title">Lịch học hôm nay</h3>
           <span className="schedule-date-badge">
-            {selectedDay} {selectedMonth}
+            <Calendar size={13} className="inline-icon" />
+            <span>Ngày {selectedDay} {selectedMonth}</span>
           </span>
         </div>
 
-        <div className="schedule-today-items-list">
+        {/* Schedule list */}
+        <div className="schedule-items-stack">
           {daySchedule.items.map((item) => (
-            <div key={item.id} className={`schedule-item-box border-accent-${item.accent}`}>
+            <div key={item.id} className={`schedule-time-card card-accent-${item.accent}`}>
               <div className="schedule-item-top-row">
-                <h4 className="schedule-item-name">{item.title}</h4>
+                <h4 className="schedule-item-title">{item.title}</h4>
                 <div className="schedule-item-tags">
                   <span className="class-code-tag">{item.classTag}</span>
                   <span className={`status-type-badge ${item.badgeClass}`}>{item.badgeTag}</span>
@@ -277,10 +264,6 @@ export default function StudentScheduleDetailCard({
                 <div className="schedule-meta-point">
                   <Clock size={13} className="meta-icon" />
                   <span>{item.time}</span>
-                </div>
-                <div className="schedule-meta-point">
-                  <MapPin size={13} className="meta-icon" />
-                  <span>{item.room}</span>
                 </div>
               </div>
             </div>
@@ -308,38 +291,31 @@ export default function StudentScheduleDetailCard({
           />
           <button 
             type="submit" 
-            className="btn-submit-quick-note" 
-            aria-label="Thêm ghi chú"
+            className="btn-submit-note"
             disabled={!newNoteText.trim()}
           >
-            <Plus size={16} strokeWidth={2.5} />
+            Lưu
           </button>
         </form>
 
-        {/* Notes List */}
-        <div className="notes-items-list">
-          {notes.length === 0 ? (
-            <div className="notes-empty-state">
-              <span>Chưa có ghi chú nào cho ngày này.</span>
-            </div>
-          ) : (
-            notes.map((note) => (
-              <div key={note.id} className="note-item-row">
-                <div className="note-item-left">
-                  <span className="note-purple-bullet">•</span>
-                  <p className="note-text-content">{note.text}</p>
-                </div>
-                <button
-                  type="button"
-                  className="btn-delete-note"
-                  onClick={() => handleDeleteNote(note.id)}
-                  title="Xóa ghi chú"
-                >
-                  <Trash2 size={15} />
-                </button>
+        {/* Notes Items List */}
+        <div className="schedule-notes-list">
+          {notes.map((note) => (
+            <div key={note.id} className="schedule-note-row">
+              <div className="note-content-area">
+                <span className="note-bullet">•</span>
+                <span className="note-text-body">{note.text}</span>
               </div>
-            ))
-          )}
+              <button 
+                type="button" 
+                className="btn-delete-note"
+                onClick={() => handleDeleteNote(note.id)}
+                title="Xóa ghi chú"
+              >
+                <Trash2 size={13} />
+              </button>
+            </div>
+          ))}
         </div>
       </div>
     </div>

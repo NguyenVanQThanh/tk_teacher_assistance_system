@@ -1,0 +1,444 @@
+/*
+File Name: AdminLayout.css
+Description: Modern styling for Admin layout container, sticky topbar, breadcrumbs, and user dropdown.
+Created At: 2026-09-19
+Created By: Tam Khang
+Updated At: 2026-09-19
+Updated By: Tam Khang
+*/
+
+.admin-layout-container {
+  display: flex;
+  width: 100vw;
+  height: 100vh;
+  overflow: hidden;
+  background-color: #F8F7FA;
+  font-family: 'Be Vietnam Pro', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  color: #1D1928;
+}
+
+.admin-sidebar-backdrop {
+  position: fixed;
+  inset: 0;
+  background-color: rgba(15, 23, 42, 0.4);
+  backdrop-filter: blur(2px);
+  z-index: 45;
+}
+
+/* Main Wrapper */
+.admin-main-wrapper {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  height: 100vh;
+  overflow: hidden;
+}
+
+/* Topbar */
+.admin-topbar {
+  height: 64px;
+  background-color: #FFFFFF;
+  border-bottom: 1px solid #ECE7F4;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 28px;
+  flex-shrink: 0;
+  z-index: 30;
+}
+
+.admin-topbar-left {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.admin-mobile-toggle {
+  display: none;
+  background: none;
+  border: none;
+  color: #5A546D;
+  cursor: pointer;
+  padding: 6px;
+  border-radius: 8px;
+}
+
+.admin-mobile-toggle:hover {
+  background-color: #F4F1FA;
+}
+
+/* Breadcrumbs */
+.admin-breadcrumb {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+  color: #79738E;
+}
+
+.admin-breadcrumb-home {
+  color: #79738E;
+}
+
+.admin-breadcrumb-sep {
+  color: #C8C4D4;
+}
+
+.admin-breadcrumb-current {
+  font-weight: 600;
+  color: #2F284B;
+}
+
+/* Topbar Center Global Search */
+.admin-topbar-center {
+  flex: 1;
+  max-width: 420px;
+  margin: 0 20px;
+}
+
+.topbar-global-search {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background-color: #F8F6FC;
+  border: 1px solid #ECE7F4;
+  border-radius: 20px;
+  padding: 7px 14px;
+  transition: all 0.18s ease;
+}
+
+.topbar-global-search:focus-within {
+  background-color: #FFFFFF;
+  border-color: #4D308D;
+  box-shadow: 0 0 0 3px rgba(77, 48, 141, 0.1);
+}
+
+.topbar-search-icon {
+  color: #8E899F;
+  flex-shrink: 0;
+}
+
+.topbar-search-input {
+  width: 100%;
+  border: none;
+  background: transparent;
+  outline: none;
+  font-size: 13px;
+  color: #1D1928;
+  font-family: inherit;
+}
+
+.topbar-search-input::placeholder {
+  color: #9C97AA;
+}
+
+/* Topbar Right Actions */
+.admin-topbar-right {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.admin-icon-btn {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  border: 1px solid #EBE7F2;
+  background-color: #FFFFFF;
+  color: #5A546D;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  position: relative;
+  transition: all 0.18s ease;
+}
+
+.admin-icon-btn:hover {
+  background-color: #F8F6FC;
+  border-color: #DCD6E8;
+  color: #312656;
+}
+
+.admin-notif-badge {
+  position: absolute;
+  top: -2px;
+  right: -2px;
+  width: 17px;
+  height: 17px;
+  border-radius: 50%;
+  background-color: #EF4444;
+  color: #FFFFFF;
+  font-size: 10px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 2px solid #FFFFFF;
+}
+
+/* User Capsule */
+.admin-dropdown-wrapper {
+  position: relative;
+}
+
+.admin-user-capsule {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 5px 12px 5px 6px;
+  border-radius: 30px;
+  cursor: pointer;
+  user-select: none;
+  transition: background-color 0.18s ease;
+}
+
+.admin-user-capsule:hover {
+  background-color: #F4F0FB;
+}
+
+.admin-user-avatar {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #4D308D 0%, #7647CD 100%);
+  color: #FFFFFF;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 2px 8px rgba(77, 48, 141, 0.25);
+}
+
+.admin-user-info {
+  display: flex;
+  flex-direction: column;
+}
+
+.admin-user-name {
+  font-size: 13.5px;
+  font-weight: 700;
+  color: #241A45;
+  line-height: 1.2;
+}
+
+.admin-user-role {
+  font-size: 11px;
+  font-weight: 500;
+  color: #827E93;
+}
+
+.admin-user-chevron {
+  color: #8E899F;
+}
+
+/* Dropdown Menus */
+.admin-dropdown-menu {
+  position: absolute;
+  top: calc(100% + 10px);
+  right: 0;
+  background-color: #FFFFFF;
+  border-radius: 14px;
+  box-shadow: 0 10px 30px rgba(29, 25, 40, 0.12);
+  border: 1px solid #ECE7F4;
+  z-index: 100;
+  overflow: hidden;
+  animation: dropdownFadeIn 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes dropdownFadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(-6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Notifications Menu */
+.admin-notif-menu {
+  width: 340px;
+}
+
+.admin-dropdown-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 18px;
+  border-bottom: 1px solid #F4F1FA;
+}
+
+.admin-dropdown-title {
+  font-size: 14px;
+  font-weight: 700;
+  color: #241A45;
+}
+
+.admin-notif-count-pill {
+  background-color: #F3ECFF;
+  color: #4D308D;
+  font-size: 11px;
+  font-weight: 600;
+  padding: 2px 8px;
+  border-radius: 12px;
+}
+
+.admin-notif-list {
+  max-height: 280px;
+  overflow-y: auto;
+}
+
+.admin-notif-item {
+  display: flex;
+  gap: 12px;
+  padding: 12px 18px;
+  border-bottom: 1px solid #F9F8FC;
+  transition: background-color 0.15s ease;
+}
+
+.admin-notif-item:hover {
+  background-color: #FBF9FF;
+}
+
+.admin-notif-icon-box {
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.admin-notif-icon-box.warning {
+  background-color: #FEF2F2;
+  color: #DC2626;
+}
+
+.admin-notif-icon-box.info {
+  background-color: #EFF6FF;
+  color: #2563EB;
+}
+
+.admin-notif-details {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.admin-notif-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: #241A45;
+  margin: 0;
+}
+
+.admin-notif-desc {
+  font-size: 12px;
+  color: #6C6680;
+  margin: 0;
+  line-height: 1.4;
+}
+
+.admin-notif-time {
+  font-size: 11px;
+  color: #9C97AA;
+  margin-top: 2px;
+}
+
+.admin-dropdown-footer {
+  padding: 10px 18px;
+  background-color: #FBF9FF;
+  border-top: 1px solid #F4F1FA;
+  text-align: center;
+}
+
+.admin-dropdown-footer button {
+  background: none;
+  border: none;
+  color: #4D308D;
+  font-size: 12.5px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+/* User Menu */
+.admin-user-menu {
+  width: 220px;
+}
+
+.admin-user-menu-header {
+  padding: 14px 16px;
+  border-bottom: 1px solid #F4F1FA;
+}
+
+.admin-user-menu-fullname {
+  font-size: 13.5px;
+  font-weight: 700;
+  color: #241A45;
+  margin: 0;
+}
+
+.admin-user-menu-email {
+  font-size: 11.5px;
+  color: #8E899F;
+  margin: 3px 0 0 0;
+}
+
+.admin-user-menu-actions {
+  padding: 6px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.admin-user-menu-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 12px;
+  border-radius: 8px;
+  border: none;
+  background: none;
+  font-size: 13px;
+  font-weight: 500;
+  color: #555068;
+  cursor: pointer;
+  width: 100%;
+  text-align: left;
+  transition: all 0.15s ease;
+}
+
+.admin-user-menu-item:hover {
+  background-color: #F8F6FC;
+  color: #241A45;
+}
+
+.admin-user-menu-item.text-danger {
+  color: #DC2626;
+}
+
+.admin-user-menu-item.text-danger:hover {
+  background-color: #FEF2F2;
+  color: #B91C1C;
+}
+
+/* Scrollable Viewport */
+.admin-content-viewport {
+  flex: 1;
+  overflow-y: auto;
+  padding: 28px;
+  background-color: #F8F7FA;
+}
+
+/* Responsive */
+@media (max-width: 992px) {
+  .admin-mobile-toggle {
+    display: flex;
+  }
+  .admin-content-viewport {
+    padding: 20px 16px;
+  }
+}

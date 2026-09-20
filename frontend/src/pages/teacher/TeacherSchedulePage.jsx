@@ -2,7 +2,7 @@
 // Description: Teaching Schedule interface with interactive calendar, urgency color bars, equal-sized grid cells, horizontal urgency legend, and detailed daily timeline.
 // Created At: 2026-09-01
 // Created By: Tam Khang
-// Updated At: 2026-09-13
+// Updated At: 2026-09-20
 // Updated By: Tam Khang
 
 import React, { useState, useMemo } from 'react';
@@ -11,46 +11,32 @@ import {
   ChevronRight, 
   Plus, 
   Clock, 
-  MapPin, 
   Calendar as CalendarIcon, 
   BookOpen, 
   CheckCircle2, 
   Sparkles, 
   Filter, 
   X, 
-  Trash2,
+  Check,
   AlertCircle
 } from 'lucide-react';
 import './TeacherSchedulePage.css';
 
 export default function TeacherSchedulePage() {
-  // State for filters (Grade only)
-  const [selectedGrade, setSelectedGrade] = useState('all');
-
-  // State for selected calendar day (default: Oct 15, 2023)
   const [currentYear, setCurrentYear] = useState(2023);
-  const [currentMonth, setCurrentMonth] = useState(9); // 0-indexed, 9 = October
+  const [currentMonth, setCurrentMonth] = useState(9); // October (0-indexed)
   const [selectedDay, setSelectedDay] = useState(15);
-
-  // Notes state
-  const [notes, setNotes] = useState([
-    { id: 1, date: '2023-10-15', text: 'Nhắc học sinh 12A1 nộp bài tập ôn tập Đạo hàm trước 22:00' },
-    { id: 2, date: '2023-10-15', text: 'Chuẩn bị đề kiểm tra 15p cho lớp 10A3' }
-  ]);
-  const [newNoteInput, setNewNoteInput] = useState('');
-
-  // Modal for adding schedule
+  const [activeFilter, setActiveFilter] = useState('all'); // 'all' | '10' | '11' | '12'
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [toastMessage, setToastMessage] = useState(null);
 
-  // New schedule form state
+  // New schedule modal state
   const [newScheduleForm, setNewScheduleForm] = useState({
-    title: 'Toán nâng cao',
-    className: '12A1',
-    grade: '12',
+    title: '',
+    className: '',
+    grade: '10',
     startTime: '07:30',
     endTime: '09:00',
-    room: 'Phòng 302',
     urgency: 'teaching', // 'critical' | 'high' | 'teaching' | 'ai' | 'meeting'
     date: 15
   });
@@ -77,7 +63,6 @@ export default function TeacherSchedulePage() {
       grade: '12',
       startTime: '07:30',
       endTime: '09:00',
-      room: 'Phòng 302',
       urgency: 'teaching',
       accentColor: '#3B82F6',
       badgeColor: '#EFF6FF',
@@ -93,7 +78,6 @@ export default function TeacherSchedulePage() {
       grade: '10',
       startTime: '09:15',
       endTime: '10:45',
-      room: 'Phòng 101',
       urgency: 'high',
       accentColor: '#F59E0B',
       badgeColor: '#FEF3C7',
@@ -109,7 +93,6 @@ export default function TeacherSchedulePage() {
       grade: '11',
       startTime: '14:00',
       endTime: '15:30',
-      room: 'Phòng 405',
       urgency: 'ai',
       accentColor: '#10B981',
       badgeColor: '#D1FAE5',
@@ -126,7 +109,6 @@ export default function TeacherSchedulePage() {
       grade: '11',
       startTime: '08:00',
       endTime: '09:30',
-      room: 'Phòng 204',
       urgency: 'teaching',
       accentColor: '#3B82F6',
       badgeColor: '#EFF6FF',
@@ -143,7 +125,6 @@ export default function TeacherSchedulePage() {
       grade: 'all',
       startTime: '14:00',
       endTime: '16:00',
-      room: 'Phòng Hội đồng',
       urgency: 'meeting',
       accentColor: '#8B5CF6',
       badgeColor: '#F5F3FF',
@@ -160,7 +141,6 @@ export default function TeacherSchedulePage() {
       grade: '10',
       startTime: '07:30',
       endTime: '08:15',
-      room: 'Phòng 102',
       urgency: 'critical',
       accentColor: '#EF4444',
       badgeColor: '#FEE2E2',
@@ -289,7 +269,6 @@ export default function TeacherSchedulePage() {
       grade: newScheduleForm.grade || 'all',
       startTime: newScheduleForm.startTime,
       endTime: newScheduleForm.endTime,
-      room: newScheduleForm.room || 'Phòng học',
       urgency: newScheduleForm.urgency,
       accentColor: urgencyData.color,
       badgeColor: urgencyData.badgeBg,
@@ -527,12 +506,6 @@ export default function TeacherSchedulePage() {
                             <Clock size={13} className="meta-icon" />
                             <span>{item.startTime} - {item.endTime}</span>
                           </div>
-                          {item.room && (
-                            <div className="item-meta-info">
-                              <MapPin size={13} className="meta-icon" />
-                              <span>{item.room}</span>
-                            </div>
-                          )}
                         </div>
                       </div>
                     );
@@ -696,17 +669,6 @@ export default function TeacherSchedulePage() {
                     className="form-input-text"
                   />
                 </div>
-              </div>
-
-              <div className="form-field-group">
-                <label className="field-label">Phòng học <span className="field-optional-tag">(Tùy chọn)</span></label>
-                <input 
-                  type="text" 
-                  value={newScheduleForm.room}
-                  onChange={(e) => setNewScheduleForm({ ...newScheduleForm, room: e.target.value })}
-                  className="form-input-text"
-                  placeholder="Ví dụ: Phòng 302, Phòng Hội đồng..."
-                />
               </div>
 
               <div className="modal-actions-footer">
