@@ -152,3 +152,22 @@ class TestGeminiVisionParserService:
         assert mock_parse_pdf.called
         assert len(res.questions) == 1
         assert res.questions[0].content == "Test Question from Gemini"
+
+    def test_process_gemini_null_options(self):
+        null_options_json = json.dumps({
+            "questions": [
+                {
+                    "question_number": 1,
+                    "part": "Part3",
+                    "question_type": "ShortAnswer",
+                    "content": "Tính tích phân $\\int_0^1 x dx$",
+                    "answer_options": None,
+                    "correct_answer": "0.5"
+                }
+            ]
+        })
+        res = GeminiVisionParserService._process_gemini_json_response(null_options_json)
+        assert len(res.errors) == 0
+        assert len(res.questions) == 1
+        assert res.questions[0].answer_options == []
+        assert res.questions[0].correct_answer == "0.5"

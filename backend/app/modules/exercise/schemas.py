@@ -250,6 +250,25 @@ class AssignmentOut(BaseModel):
     assigned_at: Optional[datetime] = None
     due_at: datetime
     status: str
+    exercise_title: Optional[str] = None
+    total_questions: Optional[int] = None
+
+    @model_validator(mode="before")
+    @classmethod
+    def populate_exercise_fields(cls, data: Any) -> Any:
+        if hasattr(data, "exercise") and data.exercise:
+            return {
+                "assignment_id": data.assignment_id,
+                "class_id": data.class_id,
+                "exercise_id": data.exercise_id,
+                "assigned_by": data.assigned_by,
+                "assigned_at": data.assigned_at,
+                "due_at": data.due_at,
+                "status": data.status,
+                "exercise_title": data.exercise.title if hasattr(data.exercise, "title") else None,
+                "total_questions": data.exercise.total_questions if hasattr(data.exercise, "total_questions") else None,
+            }
+        return data
 
     model_config = {"from_attributes": True}
 
@@ -284,6 +303,12 @@ class AttemptOut(BaseModel):
     attempt_id: UUID
     student_id: UUID
     assignment_id: UUID
+    student_name: Optional[str] = None
+    student_code: Optional[str] = None
+    exercise_id: Optional[UUID] = None
+    exercise_title: Optional[str] = None
+    class_id: Optional[UUID] = None
+    class_name: Optional[str] = None
     start_time: Optional[datetime] = None
     end_time: Optional[datetime] = None
     total_time_seconds: Optional[int] = None
@@ -294,6 +319,74 @@ class AttemptOut(BaseModel):
     created_at: Optional[datetime] = None
     updated_at: Optional[datetime] = None
 
+    @model_validator(mode="before")
+    @classmethod
+    def populate_attempt_fields(cls, data: Any) -> Any:
+        if hasattr(data, "student") and data.student:
+            student_name = getattr(data.student, "full_name", None)
+            student_code = getattr(data.student, "phone", None)
+            exercise_id = None
+            exercise_title = None
+            class_id = None
+            class_name = None
+            if hasattr(data, "assignment") and data.assignment:
+                class_id = data.assignment.class_id
+                exercise_id = data.assignment.exercise_id
+                if hasattr(data.assignment, "class_obj") and data.assignment.class_obj:
+                    class_name = data.assignment.class_obj.class_name
+                if hasattr(data.assignment, "exercise") and data.assignment.exercise:
+                    exercise_title = data.assignment.exercise.title
+            return {
+                "attempt_id": data.attempt_id,
+                "student_id": data.student_id,
+                "assignment_id": data.assignment_id,
+                "student_name": student_name,
+                "student_code": student_code,
+                "exercise_id": exercise_id,
+                "exercise_title": exercise_title,
+                "class_id": class_id,
+                "class_name": class_name,
+                "start_time": data.start_time,
+                "end_time": data.end_time,
+                "total_time_seconds": data.total_time_seconds,
+                "score": data.score,
+                "detailed_results": data.detailed_results,
+                "is_finished": data.is_finished,
+                "status": data.status,
+                "created_at": data.created_at,
+                "updated_at": data.updated_at,
+            }
+        return data
+
     model_config = {"from_attributes": True}
+
+
+class AttemptListItemOut(BaseModel):
+    attempt_id: UUID
+    assignment_id: UUID
+    student_id: UUID
+    student_name: str
+    student_code: Optional[str] = None
+    class_id: UUID
+    class_name: str
+    exercise_id: UUID
+    exercise_title: str
+    subject_id: Optional[UUID] = None
+    subject_name: Optional[str] = None
+    score: Optional[float] = None
+    is_finished: bool
+    start_time: Optional[datetime] = None
+    end_time: Optional[datetime] = None
+    total_time_seconds: Optional[int] = None
+    status: str
+
+    model_config = {"from_attributes": True}
+
+
+class AttemptGradeUpdateRequest(BaseModel):
+    score: float = Field(..., ge=0.0, le=10.0, description="Updated score from 0.0 to 10.0")
+    feedback: Optional[str] = Field(None, max_length=2000, description="Teacher feedback / notes")
+    detailed_results: Optional[Any] = Field(None, description="Optional updated detailed question results")
+
 
 

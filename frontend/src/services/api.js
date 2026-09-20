@@ -47,6 +47,10 @@ export const authApi = {
     const response = await api.get('/api/v1/auth/me');
     return response.data;
   },
+  changePassword: async (passwords) => {
+    const response = await api.post('/api/v1/auth/change-password', passwords);
+    return response.data;
+  },
   logout: async () => {
     try {
       await api.post('/api/v1/auth/logout');
@@ -123,6 +127,57 @@ export const exercisesApi = {
   },
   addQuestion: async (exerciseId, data) => {
     const response = await api.post(`/api/v1/exercises/${exerciseId}/questions`, data);
+    return response.data;
+  },
+};
+
+export const questionsApi = {
+  updateQuestion: async (questionId, data) => {
+    const response = await api.put(`/api/v1/questions/${questionId}`, data);
+    return response.data;
+  },
+  deleteQuestion: async (questionId) => {
+    await api.delete(`/api/v1/questions/${questionId}`);
+  },
+};
+
+export const assignmentsApi = {
+  createAssignment: async (classId, data) => {
+    const response = await api.post(`/api/v1/classes/${classId}/assignments`, data);
+    return response.data;
+  },
+  getClassAssignments: async (classId) => {
+    const response = await api.get(`/api/v1/classes/${classId}/assignments`);
+    return response.data;
+  },
+  deleteAssignment: async (assignmentId) => {
+    await api.delete(`/api/v1/assignments/${assignmentId}`);
+  },
+  restoreAssignment: async (assignmentId) => {
+    const response = await api.post(`/api/v1/assignments/${assignmentId}/restore`);
+    return response.data;
+  },
+};
+
+export const attemptsApi = {
+  getAttempts: async (params = {}) => {
+    const response = await api.get('/api/v1/attempts', { params });
+    return response.data;
+  },
+  getAttemptDetail: async (attemptId) => {
+    const response = await api.get(`/api/v1/attempts/${attemptId}`);
+    return response.data;
+  },
+  startAttempt: async (assignmentId) => {
+    const response = await api.post(`/api/v1/assignments/${assignmentId}/attempts`);
+    return response.data;
+  },
+  submitAttempt: async (attemptId, data) => {
+    const response = await api.put(`/api/v1/attempts/${attemptId}/submit`, data);
+    return response.data;
+  },
+  updateGrade: async (attemptId, data) => {
+    const response = await api.put(`/api/v1/attempts/${attemptId}/grade`, data);
     return response.data;
   },
 };

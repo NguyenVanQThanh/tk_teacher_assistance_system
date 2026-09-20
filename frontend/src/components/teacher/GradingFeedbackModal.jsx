@@ -21,8 +21,10 @@ import {
   MessageSquare,
   Check,
   RotateCcw,
-  AlertTriangle
+  AlertTriangle,
+  Loader2
 } from 'lucide-react';
+import { attemptsApi, exercisesApi } from '../../services/api';
 import './GradingFeedbackModal.css';
 
 export default function GradingFeedbackModal({ 
@@ -39,7 +41,7 @@ export default function GradingFeedbackModal({
   const isPendingReview = submission.status === 'pending_review' || submission.statusLabel === 'Chờ duyệt';
   const isAiExercise = submission.exerciseTypeCode === 'ai' || submission.exerciseType === 'Tạo sinh';
 
-  // Base mock questions: Question 3 requires manual grading in pending_grading mode
+  // Base mock questions fallback
   const initialQuestions = [
     {
       id: 1,
@@ -95,15 +97,91 @@ export default function GradingFeedbackModal({
   const [isGeneratingAi, setIsGeneratingAi] = useState(false);
   const [hasModifiedAnswerKey, setHasModifiedAnswerKey] = useState(false);
   const [showWarningConfirmModal, setShowWarningConfirmModal] = useState(false);
+  const [loadingDetails, setLoadingDetails] = useState(false);
 
   useEffect(() => {
-    if (submission) {
-      const initScore = submission.score !== null && submission.score !== undefined ? submission.score : 8.5;
-      setScore(initScore);
-      setFeedback(submission.feedback || 'Em làm bài tốt, tư duy giải mạch lạc. Chú ý trình bày các bước kết luận chặt chẽ hơn ở câu hỏi phân hóa.');
+    if (!submission) return;
+
+    const initScore = submission.score !== null && submission.score !== undefined ? submission.score : 8.5;
+    setScore(initScore);
+    setFeedback(submission.feedback || 'Em làm bài tốt, tư duy giải mạch lạc.');
+    setHasModifiedAnswerKey(false);
+    setShowWarningConfirmModal(false);
+
+    if (submission.attempt_id && submission.exercise_id) {
+      let isMounted = true;
+      async function loadRealDetails() {
+        try {
+          setLoadingDetails(true);
+          const [attRes, exRes] = await Promise.allSettled([
+            attemptsApi.getAttemptDetail(submission.attempt_id),
+            exercisesApi.getExerciseDetail(submission.exercise_id)
+          ]);
+
+          if (!isMounted) return;
+
+          if (exRes.status === 'fulfilled' && exRes.value && exRes.value.questions && exRes.value.questions.length > 0) {
+            const exQuestions = exRes.value.questions;
+            const attData = attRes.status === 'fulfilled' ? attRes.value : null;
+            const attResults = (attData?.detailed_results?.questions || []);
+            const resultsMap = {};
+            attResults.forEach((r) => {
+              resultsMap[r.question_id] = r;
+            });
+
+            const pointsPerQ = 10.0 / exQuestions.length;
+
+            const mapped = exQuestions.map((q, idx) => {
+              const res = resultsMap[q.question_id] || {};
+              const isMC = q.question_type === 'MultipleChoice';
+              
+              let studentOptKey = null;
+              let correctOptKey = null;
+              const formattedOptions = (q.answer_options || []).map((opt, oIdx) => {
+                const letter = String.fromCharCode(65 + oIdx);
+                if (opt.is_correct) correctOptKey = letter;
+                if (opt.option_id === res.student_answer_option_id) studentOptKey = letter;
+                return { key: letter, text: opt.content, option_id: opt.option_id };
+              });
+
+              const isCorrect = res.is_correct !== undefined ? res.is_correct : (studentOptKey && studentOptKey === correctOptKey);
+              const currentPoints = isCorrect ? pointsPerQ : 0;
+
+              return {
+                id: q.question_id,
+                type: isMC ? 'multiple_choice' : 'short_answer',
+                typeName: `CÂU ${idx + 1} (${isMC ? 'TRẮC NGHIỆM' : 'TRẢ LỜI NGẮN'})`,
+                maxPoints: pointsPerQ,
+                studentOption: studentOptKey,
+                correctOption: correctOptKey,
+                studentAnswer: res.student_answer_text || studentOptKey,
+                correctAnswer: q.correct_answer || correctOptKey,
+                currentPoints: currentPoints,
+                isCorrect: isCorrect,
+                needsManualGrading: res.pending_manual_grade || false,
+                stem: q.content,
+                options: formattedOptions
+              };
+            });
+
+            setQuestions(mapped);
+            if (attData && attData.score !== null && attData.score !== undefined) {
+              setScore(attData.score);
+            }
+          } else {
+            setQuestions(initialQuestions);
+          }
+        } catch (err) {
+          setQuestions(initialQuestions);
+        } finally {
+          if (isMounted) setLoadingDetails(false);
+        }
+      }
+
+      loadRealDetails();
+      return () => { isMounted = false; };
+    } else {
       setQuestions(initialQuestions);
-      setHasModifiedAnswerKey(false);
-      setShowWarningConfirmModal(false);
     }
   }, [submission]);
 

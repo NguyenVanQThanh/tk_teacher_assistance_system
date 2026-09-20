@@ -24,6 +24,7 @@ import ExerciseCard from '../../components/exercises/ExerciseCard';
 import CreateExerciseModal from '../../components/exercises/CreateExerciseModal';
 import ExercisePreviewModal from '../../components/exercises/ExercisePreviewModal';
 import EditDocumentModal from '../../components/documents/EditDocumentModal';
+import AssignExerciseModal from '../../components/exercises/AssignExerciseModal';
 import { exercisesApi, subjectsApi } from '../../services/api';
 import './ExerciseRepositoryPage.css';
 
@@ -46,6 +47,7 @@ export default function ExerciseRepositoryPage() {
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [previewExercise, setPreviewExercise] = useState(null);
   const [editingExercise, setEditingExercise] = useState(null);
+  const [assignModalExercise, setAssignModalExercise] = useState(null);
 
   // Centered Delete Confirmation & Toast states
   const [deleteConfirmTarget, setDeleteConfirmTarget] = useState(null);
@@ -355,7 +357,7 @@ export default function ExerciseRepositoryPage() {
                     exercise={exercise}
                     onPreview={(item) => setPreviewExercise(item)}
                     onEdit={(item) => setEditingExercise(item)}
-                    onShare={(item) => setPreviewExercise(item)}
+                    onShare={(item) => setAssignModalExercise(item)}
                     onDownload={(item) => handleDownloadPdf(item)}
                     onDelete={(item) => requestDeleteExercise(item)}
                     onMore={(item) => requestDeleteExercise(item)}
@@ -418,7 +420,7 @@ export default function ExerciseRepositoryPage() {
         onCreateSuccess={handleCreateSuccess}
       />
 
-      {/* Preview & Assign Exercise Modal */}
+      {/* Preview Exercise Modal */}
       <ExercisePreviewModal
         exercise={previewExercise}
         isOpen={!!previewExercise}
@@ -431,6 +433,16 @@ export default function ExerciseRepositoryPage() {
         doc={editingExercise}
         onClose={() => setEditingExercise(null)}
         onSave={handleSaveEditedExercise}
+      />
+
+      {/* Assign Exercise to Class Modal */}
+      <AssignExerciseModal
+        exercise={assignModalExercise}
+        isOpen={!!assignModalExercise}
+        onClose={() => setAssignModalExercise(null)}
+        onAssignedSuccess={() => {
+          loadExercises(null, 'next', 1);
+        }}
       />
 
       {/* ============================================================ */}

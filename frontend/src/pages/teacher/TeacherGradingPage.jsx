@@ -2,10 +2,10 @@
 // Description: Teacher Grading & Feedback management page with submission metrics, multi-criteria filtering, submission roster table, and interactive grading modal.
 // Created At: 2026-09-01
 // Created By: Tam Khang
-// Updated At: 2026-09-01
+// Updated At: 2026-09-12
 // Updated By: Tam Khang
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { 
   ChevronRight, 
   Search, 
@@ -20,9 +20,11 @@ import {
   ChevronDown, 
   Sparkles,
   FileSpreadsheet,
-  Check
+  Check,
+  Loader2
 } from 'lucide-react';
 import GradingFeedbackModal from '../../components/teacher/GradingFeedbackModal';
+import { attemptsApi, classesApi, subjectsApi } from '../../services/api';
 import './TeacherGradingPage.css';
 
 export default function TeacherGradingPage() {
@@ -38,6 +40,9 @@ export default function TeacherGradingPage() {
   // Selected submission for grading modal
   const [gradingSubmission, setGradingSubmission] = useState(null);
   const [toastMessage, setToastMessage] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [classesList, setClassesList] = useState([]);
+  const [subjectsList, setSubjectsList] = useState([]);
 
   // Submissions dataset with 3 official statuses: pending_grading (Chờ chấm), pending_review (Chờ duyệt), approved (Đã duyệt)
   const [submissions, setSubmissions] = useState([
@@ -403,44 +408,147 @@ export default function TeacherGradingPage() {
     }
   ]);
 
-  // Handle grade/approval saved from modal (transitions to 'approved' and supports cascade batch regrade)
-  const handleSaveGrade = (updatedSubmission) => {
-    setSubmissions((prev) =>
-      prev.map((item) => {
-        if (item.id === updatedSubmission.id) {
-          return {
-            ...updatedSubmission,
-            status: 'approved',
-            statusLabel: 'Đã duyệt'
-          };
-        }
-        // If cascade regrade is requested and another submission belongs to the same exercise
-        if (updatedSubmission.cascadeRegrade && item.exerciseTitle === updatedSubmission.exerciseTitle) {
-          return {
-            ...item,
-            score: updatedSubmission.score !== null ? updatedSubmission.score : item.score,
-            status: 'approved',
-            statusLabel: 'Đã duyệt'
-          };
-        }
-        return item;
-      })
-    );
+  const loadData = useCallback(async () => {
+    try {
+      setLoading(true);
+      const [attemptsRes, classesRes, subjectsRes] = await Promise.allSettled([
+        attemptsApi.getAttempts(),
+        classesApi.getClasses(),
+        subjectsApi.getSubjects(),
+      ]);
 
-    if (updatedSubmission.cascadeRegrade) {
-      setToastMessage(`Đã lưu đáp án mới và tự động cập nhật điểm số cho tất cả bài làm của đề "${updatedSubmission.exerciseTitle}".`);
-    } else {
-      setToastMessage(`Đã hoàn tất chấm điểm bài nộp của học sinh ${updatedSubmission.studentName} (${updatedSubmission.score} điểm).`);
+      if (classesRes.status === 'fulfilled') {
+        setClassesList(Array.isArray(classesRes.value) ? classesRes.value : classesRes.value.items || []);
+      }
+
+      if (subjectsRes.status === 'fulfilled') {
+        setSubjectsList(Array.isArray(subjectsRes.value) ? subjectsRes.value : subjectsRes.value.items || []);
+      }
+
+      if (attemptsRes.status === 'fulfilled' && Array.isArray(attemptsRes.value) && attemptsRes.value.length > 0) {
+        const mapped = attemptsRes.value.map((att, idx) => {
+          const rawScore = att.score;
+          const hasScore = rawScore !== null && rawScore !== undefined;
+          const gradeMatch = att.class_name ? att.class_name.match(/\b(10|11|12)\b/) : null;
+          const grade = gradeMatch ? gradeMatch[1] : '12';
+
+          let subjKey = 'math';
+          if (att.subject_name) {
+            const sn = att.subject_name.toLowerCase();
+            if (sn.includes('vật') || sn.includes('lý')) subjKey = 'physics';
+            else if (sn.includes('hóa')) subjKey = 'chemistry';
+            else if (sn.includes('anh')) subjKey = 'english';
+          }
+
+          const colors = ['#8B5CF6', '#6366F1', '#EC4899', '#3B82F6', '#10B981', '#F59E0B'];
+          const avatarColor = colors[idx % colors.length];
+          const nameParts = (att.student_name || 'Học sinh').trim().split(' ');
+          const avatarInitial = nameParts.length >= 2 ? (nameParts[0][0] + nameParts[nameParts.length - 1][0]).toUpperCase() : nameParts[0].slice(0, 2).toUpperCase();
+
+          const submittedFormatted = att.end_time
+            ? new Date(att.end_time).toLocaleDateString('vi-VN', { hour: '2-digit', minute: '2-digit', day: '2-digit', month: '2-digit' })
+            : (att.start_time ? new Date(att.start_time).toLocaleDateString('vi-VN', { hour: '2-digit', minute: '2-digit', day: '2-digit', month: '2-digit' }) : 'Vừa xong');
+
+          return {
+            id: att.attempt_id,
+            attempt_id: att.attempt_id,
+            assignment_id: att.assignment_id,
+            exercise_id: att.exercise_id,
+            student_id: att.student_id,
+            studentName: att.student_name || 'Học sinh',
+            avatarInitial,
+            avatarColor,
+            className: att.class_name || '12A1',
+            class_id: att.class_id,
+            grade,
+            subject: subjKey,
+            subjectName: att.subject_name || 'Toán học',
+            exerciseTitle: att.exercise_title || 'Bài tập trực tuyến',
+            exerciseType: 'Bài tập trực tuyến',
+            exerciseTypeCode: 'classroom',
+            submittedTime: submittedFormatted,
+            timeType: 'normal',
+            status: hasScore ? 'approved' : 'pending_grading',
+            statusLabel: hasScore ? 'Đã duyệt' : 'Chờ chấm',
+            score: hasScore ? Number(rawScore) : null,
+            feedback: '',
+            raw: att
+          };
+        });
+        setSubmissions(mapped);
+      }
+    } catch (err) {
+      console.error('Failed to load grading data:', err);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    loadData();
+  }, [loadData]);
+
+  // Handle grade/approval saved from modal (transitions to 'approved' and supports cascade batch regrade)
+  const handleSaveGrade = async (updatedSubmission) => {
+    try {
+      if (updatedSubmission.attempt_id) {
+        await attemptsApi.updateGrade(updatedSubmission.attempt_id, {
+          score: updatedSubmission.score !== null ? updatedSubmission.score : 0,
+          feedback: updatedSubmission.feedback || '',
+        });
+      }
+
+      setSubmissions((prev) =>
+        prev.map((item) => {
+          if (item.id === updatedSubmission.id || (item.attempt_id && item.attempt_id === updatedSubmission.attempt_id)) {
+            return {
+              ...item,
+              ...updatedSubmission,
+              status: 'approved',
+              statusLabel: 'Đã duyệt'
+            };
+          }
+          if (updatedSubmission.cascadeRegrade && item.exerciseTitle === updatedSubmission.exerciseTitle) {
+            return {
+              ...item,
+              score: updatedSubmission.score !== null ? updatedSubmission.score : item.score,
+              status: 'approved',
+              statusLabel: 'Đã duyệt'
+            };
+          }
+          return item;
+        })
+      );
+
+      if (updatedSubmission.cascadeRegrade) {
+        setToastMessage(`Đã lưu đáp án mới và tự động cập nhật điểm số cho tất cả bài làm của đề "${updatedSubmission.exerciseTitle}".`);
+      } else {
+        setToastMessage(`Đã hoàn tất chấm điểm bài nộp của học sinh ${updatedSubmission.studentName} (${updatedSubmission.score} điểm).`);
+      }
+    } catch (err) {
+      setToastMessage('Không thể lưu điểm trên máy chủ. Đã lưu tạm bộ nhớ.');
     }
     setTimeout(() => setToastMessage(null), 4000);
   };
 
   // Handle save and automatically jump to the next pending submission
-  const handleSaveAndNext = (updatedSubmission) => {
+  const handleSaveAndNext = async (updatedSubmission) => {
+    try {
+      if (updatedSubmission.attempt_id) {
+        await attemptsApi.updateGrade(updatedSubmission.attempt_id, {
+          score: updatedSubmission.score !== null ? updatedSubmission.score : 0,
+          feedback: updatedSubmission.feedback || '',
+        });
+      }
+    } catch (err) {
+      console.error(err);
+    }
+
     setSubmissions((prev) => {
       const nextSubmissions = prev.map((item) => {
-        if (item.id === updatedSubmission.id) {
+        if (item.id === updatedSubmission.id || (item.attempt_id && item.attempt_id === updatedSubmission.attempt_id)) {
           return {
+            ...item,
             ...updatedSubmission,
             status: 'approved',
             statusLabel: 'Đã duyệt'
@@ -458,7 +566,7 @@ export default function TeacherGradingPage() {
       });
 
       const remainingPending = nextSubmissions.filter(
-        (s) => (s.status === 'pending_grading' || s.status === 'pending_review') && s.id !== updatedSubmission.id
+        (s) => (s.status === 'pending_grading' || s.status === 'pending_review') && s.id !== updatedSubmission.id && s.attempt_id !== updatedSubmission.attempt_id
       );
       if (remainingPending.length > 0) {
         setGradingSubmission(remainingPending[0]);

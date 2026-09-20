@@ -12,7 +12,7 @@ import base64
 from fastapi import HTTPException, status
 from sqlalchemy import and_, or_
 from sqlalchemy.orm import Session, joinedload
-from models.models import Exercise, Question, AnswerOption, ClassAssignment, StudentExerciseAttempt
+from models.models import User, Exercise, Question, AnswerOption, ClassAssignment, StudentExerciseAttempt
 
 
 
@@ -309,7 +309,9 @@ class AssignmentRepository:
         """List assignments for given class IDs ordered by assigned_at descending."""
         if not class_ids:
             return []
-        query = self.db.query(ClassAssignment).filter(ClassAssignment.class_id.in_(class_ids))
+        query = self.db.query(ClassAssignment).options(
+            joinedload(ClassAssignment.exercise)
+        ).filter(ClassAssignment.class_id.in_(class_ids))
         if not include_deleted:
             query = query.filter(ClassAssignment.status != 'DELETED')
         return query.order_by(ClassAssignment.assigned_at.desc()).all()
@@ -368,6 +370,77 @@ class AttemptRepository:
 
     def update(self, attempt: StudentExerciseAttempt) -> StudentExerciseAttempt:
         """Commit changes to an existing StudentExerciseAttempt."""
+        self.db.commit()
+        self.db.refresh(attempt)
+        return attempt
+
+    def list_attempts(
+        self,
+        class_ids: Optional[List[UUID]] = None,
+        assignment_id: Optional[UUID] = None,
+        student_id: Optional[UUID] = None,
+        is_finished: Optional[bool] = None,
+        search: Optional[str] = None,
+        include_deleted: bool = False
+    ) -> List[StudentExerciseAttempt]:
+        """List attempts with joins on student, assignment, class, and exercise."""
+        query = self.db.query(StudentExerciseAttempt).join(
+            StudentExerciseAttempt.assignment
+        ).join(
+            StudentExerciseAttempt.student
+        ).options(
+            joinedload(StudentExerciseAttempt.student),
+            joinedload(StudentExerciseAttempt.assignment).joinedload(ClassAssignment.class_obj),
+            joinedload(StudentExerciseAttempt.assignment).joinedload(ClassAssignment.exercise)
+        )
+
+        if not include_deleted:
+            query = query.filter(
+                StudentExerciseAttempt.status != 'DELETED',
+                ClassAssignment.status != 'DELETED'
+            )
+
+        if class_ids is not None:
+            if not class_ids:
+                return []
+            query = query.filter(ClassAssignment.class_id.in_(class_ids))
+
+        if assignment_id:
+            query = query.filter(StudentExerciseAttempt.assignment_id == assignment_id)
+
+        if student_id:
+            query = query.filter(StudentExerciseAttempt.student_id == student_id)
+
+        if is_finished is not None:
+            query = query.filter(StudentExerciseAttempt.is_finished == is_finished)
+
+        if search and search.strip():
+            term = f"%{search.strip()}%"
+            query = query.filter(
+                or_(
+                    User.full_name.ilike(term),
+                    User.phone.ilike(term)
+                )
+            )
+
+        return query.order_by(StudentExerciseAttempt.created_at.desc()).all()
+
+    def update_grade(
+        self,
+        attempt: StudentExerciseAttempt,
+        score: float,
+        feedback: Optional[str] = None,
+        detailed_results: Optional[Any] = None
+    ) -> StudentExerciseAttempt:
+        """Update score, feedback and detailed_results on an attempt."""
+        attempt.score = score
+        if detailed_results is not None:
+            attempt.detailed_results = detailed_results
+        elif feedback is not None:
+            curr_results = dict(attempt.detailed_results or {})
+            curr_results["teacher_feedback"] = feedback
+            attempt.detailed_results = curr_results
+
         self.db.commit()
         self.db.refresh(attempt)
         return attempt

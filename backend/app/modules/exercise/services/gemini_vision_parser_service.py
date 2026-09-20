@@ -148,21 +148,23 @@ class GeminiVisionParserService:
 
             client = genai.Client(api_key=api_key)
 
-            contents: List[Any] = [GEMINI_SYSTEM_PROMPT]
+            contents: List[Any] = []
             for idx, img in enumerate(images, 1):
                 contents.append(f"--- TRANG {idx} CỦA ĐỀ THI ---")
                 contents.append(img)
 
             contents.append("Hãy bóc tách toàn bộ các câu hỏi từ tất cả các trang trên và trả về kết quả JSON.")
 
-            # Request structured JSON response with expanded token window
+            # Request structured JSON response with expanded token window and disable AFC warnings
             response = client.models.generate_content(
                 model=model_name,
                 contents=contents,
                 config=types.GenerateContentConfig(
+                    system_instruction=GEMINI_SYSTEM_PROMPT,
                     response_mime_type="application/json",
                     max_output_tokens=16384,
                     temperature=0.1,
+                    automatic_function_calling=types.AutomaticFunctionCallingConfig(disable=True)
                 )
             )
 
@@ -170,7 +172,7 @@ class GeminiVisionParserService:
             return cls._process_gemini_json_response(raw_json)
 
         except Exception as e:
-            logger.error(f"Gemini Vision API execution failed: {e}")
+            logger.error(f"Gemini Vision API execution failed: {e}", exc_info=True)
             return ParseResult(errors=[ParseError(question_number=None, message=f"Gemini Vision OCR error: {str(e)}")])
 
     @staticmethod
@@ -203,6 +205,7 @@ class GeminiVisionParserService:
         Parses raw JSON string from Gemini, auto-repairs any token-truncated JSON,
         and builds sorted List[ParsedQuestion].
         """
+        from app.modules.exercise.services.import_parser_service import ImportParserService
         clean_text = raw_json_str.strip()
 
         # Extract JSON block between ```json ... ``` or outermost { ... }
@@ -245,23 +248,33 @@ class GeminiVisionParserService:
                 logger.error(f"Failed to decode Gemini JSON response: {e}\nRaw: {clean_text[:500]}")
                 return ParseResult(errors=[ParseError(question_number=None, message=f"Invalid JSON from Gemini Vision: {str(e)}")])
 
-        raw_questions = data.get("questions", [])
-        if not raw_questions and isinstance(data, list):
-            raw_questions = data
+        raw_questions = data.get("questions") if isinstance(data, dict) else (data if isinstance(data, list) else [])
+        if raw_questions is None:
+            raw_questions = []
+        elif isinstance(raw_questions, dict):
+            raw_questions = list(raw_questions.values())
 
         if not raw_questions:
             return ParseResult(errors=[ParseError(question_number=None, message="Gemini Vision did not identify any questions in document.")])
 
         parsed_questions: List[ParsedQuestion] = []
         for item in raw_questions:
-            q_num = item.get("question_number", len(parsed_questions) + 1)
-            part = item.get("part", "Part1")
+            if not isinstance(item, dict):
+                continue
+
+            raw_q_num = item.get("question_number")
+            try:
+                q_num = int(raw_q_num) if raw_q_num is not None else len(parsed_questions) + 1
+            except (ValueError, TypeError):
+                q_num = len(parsed_questions) + 1
+
+            part = str(item.get("part", "Part1")).strip()
             
             # Map question type enum
-            q_type_str = item.get("question_type", "MultipleChoice")
-            if part == "Part2" or q_type_str == "TrueFalse":
+            q_type_str = str(item.get("question_type", "MultipleChoice")).strip()
+            if part == "Part2" or q_type_str.lower() in ["truefalse", "true_false"]:
                 q_type = QuestionTypeEnum.TrueFalse
-            elif part == "Part3" or q_type_str == "ShortAnswer":
+            elif part == "Part3" or q_type_str.lower() in ["shortanswer", "short_answer"]:
                 q_type = QuestionTypeEnum.ShortAnswer
             else:
                 q_type = QuestionTypeEnum.MultipleChoice
@@ -275,21 +288,44 @@ class GeminiVisionParserService:
                         difficulty = d
                         break
 
-            content = item.get("content", "").strip()
-            content_markdown = item.get("content_markdown") or content
-            content_latex = item.get("content_latex")
+            content = str(item.get("content", "") or "").strip()
+            content_markdown = item.get("content_markdown") or ImportParserService.convert_latex_to_markdown(content)
+            content_latex = item.get("content_latex") or content
 
-            # Parse answer options
+            # Parse answer options safely (handling None / null, list of strings, etc.)
+            raw_options = item.get("answer_options") or item.get("options") or []
+            if not isinstance(raw_options, list):
+                raw_options = []
+
             options: List[ParsedOption] = []
-            for opt_idx, opt in enumerate(item.get("answer_options", [])):
-                opt_content = str(opt.get("content", "")).strip()
-                is_corr = bool(opt.get("is_correct", False))
-                d_order = int(opt.get("display_order", opt_idx))
-                options.append(ParsedOption(
-                    content=opt_content,
-                    is_correct=is_corr,
-                    display_order=d_order
-                ))
+            for opt_idx, opt in enumerate(raw_options):
+                if isinstance(opt, dict):
+                    opt_content = str(opt.get("content") or opt.get("text") or "").strip()
+                    is_corr = bool(opt.get("is_correct", False))
+                    d_order = int(opt.get("display_order", opt_idx) if opt.get("display_order") is not None else opt_idx)
+                elif isinstance(opt, str):
+                    opt_content = str(opt).strip()
+                    is_corr = False
+                    d_order = opt_idx
+                else:
+                    continue
+
+                if opt_content:
+                    options.append(ParsedOption(
+                        content=opt_content,
+                        is_correct=is_corr,
+                        display_order=d_order
+                    ))
+
+            # Infer correct answer from correct_answer field if not already flagged in options
+            corr_ans = item.get("correct_answer")
+            if corr_ans and options and not any(o.is_correct for o in options):
+                corr_str = str(corr_ans).strip().upper()
+                label_map = {"A": 0, "B": 1, "C": 2, "D": 3}
+                if corr_str in label_map and label_map[corr_str] < len(options):
+                    options[label_map[corr_str]].is_correct = True
+
+            segments, needs_review = ImportParserService.extract_segments(content)
 
             parsed_questions.append(ParsedQuestion(
                 question_number=q_num,
@@ -299,11 +335,12 @@ class GeminiVisionParserService:
                 content=content,
                 content_markdown=content_markdown,
                 content_latex=content_latex,
-                confidence_score=0.98,
-                needs_review=False,
+                segments=segments,
+                confidence_score=0.98 if not needs_review else 0.75,
+                needs_review=needs_review,
                 image_url=item.get("image_url"),
                 answer_options=options,
-                correct_answer=item.get("correct_answer")
+                correct_answer=str(corr_ans) if corr_ans is not None else None
             ))
 
         # Sort questions strictly by Part and question_number (1, 2, 3, ..., N)

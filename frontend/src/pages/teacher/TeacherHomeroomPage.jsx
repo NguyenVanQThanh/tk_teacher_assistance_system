@@ -5,7 +5,7 @@
 // Updated At: 2026-09-01
 // Updated By: Tam Khang
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { 
   ChevronRight, 
   Search, 
@@ -21,9 +21,12 @@ import {
   ArrowUpDown,
   ArrowDown,
   ArrowUp,
-  Printer
+  Printer,
+  Loader2,
+  AlertCircle
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
+import { classesApi } from '../../services/api';
 import StudentDetailModal from '../../components/teacher/StudentDetailModal';
 import EditStudentInfoModal from '../../components/teacher/EditStudentInfoModal';
 import EditStudentGradesModal from '../../components/teacher/EditStudentGradesModal';
@@ -33,6 +36,12 @@ import './TeacherHomeroomPage.css';
 
 export default function TeacherHomeroomPage() {
   const [showSidebar, setShowSidebar] = useState(true);
+  const [classesList, setClassesList] = useState([]);
+  const [selectedClassId, setSelectedClassId] = useState('');
+  const [currentClassInfo, setCurrentClassInfo] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [scoreSortOrder, setScoreSortOrder] = useState('none'); // 'none' | 'desc' (cao -> thấp) | 'asc' (thấp -> cao)
@@ -44,15 +53,6 @@ export default function TeacherHomeroomPage() {
   const [printingStudent, setPrintingStudent] = useState(null);
   const [showAddStudentModal, setShowAddStudentModal] = useState(false);
   const [activeMenuId, setActiveMenuId] = useState(null);
-
-  // Homeroom class metadata
-  const homeroomClass = {
-    name: '12A1 - Toán nâng cao',
-    roleLabel: 'Lớp chủ nhiệm',
-    totalStudents: 45,
-    grade: 12,
-    term: 'Kì 1, 2023–2024'
-  };
 
   // Subject label dictionary
   const subjectLabels = {
@@ -66,121 +66,95 @@ export default function TeacherHomeroomPage() {
     history: 'Lịch sử',
   };
 
-  // Mock student roster with per-subject scores
-  const initialStudentsData = [
-    { 
-      id: 1, 
-      code: 'HS2023001', 
-      name: 'Nguyễn Văn A', 
-      initials: 'NA', 
-      avatarColor: '#7C3AED', 
-      avgScore: 8.5, 
-      status: 'good', 
-      statusLabel: 'Tốt',
-      subjectScores: { math: 8.8, physics: 8.5, chemistry: 8.2, literature: 8.0, english: 9.0, biology: 8.4, history: 8.6, informatics: 9.5 }
-    },
-    { 
-      id: 2, 
-      code: 'HS2023002', 
-      name: 'Trần Thị B', 
-      initials: 'TB', 
-      avatarColor: '#8B5CF6', 
-      avgScore: 9.2, 
-      status: 'excellent', 
-      statusLabel: 'Xuất sắc',
-      subjectScores: { math: 9.6, physics: 9.2, chemistry: 9.0, literature: 8.8, english: 9.5, biology: 9.0, history: 9.3, informatics: 9.8 }
-    },
-    { 
-      id: 3, 
-      code: 'HS2023003', 
-      name: 'Lê Văn C', 
-      initials: 'LC', 
-      avatarColor: '#A78BFA', 
-      avgScore: 6.8, 
-      status: 'fair', 
-      statusLabel: 'Khá',
-      subjectScores: { math: 7.0, physics: 6.5, chemistry: 6.8, literature: 6.5, english: 7.2, biology: 6.9, history: 6.7, informatics: 7.5 }
-    },
-    { 
-      id: 4, 
-      code: 'HS2023004', 
-      name: 'Phạm Minh Tuấn', 
-      initials: 'PT', 
-      avatarColor: '#6366F1', 
-      avgScore: 9.5, 
-      status: 'excellent', 
-      statusLabel: 'Xuất sắc',
-      subjectScores: { math: 9.8, physics: 9.5, chemistry: 9.6, literature: 9.0, english: 9.8, biology: 9.2, history: 9.6, informatics: 9.8 }
-    },
-    { 
-      id: 5, 
-      code: 'HS2023005', 
-      name: 'Đặng Thu Thảo', 
-      initials: 'DT', 
-      avatarColor: '#EC4899', 
-      avgScore: 8.0, 
-      status: 'good', 
-      statusLabel: 'Tốt',
-      subjectScores: { math: 8.2, physics: 8.0, chemistry: 7.8, literature: 8.5, english: 8.2, biology: 7.5, history: 7.8, informatics: 8.6 }
-    },
-    { 
-      id: 6, 
-      code: 'HS2023006', 
-      name: 'Vũ Hoàng Long', 
-      initials: 'VL', 
-      avatarColor: '#3B82F6', 
-      avgScore: 8.5, 
-      status: 'good', 
-      statusLabel: 'Tốt',
-      subjectScores: { math: 8.6, physics: 8.8, chemistry: 8.4, literature: 7.8, english: 8.8, biology: 8.5, history: 8.6, informatics: 8.8 }
-    },
-    { 
-      id: 7, 
-      code: 'HS2023007', 
-      name: 'Bùi Phương Linh', 
-      initials: 'BL', 
-      avatarColor: '#10B981', 
-      avgScore: 9.0, 
-      status: 'excellent', 
-      statusLabel: 'Xuất sắc',
-      subjectScores: { math: 9.2, physics: 8.8, chemistry: 9.0, literature: 9.2, english: 9.4, biology: 8.6, history: 8.8, informatics: 9.4 }
-    },
-    { 
-      id: 8, 
-      code: 'HS2023008', 
-      name: 'Hoàng Quốc Bảo', 
-      initials: 'HB', 
-      avatarColor: '#F59E0B', 
-      avgScore: 7.8, 
-      status: 'fair', 
-      statusLabel: 'Khá',
-      subjectScores: { math: 8.0, physics: 7.8, chemistry: 7.5, literature: 7.6, english: 8.2, biology: 7.8, history: 7.9, informatics: 8.0 }
-    },
-    { 
-      id: 9, 
-      code: 'HS2023009', 
-      name: 'Ngô Đức Thịnh', 
-      initials: 'NT', 
-      avatarColor: '#6B7280', 
-      avgScore: 8.2, 
-      status: 'good', 
-      statusLabel: 'Tốt',
-      subjectScores: { math: 8.4, physics: 8.0, chemistry: 8.5, literature: 7.9, english: 8.2, biology: 8.3, history: 8.1, informatics: 8.5 }
-    },
-    { 
-      id: 10, 
-      code: 'HS2023010', 
-      name: 'Đỗ Mai Trang', 
-      initials: 'DT', 
-      avatarColor: '#8B5CF6', 
-      avgScore: 7.2, 
-      status: 'fair', 
-      statusLabel: 'Khá',
-      subjectScores: { math: 7.5, physics: 7.0, chemistry: 7.2, literature: 7.6, english: 7.4, biology: 6.8, history: 6.9, informatics: 7.8 }
-    },
-  ];
+  const [studentsList, setStudentsList] = useState([]);
 
-  const [studentsList, setStudentsList] = useState(initialStudentsData);
+  // Load available classes on mount
+  useEffect(() => {
+    let isMounted = true;
+    async function loadClasses() {
+      try {
+        setLoading(true);
+        setError(null);
+        const res = await classesApi.getClasses();
+        if (!isMounted) return;
+        if (Array.isArray(res) && res.length > 0) {
+          setClassesList(res);
+          setSelectedClassId(res[0].class_id);
+          setCurrentClassInfo(res[0]);
+        }
+      } catch (err) {
+        if (isMounted) setError('Không thể tải danh sách lớp học.');
+      } finally {
+        if (isMounted) setLoading(false);
+      }
+    }
+    loadClasses();
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
+  // Load students for selected class
+  useEffect(() => {
+    if (!selectedClassId) return;
+    let isMounted = true;
+
+    async function loadStudents() {
+      try {
+        setLoading(true);
+        const cls = classesList.find(c => c.class_id === selectedClassId);
+        if (cls) setCurrentClassInfo(cls);
+
+        const res = await classesApi.getStudentsInClass(selectedClassId);
+        if (!isMounted) return;
+
+        if (Array.isArray(res) && res.length > 0) {
+          const avatarColors = ['#7C3AED', '#8B5CF6', '#A78BFA', '#6366F1', '#EC4899', '#3B82F6', '#10B981', '#F59E0B'];
+          const mapped = res.map((s, idx) => {
+            const name = s.student_name || `Học sinh ${idx + 1}`;
+            const nameParts = name.trim().split(' ');
+            const initials = nameParts.length >= 2
+              ? (nameParts[nameParts.length - 2][0] + nameParts[nameParts.length - 1][0]).toUpperCase()
+              : name.substring(0, 2).toUpperCase();
+            return {
+              id: s.student_id,
+              code: s.student_code || `HS${String(idx + 1).padStart(3, '0')}`,
+              name: name,
+              initials: initials,
+              avatarColor: avatarColors[idx % avatarColors.length],
+              avgScore: 8.2,
+              status: s.status === 'ACTIVE' ? 'good' : 'fair',
+              statusLabel: s.status === 'ACTIVE' ? 'Đang học' : 'Nghỉ học',
+              subjectScores: { math: 8.5, physics: 8.0, chemistry: 8.2, literature: 8.0, english: 8.5, biology: 8.0, history: 8.0, informatics: 8.5 }
+            };
+          });
+          setStudentsList(mapped);
+        } else {
+          setStudentsList([]);
+        }
+      } catch (err) {
+        if (isMounted) {
+          // If error loading students
+        }
+      } finally {
+        if (isMounted) setLoading(false);
+      }
+    }
+
+    loadStudents();
+    return () => {
+      isMounted = false;
+    };
+  }, [selectedClassId, classesList]);
+
+  // Homeroom class metadata
+  const homeroomClass = {
+    name: currentClassInfo?.class_name || '12A1 - Toán nâng cao',
+    roleLabel: 'Lớp chủ nhiệm',
+    totalStudents: studentsList.length,
+    grade: currentClassInfo?.class_name?.match(/\d+/)?.[0] || 12,
+    term: currentClassInfo?.school_year || '2025-2026'
+  };
 
   const handleSaveStudent = (updatedStudent) => {
     setStudentsList(prev => prev.map(s => s.id === updatedStudent.id ? updatedStudent : s));
@@ -272,7 +246,22 @@ export default function TeacherHomeroomPage() {
           {/* Class Header Banner Card */}
           <div className="homeroom-header-card">
             <div className="header-card-left">
-              <h1 className="homeroom-class-title">{homeroomClass.name}</h1>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                <h1 className="homeroom-class-title">{homeroomClass.name}</h1>
+                {classesList.length > 1 && (
+                  <select
+                    value={selectedClassId}
+                    onChange={(e) => setSelectedClassId(e.target.value)}
+                    style={{ padding: '6px 12px', borderRadius: '6px', border: '1px solid #CBD5E1', fontSize: '13px', background: '#FFFFFF', color: '#1E293B', cursor: 'pointer', fontWeight: 600 }}
+                  >
+                    {classesList.map(c => (
+                      <option key={c.class_id} value={c.class_id}>
+                        {c.class_name} {c.school_year ? `(${c.school_year})` : ''}
+                      </option>
+                    ))}
+                  </select>
+                )}
+              </div>
               <div className="homeroom-meta-row">
                 <div className="meta-item">
                   <Users size={16} className="meta-icon" />
@@ -301,7 +290,10 @@ export default function TeacherHomeroomPage() {
           <div className="homeroom-roster-card">
             {/* Table Toolbar Header */}
             <div className="roster-toolbar">
-              <h2 className="roster-toolbar-title">Danh sách học sinh</h2>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <h2 className="roster-toolbar-title">Danh sách học sinh</h2>
+                {loading && <Loader2 size={16} className="animate-spin" style={{ color: '#6366F1' }} />}
+              </div>
 
               <div className="roster-toolbar-controls">
                 {/* Search Bar */}

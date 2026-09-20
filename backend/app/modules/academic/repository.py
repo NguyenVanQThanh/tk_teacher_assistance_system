@@ -7,7 +7,7 @@
 
 from typing import Optional, List
 from uuid import UUID
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 
 from app.modules.academic.models import Subject, Class, StudentClass, TeacherSubject
 
@@ -215,7 +215,7 @@ class EnrollmentRepository:
         exclude_status: Optional[str] = 'DELETED'
     ) -> List[StudentClass]:
         """Flexible multi-field filter for enrollments."""
-        query = db.query(StudentClass)
+        query = db.query(StudentClass).options(joinedload(StudentClass.student))
         if class_id is not None:
             query = query.filter(StudentClass.class_id == class_id)
         if student_id is not None:

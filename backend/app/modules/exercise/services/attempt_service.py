@@ -12,10 +12,10 @@ from fastapi import HTTPException, status
 from sqlalchemy.orm import Session
 
 from models.models import User, ClassAssignment, StudentClass, StudentExerciseAttempt
-from app.modules.exercise.schemas import AttemptSubmitRequest
+from app.modules.exercise.schemas import AttemptSubmitRequest, AttemptListItemOut, AttemptGradeUpdateRequest
 from app.modules.exercise.repository import AttemptRepository, AssignmentRepository
 from app.modules.exercise.services.grading_service import GradingService
-from app.modules.academic.scoping import get_user_role_name, check_class_access
+from app.modules.academic.scoping import get_user_role_name, check_class_access, get_accessible_class_ids
 
 
 class AttemptService:
@@ -157,3 +157,122 @@ class AttemptService:
             check_class_access(self.db, current_user, assignment.class_id)
 
         return attempt
+
+    def list_attempts(
+        self,
+        current_user: User,
+        class_id: Optional[UUID] = None,
+        assignment_id: Optional[UUID] = None,
+        is_finished: Optional[bool] = None,
+        search: Optional[str] = None
+    ) -> List[AttemptListItemOut]:
+        """List attempts with RBAC data scoping for Teacher / Student / Admin."""
+        role_name = get_user_role_name(self.db, current_user)
+
+        if role_name == "Student":
+            attempts = self.repo.list_attempts(
+                student_id=current_user.user_id,
+                assignment_id=assignment_id,
+                is_finished=is_finished,
+                search=search
+            )
+        elif role_name == "Teacher":
+            accessible_class_ids = get_accessible_class_ids(self.db, current_user, role_name) or []
+            if class_id:
+                if class_id not in accessible_class_ids:
+                    raise HTTPException(
+                        status_code=status.HTTP_403_FORBIDDEN,
+                        detail={
+                            "code": "ERR-ACAD-CLASS_ACCESS_DENIED",
+                            "message": "You do not have permission to access attempts for this class."
+                        }
+                    )
+                target_class_ids = [class_id]
+            else:
+                target_class_ids = accessible_class_ids
+
+            attempts = self.repo.list_attempts(
+                class_ids=target_class_ids,
+                assignment_id=assignment_id,
+                is_finished=is_finished,
+                search=search
+            )
+        else:
+            # Admin: unrestricted
+            target_class_ids = [class_id] if class_id else None
+            attempts = self.repo.list_attempts(
+                class_ids=target_class_ids,
+                assignment_id=assignment_id,
+                is_finished=is_finished,
+                search=search
+            )
+
+        items: List[AttemptListItemOut] = []
+        for att in attempts:
+            student_name = att.student.full_name if att.student else "Học sinh"
+            student_code = att.student.phone if att.student else None
+            class_id_val = att.assignment.class_id if att.assignment else att.attempt_id
+            class_name = att.assignment.class_obj.class_name if (att.assignment and att.assignment.class_obj) else "Lớp"
+            exercise_id = att.assignment.exercise_id if att.assignment else att.attempt_id
+            exercise_title = att.assignment.exercise.title if (att.assignment and att.assignment.exercise) else "Bài tập"
+            subject_id = att.assignment.exercise.subject_id if (att.assignment and att.assignment.exercise) else None
+
+            items.append(
+                AttemptListItemOut(
+                    attempt_id=att.attempt_id,
+                    assignment_id=att.assignment_id,
+                    student_id=att.student_id,
+                    student_name=student_name,
+                    student_code=student_code,
+                    class_id=class_id_val,
+                    class_name=class_name,
+                    exercise_id=exercise_id,
+                    exercise_title=exercise_title,
+                    subject_id=subject_id,
+                    score=float(att.score) if att.score is not None else None,
+                    is_finished=att.is_finished,
+                    start_time=att.start_time,
+                    end_time=att.end_time,
+                    total_time_seconds=att.total_time_seconds,
+                    status=att.status
+                )
+            )
+
+        return items
+
+    def update_attempt_grade(
+        self,
+        attempt_id: UUID,
+        payload: AttemptGradeUpdateRequest,
+        current_user: User
+    ) -> StudentExerciseAttempt:
+        """Teacher updates score and feedback on a submitted attempt."""
+        attempt = self.repo.get_by_id(attempt_id)
+        if not attempt:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail={
+                    "code": "ERR-EXE-ATTEMPT_NOT_FOUND",
+                    "message": "Exercise attempt record not found."
+                }
+            )
+
+        assignment = self.assignment_repo.get_by_id(attempt.assignment_id)
+        if not assignment:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail={
+                    "code": "ERR-EXE-ASSIGNMENT_NOT_FOUND",
+                    "message": "Associated assignment record not found."
+                }
+            )
+
+        # Enforce class access scoping for Teacher
+        check_class_access(self.db, current_user, assignment.class_id)
+
+        return self.repo.update_grade(
+            attempt=attempt,
+            score=payload.score,
+            feedback=payload.feedback,
+            detailed_results=payload.detailed_results
+        )

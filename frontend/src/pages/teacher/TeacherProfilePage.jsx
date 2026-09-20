@@ -28,10 +28,12 @@ import {
   Edit3, 
   Camera, 
   XCircle,
-  AlertCircle
+  AlertCircle,
+  Loader2
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { getTeacherProfileDefaults } from '../../utils/teacherSubjectHelper';
+import { authApi } from '../../services/api';
 import './TeacherProfilePage.css';
 
 export default function TeacherProfilePage() {
@@ -62,17 +64,19 @@ export default function TeacherProfilePage() {
 
   // Toast notification
   const [toastMessage, setToastMessage] = useState(null);
+  const [errorMessage, setErrorMessage] = useState(null);
+  const [isChangingPass, setIsChangingPass] = useState(false);
 
   // --- Profile Info State ---
   const [isEditingProfile, setIsEditingProfile] = useState(false);
   const [profileForm, setProfileForm] = useState({
-    fullName: user?.full_name || 'Nguyễn Văn A',
+    fullName: user?.full_name || 'Giáo viên',
     title: 'GV.',
     gender: 'Nam',
     dob: '1985-08-15',
     citizenId: '001085012345',
-    email: user?.email || 'giaovien.mau@eduglobal.edu.vn',
-    phone: user?.phone || '0912 345 678',
+    email: user?.email || '',
+    phone: user?.phone || '',
     address: 'Số 144 Xuân Thủy, Cầu Giấy, Hà Nội',
     school: 'Trường THPT Chuyên',
     department: profileDefaults.department,
@@ -82,8 +86,9 @@ export default function TeacherProfilePage() {
     teacherCode: profileDefaults.teacherCode
   });
 
-  // Re-sync profile form when user context changes
+  // Load and re-sync profile form from API and AuthContext
   useEffect(() => {
+    let isMounted = true;
     if (user) {
       const defs = getTeacherProfileDefaults(user);
       setProfileForm(prev => ({
@@ -97,6 +102,32 @@ export default function TeacherProfilePage() {
         teacherCode: defs.teacherCode
       }));
     }
+
+    async function loadMe() {
+      try {
+        const me = await authApi.getMe();
+        if (isMounted && me) {
+          const defs = getTeacherProfileDefaults(me);
+          setProfileForm(prev => ({
+            ...prev,
+            fullName: me.full_name || prev.fullName,
+            email: me.email || prev.email,
+            phone: me.phone || prev.phone,
+            department: defs.department,
+            position: me.role ? `Giáo viên (${me.role})` : defs.position,
+            degree: defs.degree,
+            teacherCode: defs.teacherCode
+          }));
+        }
+      } catch (err) {
+        // Fallback to auth context
+      }
+    }
+    loadMe();
+
+    return () => {
+      isMounted = false;
+    };
   }, [user]);
 
   // --- Security & Password State ---
@@ -119,28 +150,43 @@ export default function TeacherProfilePage() {
   };
 
   // Change password
-  const handleChangePassword = (e) => {
+  const handleChangePassword = async (e) => {
     e.preventDefault();
+    setErrorMessage(null);
     if (!passwordForm.currentPassword || !passwordForm.newPassword || !passwordForm.confirmPassword) {
-      alert('Vui lòng điền đầy đủ các trường mật khẩu.');
+      setErrorMessage('Vui lòng điền đầy đủ các trường mật khẩu.');
       return;
     }
     if (passwordForm.newPassword !== passwordForm.confirmPassword) {
-      alert('Mật khẩu mới và xác nhận mật khẩu không khớp!');
+      setErrorMessage('Mật khẩu mới và xác nhận mật khẩu không khớp!');
       return;
     }
     if (passwordForm.newPassword.length < 8) {
-      alert('Mật khẩu mới phải có ít nhất 8 ký tự!');
+      setErrorMessage('Mật khẩu mới phải có ít nhất 8 ký tự!');
       return;
     }
 
-    setPasswordForm({
-      currentPassword: '',
-      newPassword: '',
-      confirmPassword: ''
-    });
-    setToastMessage('Đã đổi mật khẩu thành công! Vui lòng sử dụng mật khẩu mới cho lần đăng nhập tiếp theo.');
-    setTimeout(() => setToastMessage(null), 4000);
+    try {
+      setIsChangingPass(true);
+      await authApi.changePassword({
+        old_password: passwordForm.currentPassword,
+        new_password: passwordForm.newPassword,
+      });
+
+      setPasswordForm({
+        currentPassword: '',
+        newPassword: '',
+        confirmPassword: ''
+      });
+      setToastMessage('Đã đổi mật khẩu thành công! Vui lòng sử dụng mật khẩu mới cho lần đăng nhập tiếp theo.');
+      setTimeout(() => setToastMessage(null), 4000);
+    } catch (err) {
+      const detail = err.response?.data?.detail;
+      const msg = typeof detail === 'string' ? detail : detail?.message || 'Không thể đổi mật khẩu. Vui lòng kiểm tra lại mật khẩu hiện tại.';
+      setErrorMessage(msg);
+    } finally {
+      setIsChangingPass(false);
+    }
   };
 
   // Password strength checker
@@ -581,10 +627,27 @@ export default function TeacherProfilePage() {
                     </ul>
                   </div>
 
+                  {/* Error Alert */}
+                  {errorMessage && (
+                    <div style={{ marginTop: '16px', padding: '10px 14px', background: '#FEF2F2', border: '1px solid #FCA5A5', borderRadius: '8px', color: '#991B1B', fontSize: '13px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <AlertCircle size={16} />
+                      <span>{errorMessage}</span>
+                    </div>
+                  )}
+
                   <div className="password-actions-bar">
-                    <button type="submit" className="btn-update-password">
-                      <Lock size={16} />
-                      <span>Cập nhật mật khẩu mới</span>
+                    <button type="submit" className="btn-update-password" disabled={isChangingPass}>
+                      {isChangingPass ? (
+                        <>
+                          <Loader2 size={16} className="animate-spin" />
+                          <span>Đang cập nhật...</span>
+                        </>
+                      ) : (
+                        <>
+                          <Lock size={16} />
+                          <span>Cập nhật mật khẩu mới</span>
+                        </>
+                      )}
                     </button>
                   </div>
                 </form>

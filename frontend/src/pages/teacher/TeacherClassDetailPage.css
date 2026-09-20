@@ -239,3 +239,199 @@ Updated By: Tam Khang
   background-color: #F8F1FF;
   text-decoration: underline;
 }
+
+/* Title bar and Assign Action Button */
+.class-title-and-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.btn-header-assign-new {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 16px;
+  background: linear-gradient(135deg, #4F46E5 0%, #3B82F6 100%);
+  color: #FFFFFF;
+  border: none;
+  border-radius: 8px;
+  font-size: 13.5px;
+  font-weight: 600;
+  cursor: pointer;
+  box-shadow: 0 2px 6px rgba(79, 70, 229, 0.2);
+  transition: all 0.2s ease;
+}
+
+.btn-header-assign-new:hover {
+  opacity: 0.95;
+  transform: translateY(-1px);
+}
+
+/* Tabs Bar */
+.class-tabs-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 16px;
+  border-bottom: 1px solid #E5E7EB;
+  padding-bottom: 8px;
+}
+
+.class-tab-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 16px;
+  background: transparent;
+  border: none;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 600;
+  color: #6B7280;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.class-tab-btn:hover {
+  background-color: #F3F4F6;
+  color: #1F2937;
+}
+
+.class-tab-btn.active {
+  background-color: #EEF2FF;
+  color: #4F46E5;
+}
+
+.class-tab-count-badge {
+  background-color: #E5E7EB;
+  color: #4B5563;
+  padding: 1px 8px;
+  border-radius: 9999px;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.class-tab-btn.active .class-tab-count-badge {
+  background-color: #C7D2FE;
+  color: #3730A3;
+}
+
+/* Success Alert */
+.class-action-alert-success {
+  padding: 12px 16px;
+  background-color: #F0FDF4;
+  border: 1px solid #BBF7D0;
+  border-radius: 8px;
+  color: #166534;
+  margin-bottom: 16px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13.5px;
+  font-weight: 500;
+  animation: fadeInBackdrop 0.2s ease;
+}
+
+/* Assignments Table Elements */
+.assignment-title-cell {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.assignment-row-icon {
+  color: #4F46E5;
+  flex-shrink: 0;
+}
+
+.assignment-title-text {
+  font-weight: 600;
+  color: #111827;
+  max-width: 320px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.assignment-q-badge {
+  background-color: #F3F4F6;
+  color: #374151;
+  padding: 3px 8px;
+  border-radius: 6px;
+  font-size: 12.5px;
+  font-weight: 500;
+}
+
+/* Status Pills */
+.status-pill {
+  display: inline-block;
+  padding: 3px 10px;
+  border-radius: 9999px;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.pill-active {
+  background-color: #DCFCE7;
+  color: #15803D;
+}
+
+.pill-expired {
+  background-color: #F3F4F6;
+  color: #6B7280;
+}
+
+/* Action Button */
+.btn-cancel-assignment {
+  background: transparent;
+  border: none;
+  color: #9CA3AF;
+  padding: 6px;
+  border-radius: 6px;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.15s ease;
+}
+
+.btn-cancel-assignment:hover:not(:disabled) {
+  background-color: #FEE2E2;
+  color: #DC2626;
+}
+
+.btn-cancel-assignment:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* Empty Assignment Box */
+.empty-assignment-box {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 24px 16px;
+}
+
+.btn-go-to-exercises {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 16px;
+  background-color: #4F46E5;
+  color: #FFFFFF;
+  border: none;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+
+.btn-go-to-exercises:hover {
+  background-color: #4338CA;
+}
