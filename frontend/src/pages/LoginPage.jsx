@@ -2,7 +2,7 @@
 // Description: Split-screen Login Page component connected to backend authentication API.
 // Created At: 2026-08-30
 // Created By: Tam Khang
-// Updated At: 2026-09-13
+// Updated At: 2026-09-20
 // Updated By: Tam Khang
 
 import React, { useState, useEffect } from 'react';
@@ -32,17 +32,23 @@ export default function LoginPage() {
   const [successMsg, setSuccessMsg] = useState('');
   const [fieldErrors, setFieldErrors] = useState({});
 
-  const { login, isAuthenticated } = useAuth();
+  const { login, isAuthenticated, user } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
 
   // If already authenticated, redirect to target or home
   useEffect(() => {
     if (isAuthenticated) {
-      const fromPath = location.state?.from?.pathname || '/teacher';
+      let defaultPath = '/teacher';
+      if (user?.role === 'Admin') {
+        defaultPath = '/admin';
+      } else if (user?.role === 'Student') {
+        defaultPath = '/student';
+      }
+      const fromPath = location.state?.from?.pathname || defaultPath;
       navigate(fromPath, { replace: true });
     }
-  }, [isAuthenticated, navigate, location]);
+  }, [isAuthenticated, user, navigate, location]);
 
   // Regex patterns
   const PHONE_REGEX = /^0\d{9}$/;
@@ -91,7 +97,12 @@ export default function LoginPage() {
       
       setTimeout(() => {
         const userRole = result.user?.role || '';
-        const defaultPath = userRole === 'Student' ? '/student' : '/teacher';
+        let defaultPath = '/teacher';
+        if (userRole === 'Admin') {
+          defaultPath = '/admin';
+        } else if (userRole === 'Student') {
+          defaultPath = '/student';
+        }
         const fromPath = location.state?.from?.pathname || defaultPath;
         navigate(fromPath, { replace: true });
       }, 500);

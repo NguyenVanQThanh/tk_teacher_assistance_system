@@ -1,12 +1,12 @@
 // File Name: DailyScheduleDetailCard.jsx
-// Description: Right sidebar details card showing detailed schedule for the selected date with room and period info.
+// Description: Right sidebar details card showing detailed schedule for the selected date with period info.
 // Created At: 2026-09-07
 // Created By: Tam Khang
-// Updated At: 2026-09-07
+// Updated At: 2026-09-20
 // Updated By: Tam Khang
 
 import React from 'react';
-import { Info, MapPin } from 'lucide-react';
+import { Info } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { getTeacherSubjectInfo } from '../../utils/teacherSubjectHelper';
@@ -29,7 +29,6 @@ export default function DailyScheduleDetailCard({ selectedDay = 5 }) {
           title: `${teacherSubject} 10A1`,
           time: '07:30 - 09:00',
           period: 'Tiết 2 - 3',
-          room: 'Lab 02',
           dotColor: '#3B82F6',
           timeBadgeVariant: 'blue',
         },
@@ -38,7 +37,6 @@ export default function DailyScheduleDetailCard({ selectedDay = 5 }) {
           title: `${teacherSubject} 11B2`,
           time: '10:15 - 11:00',
           period: 'Tiết 5',
-          room: 'P.304',
           dotColor: '#7C3AED',
           timeBadgeVariant: 'purple',
         },
@@ -47,7 +45,6 @@ export default function DailyScheduleDetailCard({ selectedDay = 5 }) {
           title: `Bồi dưỡng Đội tuyển ${teacherSubject}`,
           time: '14:00 - 16:30',
           period: 'Tiết 7 - 9',
-          room: 'Lab 01',
           dotColor: '#7C3AED',
           timeBadgeVariant: 'purple',
         },
@@ -61,7 +58,6 @@ export default function DailyScheduleDetailCard({ selectedDay = 5 }) {
           title: `${teacherSubject} 10A2`,
           time: '07:30 - 09:00',
           period: 'Tiết 1 - 2',
-          room: 'Lab 02',
           dotColor: '#3B82F6',
           timeBadgeVariant: 'blue',
         },
@@ -70,7 +66,6 @@ export default function DailyScheduleDetailCard({ selectedDay = 5 }) {
           title: `${teacherSubject} 12A1`,
           time: '09:15 - 10:45',
           period: 'Tiết 3 - 4',
-          room: 'P.201',
           dotColor: '#7C3AED',
           timeBadgeVariant: 'purple',
         },
@@ -84,7 +79,6 @@ export default function DailyScheduleDetailCard({ selectedDay = 5 }) {
           title: `${teacherSubject} 11B1`,
           time: '08:15 - 09:45',
           period: 'Tiết 2 - 3',
-          room: 'P.302',
           dotColor: '#3B82F6',
           timeBadgeVariant: 'blue',
         },
@@ -93,7 +87,6 @@ export default function DailyScheduleDetailCard({ selectedDay = 5 }) {
           title: `Thực hành ${teacherSubject} 10A1`,
           time: '14:00 - 16:30',
           period: 'Tiết 7 - 9',
-          room: 'Lab 01',
           dotColor: '#7C3AED',
           timeBadgeVariant: 'purple',
         },
@@ -107,7 +100,6 @@ export default function DailyScheduleDetailCard({ selectedDay = 5 }) {
           title: `${teacherSubject} 10A1`,
           time: '07:30 - 09:00',
           period: 'Tiết 1 - 2',
-          room: 'P.104',
           dotColor: '#3B82F6',
           timeBadgeVariant: 'blue',
         },
@@ -116,7 +108,6 @@ export default function DailyScheduleDetailCard({ selectedDay = 5 }) {
           title: 'Họp Tổ Bộ Môn',
           time: '10:15 - 11:30',
           period: 'Tiết 5',
-          room: 'Phòng Hội đồng',
           dotColor: '#7C3AED',
           timeBadgeVariant: 'purple',
         },
@@ -132,7 +123,6 @@ export default function DailyScheduleDetailCard({ selectedDay = 5 }) {
         title: `${teacherSubject} 10A1`,
         time: '08:00 - 09:30',
         period: 'Tiết 2 - 3',
-        room: 'Lab 02',
         dotColor: '#3B82F6',
         timeBadgeVariant: 'blue',
       },
@@ -173,11 +163,6 @@ export default function DailyScheduleDetailCard({ selectedDay = 5 }) {
 
               <div className="class-period-text">
                 {cls.period}
-              </div>
-
-              <div className="class-room-row">
-                <MapPin size={13} className="room-pin-icon" />
-                <span>Phòng học: {cls.room}</span>
               </div>
             </div>
           ))}
