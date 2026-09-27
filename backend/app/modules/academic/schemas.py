@@ -1,8 +1,8 @@
 # File Name: schemas.py
-# Description: Pydantic schemas for the academic module with comprehensive validation and AcademicStatusEnum.
+# Description: Pydantic schemas for the academic module with comprehensive validation, name sanitization, and AcademicStatusEnum.
 # Created At: 2026-07-21
 # Created By: Tam Khang
-# Updated At: 2026-09-01
+# Updated At: 2026-09-27
 # Updated By: Tam Khang
 
 import re
@@ -93,7 +93,10 @@ class ClassCreate(BaseModel):
         v = v.strip()
         if not v:
             raise ValueError("Class name cannot be empty or blank.")
-        return v
+        clean = re.sub(r'[^a-zA-Z0-9\sÀ-ỹ_-]', '', v).strip()
+        if not clean:
+            raise ValueError("Class name must contain valid alphanumeric characters and no special symbols.")
+        return clean
 
     @field_validator("school_year")
     @classmethod
@@ -122,7 +125,10 @@ class ClassUpdate(BaseModel):
             v = v.strip()
             if not v:
                 raise ValueError("Class name cannot be empty or blank.")
-            return v
+            clean = re.sub(r'[^a-zA-Z0-9\sÀ-ỹ_-]', '', v).strip()
+            if not clean:
+                raise ValueError("Class name must contain valid alphanumeric characters and no special symbols.")
+            return clean
 
     @field_validator("school_year")
     @classmethod

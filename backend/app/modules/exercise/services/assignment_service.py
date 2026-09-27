@@ -2,7 +2,7 @@
 # Description: Service layer for ClassAssignment operations (creation, scoping, soft-delete, restore).
 # Created At: 2026-07-31
 # Created By: Tam Khang
-# Updated At: 2026-07-31
+# Updated At: 2026-09-27
 # Updated By: Tam Khang
 
 from typing import List, Optional
@@ -55,6 +55,22 @@ class AssignmentService:
                 TeacherSubject.subject_id == exercise.subject_id,
                 TeacherSubject.status == 'ACTIVE'
             ).first()
+
+            # Also permit if teacher authored the exercise and teaches this class / is homeroom teacher
+            if not assigned and exercise.created_by == current_user.user_id:
+                has_class_access = self.db.query(TeacherSubject).filter(
+                    TeacherSubject.teacher_id == current_user.user_id,
+                    TeacherSubject.class_id == class_id,
+                    TeacherSubject.status == 'ACTIVE'
+                ).first()
+                if not has_class_access:
+                    has_class_access = self.db.query(Class).filter(
+                        Class.class_id == class_id,
+                        Class.homeroom_teacher_id == current_user.user_id,
+                        Class.status != 'DELETED'
+                    ).first()
+                if has_class_access:
+                    assigned = True
 
             if not assigned:
                 raise HTTPException(

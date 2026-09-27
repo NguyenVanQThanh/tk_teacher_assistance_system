@@ -29,13 +29,13 @@ from models.models import User, Subject, Exercise, Question, AnswerOption
 
 load_dotenv()
 
-DB_USERNAME = os.environ.get("DB_USERNAME")
+DB_USERNAME = os.environ.get("DB_USERNAME") or os.environ.get("DB_USER")
 DB_PASSWORD = os.environ.get("DB_PASSWORD")
 DB_HOST = os.environ.get("DB_HOST", "localhost")
 DB_PORT = os.environ.get("DB_PORT", "5432")
 DB_NAME = os.environ.get("DB_NAME")
 
-DATABASE_URL = f"postgresql://{DB_USERNAME}:{DB_PASSWORD}@{DB_HOST}:{DB_PORT}/{DB_NAME}"
+DATABASE_URL = f"postgresql+psycopg2://{DB_USERNAME}:{DB_PASSWORD}@{DB_HOST}:{DB_PORT}/{DB_NAME}"
 engine = create_engine(DATABASE_URL)
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
@@ -51,6 +51,8 @@ def seed_sample_exercises():
         math_subj = session.query(Subject).filter(Subject.subject_name == "Toán học").first()
         phys_subj = session.query(Subject).filter(Subject.subject_name == "Vật lý").first()
         chem_subj = session.query(Subject).filter(Subject.subject_name == "Hóa học").first()
+        bio_subj = session.query(Subject).filter(Subject.subject_name == "Sinh học").first()
+        hist_subj = session.query(Subject).filter(Subject.subject_name == "Lịch sử").first()
 
         if not math_subj or not phys_subj:
             raise ValueError("Subjects not found. Run seed_academic_data.py first.")
@@ -255,6 +257,99 @@ def seed_sample_exercises():
                             {"content": "Phản ứng cộng", "is_correct": False, "order": 2},
                             {"content": "Phản ứng tách", "is_correct": False, "order": 3},
                             {"content": "Phản ứng trùng hợp", "is_correct": False, "order": 4},
+                        ]
+                    }
+                ]
+            },
+            {
+                "title": "Kiểm tra 15p – Este và Lipit (Hóa học 12)",
+                "subject": chem_subj if chem_subj else math_subj,
+                "ai_metadata": {"grade": "12", "duration": "15 phút", "type": "quiz"},
+                "questions": [
+                    {
+                        "content": "Este etyl axetat có công thức phân tử là:",
+                        "difficulty": "Nhận biết",
+                        "question_type": "MultipleChoice",
+                        "correct_answer": "B",
+                        "options": [
+                            {"content": "$\\text{CH}_3\\text{COOCH}_3$", "is_correct": False, "order": 1},
+                            {"content": "$\\text{CH}_3\\text{COOC}_2\\text{H}_5$", "is_correct": True, "order": 2},
+                            {"content": "$\\text{HCOOC}_2\\text{H}_5$", "is_correct": False, "order": 3},
+                            {"content": "$\\text{C}_2\\text{H}_5\\text{COOCH}_3$", "is_correct": False, "order": 4},
+                        ]
+                    },
+                    {
+                        "content": "Thủy phân hoàn toàn $8.8\\text{ gam}$ etyl axetat trong dung dịch $\\text{NaOH}$ dư thu được khối lượng muối natri axetat là:",
+                        "difficulty": "Vận dụng",
+                        "question_type": "MultipleChoice",
+                        "correct_answer": "A",
+                        "options": [
+                            {"content": "$8.2\\text{ gam}$", "is_correct": True, "order": 1},
+                            {"content": "$6.8\\text{ gam}$", "is_correct": False, "order": 2},
+                            {"content": "$9.4\\text{ gam}$", "is_correct": False, "order": 3},
+                            {"content": "$10.2\\text{ gam}$", "is_correct": False, "order": 4},
+                        ]
+                    }
+                ]
+            },
+            {
+                "title": "Kiểm tra 15p – Cơ chế di truyền và biến dị (Sinh học 12)",
+                "subject": bio_subj if bio_subj else math_subj,
+                "ai_metadata": {"grade": "12", "duration": "15 phút", "type": "quiz"},
+                "questions": [
+                    {
+                        "content": "Một phân tử ADN mạch kép có số nuclêôtit loại A chiếm $20\\%$. Tỉ lệ nuclêôtit loại G của phân tử này là:",
+                        "difficulty": "Thông hiểu",
+                        "question_type": "MultipleChoice",
+                        "correct_answer": "C",
+                        "options": [
+                            {"content": "$20\\%$", "is_correct": False, "order": 1},
+                            {"content": "$40\\%$", "is_correct": False, "order": 2},
+                            {"content": "$30\\%$", "is_correct": True, "order": 3},
+                            {"content": "$10\\%$", "is_correct": False, "order": 4},
+                        ]
+                    },
+                    {
+                        "content": "Quá trình nhân đôi ADN diễn ra theo nguyên tắc nào sau đây?",
+                        "difficulty": "Nhận biết",
+                        "question_type": "MultipleChoice",
+                        "correct_answer": "A",
+                        "options": [
+                            {"content": "Bổ sung và bán bảo toàn", "is_correct": True, "order": 1},
+                            {"content": "Bảo toàn hoàn toàn", "is_correct": False, "order": 2},
+                            {"content": "Khuôn mẫu gián đoạn", "is_correct": False, "order": 3},
+                            {"content": "Tự do ngẫu nhiên", "is_correct": False, "order": 4},
+                        ]
+                    }
+                ]
+            },
+            {
+                "title": "Kiểm tra 15p – Cách mạng tháng Tám năm 1945 (Lịch sử 12)",
+                "subject": hist_subj if hist_subj else math_subj,
+                "ai_metadata": {"grade": "12", "duration": "15 phút", "type": "quiz"},
+                "questions": [
+                    {
+                        "content": "Chủ tịch Hồ Chí Minh đọc bản Tuyên ngôn Độc lập khai sinh ra nước Việt Nam Dân chủ Cộng hòa vào ngày nào?",
+                        "difficulty": "Nhận biết",
+                        "question_type": "MultipleChoice",
+                        "correct_answer": "A",
+                        "options": [
+                            {"content": "Ngày 02/09/1945", "is_correct": True, "order": 1},
+                            {"content": "Ngày 19/08/1945", "is_correct": False, "order": 2},
+                            {"content": "Ngày 23/08/1945", "is_correct": False, "order": 3},
+                            {"content": "Ngày 25/08/1945", "is_correct": False, "order": 4},
+                        ]
+                    },
+                    {
+                        "content": "Sự kiện nào đánh dấu bước ngoặt quyết định của phong trào giải phóng dân tộc Việt Nam năm 1945?",
+                        "difficulty": "Thông hiểu",
+                        "question_type": "MultipleChoice",
+                        "correct_answer": "D",
+                        "options": [
+                            {"content": "Hội nghị thành lập Mặt trận Việt Minh", "is_correct": False, "order": 1},
+                            {"content": "Khởi nghĩa Ba Tơ", "is_correct": False, "order": 2},
+                            {"content": "Chỉ thị Nhật - Pháp bắn nhau", "is_correct": False, "order": 3},
+                            {"content": "Thắng lợi của Cách mạng tháng Tám năm 1945", "is_correct": True, "order": 4},
                         ]
                     }
                 ]

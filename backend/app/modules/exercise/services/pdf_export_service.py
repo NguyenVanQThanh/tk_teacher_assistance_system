@@ -2,7 +2,7 @@
 # Description: Service for generating formatted PDF documents from exercise data including LaTeX math rendering.
 # Created At: 2026-08-12
 # Created By: Tam Khang
-# Updated At: 2026-08-13
+# Updated At: 2026-09-27
 # Updated By: Tam Khang
 
 import io
@@ -51,6 +51,17 @@ class PdfExportService:
             ("VietnameseFont-Bold", "/usr/share/fonts/truetype/dejavu/DejaVuSerif-Bold.ttf"),
         ]
 
+        # Add bundled matplotlib fonts as cross-platform fallbacks
+        try:
+            mpl_font_dir = os.path.join(os.path.dirname(matplotlib.__file__), "mpl-data", "fonts", "ttf")
+            font_paths.extend([
+                ("VietnameseFont", os.path.join(mpl_font_dir, "DejaVuSerif.ttf")),
+                ("VietnameseFont-Bold", os.path.join(mpl_font_dir, "DejaVuSerif-Bold.ttf")),
+                ("VietnameseFont-Italic", os.path.join(mpl_font_dir, "DejaVuSerif-Italic.ttf")),
+            ])
+        except Exception:
+            pass
+
         regular_registered = False
         bold_registered = False
 
@@ -66,9 +77,15 @@ class PdfExportService:
                     print(f"Warning: Could not register font {font_name} from {path}: {e}")
 
         if not regular_registered:
-            pdfmetrics.registerFont(TTFont("VietnameseFont", "Times-Roman"))
+            try:
+                pdfmetrics.registerFont(TTFont("VietnameseFont", "Vera.ttf"))
+            except Exception:
+                pass
         if not bold_registered:
-            pdfmetrics.registerFont(TTFont("VietnameseFont-Bold", "Times-Bold"))
+            try:
+                pdfmetrics.registerFont(TTFont("VietnameseFont-Bold", "VeraBd.ttf"))
+            except Exception:
+                pass
 
         cls._font_registered = True
 

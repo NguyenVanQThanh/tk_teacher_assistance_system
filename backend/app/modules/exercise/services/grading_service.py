@@ -2,7 +2,7 @@
 # Description: Internal auto-grading engine for exercise attempts (F-EXE-04).
 # Created At: 2026-08-05
 # Created By: Tam Khang
-# Updated At: 2026-08-08
+# Updated At: 2026-09-27
 # Updated By: Tam Khang
 
 from typing import List, Tuple, Optional, Dict, Any
@@ -85,17 +85,19 @@ class GradingService:
             elif q.question_type == 'ShortAnswer':
                 student_text = ans.answer_text if ans else None
                 is_correct = None
-                if student_text and q.correct_answer:
+                correct_ans = getattr(q, 'correct_answer', None)
+                if student_text and isinstance(correct_ans, str) and correct_ans.strip():
                     norm_student = str(student_text).strip().replace(',', '.')
-                    norm_correct = str(q.correct_answer).strip().replace(',', '.')
-                    is_correct = norm_student == norm_correct
+                    norm_correct = correct_ans.strip().replace(',', '.')
+                    if norm_student.lower() == norm_correct.lower():
+                        is_correct = True
 
                 question_results.append({
                     "question_id": str(q.question_id),
                     "question_type": "ShortAnswer",
                     "student_answer_text": student_text,
                     "is_correct": is_correct,
-                    "pending_manual_grade": is_correct is None
+                    "pending_manual_grade": True
                 })
 
         final_score = round(earned_points, 2) if total_mc_count > 0 else None
