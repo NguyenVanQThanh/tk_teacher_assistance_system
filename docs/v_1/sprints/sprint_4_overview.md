@@ -10,10 +10,10 @@
 
 ## 1. Mục tiêu Sprint (Sprint Objectives)
 
-Triển khai nhóm tính năng **Ưu tiên 2 (Priority 2)** nhằm số hóa toàn diện học liệu số và công tác lập kế hoạch giảng dạy của Giáo viên, thay thế toàn bộ Mock Data tại 2 màn hình quan trọng trên Frontend:
+Triển khai nhóm tính năng **Ưu tiên 2 (Priority 2)** nhằm số hóa toàn diện học liệu số và lịch kiểm tra của Giáo viên, thay thế toàn bộ Mock Data tại 2 màn hình quan trọng trên Frontend:
 
 1. **Kho Tài liệu & Học liệu Số (Document Repository - `F-DOC-01`)**: Xây dựng phân hệ upload, lưu trữ, quản lý metadata, phân loại theo môn học / khối lớp, xem trước (preview), tải xuống an toàn và xóa mềm/khôi phục tài liệu giảng dạy.
-2. **Thời khóa biểu & Lịch Giảng dạy Giáo viên (Teacher Schedule & Timetable - `F-ACAD-05`)**: Xây dựng hệ thống quản lý lịch dạy, ca dạy, phòng học, phát hiện trùng lịch (conflict detection), phân loại mức độ khẩn cấp (Urgency Tagging) và danh sách ghi chú công việc sư phạm theo ngày.
+2. **Thời khóa biểu & Lịch Giảng dạy Giáo viên (Teacher Schedule & Timetable - `F-ACAD-05`)**: Xây dựng hệ thống quản lý lịch kiểm tra, phát hiện trùng lịch (conflict detection), phân loại mức độ khẩn cấp (Urgency Tagging) và danh sách ghi chú công việc sư phạm theo ngày.
 3. **Tích hợp Frontend**: Kết nối trực tiếp [frontend/src/services/api.js](file:///e:/tk_teacher_assistance_system/frontend/src/services/api.js) với [DocumentRepositoryPage.jsx](file:///e:/tk_teacher_assistance_system/frontend/src/pages/teacher/DocumentRepositoryPage.jsx) và [TeacherSchedulePage.jsx](file:///e:/tk_teacher_assistance_system/frontend/src/pages/teacher/TeacherSchedulePage.jsx).
 
 ---
@@ -36,10 +36,10 @@ Triển khai nhóm tính năng **Ưu tiên 2 (Priority 2)** nhằm số hóa to�
 | # | Quyết định | Lý do & Căn cứ kỹ thuật |
 |:---|:---|:---|
 | **AS-01** | **Chính sách Xóa mềm 100% (Soft Delete Policy)**: Tất cả tài liệu học liệu và lịch giảng dạy khi xóa chỉ chuyển `status` sang `DELETED`. Cung cấp endpoint `RESTORE` để khôi phục dữ liệu tức thì. | Tuân thủ Quy tắc 6 của hệ thống và bảo toàn dữ liệu học liệu qua các năm học. |
-| **AS-02** | **Quản lý Lưu trữ File An toàn**: Hỗ trợ định dạng file: `.pdf`, `.docx`, `.doc`, `.pptx`, `.ppt`, `.xlsx`, dung lượng tối đa 50MB/file. File được lưu theo cấu trúc thư mục hashed trên đĩa cứng (`uploads/documents/YYYY/MM/UUID.ext`), che giấu đường dẫn thực trên server. | Đảm bảo tính bảo mật của tài nguyên giáo dục và tránh xung đột tên file. |
+| **AS-02** | **Quản lý Lưu trữ File An toàn**: Hỗ trợ định dạng file: `.pdf`, `.docx`, `.doc`, `.xlsx`, dung lượng tối đa 50MB/file. File được lưu theo cấu trúc thư mục hashed trên đĩa cứng (`uploads/documents/YYYY/MM/UUID.ext`), che giấu đường dẫn thực trên server. | Đảm bảo tính bảo mật của tài nguyên giáo dục và tránh xung đột tên file. |
 | **AS-03** | **Phân quyền Phạm vi Tài liệu (Document RBAC Scoping)**: Giáo viên có thể tải lên tài liệu cá nhân (chỉ GV đó thấy) hoặc tài liệu công khai toàn trường/tổ bộ môn (`is_public = true`). Giáo viên chỉ có quyền chỉnh sửa/xóa tài liệu do chính mình tải lên. Admin có toàn quyền quản trị. | Đảm bảo quyền tác giả của giáo viên và tăng tính chia sẻ trong tổ chuyên môn. |
-| **AS-04** | **Phát hiện Trùng lịch (Conflict Detection)**: Khi giáo viên thêm hoặc sửa lịch dạy, Backend tự động kiểm tra xem khung giờ (`start_time` - `end_time`) trong cùng một ngày có bị trùng với tiết dạy khác của cùng giáo viên hoặc cùng phòng học hay không. | Ngăn chặn việc xếp trùng ca dạy gây gián đoạn công tác giảng dạy thực tế. |
-| **AS-05** | **Phân loại Mức độ Khẩn cấp (Urgency Tagging Dictionary)**: Lịch dạy hỗ trợ 5 nhóm phân loại chuẩn hóa khớp với Frontend: `critical` (Khẩn cấp / Kiểm tra), `high` (Ưu tiên cao), `teaching` (Lịch giảng dạy tiêu chuẩn), `ai` (Luyện tập AI), `meeting` (Họp khoa / Sự kiện). | Đồng bộ dữ liệu hiển thị màu sắc trên lưới thời khóa biểu của Frontend. |
+| **AS-04** | **Phát hiện Trùng lịch (Conflict Detection)**: Khi giáo viên thêm hoặc sửa lịch kiểm tra, Backend tự động kiểm tra xem khung giờ (`start_time` - `end_time`) trong cùng một ngày có bị trùng với lịch kiểm tra khác của cùng giáo viên hay không. | Ngăn chặn việc xếp trùng lịch gây gián đoạn công tác giảng dạy thực tế. |
+| **AS-05** | **Phân loại Mức độ Khẩn cấp (Urgency Tagging Dictionary)**: Lịch kiểm tra hỗ trợ các nhóm phân loại chuẩn hóa: `critical` (Khẩn cấp / Kiểm tra), `high` (Ưu tiên cao), `teaching` (Lịch giảng dạy). | Đồng bộ dữ liệu hiển thị màu sắc trên lưới thời khóa biểu của Frontend. |
 
 ---
 
@@ -143,7 +143,6 @@ graph TD
 * `ERR-DOC-FILE_SIZE_EXCEEDED`: Dung lượng file vượt quá giới hạn 50MB.
 * `ERR-DOC-DOCUMENT_NOT_FOUND`: Tài liệu không tồn tại hoặc đã bị xóa.
 * `ERR-DOC-ACCESS_DENIED`: Không có quyền thao tác trên tài liệu riêng tư của giáo viên khác.
-* `ERR-SCHED-SCHEDULE_NOT_FOUND`: Ca dạy không tồn tại trong hệ thống.
-* `ERR-SCHED-TIME_CONFLICT`: Khung giờ giảng dạy bị trùng với một ca dạy khác đã tồn tại.
-* `ERR-SCHED-ROOM_OCCUPIED`: Phòng học đã được xếp cho một lớp học khác trong cùng khung giờ.
+* `ERR-SCHED-SCHEDULE_NOT_FOUND`: Lịch kiểm tra không tồn tại trong hệ thống.
+* `ERR-SCHED-TIME_CONFLICT`: Khung giờ kiểm tra bị trùng với một lịch kiểm tra khác đã tồn tại.
 * `ERR-SCHED-INVALID_TIME_RANGE`: Thời gian kết thúc phải diễn ra sau thời gian bắt đầu.

@@ -2,7 +2,7 @@
 // Description: Student daily study schedule and personal study notes widget matching Image 2 mockup.
 // Created At: 2026-09-13
 // Created By: Tam Khang
-// Updated At: 2026-09-20
+// Updated At: 2026-09-27
 // Updated By: Tam Khang
 
 import React, { useState } from 'react';
@@ -221,23 +221,6 @@ export default function StudentScheduleDetailCard({
 
   return (
     <div className="student-schedule-detail-container">
-      {/* Top Action Button matching Image 2 */}
-      <div className="schedule-detail-top-action-bar">
-        <button 
-          type="button" 
-          className="btn-add-schedule-purple"
-          onClick={() => {
-            const promptText = prompt('Nhập môn học hoặc hoạt động cần thêm vào lịch học:', 'Ôn tập tiếng Anh Unit 4');
-            if (promptText) {
-              alert(`Đã thêm lịch học: "${promptText}" vào ngày ${selectedDay} ${selectedMonth}!`);
-            }
-          }}
-        >
-          <Plus size={18} strokeWidth={2.5} />
-          <span>Thêm lịch mới</span>
-        </button>
-      </div>
-
       {/* Card 1: Lịch học hôm nay matching Image 2 (Dedicated for Students) */}
       <div className="schedule-today-card">
         <div className="schedule-today-header">
@@ -269,6 +252,25 @@ export default function StudentScheduleDetailCard({
             </div>
           ))}
         </div>
+
+        {/* Bottom Action Button: Thêm lịch mới */}
+        <button 
+          type="button" 
+          className="btn-bottom-add-schedule"
+          onClick={() => {
+            if (onAddNewSchedule) {
+              onAddNewSchedule();
+            } else {
+              const promptText = prompt('Nhập môn học hoặc hoạt động cần thêm vào lịch học:', 'Ôn tập Tiếng Anh Unit 4');
+              if (promptText) {
+                alert(`Đã thêm lịch học: "${promptText}" vào ngày ${selectedDay} ${selectedMonth}!`);
+              }
+            }
+          }}
+        >
+          <Plus size={16} strokeWidth={2.5} />
+          <span>Thêm lịch mới</span>
+        </button>
       </div>
 
       {/* Card 2: Ghi chú & Nhắc nhở học tập matching Image 2 */}
@@ -291,28 +293,27 @@ export default function StudentScheduleDetailCard({
           />
           <button 
             type="submit" 
-            className="btn-submit-note"
+            className="btn-submit-quick-note"
             disabled={!newNoteText.trim()}
+            title="Thêm ghi chú"
           >
-            Lưu
+            <Plus size={16} />
           </button>
         </form>
 
         {/* Notes Items List */}
         <div className="schedule-notes-list">
           {notes.map((note) => (
-            <div key={note.id} className="schedule-note-row">
-              <div className="note-content-area">
-                <span className="note-bullet">•</span>
-                <span className="note-text-body">{note.text}</span>
-              </div>
+            <div key={note.id} className="single-note-item">
+              <div className="note-bullet" />
+              <span className="note-text">{note.text}</span>
               <button 
                 type="button" 
                 className="btn-delete-note"
                 onClick={() => handleDeleteNote(note.id)}
                 title="Xóa ghi chú"
               >
-                <Trash2 size={13} />
+                <Trash2 size={12} />
               </button>
             </div>
           ))}

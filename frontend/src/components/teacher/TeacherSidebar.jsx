@@ -2,14 +2,14 @@
 // Description: Synchronized sidebar navigation component for Teacher role with dynamic route awareness.
 // Created At: 2026-08-30
 // Created By: Tam Khang
-// Updated At: 2026-09-02
+// Updated At: 2026-09-27
 // Updated By: Tam Khang
 
 import React from 'react';
 import { 
   LayoutGrid, 
   GraduationCap, 
-  Users,
+  Users, 
   Star, 
   FolderOpen, 
   ClipboardList, 
@@ -32,8 +32,10 @@ export default function TeacherSidebar({
   const navigate = useNavigate();
   const location = useLocation();
 
-  const displayName = user?.full_name ? `GV. ${user.full_name}` : 'GV. Sample Teacher (Thầy Nguyễn Văn A)';
+  const prefix = user?.role === 'Teacher' ? 'GV. ' : '';
+  const displayName = user?.full_name ? `${prefix}${user.full_name}` : 'GV. Sample Teacher (Thầy Nguyễn Văn A)';
   const initial = user?.full_name ? user.full_name.split(' ').map(n => n[0]).slice(-2).join('').toUpperCase() : 'VA';
+
 
   // Automatically determine active navigation item from URL pathname if not explicitly passed
   let currentActive = activeNav;

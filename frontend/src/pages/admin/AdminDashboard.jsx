@@ -582,7 +582,9 @@ export default function AdminDashboard() {
                     <option value="Toán học">Tổ Toán học</option>
                     <option value="Vật lý">Tổ Vật lý</option>
                     <option value="Hóa học">Tổ Hóa học</option>
+                    <option value="Sinh học">Tổ Sinh học</option>
                     <option value="Ngữ văn">Tổ Ngữ văn</option>
+                    <option value="Lịch sử">Tổ Lịch sử</option>
                     <option value="Tin học">Tổ Tin học</option>
                     <option value="Tiếng Anh">Tổ Tiếng Anh</option>
                   </select>

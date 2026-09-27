@@ -2,7 +2,7 @@
 // Description: Modal dialog for uploading new educational materials and documents.
 // Created At: 2026-08-30
 // Created By: Tam Khang
-// Updated At: 2026-08-30
+// Updated At: 2026-09-27
 // Updated By: Tam Khang
 
 import React, { useState } from 'react';
@@ -14,7 +14,7 @@ export default function UploadDocumentModal({ isOpen, onClose, onUploadSuccess }
   const [title, setTitle] = useState('');
   const [grade, setGrade] = useState('12');
   const [subject, setSubject] = useState('math');
-  const [docType, setDocType] = useState('pdf');
+  const [docType, setDocType] = useState('lecture');
   const [isDragging, setIsDragging] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
@@ -56,6 +56,10 @@ export default function UploadDocumentModal({ isOpen, onClose, onUploadSuccess }
     e.preventDefault();
     if (!file) {
       setErrorMsg('Vui lòng chọn tập tin tài liệu cần tải lên.');
+      return;
+    }
+    if (file.size > 50 * 1024 * 1024) {
+      setErrorMsg('Dung lượng tập tin vượt quá giới hạn 50MB.');
       return;
     }
     if (!title.trim()) {
@@ -124,7 +128,7 @@ export default function UploadDocumentModal({ isOpen, onClose, onUploadSuccess }
               id="file-input-upload"
               className="hidden-file-input"
               onChange={handleFileChange}
-              accept=".pdf,.doc,.docx,.ppt,.pptx,.mp4,.zip"
+              accept=".pdf,.doc,.docx,.xlsx"
             />
             <label htmlFor="file-input-upload" className="drop-zone-label">
               {file ? (
@@ -142,7 +146,7 @@ export default function UploadDocumentModal({ isOpen, onClose, onUploadSuccess }
                   <p className="drop-main-text">
                     Kéo thả tập tin vào đây hoặc <span className="browse-link">Chọn từ máy tính</span>
                   </p>
-                  <p className="drop-sub-text">Hỗ trợ: PDF, Word (DOC/DOCX), PowerPoint, MP4, ZIP (Tối đa 100MB)</p>
+                  <p className="drop-sub-text">Hỗ trợ: PDF, Word (DOC/DOCX), Excel (XLSX) (Tối đa 50MB)</p>
                 </>
               )}
             </label>
@@ -186,9 +190,10 @@ export default function UploadDocumentModal({ isOpen, onClose, onUploadSuccess }
                 <option value="math">Toán học</option>
                 <option value="physics">Vật lý</option>
                 <option value="chemistry">Hóa học</option>
+                <option value="biology">Sinh học</option>
+                <option value="history">Lịch sử</option>
                 <option value="english">Tiếng Anh</option>
                 <option value="it">Tin học</option>
-                <option value="history">Lịch sử</option>
               </select>
             </div>
 
@@ -199,11 +204,9 @@ export default function UploadDocumentModal({ isOpen, onClose, onUploadSuccess }
                 value={docType}
                 onChange={(e) => setDocType(e.target.value)}
               >
-                <option value="pdf">Tài liệu PDF</option>
-                <option value="word">Bài tập Word</option>
-                <option value="video">Video bài giảng</option>
-                <option value="exercise">Bài tập chuyên đề</option>
-                <option value="code">Mã nguồn / Thực hành</option>
+                <option value="lecture">Bài giảng</option>
+                <option value="exam">Đề kiểm tra</option>
+                <option value="reference">Tài liệu tham khảo</option>
               </select>
             </div>
           </div>

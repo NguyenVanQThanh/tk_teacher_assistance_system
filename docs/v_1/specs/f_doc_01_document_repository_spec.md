@@ -29,8 +29,8 @@
 ## A.1 Feature Summary
 
 Cung cấp kho lưu trữ và chia sẻ học liệu số phục vụ giảng dạy cho Giáo viên:
-1. **Quản lý tài liệu đa định dạng**: Lưu trữ file giáo án, bài giảng trình chiếu, tài liệu tham khảo dạng `.pdf`, `.docx`, `.pptx`, `.xlsx`.
-2. **Phân loại & Tìm kiếm đa tiêu chí**: Lọc tài liệu theo Khối lớp (10, 11, 12), Môn học (Toán, Lý, Hóa,...) và loại tài liệu (`lecture`, `exam`, `slide`, `reference`).
+1. **Quản lý tài liệu đa định dạng**: Lưu trữ file giáo án, tài liệu tham khảo dạng `.pdf`, `.docx`, `.xlsx`.
+2. **Phân loại & Tìm kiếm đa tiêu chí**: Lọc tài liệu theo Khối lớp (10, 11, 12), Môn học (Toán, Lý, Hóa,...) và loại tài liệu (`lecture`, `exam`, `reference`).
 3. **Xem trước & Tải về trực quan**: Cho phép giáo viên xem trước nội dung tài liệu trực tiếp trên trình duyệt hoặc tải file về máy an toàn.
 4. **Chính sách Xóa mềm (Soft Delete)**: Đảm bảo tài liệu khi xóa chỉ chuyển sang trạng thái `DELETED` và có thể khôi phục khi cần thiết (`POST /restore`).
 
@@ -52,11 +52,11 @@ Cung cấp kho lưu trữ và chia sẻ học liệu số phục vụ giảng d�
 ### 1. `POST /api/v1/documents/upload`
 * **Permission**: `DOC_DOCUMENT_MANAGE` & Role `Teacher`/`Admin`
 * **Request**: `multipart/form-data`
-  * `file`: File upload (`.pdf`, `.docx`, `.pptx`, `.xlsx`, tối đa 50MB)
+  * `file`: File upload (`.pdf`, `.docx`, `.xlsx`, tối đa 50MB)
   * `title`: str (bắt buộc, 3..255 ký tự)
   * `subject_id`: UUID (bắt buộc)
   * `grade`: str (bắt buộc, vd: `"10"`, `"11"`, `"12"`)
-  * `document_type`: str (`lecture` | `exam` | `slide` | `reference`)
+  * `document_type`: str (`lecture` | `exam` | `reference`)
   * `description`: str (tùy chọn)
   * `is_public`: bool (mặc định: `false`)
 * **Response `201 Created`**: Document Object.

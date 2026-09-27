@@ -2,7 +2,7 @@
 // Description: Main application router with AuthProvider, ProtectedRoute, TeacherLayout, StudentLayout, and standalone exam taking mode.
 // Created At: 2026-08-30
 // Created By: Tam Khang
-// Updated At: 2026-09-20
+// Updated At: 2026-09-27
 // Updated By: Tam Khang
 
 import React from 'react';
@@ -166,7 +166,7 @@ export default function App() {
           <Route
             path="/student/exercises/:exerciseId/taking"
             element={
-              <ProtectedRoute>
+              <ProtectedRoute allowedRoles={['Student']}>
                 <StudentExerciseTakingPage />
               </ProtectedRoute>
             }
@@ -175,7 +175,7 @@ export default function App() {
           {/* Protected Teacher Module Routes with Shared Persistent TeacherLayout */}
           <Route
             element={
-              <ProtectedRoute>
+              <ProtectedRoute allowedRoles={['Teacher']}>
                 <TeacherLayout />
               </ProtectedRoute>
             }
@@ -195,7 +195,7 @@ export default function App() {
           {/* Protected Student Module Routes with Shared Persistent StudentLayout */}
           <Route
             element={
-              <ProtectedRoute>
+              <ProtectedRoute allowedRoles={['Student']}>
                 <StudentLayout />
               </ProtectedRoute>
             }
@@ -208,7 +208,7 @@ export default function App() {
           {/* Protected Admin Module Routes with Shared Persistent AdminLayout */}
           <Route
             element={
-              <ProtectedRoute>
+              <ProtectedRoute allowedRoles={['Admin']}>
                 <AdminLayout />
               </ProtectedRoute>
             }
@@ -229,3 +229,4 @@ export default function App() {
     </ErrorBoundary>
   );
 }
+

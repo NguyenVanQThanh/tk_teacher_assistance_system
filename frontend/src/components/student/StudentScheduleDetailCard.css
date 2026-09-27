@@ -3,7 +3,7 @@ File Name: StudentScheduleDetailCard.css
 Description: Styling for Student daily schedule detail and interactive notes widget matching Image 2.
 Created At: 2026-09-13
 Created By: Tam Khang
-Updated At: 2026-09-13
+Updated At: 2026-09-27
 Updated By: Tam Khang
 */
 
@@ -14,32 +14,31 @@ Updated By: Tam Khang
   width: 100%;
 }
 
-/* Top Action Button */
-.schedule-detail-top-action-bar {
+.btn-bottom-add-schedule {
+  margin-top: 16px;
+  width: 100%;
   display: flex;
-  justify-content: flex-end;
-}
-
-.btn-add-schedule-purple {
-  display: inline-flex;
   align-items: center;
+  justify-content: center;
   gap: 8px;
-  background-color: #6D28D9;
-  color: #FFFFFF;
-  border: none;
+  padding: 11px 16px;
+  background-color: #F8F5FE;
+  color: #6D28D9;
+  border: 1.5px dashed #C4B5FD;
   border-radius: 12px;
-  padding: 10px 20px;
-  font-size: 14.5px;
+  font-size: 13.5px;
   font-weight: 600;
   cursor: pointer;
-  box-shadow: 0 4px 14px rgba(109, 40, 217, 0.28);
   transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  font-family: inherit;
 }
 
-.btn-add-schedule-purple:hover {
-  background-color: #5B21B6;
+.btn-bottom-add-schedule:hover {
+  background-color: #EDE9FE;
+  border-color: #7C3AED;
+  color: #5B21B6;
   transform: translateY(-1px);
-  box-shadow: 0 6px 18px rgba(109, 40, 217, 0.35);
+  box-shadow: 0 4px 12px rgba(109, 40, 217, 0.15);
 }
 
 /* Card 1: Lịch dạy hôm nay */
@@ -213,43 +212,45 @@ Updated By: Tam Khang
 }
 
 .notes-counter-badge {
-  background-color: #F3E8FF;
-  color: #7C3AED;
-  font-size: 12px;
+  background-color: #EDE9FE;
+  color: #6D28D9;
+  font-size: 11.5px;
   font-weight: 700;
-  width: 22px;
-  height: 22px;
-  border-radius: 50%;
-  display: flex;
+  padding: 2px 8px;
+  border-radius: 9999px;
+  display: inline-flex;
   align-items: center;
   justify-content: center;
+  font-family: inherit;
 }
 
 .quick-add-note-form {
   display: flex;
   align-items: center;
-  background-color: #FAFAFC;
-  border: 1px solid #E2E8F0;
-  border-radius: 10px;
+  gap: 8px;
+  background-color: #F8FAFC;
+  border: 1.5px solid #E2E8F0;
+  border-radius: 8px;
   padding: 4px 6px 4px 12px;
-  margin-bottom: 16px;
-  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+  margin-bottom: 14px;
+  transition: all 0.2s ease;
 }
 
 .quick-add-note-form:focus-within {
-  border-color: #7C3AED;
   background-color: #FFFFFF;
-  box-shadow: 0 0 0 3px rgba(124, 58, 237, 0.12);
+  border-color: #7C3AED;
+  box-shadow: 0 0 0 3px rgba(124, 58, 237, 0.1);
 }
 
 .quick-add-note-input {
   flex: 1;
   border: none;
   background: transparent;
-  font-size: 13.5px;
+  font-size: 13px;
   color: #1E293B;
   outline: none;
   font-family: inherit;
+  font-weight: 500;
 }
 
 .quick-add-note-input::placeholder {
@@ -259,7 +260,7 @@ Updated By: Tam Khang
 .btn-submit-quick-note {
   width: 28px;
   height: 28px;
-  border-radius: 8px;
+  border-radius: 6px;
   background-color: #7C3AED;
   color: #FFFFFF;
   border: none;
@@ -267,78 +268,75 @@ Updated By: Tam Khang
   align-items: center;
   justify-content: center;
   cursor: pointer;
-  transition: background-color 0.15s ease;
+  transition: all 0.15s ease;
+  flex-shrink: 0;
   padding: 0;
 }
 
 .btn-submit-quick-note:hover:not(:disabled) {
   background-color: #6D28D9;
+  transform: scale(1.05);
 }
 
 .btn-submit-quick-note:disabled {
-  background-color: #CBD5E1;
+  opacity: 0.5;
   cursor: not-allowed;
 }
 
-.notes-items-list {
+.schedule-notes-list {
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 6px;
 }
 
-.note-item-row {
+.single-note-item {
   display: flex;
   align-items: flex-start;
-  justify-content: space-between;
   gap: 10px;
-  padding: 6px 0;
+  padding: 8px 10px;
+  border-radius: 8px;
+  transition: all 0.15s ease;
 }
 
-.note-item-left {
-  display: flex;
-  align-items: baseline;
-  gap: 8px;
+.single-note-item:hover {
+  background-color: #F8FAFC;
+}
+
+.single-note-item .note-bullet {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background-color: #7C3AED;
+  margin-top: 7px;
+  flex-shrink: 0;
+}
+
+.single-note-item .note-text {
   flex: 1;
+  font-size: 13px;
+  color: #334155;
+  line-height: 1.5;
+  font-family: inherit;
+  font-weight: 500;
 }
 
-.note-purple-bullet {
-  color: #7C3AED;
-  font-size: 20px;
-  line-height: 1;
-  font-weight: 900;
-}
-
-.note-text-content {
-  font-size: 13.5px;
-  color: #1E293B;
-  line-height: 1.45;
-  margin: 0;
-  word-break: break-word;
-}
-
-.btn-delete-note {
-  background: transparent;
+.single-note-item .btn-delete-note {
   border: none;
-  color: #CBD5E1;
+  background: transparent;
+  color: #94A3B8;
   cursor: pointer;
   padding: 4px;
+  border-radius: 6px;
   display: flex;
   align-items: center;
   justify-content: center;
-  border-radius: 6px;
   transition: all 0.15s ease;
-  margin-top: -2px;
+  opacity: 0.6;
+  margin-top: 2px;
 }
 
-.btn-delete-note:hover {
+.single-note-item .btn-delete-note:hover {
   color: #EF4444;
-  background-color: #FEF2F2;
-}
-
-.notes-empty-state {
-  padding: 16px;
-  text-align: center;
-  font-size: 13px;
-  color: #94A3B8;
-  font-style: italic;
+  background-color: #FEE2E2;
+  opacity: 1;
 }

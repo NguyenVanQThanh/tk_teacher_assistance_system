@@ -3,7 +3,7 @@ File Name: StudentDashboard.css
 Description: Responsive layout styles for Student Dashboard matching the exact mockup.
 Created At: 2026-09-07
 Created By: Tam Khang
-Updated At: 2026-09-07
+Updated At: 2026-09-27
 Updated By: Tam Khang
 */
 
@@ -16,15 +16,16 @@ Updated By: Tam Khang
 
 .student-dashboard-grid-layout {
   display: grid;
-  grid-template-columns: 2.1fr 1fr;
+  grid-template-columns: 1.9fr 1.1fr;
   gap: 24px;
-  align-items: stretch;
+  align-items: start;
 }
 
 .student-dashboard-main-columns {
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 24px;
+  align-items: start;
 }
 
 .student-dashboard-right-panel {

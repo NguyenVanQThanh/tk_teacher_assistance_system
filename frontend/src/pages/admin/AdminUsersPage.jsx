@@ -213,8 +213,8 @@ export default function AdminUsersPage() {
     {
       id: 'GV2018042',
       code: 'GV2018042',
-      fullName: 'ThS. Lê Nguyên',
-      email: 'le.nguyen@clarity.edu.vn',
+      fullName: 'ThS. Lê Nguyên (Sample Teacher)',
+      email: 'teacher@school.com',
       avatarUrl: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=120',
       role: 'Giáo viên',
       roleKey: 'teacher',
@@ -222,16 +222,16 @@ export default function AdminUsersPage() {
       lastLoginRelative: '10 phút trước',
       lastLoginDate: '14/10/2024 - 10:24',
       status: 'active', // 'active' | 'pending' | 'locked'
-      phone: '0912345678',
+      phone: '0999000002',
       createdAt: '15/08/2018 - 08:30',
       academicYear: '2024 - 2025',
       allAcademicYears: ['2020 - 2021', '2021 - 2022', '2022 - 2023', '2023 - 2024', '2024 - 2025']
     },
     {
       id: 'HS2022019',
-      code: 'HS2022019',
-      fullName: 'Trần Minh Phong',
-      email: 'phong.tm22@student.clarity.edu.vn',
+      code: 'HS12001',
+      fullName: 'Nguyễn Hoàng Nam',
+      email: 'student01@school.com',
       avatarUrl: 'https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?auto=format&fit=crop&q=80&w=120',
       role: 'Học sinh',
       roleKey: 'student',
@@ -239,7 +239,7 @@ export default function AdminUsersPage() {
       lastLoginRelative: 'Hôm nay',
       lastLoginDate: '14/10/2024 - 08:15',
       status: 'active',
-      phone: '0987654321',
+      phone: '0999100001',
       createdAt: '05/09/2022 - 07:15',
       academicYear: '2024 - 2025',
       allAcademicYears: ['2022 - 2023', '2023 - 2024', '2024 - 2025']
@@ -247,9 +247,9 @@ export default function AdminUsersPage() {
     {
       id: 'AD2015001',
       code: 'AD2015001',
-      fullName: 'Nguyễn Văn A',
-      email: 'admin.anv@clarity.edu.vn',
-      avatarText: 'NA',
+      fullName: 'Quản trị viên Hệ thống',
+      email: 'admin@school.com',
+      avatarText: 'AD',
       avatarBg: '#F3ECFF',
       avatarColor: '#5B32A8',
       role: 'Quản trị viên',
@@ -296,6 +296,63 @@ export default function AdminUsersPage() {
       status: 'active',
       phone: '0944556677',
       createdAt: '12/08/2016 - 14:10',
+      academicYear: '2024 - 2025',
+      allAcademicYears: ['2021 - 2022', '2022 - 2023', '2023 - 2024', '2024 - 2025']
+    },
+    {
+      id: 'GV2017033',
+      code: 'GV2017033',
+      fullName: 'Cô Trần Thị Mai',
+      email: 'teacher_mai@school.com',
+      avatarText: 'TM',
+      avatarBg: '#FEF3C7',
+      avatarColor: '#D97706',
+      role: 'Giáo viên',
+      roleKey: 'teacher',
+      department: 'Tổ Hóa học',
+      lastLoginRelative: '1 giờ trước',
+      lastLoginDate: '14/10/2024 - 09:30',
+      status: 'active',
+      phone: '0999000005',
+      createdAt: '10/08/2017 - 08:00',
+      academicYear: '2024 - 2025',
+      allAcademicYears: ['2021 - 2022', '2022 - 2023', '2023 - 2024', '2024 - 2025']
+    },
+    {
+      id: 'GV2019052',
+      code: 'GV2019052',
+      fullName: 'Cô Đặng Thu Hà',
+      email: 'teacher_ha@school.com',
+      avatarText: 'TH',
+      avatarBg: '#DCFCE7',
+      avatarColor: '#16A34A',
+      role: 'Giáo viên',
+      roleKey: 'teacher',
+      department: 'Tổ Sinh học',
+      lastLoginRelative: '2 giờ trước',
+      lastLoginDate: '14/10/2024 - 08:45',
+      status: 'active',
+      phone: '0999000008',
+      createdAt: '15/09/2019 - 09:15',
+      academicYear: '2024 - 2025',
+      allAcademicYears: ['2022 - 2023', '2023 - 2024', '2024 - 2025']
+    },
+    {
+      id: 'GV2015018',
+      code: 'GV2015018',
+      fullName: 'Thầy Nguyễn Quốc Hùng',
+      email: 'teacher_hung@school.com',
+      avatarText: 'QH',
+      avatarBg: '#FFEDD5',
+      avatarColor: '#EA580C',
+      role: 'Giáo viên',
+      roleKey: 'teacher',
+      department: 'Tổ Lịch sử',
+      lastLoginRelative: 'Hôm nay',
+      lastLoginDate: '14/10/2024 - 07:50',
+      status: 'active',
+      phone: '0999000009',
+      createdAt: '01/09/2015 - 10:00',
       academicYear: '2024 - 2025',
       allAcademicYears: ['2021 - 2022', '2022 - 2023', '2023 - 2024', '2024 - 2025']
     },
@@ -426,14 +483,15 @@ export default function AdminUsersPage() {
         return false;
       }
 
-      // Search query filter
+      // Search query filter (matches code, name, phone, department, email)
       if (searchQuery.trim()) {
         const query = searchQuery.trim().toLowerCase();
-        const matchCode = user.code.toLowerCase().includes(query);
-        const matchName = user.fullName.toLowerCase().includes(query);
-        const matchEmail = user.email.toLowerCase().includes(query);
-        const matchDept = user.department.toLowerCase().includes(query);
-        if (!matchCode && !matchName && !matchEmail && !matchDept) return false;
+        const matchCode = (user.code || '').toLowerCase().includes(query);
+        const matchName = (user.fullName || '').toLowerCase().includes(query);
+        const matchPhone = (user.phone || '').toLowerCase().includes(query);
+        const matchDept = (user.department || '').toLowerCase().includes(query);
+        const matchEmail = (user.email || '').toLowerCase().includes(query);
+        if (!matchCode && !matchName && !matchPhone && !matchDept && !matchEmail) return false;
       }
 
       return true;
@@ -601,7 +659,7 @@ export default function AdminUsersPage() {
             <input 
               type="text" 
               className="filter-search-input" 
-              placeholder="Tìm theo tên, mã hoặc email..." 
+              placeholder="Tìm theo họ tên, mã định danh hoặc số điện thoại..." 
               value={searchQuery}
               onChange={e => setSearchQuery(e.target.value)}
             />
@@ -643,6 +701,9 @@ export default function AdminUsersPage() {
               <option value="Ngoại ngữ">Tổ Ngoại ngữ</option>
               <option value="Ngữ văn">Tổ Ngữ văn</option>
               <option value="Vật lý">Tổ Vật lý</option>
+              <option value="Hóa">Tổ Hóa học</option>
+              <option value="Sinh">Tổ Sinh học</option>
+              <option value="Sử">Tổ Lịch sử</option>
               <option value="CNTT">Phòng CNTT & Dữ liệu</option>
               <option value="Khảo thí">Phòng Khảo thí & ĐBCL</option>
             </select>
@@ -779,7 +840,7 @@ export default function AdminUsersPage() {
                             >
                               {user.fullName}
                             </span>
-                            <span className="user-email-text">{user.email}</span>
+                            <span className="user-email-text">{user.phone ? `SĐT: ${user.phone}` : user.email}</span>
                           </div>
                         </div>
                       </td>
@@ -1110,12 +1171,12 @@ export default function AdminUsersPage() {
               </div>
 
               <div className="admin-form-group">
-                <label className="admin-form-label">Email trường *</label>
+                <label className="admin-form-label">Số điện thoại liên hệ *</label>
                 <input 
-                  type="email" 
+                  type="tel" 
                   className="admin-form-input" 
-                  value={selectedUser.email}
-                  onChange={e => setSelectedUser(p => ({ ...p, email: e.target.value }))}
+                  value={selectedUser.phone || ''}
+                  onChange={e => setSelectedUser(p => ({ ...p, phone: e.target.value }))}
                   required 
                 />
               </div>
@@ -1337,6 +1398,9 @@ export default function AdminUsersPage() {
                           <option value="Tổ Ngữ văn">Tổ Ngữ văn</option>
                           <option value="Tổ Ngoại ngữ">Tổ Ngoại ngữ</option>
                           <option value="Tổ Vật lý">Tổ Vật lý</option>
+                          <option value="Tổ Hóa học">Tổ Hóa học</option>
+                          <option value="Tổ Sinh học">Tổ Sinh học</option>
+                          <option value="Tổ Lịch sử">Tổ Lịch sử</option>
                         </select>
                       )}
                       <ChevronDown size={14} className="select-arrow-icon" />
@@ -1383,19 +1447,19 @@ export default function AdminUsersPage() {
                     )}
                   </div>
 
-                  {/* SĐT phụ huynh / Email công vụ */}
+                  {/* SĐT phụ huynh / SĐT liên hệ */}
                   <div className="admin-form-group">
                     <label className="admin-form-label">
-                      {newUserForm.roleType === 'student' ? 'Số điện thoại phụ huynh / Người giám hộ' : 'Email công vụ'}
+                      {newUserForm.roleType === 'student' ? 'Số điện thoại phụ huynh / Người giám hộ' : 'Số điện thoại liên hệ'}
                     </label>
                     <div className="input-with-icon-left">
                       <span className="input-left-icon">
                         {newUserForm.roleType === 'student' ? <Contact size={15} /> : <Phone size={15} />}
                       </span>
                       <input 
-                        type="text" 
+                        type="tel" 
                         className="admin-form-input" 
-                        placeholder={newUserForm.roleType === 'student' ? "0987 654 321" : "giaovien@clarity.edu.vn"}
+                        placeholder={newUserForm.roleType === 'student' ? "0987 654 321" : "0999 000 002"}
                         value={newUserForm.parentPhone}
                         onChange={e => setNewUserForm(p => ({ ...p, parentPhone: e.target.value }))}
                       />
@@ -1422,7 +1486,7 @@ export default function AdminUsersPage() {
                       </button>
                     </div>
                     <span className="input-helper-text">
-                      Mật khẩu mặc định hoặc hệ thống sẽ gửi mật mã qua email.
+                      Mật khẩu mặc định khởi tạo hoặc gửi thông báo qua SMS/hệ thống.
                     </span>
                   </div>
 
@@ -1649,7 +1713,7 @@ export default function AdminUsersPage() {
                 <h5>Lưu ý định dạng:</h5>
                 <ul>
                   <li>Chỉ hỗ trợ tệp định dạng chuẩn SMAS, VnEdu hoặc mẫu của SmartLMS.</li>
-                  <li>Dữ liệu bắt buộc: Mã định danh, Họ và tên, Email, Vai trò, Lớp/Bộ môn.</li>
+                  <li>Dữ liệu bắt buộc: Mã định danh, Họ và tên, Số điện thoại, Vai trò, Lớp/Bộ môn.</li>
                 </ul>
               </div>
 

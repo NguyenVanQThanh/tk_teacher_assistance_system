@@ -1,8 +1,8 @@
 // File Name: StudentDashboard.jsx
-// Description: Student Dashboard featuring interactive study schedule synchronization, full-screen dialog for subject cognitive radar analysis matching Image 3, and rich student mock data.
+// Description: Student Dashboard featuring interactive study schedule synchronization, categorized pending assignments, flexible right container switching between daily schedule and detailed pending assignments, and full-screen cognitive radar modal.
 // Created At: 2026-09-07
 // Created By: Tam Khang
-// Updated At: 2026-09-13
+// Updated At: 2026-09-27
 // Updated By: Tam Khang
 
 import React, { useState } from 'react';
@@ -11,6 +11,7 @@ import StudentScheduleCard from '../../components/student/StudentScheduleCard';
 import StudentRadarCard from '../../components/student/StudentRadarCard';
 import TeacherFeedbackNoteCard from '../../components/student/TeacherFeedbackNoteCard';
 import StudentScheduleDetailCard from '../../components/student/StudentScheduleDetailCard';
+import StudentPendingAssignmentsDetailCard from '../../components/student/StudentPendingAssignmentsDetailCard';
 import StudentSubjectRadarModal from '../../components/student/StudentSubjectRadarModal';
 import './StudentDashboard.css';
 
@@ -18,6 +19,9 @@ export default function StudentDashboard() {
   // Currently selected calendar day (defaults to 8 matching Image 1)
   const [selectedDay, setSelectedDay] = useState(8);
   
+  // Flexible right container active view: 'schedule' | 'assignments'
+  const [activeRightPanel, setActiveRightPanel] = useState('schedule');
+
   // Currently selected subject for detailed radar analysis
   const [selectedSubject, setSelectedSubject] = useState('Toán Học');
   
@@ -27,6 +31,7 @@ export default function StudentDashboard() {
   // Triggered when a calendar day is clicked in StudentScheduleCard
   const handleSelectDay = (day) => {
     setSelectedDay(day);
+    setActiveRightPanel('schedule');
   };
 
   // Triggered when a subject is clicked on either radar chart -> Opens Fullscreen Dialog matching Image 3
@@ -40,11 +45,16 @@ export default function StudentDashboard() {
       <div className="student-dashboard-grid-layout">
         {/* Main 2-Column Matrix (6 Cards) */}
         <div className="student-dashboard-main-columns">
-          {/* Row 1: Homework checklist & Monthly Calendar */}
-          <PendingStudentAssignmentsCard />
+          {/* Row 1: Homework checklist (Categorized) & Monthly Calendar */}
+          <PendingStudentAssignmentsCard 
+            isActive={activeRightPanel === 'assignments'}
+            onClickCard={() => setActiveRightPanel('assignments')}
+          />
           <StudentScheduleCard 
             selectedDay={selectedDay}
             onSelectDay={handleSelectDay}
+            isActive={activeRightPanel === 'schedule'}
+            onClickCard={() => setActiveRightPanel('schedule')}
           />
 
           {/* Row 2: Bài tập trên lớp (Interactive Radar - Click to open full dialog modal) */}
@@ -82,12 +92,22 @@ export default function StudentDashboard() {
           />
         </div>
 
-        {/* Right Column: Chi tiết dashboard matching Image 2 */}
+        {/* Right Column: Flexible container switching between Schedule and Assignments details */}
         <div className="student-dashboard-right-panel">
-          <StudentScheduleDetailCard 
-            selectedDay={selectedDay}
-            selectedMonth="Thg 3"
-          />
+          {activeRightPanel === 'schedule' ? (
+            <div className="right-panel-content-body">
+              <StudentScheduleDetailCard 
+                selectedDay={selectedDay}
+                selectedMonth="Thg 3"
+              />
+            </div>
+          ) : (
+            <div className="right-panel-content-body">
+              <StudentPendingAssignmentsDetailCard 
+                onSwitchToSchedule={() => setActiveRightPanel('schedule')}
+              />
+            </div>
+          )}
         </div>
       </div>
 

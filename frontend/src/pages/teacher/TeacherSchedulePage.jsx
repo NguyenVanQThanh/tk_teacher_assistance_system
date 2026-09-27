@@ -1,8 +1,8 @@
 // File Name: TeacherSchedulePage.jsx
-// Description: Teaching Schedule interface with interactive calendar, urgency color bars, equal-sized grid cells, horizontal urgency legend, and detailed daily timeline.
+// Description: Examination and Teaching Schedule interface with interactive calendar, urgency color bars, equal-sized grid cells, horizontal urgency legend, and detailed daily timeline.
 // Created At: 2026-09-01
 // Created By: Tam Khang
-// Updated At: 2026-09-20
+// Updated At: 2026-09-27
 // Updated By: Tam Khang
 
 import React, { useState, useMemo } from 'react';
@@ -18,7 +18,8 @@ import {
   Filter, 
   X, 
   Check,
-  AlertCircle
+  AlertCircle,
+  Trash2
 } from 'lucide-react';
 import './TeacherSchedulePage.css';
 
@@ -26,7 +27,12 @@ export default function TeacherSchedulePage() {
   const [currentYear, setCurrentYear] = useState(2023);
   const [currentMonth, setCurrentMonth] = useState(9); // October (0-indexed)
   const [selectedDay, setSelectedDay] = useState(15);
-  const [activeFilter, setActiveFilter] = useState('all'); // 'all' | '10' | '11' | '12'
+  const [selectedGrade, setSelectedGrade] = useState('all'); // 'all' | '10' | '11' | '12'
+  const [notes, setNotes] = useState([
+    { id: 1, text: 'Chuẩn bị đề kiểm tra 15 phút Giải tích 12' },
+    { id: 2, text: 'Nộp báo cáo chuyên môn cho Tổ trưởng trước thứ 6' }
+  ]);
+  const [newNoteInput, setNewNoteInput] = useState('');
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [toastMessage, setToastMessage] = useState(null);
 
@@ -37,20 +43,18 @@ export default function TeacherSchedulePage() {
     grade: '10',
     startTime: '07:30',
     endTime: '09:00',
-    urgency: 'teaching', // 'critical' | 'high' | 'teaching' | 'ai' | 'meeting'
+    urgency: 'teaching', // 'critical' | 'high' | 'teaching'
     date: 15
   });
 
-  // Urgency configuration dictionary
+  // Urgency configuration dictionary (3 standardized levels)
   const urgencyConfig = {
     critical: { label: 'Khẩn cấp / Kiểm tra', color: '#EF4444', badgeBg: '#FEE2E2', badgeText: '#DC2626' },
     high: { label: 'Ưu tiên cao', color: '#F59E0B', badgeBg: '#FEF3C7', badgeText: '#D97706' },
-    teaching: { label: 'Lịch giảng dạy', color: '#3B82F6', badgeBg: '#EFF6FF', badgeText: '#2563EB' },
-    ai: { label: 'Luyện tập AI', color: '#10B981', badgeBg: '#D1FAE5', badgeText: '#059669' },
-    meeting: { label: 'Họp khoa / Sự kiện', color: '#8B5CF6', badgeBg: '#F5F3FF', badgeText: '#7C3AED' }
+    teaching: { label: 'Lịch giảng dạy', color: '#3B82F6', badgeBg: '#EFF6FF', badgeText: '#2563EB' }
   };
 
-  // Mock schedule database
+  // Mock schedule database - focused on examination and assessment
   const [scheduleList, setScheduleList] = useState([
     // October 15
     {
@@ -58,22 +62,22 @@ export default function TeacherSchedulePage() {
       year: 2023,
       month: 9,
       day: 15,
-      title: 'Toán nâng cao',
+      title: 'Kiểm tra 15p - Giải tích 12',
       className: '12A1',
       grade: '12',
       startTime: '07:30',
       endTime: '09:00',
-      urgency: 'teaching',
-      accentColor: '#3B82F6',
-      badgeColor: '#EFF6FF',
-      badgeTextColor: '#2563EB'
+      urgency: 'critical',
+      accentColor: '#EF4444',
+      badgeColor: '#FEE2E2',
+      badgeTextColor: '#DC2626'
     },
     {
       id: 2,
       year: 2023,
       month: 9,
       day: 15,
-      title: 'Toán cơ bản',
+      title: 'Ôn tập kiểm tra Toán 10',
       className: '10A3',
       grade: '10',
       startTime: '09:15',
@@ -88,15 +92,15 @@ export default function TeacherSchedulePage() {
       year: 2023,
       month: 9,
       day: 15,
-      title: 'Luyện tập AI',
+      title: 'Khảo sát chất lượng Hình học 11',
       className: '11B2',
       grade: '11',
       startTime: '14:00',
       endTime: '15:30',
-      urgency: 'ai',
-      accentColor: '#10B981',
-      badgeColor: '#D1FAE5',
-      badgeTextColor: '#059669'
+      urgency: 'high',
+      accentColor: '#F59E0B',
+      badgeColor: '#FEF3C7',
+      badgeTextColor: '#D97706'
     },
     // October 3
     {
@@ -104,15 +108,15 @@ export default function TeacherSchedulePage() {
       year: 2023,
       month: 9,
       day: 3,
-      title: 'Hình học không gian',
+      title: 'Kiểm tra giữa kì Hình học không gian',
       className: '11A1',
       grade: '11',
       startTime: '08:00',
       endTime: '09:30',
-      urgency: 'teaching',
-      accentColor: '#3B82F6',
-      badgeColor: '#EFF6FF',
-      badgeTextColor: '#2563EB'
+      urgency: 'critical',
+      accentColor: '#EF4444',
+      badgeColor: '#FEE2E2',
+      badgeTextColor: '#DC2626'
     },
     // October 5
     {
@@ -120,15 +124,15 @@ export default function TeacherSchedulePage() {
       year: 2023,
       month: 9,
       day: 5,
-      title: 'Họp khoa Toán - Tin',
-      className: 'Tổ bộ môn',
-      grade: 'all',
+      title: 'Luyện đề thi thử Toán 12',
+      className: '12A1',
+      grade: '12',
       startTime: '14:00',
       endTime: '16:00',
-      urgency: 'meeting',
-      accentColor: '#8B5CF6',
-      badgeColor: '#F5F3FF',
-      badgeTextColor: '#7C3AED'
+      urgency: 'teaching',
+      accentColor: '#3B82F6',
+      badgeColor: '#EFF6FF',
+      badgeTextColor: '#2563EB'
     },
     // October 19
     {
@@ -299,9 +303,9 @@ export default function TeacherSchedulePage() {
           <div className="schedule-breadcrumb">
             <span className="crumb-root">Trang chủ</span>
             <span className="crumb-sep">›</span>
-            <span className="crumb-current">Lịch giảng dạy</span>
+            <span className="crumb-current">Lịch kiểm tra</span>
           </div>
-          <h1 className="schedule-main-title">Lịch giảng dạy</h1>
+          <h1 className="schedule-main-title">Lịch kiểm tra & Khảo thí</h1>
         </div>
 
         {/* Horizontal Urgency Level Legend Bar */}
@@ -314,19 +318,11 @@ export default function TeacherSchedulePage() {
             </div>
             <div className="legend-chip">
               <span className="legend-chip-dot" style={{ backgroundColor: '#F59E0B' }} />
-              <span className="legend-chip-text">Ưu tiên cao (Lưu ý)</span>
+              <span className="legend-chip-text">Ưu tiên cao (Lưu ý / Ôn tập)</span>
             </div>
             <div className="legend-chip">
               <span className="legend-chip-dot" style={{ backgroundColor: '#3B82F6' }} />
               <span className="legend-chip-text">Lịch giảng dạy</span>
-            </div>
-            <div className="legend-chip">
-              <span className="legend-chip-dot" style={{ backgroundColor: '#10B981' }} />
-              <span className="legend-chip-text">Luyện tập AI / Hoạt động</span>
-            </div>
-            <div className="legend-chip">
-              <span className="legend-chip-dot" style={{ backgroundColor: '#8B5CF6' }} />
-              <span className="legend-chip-text">Họp khoa / Sự kiện</span>
             </div>
           </div>
         </div>
@@ -582,7 +578,7 @@ export default function TeacherSchedulePage() {
             <div className="modal-top-bar">
               <div className="modal-title-group">
                 <CalendarIcon size={20} className="text-purple" />
-                <h3 className="modal-heading">Thêm lịch giảng dạy mới</h3>
+                <h3 className="modal-heading">Thêm lịch kiểm tra mới</h3>
               </div>
               <button 
                 type="button" 
@@ -595,14 +591,14 @@ export default function TeacherSchedulePage() {
 
             <form onSubmit={handleCreateSchedule} className="schedule-form-body">
               <div className="form-field-group">
-                <label className="field-label">Tên môn học / Tiết dạy</label>
+                <label className="field-label">Tên môn học / Bài kiểm tra</label>
                 <input 
                   type="text" 
                   required
                   value={newScheduleForm.title}
                   onChange={(e) => setNewScheduleForm({ ...newScheduleForm, title: e.target.value })}
                   className="form-input-text"
-                  placeholder="Ví dụ: Toán nâng cao, Kiểm tra Đại số..."
+                  placeholder="Ví dụ: Kiểm tra 15p Giải tích, Kiểm tra giữa kì..."
                 />
               </div>
 
@@ -626,10 +622,8 @@ export default function TeacherSchedulePage() {
                     className="form-input-text"
                   >
                     <option value="critical">🔴 Khẩn cấp (Kiểm tra / Thi cử)</option>
-                    <option value="high">🟠 Ưu tiên cao (Lưu ý / Hạn nộp)</option>
+                    <option value="high">🟠 Ưu tiên cao (Lưu ý / Ôn tập)</option>
                     <option value="teaching">🔵 Lịch giảng dạy chính khóa</option>
-                    <option value="ai">🟢 Luyện tập AI / Hoạt động</option>
-                    <option value="meeting">🟣 Họp khoa / Sự kiện</option>
                   </select>
                 </div>
               </div>

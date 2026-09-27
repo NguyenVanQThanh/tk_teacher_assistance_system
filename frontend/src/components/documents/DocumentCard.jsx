@@ -19,34 +19,43 @@ import {
 import './DocumentCard.css';
 
 export default function DocumentCard({ doc, onPreview, onDownload, onEdit, onMore, onDelete, onRemove }) {
-  // Determine icon and color scheme based on file type
+  // Determine icon and color scheme based on file/document type
   const renderTypeIcon = () => {
-    switch (doc.fileType?.toLowerCase()) {
+    const type = doc.fileType?.toLowerCase();
+    switch (type) {
+      case 'exam':
+        return (
+          <div className="doc-icon-badge pdf-badge" title="Đề kiểm tra">
+            <span className="pdf-tag">EXAM</span>
+          </div>
+        );
+      case 'lecture':
+        return (
+          <div className="doc-icon-badge word-badge" title="Bài giảng">
+            <FileText size={20} strokeWidth={2.2} />
+          </div>
+        );
+      case 'reference':
+        return (
+          <div className="doc-icon-badge code-badge" title="Tài liệu tham khảo">
+            <FileText size={20} strokeWidth={2.2} />
+          </div>
+        );
       case 'pdf':
         return (
           <div className="doc-icon-badge pdf-badge">
             <span className="pdf-tag">PDF</span>
           </div>
         );
-      case 'video':
-        return (
-          <div className="doc-icon-badge video-badge">
-            <Video size={20} strokeWidth={2.2} />
-          </div>
-        );
-      case 'code':
-        return (
-          <div className="doc-icon-badge code-badge">
-            <FileCode size={20} strokeWidth={2.2} />
-          </div>
-        );
-      case 'exercise':
+      case 'xlsx':
+      case 'excel':
         return (
           <div className="doc-icon-badge exercise-badge">
-            <FileText size={20} strokeWidth={2.2} />
+            <span className="pdf-tag" style={{ background: '#10B981', color: '#fff' }}>XLSX</span>
           </div>
         );
       case 'word':
+      case 'docx':
       default:
         return (
           <div className="doc-icon-badge word-badge">

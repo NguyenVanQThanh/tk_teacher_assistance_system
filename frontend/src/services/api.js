@@ -1,8 +1,8 @@
 // File Name: api.js
-// Description: Centralized Axios API client configuration with token management and academic service APIs.
+// Description: Centralized Axios API client configuration with token management, academic, and assignment service APIs.
 // Created At: 2026-08-30
 // Created By: Tam Khang
-// Updated At: 2026-09-01
+// Updated At: 2026-09-27
 // Updated By: Tam Khang
 
 import axios from 'axios';
@@ -145,6 +145,19 @@ export const assignmentsApi = {
   createAssignment: async (classId, data) => {
     const response = await api.post(`/api/v1/classes/${classId}/assignments`, data);
     return response.data;
+  },
+  assignToMultipleClasses: async (classIds, data) => {
+    const promises = classIds.map((cid) =>
+      api.post(`/api/v1/classes/${cid}/assignments`, data)
+        .then((res) => ({ classId: cid, success: true, data: res.data }))
+        .catch((err) => ({
+          classId: cid,
+          success: false,
+          error: err.response?.data?.detail?.message || err.message,
+          code: err.response?.data?.detail?.code,
+        }))
+    );
+    return Promise.all(promises);
   },
   getClassAssignments: async (classId) => {
     const response = await api.get(`/api/v1/classes/${classId}/assignments`);

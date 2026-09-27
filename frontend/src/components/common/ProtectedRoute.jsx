@@ -1,16 +1,16 @@
 // File Name: ProtectedRoute.jsx
-// Description: Route guard middleware requiring valid authentication before accessing protected pages.
+// Description: Route guard middleware requiring valid authentication and authorized roles before accessing protected pages.
 // Created At: 2026-08-30
 // Created By: Tam Khang
-// Updated At: 2026-08-30
+// Updated At: 2026-09-27
 // Updated By: Tam Khang
 
 import React from 'react';
 import { Navigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 
-export default function ProtectedRoute({ children }) {
-  const { isAuthenticated, isLoading } = useAuth();
+export default function ProtectedRoute({ children, allowedRoles }) {
+  const { isAuthenticated, isLoading, user } = useAuth();
   const location = useLocation();
 
   if (isLoading) {
@@ -34,7 +34,7 @@ export default function ProtectedRoute({ children }) {
           borderRadius: '50%',
           animation: 'spin 0.8s linear infinite'
         }} />
-        <span style={{ fontSize: '14px', fontWeight: 600 }}>Đang kiểm tra quyền truy cập...</span>
+        <span style={{ fontSize: '14px', fontWeight: 600 }}>Checking access permissions...</span>
         <style>{`
           @keyframes spin {
             to { transform: rotate(360deg); }
@@ -49,5 +49,19 @@ export default function ProtectedRoute({ children }) {
     return <Navigate to="/login" state={{ from: location }} replace />;
   }
 
+  // Role-based access control
+  if (allowedRoles && allowedRoles.length > 0 && user?.role) {
+    if (!allowedRoles.includes(user.role)) {
+      if (user.role === 'Student') {
+        return <Navigate to="/student" replace />;
+      }
+      if (user.role === 'Admin') {
+        return <Navigate to="/admin" replace />;
+      }
+      return <Navigate to="/teacher" replace />;
+    }
+  }
+
   return children;
 }
+

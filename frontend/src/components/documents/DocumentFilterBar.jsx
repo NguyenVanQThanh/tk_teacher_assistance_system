@@ -2,7 +2,7 @@
 // Description: Multi-filter and search bar component for Document Repository.
 // Created At: 2026-08-30
 // Created By: Tam Khang
-// Updated At: 2026-08-30
+// Updated At: 2026-09-27
 // Updated By: Tam Khang
 
 import React from 'react';
@@ -52,9 +52,10 @@ export default function DocumentFilterBar({
             <option value="math">Toán học</option>
             <option value="physics">Vật lý</option>
             <option value="chemistry">Hóa học</option>
+            <option value="biology">Sinh học</option>
+            <option value="history">Lịch sử</option>
             <option value="english">Tiếng Anh</option>
             <option value="it">Tin học</option>
-            <option value="history">Lịch sử</option>
           </select>
           <ChevronDown size={16} className="select-arrow-icon" />
         </div>
@@ -70,11 +71,9 @@ export default function DocumentFilterBar({
             className="filter-select"
           >
             <option value="all">Tất cả loại</option>
-            <option value="pdf">Tài liệu PDF / Đề thi</option>
-            <option value="video">Video bài giảng</option>
-            <option value="word">Bài tập Word / Văn bản</option>
-            <option value="exercise">Bài tập chuyên đề</option>
-            <option value="code">Mã nguồn / Thực hành</option>
+            <option value="lecture">Bài giảng</option>
+            <option value="exam">Đề kiểm tra</option>
+            <option value="reference">Tài liệu tham khảo</option>
           </select>
           <ChevronDown size={16} className="select-arrow-icon" />
         </div>
