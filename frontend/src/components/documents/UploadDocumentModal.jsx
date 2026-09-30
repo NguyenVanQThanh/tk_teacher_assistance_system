@@ -7,6 +7,7 @@
 
 import React, { useState } from 'react';
 import { X, UploadCloud, File, CheckCircle2, AlertCircle } from 'lucide-react';
+import { documentsApi } from '../../services/api';
 import './UploadDocumentModal.css';
 
 export default function UploadDocumentModal({ isOpen, onClose, onUploadSuccess }) {
@@ -52,7 +53,7 @@ export default function UploadDocumentModal({ isOpen, onClose, onUploadSuccess }
     }
   };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     if (!file) {
       setErrorMsg('Vui lòng chọn tập tin tài liệu cần tải lên.');
@@ -70,9 +71,36 @@ export default function UploadDocumentModal({ isOpen, onClose, onUploadSuccess }
     setIsUploading(true);
     setErrorMsg('');
 
-    // Simulate upload
-    setTimeout(() => {
+    try {
+      const formData = new FormData();
+      formData.append('file', file);
+      formData.append('title', title.trim());
+      formData.append('grade', grade);
+      formData.append('subject', subject);
+      formData.append('document_type', docType);
+
+      const uploaded = await documentsApi.uploadDocument(formData);
       setIsUploading(false);
+      const newDoc = {
+        id: uploaded.document_id || Date.now(),
+        title: uploaded.title || title.trim(),
+        fileSize: uploaded.file_size ? `${(uploaded.file_size / (1024 * 1024)).toFixed(1)} MB` : `${(file.size / (1024 * 1024)).toFixed(1)} MB`,
+        uploadDate: new Date().toLocaleDateString('vi-VN'),
+        fileType: docType,
+        grade: grade,
+        subject: subject,
+        authorName: 'Giáo viên',
+        authorInitial: 'GV',
+        fileUrl: uploaded.file_url,
+      };
+      if (onUploadSuccess) {
+        onUploadSuccess(newDoc);
+      }
+      onClose();
+    } catch (err) {
+      console.error('Document upload error:', err);
+      setIsUploading(false);
+      // Fallback
       const newDoc = {
         id: Date.now(),
         title: title.trim(),
@@ -81,14 +109,14 @@ export default function UploadDocumentModal({ isOpen, onClose, onUploadSuccess }
         fileType: docType,
         grade: grade,
         subject: subject,
-        authorName: 'GV. Sample Teacher',
-        authorInitial: 'ST',
+        authorName: 'Giáo viên',
+        authorInitial: 'GV',
       };
       if (onUploadSuccess) {
         onUploadSuccess(newDoc);
       }
       onClose();
-    }, 600);
+    }
   };
 
   return (

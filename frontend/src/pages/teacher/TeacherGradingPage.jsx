@@ -43,6 +43,7 @@ export default function TeacherGradingPage() {
   const [loading, setLoading] = useState(true);
   const [classesList, setClassesList] = useState([]);
   const [subjectsList, setSubjectsList] = useState([]);
+  const [dashboardStats, setDashboardStats] = useState(null);
 
   // Submissions dataset with 3 official statuses: pending_grading (Chờ chấm), pending_review (Chờ duyệt), approved (Đã duyệt)
   const [submissions, setSubmissions] = useState([
@@ -411,11 +412,16 @@ export default function TeacherGradingPage() {
   const loadData = useCallback(async () => {
     try {
       setLoading(true);
-      const [attemptsRes, classesRes, subjectsRes] = await Promise.allSettled([
+      const [attemptsRes, classesRes, subjectsRes, dashboardRes] = await Promise.allSettled([
         attemptsApi.getAttempts(),
         classesApi.getClasses(),
         subjectsApi.getSubjects(),
+        attemptsApi.getGradingDashboard(),
       ]);
+
+      if (dashboardRes.status === 'fulfilled' && dashboardRes.value) {
+        setDashboardStats(dashboardRes.value);
+      }
 
       if (classesRes.status === 'fulfilled') {
         setClassesList(Array.isArray(classesRes.value) ? classesRes.value : classesRes.value.items || []);
@@ -594,12 +600,18 @@ export default function TeacherGradingPage() {
 
   // Dynamic counts: exact real-time counts from submissions
   const pendingGradingCount = useMemo(() => {
+    if (dashboardStats?.pending_grading_count !== undefined && dashboardStats.pending_grading_count > 0) {
+      return dashboardStats.pending_grading_count;
+    }
     return submissions.filter((s) => s.status === 'pending_grading').length;
-  }, [submissions]);
+  }, [dashboardStats, submissions]);
 
   const pendingReviewCount = useMemo(() => {
+    if (dashboardStats?.pending_review_count !== undefined && dashboardStats.pending_review_count > 0) {
+      return dashboardStats.pending_review_count;
+    }
     return submissions.filter((s) => s.status === 'pending_review').length;
-  }, [submissions]);
+  }, [dashboardStats, submissions]);
 
   // Filter logic
   const filteredSubmissions = useMemo(() => {

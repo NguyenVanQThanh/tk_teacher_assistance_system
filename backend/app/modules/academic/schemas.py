@@ -8,7 +8,7 @@
 import re
 from enum import Enum
 from uuid import UUID
-from datetime import datetime
+from datetime import datetime, date
 from typing import Optional
 from pydantic import BaseModel, Field, field_validator
 
@@ -157,8 +157,12 @@ class ClassOut(BaseModel):
 
 
 class EnrollmentCreate(BaseModel):
-    """Schema for enrolling a student into a class."""
-    student_id: UUID = Field(..., description="UUID of Student")
+    """Schema for enrolling a student into a class, with optional automatic student creation."""
+    student_id: Optional[UUID] = Field(None, description="UUID of existing Student (if already registered)")
+    student_name: Optional[str] = Field(None, max_length=150, description="Full name of student to create/enroll")
+    birthday: Optional[date] = Field(None, description="Student birthday (must be >= 16 years old)")
+    gender: Optional[str] = Field(None, max_length=20, description="Gender (Nam, Nữ, Khác)")
+    phone: Optional[str] = Field(None, max_length=20, description="Contact phone number")
     student_code: Optional[str] = Field(None, max_length=50, description="Student code (unique if provided)")
     status: AcademicStatusEnum = Field(AcademicStatusEnum.ACTIVE, description="Enrollment status")
 
@@ -169,6 +173,7 @@ class EnrollmentCreate(BaseModel):
             v = v.strip()
             return v if v else None
         return v
+
 
 
 class EnrollmentOut(BaseModel):

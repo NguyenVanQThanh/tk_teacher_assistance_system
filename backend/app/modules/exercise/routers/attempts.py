@@ -14,7 +14,8 @@ from app.core.database import get_db
 from models.models import User
 from app.modules.auth.dependencies import require_perm, get_current_user
 from app.modules.exercise.schemas import (
-    AttemptStartOut, AttemptSubmitRequest, AttemptOut, AttemptListItemOut, AttemptGradeUpdateRequest
+    AttemptStartOut, AttemptSubmitRequest, AttemptOut, AttemptListItemOut,
+    AttemptGradeUpdateRequest, GradingDashboardOut
 )
 from app.modules.exercise.services.attempt_service import AttemptService
 
@@ -24,6 +25,27 @@ router = APIRouter(tags=["student-attempts"])
 def get_attempt_service(db: Session = Depends(get_db)) -> AttemptService:
     """Dependency provider for AttemptService."""
     return AttemptService(db)
+
+
+@router.get(
+    "/api/v1/attempts/dashboard",
+    response_model=GradingDashboardOut,
+    dependencies=[Depends(require_perm("EXE_ATTEMPT_VIEW"))]
+)
+@router.get(
+    "/api/v1/grading/dashboard",
+    response_model=GradingDashboardOut,
+    dependencies=[Depends(require_perm("EXE_ATTEMPT_VIEW"))]
+)
+def get_grading_dashboard(
+    service: AttemptService = Depends(get_attempt_service),
+    current_user: User = Depends(get_current_user)
+):
+    """
+    Retrieve grading dashboard metrics, score distribution, and breakdown by class.
+    Requires EXE_ATTEMPT_VIEW permission.
+    """
+    return service.get_grading_dashboard(current_user=current_user)
 
 
 @router.post(

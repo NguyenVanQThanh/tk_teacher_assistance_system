@@ -389,4 +389,32 @@ class AttemptGradeUpdateRequest(BaseModel):
     detailed_results: Optional[Any] = Field(None, description="Optional updated detailed question results")
 
 
+class GradingScoreDistribution(BaseModel):
+    under_5: int = 0
+    from_5_to_6_5: int = 0
+    from_6_5_to_8: int = 0
+    from_8_to_10: int = 0
+
+
+class GradingClassSummary(BaseModel):
+    class_id: UUID
+    class_name: str
+    total_submissions: int = 0
+    graded_count: int = 0
+    pending_count: int = 0
+    avg_score: float = 0.0
+
+
+class GradingDashboardOut(BaseModel):
+    total_submissions: int = 0
+    pending_grading_count: int = 0
+    graded_count: int = 0
+    need_feedback_count: int = 0
+    avg_score: float = 0.0
+    score_distribution: GradingScoreDistribution = GradingScoreDistribution()
+    by_class: List[GradingClassSummary] = []
+    recent_submissions: List[AttemptListItemOut] = []
+
+
+
 

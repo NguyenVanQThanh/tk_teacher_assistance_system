@@ -330,14 +330,14 @@ export default function CreateExerciseManualPage() {
           <div className="form-card-section">
             <h2 className="section-card-title">Thông tin cơ bản</h2>
 
-            {/* Row 1: Tên bài tập & Môn học */}
+            {/* Row 1: Tên bài tập & Loại bài tập */}
             <div className="form-row-2-1">
               <div className="form-field-item flex-2">
-                <label className="field-label">Tên bài tập / Đề thi *</label>
+                <label className="field-label">Tên bài tập *</label>
                 <input
                   type="text"
                   className="custom-text-input"
-                  placeholder="VD: Kiểm tra 15p Chương 1 – Đạo hàm"
+                  placeholder="Nhập tên bài tập..."
                   value={title}
                   onChange={(e) => setTitle(e.target.value)}
                   required
@@ -345,21 +345,22 @@ export default function CreateExerciseManualPage() {
               </div>
 
               <div className="form-field-item flex-1">
-                <label className="field-label">Môn giảng dạy</label>
-                <input
-                  type="text"
-                  className="custom-text-input"
-                  value={subjectsList[0]?.subject_name || 'Toán học'}
-                  readOnly
-                  style={{ backgroundColor: '#F3F4F6', color: '#1F2937', fontWeight: 600, cursor: 'default' }}
-                />
+                <label className="field-label">Loại bài tập *</label>
+                <select
+                  className="custom-select-input"
+                  value={exerciseType}
+                  onChange={(e) => setExerciseType(e.target.value)}
+                >
+                  <option value="exam">Bài kiểm tra (Tính điểm)</option>
+                  <option value="practice">Luyện tập tại nhà</option>
+                </select>
               </div>
             </div>
 
-            {/* Row 2: Khối, Thời gian, Loại bài tập */}
+            {/* Row 2: Khối, Thời gian, Phân loại cấp độ */}
             <div className="form-grid-3">
               <div className="form-field-item">
-                <label className="field-label">Khối lớp *</label>
+                <label className="field-label">Khối *</label>
                 <select
                   className="custom-select-input"
                   value={grade}
@@ -372,359 +373,389 @@ export default function CreateExerciseManualPage() {
               </div>
 
               <div className="form-field-item">
-                <label className="field-label">Thời gian làm bài (Phút)</label>
+                <label className="field-label">
+                  Thời gian làm bài {exerciseType === 'exam' ? '(Phút) *' : '(Tùy chọn)'}
+                </label>
                 <input
                   type="text"
                   className="custom-text-input"
-                  placeholder="VD: 15, 45, 60"
+                  placeholder="VD: 15, 45, 60 phút"
                   value={duration}
                   onChange={(e) => setDuration(e.target.value)}
                 />
               </div>
 
               <div className="form-field-item">
-                <label className="field-label">Loại bài tập</label>
+                <label className="field-label">Phân loại cấp độ</label>
                 <select
                   className="custom-select-input"
-                  value={exerciseType}
-                  onChange={(e) => setExerciseType(e.target.value)}
+                  value={level}
+                  onChange={(e) => setLevel(e.target.value)}
                 >
-                  <option value="exam">Bài kiểm tra (Tính điểm)</option>
-                  <option value="practice">Luyện tập tại nhà</option>
+                  <option value="basic">Cơ bản (Nhận biết / Thông hiểu)</option>
+                  <option value="medium">Trung bình (Vận dụng)</option>
+                  <option value="advanced">Nâng cao (Vận dụng cao)</option>
                 </select>
+              </div>
+            </div>
+
+            {/* Row 3: Giờ mở bài & Hạn nộp bài */}
+            <div className="form-grid-2">
+              <div className="form-field-item">
+                <label className="field-label">Giờ mở bài (Tùy chọn)</label>
+                <input
+                  type="datetime-local"
+                  className="custom-text-input"
+                  value={startTime}
+                  onChange={(e) => setStartTime(e.target.value)}
+                />
+              </div>
+
+              <div className="form-field-item">
+                <label className="field-label">Hạn nộp bài (Tùy chọn)</label>
+                <input
+                  type="datetime-local"
+                  className="custom-text-input"
+                  value={dueTime}
+                  onChange={(e) => setDueTime(e.target.value)}
+                />
               </div>
             </div>
           </div>
 
-          {/* CARD 2: PHẦN 1 - TRẮC NGHIỆM 4 LỰA CHỌN */}
+          {/* CARD 2: CÂU HỎI VÀ ĐÁP ÁN */}
           <div className="form-card-section">
-            <div className="section-header-flex">
-              <div>
-                <h2 className="section-card-title">Phần 1: Trắc nghiệm 4 lựa chọn (MCQ)</h2>
-                <p className="section-sub-desc">Mỗi câu hỏi có 4 phương án, chọn 1 phương án đúng nhất</p>
+            <h2 className="section-card-title">Câu hỏi và Đáp án</h2>
+
+            {/* SECTION 1: TRẮC NGHIỆM */}
+            <div className="question-category-section">
+              <div className="category-header-row">
+                <span className="category-title">Phần 1: Trắc nghiệm</span>
+                <button 
+                  type="button" 
+                  className="btn-add-question"
+                  onClick={handleAddMcq}
+                >
+                  <Plus size={16} />
+                  <span>Thêm câu hỏi</span>
+                </button>
               </div>
-              <button 
-                type="button" 
-                className="btn-add-question-outline"
-                onClick={handleAddMcq}
-              >
-                <Plus size={16} />
-                <span>Thêm câu hỏi trắc nghiệm</span>
-              </button>
-            </div>
 
-            <div className="questions-list-wrapper">
-              {mcqQuestions.map((q, qIndex) => (
-                <div key={q.id} className="question-composer-card">
-                  {/* Header row */}
-                  <div className="question-card-top-row">
-                    <span className="q-badge-label">Câu {qIndex + 1}</span>
-                    <div className="q-actions-right">
-                      <select
-                        className="level-select-pill"
-                        value={q.cognitiveLevel}
-                        onChange={(e) => {
-                          const val = e.target.value;
-                          setMcqQuestions((prev) =>
-                            prev.map((item) =>
-                              item.id === q.id ? { ...item, cognitiveLevel: val } : item
-                            )
-                          );
-                        }}
-                      >
-                        <option value="knowledge">Nhận biết</option>
-                        <option value="comprehension">Thông hiểu</option>
-                        <option value="application">Vận dụng</option>
-                      </select>
-
-                      <button
-                        type="button"
-                        className="btn-trash-action"
+              {mcqQuestions.map((q, idx) => (
+                <div key={q.id} className="question-editor-card">
+                  <div className="q-card-header">
+                    <div className="q-header-left">
+                      <span className="q-badge-purple">Câu {idx + 1}</span>
+                      <span className="q-type-label">Trắc nghiệm:</span>
+                    </div>
+                    {mcqQuestions.length > 1 && (
+                      <button 
+                        type="button" 
+                        className="btn-delete-q"
                         onClick={() => handleDeleteMcq(q.id)}
                         title="Xóa câu hỏi này"
                       >
                         <Trash2 size={16} />
                       </button>
-                    </div>
+                    )}
                   </div>
 
-                  {/* Question Content */}
-                  <div className="question-content-input-group">
-                    <textarea
-                      className="question-textarea"
-                      placeholder="Nhập nội dung câu hỏi (hỗ trợ công thức LaTeX ví dụ $y = x^2$)..."
-                      rows={2}
-                      value={q.content}
-                      onChange={(e) => {
-                        const val = e.target.value;
-                        setMcqQuestions((prev) =>
-                          prev.map((item) =>
-                            item.id === q.id ? { ...item, content: val } : item
-                          )
-                        );
-                      }}
-                    />
-                  </div>
+                  <textarea
+                    rows={3}
+                    className="q-content-textarea"
+                    placeholder="Nhập nội dung câu hỏi..."
+                    value={q.content}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      setMcqQuestions(prev => prev.map(item => item.id === q.id ? { ...item, content: val } : item));
+                    }}
+                  />
 
-                  {/* 4 Options Grid */}
-                  <div className="options-composer-grid">
+                  {/* Options 2x2 grid */}
+                  <div className="mcq-options-grid">
                     {q.options.map((opt) => (
-                      <div
-                        key={opt.key}
-                        className={`option-composer-item ${opt.isCorrect ? 'is-selected-correct' : ''}`}
-                        onClick={() => handleSetMcqCorrectOption(q.id, opt.key)}
-                      >
-                        <span className="opt-key-badge">{opt.key}</span>
+                      <div key={opt.key} className="mcq-option-field">
+                        <input
+                          type="radio"
+                          name={`correct-mcq-${q.id}`}
+                          className="opt-radio-circle"
+                          checked={opt.isCorrect}
+                          onChange={() => handleSetMcqCorrectOption(q.id, opt.key)}
+                          title="Chọn làm đáp án đúng"
+                        />
                         <input
                           type="text"
                           className="opt-text-input"
-                          placeholder={`Phương án ${opt.key}...`}
+                          placeholder={`Lựa chọn ${opt.key}...`}
                           value={opt.text}
                           onChange={(e) => handleUpdateMcqOption(q.id, opt.key, e.target.value)}
-                          onClick={(e) => e.stopPropagation()}
                         />
-                        <button
-                          type="button"
-                          className={`btn-correct-radio ${opt.isCorrect ? 'active' : ''}`}
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleSetMcqCorrectOption(q.id, opt.key);
-                          }}
-                          title="Đánh dấu đáp án đúng"
-                        >
-                          {opt.isCorrect ? <CheckCircle2 size={18} /> : <div className="radio-circle-empty" />}
-                        </button>
                       </div>
                     ))}
+                  </div>
+
+                  {/* Cognitive level */}
+                  <div className="cognitive-level-row">
+                    <span className="cog-label">Mức độ nhận thức (Tùy chọn)</span>
+                    <div className="cog-radio-group">
+                      <label className="cog-radio-item">
+                        <input 
+                          type="radio" 
+                          name={`cog-mcq-${q.id}`} 
+                          checked={q.cognitiveLevel === 'knowledge'}
+                          onChange={() => setMcqQuestions(prev => prev.map(item => item.id === q.id ? { ...item, cognitiveLevel: 'knowledge' } : item))}
+                        />
+                        <span>Nhận biết</span>
+                      </label>
+                      <label className="cog-radio-item">
+                        <input 
+                          type="radio" 
+                          name={`cog-mcq-${q.id}`} 
+                          checked={q.cognitiveLevel === 'comprehension'}
+                          onChange={() => setMcqQuestions(prev => prev.map(item => item.id === q.id ? { ...item, cognitiveLevel: 'comprehension' } : item))}
+                        />
+                        <span>Thông hiểu</span>
+                      </label>
+                      <label className="cog-radio-item">
+                        <input 
+                          type="radio" 
+                          name={`cog-mcq-${q.id}`} 
+                          checked={q.cognitiveLevel === 'application'}
+                          onChange={() => setMcqQuestions(prev => prev.map(item => item.id === q.id ? { ...item, cognitiveLevel: 'application' } : item))}
+                        />
+                        <span>Vận dụng</span>
+                      </label>
+                    </div>
                   </div>
                 </div>
               ))}
             </div>
-          </div>
 
-          {/* CARD 3: PHẦN 2 - ĐÚNG / SAI */}
-          <div className="form-card-section">
-            <div className="section-header-flex">
-              <div>
-                <h2 className="section-card-title">Phần 2: Trắc nghiệm Đúng / Sai</h2>
-                <p className="section-sub-desc">Mỗi câu hỏi học sinh chọn khẳng định là Đúng hoặc Sai</p>
+            {/* SECTION 2: ĐÚNG / SAI */}
+            <div className="question-category-section">
+              <div className="category-header-row">
+                <span className="category-title">Phần 2: Đúng / Sai</span>
+                <button 
+                  type="button" 
+                  className="btn-add-question"
+                  onClick={handleAddTf}
+                >
+                  <Plus size={16} />
+                  <span>Thêm câu hỏi</span>
+                </button>
               </div>
-              <button 
-                type="button" 
-                className="btn-add-question-outline"
-                onClick={handleAddTf}
-              >
-                <Plus size={16} />
-                <span>Thêm câu hỏi Đúng/Sai</span>
-              </button>
-            </div>
 
-            <div className="questions-list-wrapper">
-              {tfQuestions.map((q, qIndex) => (
-                <div key={q.id} className="question-composer-card">
-                  <div className="question-card-top-row">
-                    <span className="q-badge-label">Câu {mcqQuestions.length + qIndex + 1}</span>
-                    <div className="q-actions-right">
-                      <select
-                        className="level-select-pill"
-                        value={q.cognitiveLevel}
-                        onChange={(e) => {
-                          const val = e.target.value;
-                          setTfQuestions((prev) =>
-                            prev.map((item) =>
-                              item.id === q.id ? { ...item, cognitiveLevel: val } : item
-                            )
-                          );
-                        }}
-                      >
-                        <option value="knowledge">Nhận biết</option>
-                        <option value="comprehension">Thông hiểu</option>
-                        <option value="application">Vận dụng</option>
-                      </select>
-
-                      <button
-                        type="button"
-                        className="btn-trash-action"
+              {tfQuestions.map((q, idx) => (
+                <div key={q.id} className="question-editor-card">
+                  <div className="q-card-header">
+                    <div className="q-header-left">
+                      <span className="q-badge-purple">Câu {mcqQuestions.length + idx + 1}</span>
+                      <span className="q-type-label">Đúng / Sai:</span>
+                    </div>
+                    {tfQuestions.length > 1 && (
+                      <button 
+                        type="button" 
+                        className="btn-delete-q"
                         onClick={() => handleDeleteTf(q.id)}
                         title="Xóa câu hỏi này"
                       >
                         <Trash2 size={16} />
                       </button>
-                    </div>
+                    )}
                   </div>
 
-                  <div className="question-content-input-group">
-                    <textarea
-                      className="question-textarea"
-                      placeholder="Nhập nhận định / câu hỏi..."
-                      rows={2}
-                      value={q.content}
-                      onChange={(e) => {
-                        const val = e.target.value;
-                        setTfQuestions((prev) =>
-                          prev.map((item) =>
-                            item.id === q.id ? { ...item, content: val } : item
-                          )
-                        );
-                      }}
-                    />
+                  <textarea
+                    rows={3}
+                    className="q-content-textarea"
+                    placeholder="Nhập nhận định / câu hỏi..."
+                    value={q.content}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      setTfQuestions(prev => prev.map(item => item.id === q.id ? { ...item, content: val } : item));
+                    }}
+                  />
+
+                  {/* True / False choices */}
+                  <div className="tf-options-row">
+                    <label className={`tf-pill-item ${q.correctAnswer === 'true' ? 'is-active' : ''}`}>
+                      <input
+                        type="radio"
+                        name={`tf-opt-${q.id}`}
+                        checked={q.correctAnswer === 'true'}
+                        onChange={() => setTfQuestions(prev => prev.map(item => item.id === q.id ? { ...item, correctAnswer: 'true' } : item))}
+                      />
+                      <span>Đúng</span>
+                    </label>
+
+                    <label className={`tf-pill-item ${q.correctAnswer === 'false' ? 'is-active' : ''}`}>
+                      <input
+                        type="radio"
+                        name={`tf-opt-${q.id}`}
+                        checked={q.correctAnswer === 'false'}
+                        onChange={() => setTfQuestions(prev => prev.map(item => item.id === q.id ? { ...item, correctAnswer: 'false' } : item))}
+                      />
+                      <span>Sai</span>
+                    </label>
                   </div>
 
-                  {/* True / False Choice */}
-                  <div className="tf-choice-row">
-                    <span className="tf-choice-label">Đáp án đúng:</span>
-                    <div className="tf-btn-group">
-                      <button
-                        type="button"
-                        className={`tf-toggle-btn ${q.correctAnswer === 'true' ? 'active-true' : ''}`}
-                        onClick={() => {
-                          setTfQuestions((prev) =>
-                            prev.map((item) =>
-                              item.id === q.id ? { ...item, correctAnswer: 'true' } : item
-                            )
-                          );
-                        }}
-                      >
-                        Đúng
-                      </button>
-                      <button
-                        type="button"
-                        className={`tf-toggle-btn ${q.correctAnswer === 'false' ? 'active-false' : ''}`}
-                        onClick={() => {
-                          setTfQuestions((prev) =>
-                            prev.map((item) =>
-                              item.id === q.id ? { ...item, correctAnswer: 'false' } : item
-                            )
-                          );
-                        }}
-                      >
-                        Sai
-                      </button>
+                  {/* Cognitive level */}
+                  <div className="cognitive-level-row">
+                    <span className="cog-label">Mức độ nhận thức (Tùy chọn)</span>
+                    <div className="cog-radio-group">
+                      <label className="cog-radio-item">
+                        <input 
+                          type="radio" 
+                          name={`cog-tf-${q.id}`} 
+                          checked={q.cognitiveLevel === 'knowledge'}
+                          onChange={() => setTfQuestions(prev => prev.map(item => item.id === q.id ? { ...item, cognitiveLevel: 'knowledge' } : item))}
+                        />
+                        <span>Nhận biết</span>
+                      </label>
+                      <label className="cog-radio-item">
+                        <input 
+                          type="radio" 
+                          name={`cog-tf-${q.id}`} 
+                          checked={q.cognitiveLevel === 'comprehension'}
+                          onChange={() => setTfQuestions(prev => prev.map(item => item.id === q.id ? { ...item, cognitiveLevel: 'comprehension' } : item))}
+                        />
+                        <span>Thông hiểu</span>
+                      </label>
+                      <label className="cog-radio-item">
+                        <input 
+                          type="radio" 
+                          name={`cog-tf-${q.id}`} 
+                          checked={q.cognitiveLevel === 'application'}
+                          onChange={() => setTfQuestions(prev => prev.map(item => item.id === q.id ? { ...item, cognitiveLevel: 'application' } : item))}
+                        />
+                        <span>Vận dụng</span>
+                      </label>
                     </div>
                   </div>
                 </div>
               ))}
             </div>
-          </div>
 
-          {/* CARD 4: PHẦN 3 - TRẢ LỜI NGẮN */}
-          <div className="form-card-section">
-            <div className="section-header-flex">
-              <div>
-                <h2 className="section-card-title">Phần 3: Trắc nghiệm Trả lời ngắn</h2>
-                <p className="section-sub-desc">Học sinh tự điền kết quả số hoặc chuỗi ngắn</p>
+            {/* SECTION 3: TRẢ LỜI NGẮN */}
+            <div className="question-category-section">
+              <div className="category-header-row">
+                <span className="category-title">Phần 3: Trả lời ngắn</span>
+                <button 
+                  type="button" 
+                  className="btn-add-question"
+                  onClick={handleAddSa}
+                >
+                  <Plus size={16} />
+                  <span>Thêm câu hỏi</span>
+                </button>
               </div>
-              <button 
-                type="button" 
-                className="btn-add-question-outline"
-                onClick={handleAddSa}
-              >
-                <Plus size={16} />
-                <span>Thêm câu trả lời ngắn</span>
-              </button>
-            </div>
 
-            <div className="questions-list-wrapper">
-              {saQuestions.map((q, qIndex) => (
-                <div key={q.id} className="question-composer-card">
-                  <div className="question-card-top-row">
-                    <span className="q-badge-label">Câu {mcqQuestions.length + tfQuestions.length + qIndex + 1}</span>
-                    <div className="q-actions-right">
-                      <select
-                        className="level-select-pill"
-                        value={q.cognitiveLevel}
-                        onChange={(e) => {
-                          const val = e.target.value;
-                          setSaQuestions((prev) =>
-                            prev.map((item) =>
-                              item.id === q.id ? { ...item, cognitiveLevel: val } : item
-                            )
-                          );
-                        }}
-                      >
-                        <option value="knowledge">Nhận biết</option>
-                        <option value="comprehension">Thông hiểu</option>
-                        <option value="application">Vận dụng</option>
-                      </select>
-
-                      <button
-                        type="button"
-                        className="btn-trash-action"
+              {saQuestions.map((q, idx) => (
+                <div key={q.id} className="question-editor-card">
+                  <div className="q-card-header">
+                    <div className="q-header-left">
+                      <span className="q-badge-purple">Câu {mcqQuestions.length + tfQuestions.length + idx + 1}</span>
+                      <span className="q-type-label">Trả lời ngắn:</span>
+                    </div>
+                    {saQuestions.length > 1 && (
+                      <button 
+                        type="button" 
+                        className="btn-delete-q"
                         onClick={() => handleDeleteSa(q.id)}
                         title="Xóa câu hỏi này"
                       >
                         <Trash2 size={16} />
                       </button>
-                    </div>
+                    )}
                   </div>
 
-                  <div className="question-content-input-group">
-                    <textarea
-                      className="question-textarea"
-                      placeholder="Nhập nội dung câu hỏi tính toán..."
-                      rows={2}
-                      value={q.content}
-                      onChange={(e) => {
-                        const val = e.target.value;
-                        setSaQuestions((prev) =>
-                          prev.map((item) =>
-                            item.id === q.id ? { ...item, content: val } : item
-                          )
-                        );
-                      }}
-                    />
-                  </div>
+                  <textarea
+                    rows={3}
+                    className="q-content-textarea"
+                    placeholder="Nhập nội dung câu hỏi..."
+                    value={q.content}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      setSaQuestions(prev => prev.map(item => item.id === q.id ? { ...item, content: val } : item));
+                    }}
+                  />
 
-                  {/* Short Answer Input */}
-                  <div className="sa-answer-input-row">
-                    <span className="sa-label">Đáp án chuẩn:</span>
+                  {/* Expected answer input */}
+                  <div className="sa-answer-box">
+                    <label className="sa-label">Đáp án dự kiến</label>
                     <input
                       type="text"
-                      className="custom-text-input flex-1"
-                      placeholder="Nhập kết quả số (VD: 4.5, -2, 100)..."
+                      className="custom-text-input"
+                      placeholder="Nhập câu trả lời ngắn..."
                       value={q.expectedAnswer}
                       onChange={(e) => {
                         const val = e.target.value;
-                        setSaQuestions((prev) =>
-                          prev.map((item) =>
-                            item.id === q.id ? { ...item, expectedAnswer: val } : item
-                          )
-                        );
+                        setSaQuestions(prev => prev.map(item => item.id === q.id ? { ...item, expectedAnswer: val } : item));
                       }}
                     />
+                  </div>
+
+                  {/* Cognitive level */}
+                  <div className="cognitive-level-row">
+                    <span className="cog-label">Mức độ nhận thức (Tùy chọn)</span>
+                    <div className="cog-radio-group">
+                      <label className="cog-radio-item">
+                        <input 
+                          type="radio" 
+                          name={`cog-sa-${q.id}`} 
+                          checked={q.cognitiveLevel === 'knowledge'}
+                          onChange={() => setSaQuestions(prev => prev.map(item => item.id === q.id ? { ...item, cognitiveLevel: 'knowledge' } : item))}
+                        />
+                        <span>Nhận biết</span>
+                      </label>
+                      <label className="cog-radio-item">
+                        <input 
+                          type="radio" 
+                          name={`cog-sa-${q.id}`} 
+                          checked={q.cognitiveLevel === 'comprehension'}
+                          onChange={() => setSaQuestions(prev => prev.map(item => item.id === q.id ? { ...item, cognitiveLevel: 'comprehension' } : item))}
+                        />
+                        <span>Thông hiểu</span>
+                      </label>
+                      <label className="cog-radio-item">
+                        <input 
+                          type="radio" 
+                          name={`cog-sa-${q.id}`} 
+                          checked={q.cognitiveLevel === 'application'}
+                          onChange={() => setSaQuestions(prev => prev.map(item => item.id === q.id ? { ...item, cognitiveLevel: 'application' } : item))}
+                        />
+                        <span>Vận dụng</span>
+                      </label>
+                    </div>
                   </div>
                 </div>
               ))}
             </div>
           </div>
 
-          {/* BOTTOM SUBMIT BAR */}
-          <div className="manual-bottom-actions-bar">
-            <button
-              type="button"
-              className="btn-bottom-cancel"
+          {/* Bottom Action Buttons */}
+          <div className="manual-page-footer-actions">
+            <button 
+              type="button" 
+              className="btn-footer-cancel"
               onClick={() => navigate('/teacher/exercises')}
-              disabled={isSaving}
             >
-              Hủy bỏ
+              Hủy
             </button>
-
-            <button
-              type="button"
-              className="btn-bottom-publish"
+            <button 
+              type="button" 
+              className="btn-footer-publish"
               onClick={handleSaveAndPublish}
               disabled={isSaving}
-              style={{ display: 'flex', alignItems: 'center', gap: '8px' }}
             >
               {isSaving ? (
                 <>
-                  <Loader2 size={18} className="animate-spin" />
-                  <span>Đang lưu bài tập...</span>
+                  <Loader2 size={16} className="animate-spin" />
+                  <span>Đang lưu...</span>
                 </>
               ) : (
                 <>
-                  <Save size={18} />
-                  <span>Lưu bài tập</span>
+                  <Save size={16} />
+                  <span>Lưu & Đăng</span>
                 </>
               )}
             </button>

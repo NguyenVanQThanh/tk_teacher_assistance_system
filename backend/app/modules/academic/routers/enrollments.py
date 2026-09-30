@@ -8,7 +8,7 @@
 from uuid import UUID
 from typing import List, Optional
 
-from fastapi import APIRouter, Depends, Query, status
+from fastapi import APIRouter, Depends, Query, status, HTTPException
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
@@ -23,24 +23,48 @@ router = APIRouter(prefix="/api/v1/classes", tags=["academic-enrollment"])
 @router.post(
     "/{class_id}/students",
     response_model=EnrollmentOut,
-    status_code=status.HTTP_201_CREATED,
-    dependencies=[Depends(require_perm("ACAD_ENROLLMENT_MANAGE"))]
+    status_code=status.HTTP_201_CREATED
 )
 def enroll_student(
     class_id: UUID,
     payload: EnrollmentCreate,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
 ):
     """
-    Ghi danh học sinh vào lớp. Yêu cầu quyền ACAD_ENROLLMENT_MANAGE.
+    Ghi danh học sinh vào lớp. Yêu cầu quyền ACAD_ENROLLMENT_MANAGE hoặc là Giáo viên phụ trách/chủ nhiệm lớp.
     """
+    from models.models import Class
+    from app.modules.auth.services.permission_service import PermissionService
+
+    cls = db.query(Class).filter(Class.class_id == class_id).first()
+    if not cls:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail={"code": "ERR-ACAD-CLASS_NOT_FOUND", "message": "Class not found."}
+        )
+
+    perms = PermissionService.get_effective_permissions(db, current_user.user_id, current_user.role_id)
+    has_perm = "ACAD_ENROLLMENT_MANAGE" in perms
+    is_homeroom = cls.homeroom_teacher_id == current_user.user_id
+    if not has_perm and not is_homeroom:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail={"code": "ERR-AUTH-PERMISSION_DENIED", "message": "You do not have permission to enroll students into this class."}
+        )
+
     return EnrollmentService.enroll_student(
         db=db,
         class_id=class_id,
         student_id=payload.student_id,
         student_code=payload.student_code,
-        status_val=payload.status.value
+        status_val=payload.status.value,
+        student_name=payload.student_name,
+        birthday=payload.birthday,
+        phone=payload.phone,
+        gender=payload.gender
     )
+
 
 
 @router.get(

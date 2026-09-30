@@ -2,7 +2,7 @@
 # Description: Testing configuration, database setup using SQLite in-memory, and fixtures.
 # Created At: 2026-07-17
 # Created By: Tam Khang
-# Updated At: 2026-07-22
+# Updated At: 2026-09-30
 # Updated By: Tam Khang
 
 
@@ -31,7 +31,7 @@ def _patched_hashpw(password, salt):
 bcrypt.hashpw = _patched_hashpw
 
 from models.base import Base
-from models.models import User, Role, Permission, RolePermission, UserPermission
+from models.models import User, Role, Permission, RolePermission, UserPermission, ApprovalRequest, AuditLog
 from app.core.database import get_db
 from app.core.security import get_password_hash
 from app.modules.auth.services.permission_service import PermissionService
@@ -39,8 +39,9 @@ from app.main import app
 
 
 # Create SQLite in-memory engine for testing
+from sqlalchemy.pool import StaticPool
 SQLALCHEMY_DATABASE_URL = "sqlite:///:memory:"
-engine = create_engine(SQLALCHEMY_DATABASE_URL, connect_args={"check_same_thread": False})
+engine = create_engine(SQLALCHEMY_DATABASE_URL, connect_args={"check_same_thread": False}, poolclass=StaticPool)
 TestingSessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
 @pytest.fixture(scope="session", autouse=True)
