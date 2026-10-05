@@ -1,8 +1,8 @@
 # File Name: schemas.py
-# Description: Pydantic schemas for Exercise, Question, and AnswerOption CRUD & validation.
+# Description: Pydantic schemas for Exercise, Question, AnswerOption, and Assignment CRUD & validation.
 # Created At: 2026-07-31
 # Created By: Tam Khang
-# Updated At: 2026-08-09
+# Updated At: 2026-10-06
 # Updated By: Tam Khang
 
 from enum import Enum
@@ -78,6 +78,23 @@ class QuestionCreate(BaseModel):
     image_url: Optional[str] = Field(None, description="URL of question image")
     answer_options: Optional[List[AnswerOptionCreate]] = Field(default=None, description="List of answer choices")
 
+    @field_validator("difficulty", mode="before")
+    @classmethod
+    def normalize_difficulty(cls, v: Any) -> Any:
+        if v is None or v == "":
+            return None
+        if isinstance(v, DifficultyEnum):
+            return v
+        if isinstance(v, str):
+            s = v.strip().lower()
+            if s in ("nhanbiet", "nhận biết", "nb", "knowledge", "basic"):
+                return DifficultyEnum.NhanBiet
+            if s in ("thonghieu", "thông hiểu", "th", "comprehension", "medium"):
+                return DifficultyEnum.ThongHieu
+            if s in ("vandung", "vận dụng", "vd", "vdc", "vận dụng cao", "application", "advanced"):
+                return DifficultyEnum.VanDung
+        return v
+
     @field_validator("content")
     @classmethod
     def validate_content(cls, v: str) -> str:
@@ -98,7 +115,17 @@ class QuestionCreate(BaseModel):
         elif self.question_type == QuestionTypeEnum.TrueFalse:
             options = self.answer_options or []
             if len(options) < 1:
-                raise ValueError("TrueFalse questions must have at least 1 option item.")
+                if self.correct_answer:
+                    is_corr = str(self.correct_answer).strip().lower() in ("đúng", "true", "1", "dung")
+                    self.answer_options = [
+                        AnswerOptionCreate(
+                            content=f"a) {self.content}",
+                            is_correct=is_corr,
+                            display_order=1
+                        )
+                    ]
+                else:
+                    raise ValueError("TrueFalse questions must have at least 1 option item.")
         return self
 
 
@@ -116,6 +143,23 @@ class QuestionUpdate(BaseModel):
     display_order: Optional[int] = None
     image_url: Optional[str] = None
     answer_options: Optional[List[AnswerOptionCreate]] = None
+
+    @field_validator("difficulty", mode="before")
+    @classmethod
+    def normalize_difficulty_update(cls, v: Any) -> Any:
+        if v is None or v == "":
+            return None
+        if isinstance(v, DifficultyEnum):
+            return v
+        if isinstance(v, str):
+            s = v.strip().lower()
+            if s in ("nhanbiet", "nhận biết", "nb", "knowledge", "basic"):
+                return DifficultyEnum.NhanBiet
+            if s in ("thonghieu", "thông hiểu", "th", "comprehension", "medium"):
+                return DifficultyEnum.ThongHieu
+            if s in ("vandung", "vận dụng", "vd", "vdc", "vận dụng cao", "application", "advanced"):
+                return DifficultyEnum.VanDung
+        return v
 
     @field_validator("content")
     @classmethod
@@ -252,11 +296,30 @@ class AssignmentOut(BaseModel):
     status: str
     exercise_title: Optional[str] = None
     total_questions: Optional[int] = None
+    class_name: Optional[str] = None
+    subject_id: Optional[UUID] = None
+    subject_name: Optional[str] = None
+    teacher_name: Optional[str] = None
+    duration_minutes: Optional[int] = 45
+    max_attempts: Optional[int] = 1
+    completed_attempts_count: Optional[int] = 0
+    is_finished: Optional[bool] = False
+    latest_score: Optional[float] = None
+    feed_status: Optional[str] = None
+    category: Optional[str] = "class_exercise"
+    categoryLabel: Optional[str] = "Bài tập trên lớp"
+    is_ai_generated: Optional[bool] = False
 
     @model_validator(mode="before")
     @classmethod
     def populate_exercise_fields(cls, data: Any) -> Any:
+        if isinstance(data, dict):
+            return data
         if hasattr(data, "exercise") and data.exercise:
+            class_name = getattr(data.class_obj, "class_name", None) if hasattr(data, "class_obj") and data.class_obj else None
+            teacher_name = getattr(data.assigner, "full_name", None) if hasattr(data, "assigner") and data.assigner else None
+            subject_id = getattr(data.exercise, "subject_id", None)
+            is_exam = "đề thi" in (data.exercise.title or "").lower()
             return {
                 "assignment_id": data.assignment_id,
                 "class_id": data.class_id,
@@ -267,6 +330,18 @@ class AssignmentOut(BaseModel):
                 "status": data.status,
                 "exercise_title": data.exercise.title if hasattr(data.exercise, "title") else None,
                 "total_questions": data.exercise.total_questions if hasattr(data.exercise, "total_questions") else None,
+                "class_name": class_name,
+                "subject_id": subject_id,
+                "teacher_name": teacher_name,
+                "duration_minutes": 45,
+                "max_attempts": 1 if is_exam else 3,
+                "completed_attempts_count": 0,
+                "is_finished": False,
+                "latest_score": None,
+                "feed_status": "active",
+                "category": "exam" if is_exam else "class_exercise",
+                "categoryLabel": "Bài thi" if is_exam else "Bài tập trên lớp",
+                "is_ai_generated": False
             }
         return data
 
@@ -416,5 +491,82 @@ class GradingDashboardOut(BaseModel):
     recent_submissions: List[AttemptListItemOut] = []
 
 
+class CognitiveLevelStats(BaseModel):
+    correct: int = 0
+    total: int = 0
+    pct: str = "0%"
 
 
+class CognitiveAnalysis(BaseModel):
+    recognition: CognitiveLevelStats = Field(default_factory=CognitiveLevelStats)
+    understanding: CognitiveLevelStats = Field(default_factory=CognitiveLevelStats)
+    application: CognitiveLevelStats = Field(default_factory=CognitiveLevelStats)
+
+
+class AssignmentAttemptDetail(BaseModel):
+    id: UUID
+    attempt_id: UUID
+    attempt_num: int
+    badge_label: str
+    is_latest: bool = False
+    is_best: bool = False
+    date_text: str
+    status_tag: str
+    status_tag_class: str
+    score: Optional[float] = None
+    score_label: str
+    grade: str
+    correct_count: int
+    total_count: int
+    correct_pct: str
+    time_spent: str
+    cognitive: CognitiveAnalysis
+
+    model_config = {"from_attributes": True}
+
+
+class AssignmentResultSummaryOut(BaseModel):
+    assignment_id: Optional[UUID] = None
+    exercise_id: Optional[UUID] = None
+    class_id: Optional[UUID] = None
+    title: str
+    subject_name: Optional[str] = "Toán học"
+    grade_name: Optional[str] = "Lớp 12"
+    teacher_name: Optional[str] = "Giáo viên bộ môn"
+    duration_minutes: int = 45
+    total_questions: int = 0
+    due_at: Optional[datetime] = None
+    deadline_text: Optional[str] = None
+    status: str = "active"
+    max_attempts: int = 1
+    attempts: List[AssignmentAttemptDetail] = []
+    best_attempt: Optional[AssignmentAttemptDetail] = None
+    latest_attempt: Optional[AssignmentAttemptDetail] = None
+
+    model_config = {"from_attributes": True}
+
+
+class AiExerciseGenerateRequest(BaseModel):
+    subject_name: str
+    grade_name: Optional[str] = "Lớp 12"
+    topic_prompt: str
+    part1_count: int = 4
+    part2_count: int = 1
+    part3_count: int = 1
+    duration_minutes: int = 45
+    class_id: Optional[UUID] = None
+
+
+class AiExerciseGenerateOut(BaseModel):
+    exercise_id: UUID
+    assignment_id: UUID
+    title: str
+    subject_name: str
+    total_questions: int
+    duration_minutes: int
+    class_id: UUID
+    class_name: str
+    due_at: Optional[datetime] = None
+    created_at: datetime
+
+    model_config = {"from_attributes": True}

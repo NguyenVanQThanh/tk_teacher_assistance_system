@@ -227,6 +227,7 @@ def setup_db() -> Generator[None, None, None]:
             RolePermission(role_id=student_role.role_id, permission_id=me_view_perm.permission_id),
             RolePermission(role_id=student_role.role_id, permission_id=pwd_change_perm.permission_id),
             RolePermission(role_id=student_role.role_id, permission_id=exe_assignment_view_perm.permission_id),
+            RolePermission(role_id=student_role.role_id, permission_id=exe_exercise_view_perm.permission_id),
             RolePermission(role_id=student_role.role_id, permission_id=exe_attempt_submit_perm.permission_id),
             RolePermission(role_id=student_role.role_id, permission_id=exe_attempt_view_perm.permission_id),
         ])

@@ -2,7 +2,7 @@
 # Description: Service layer for StudentExerciseAttempt operations (start, submit, grade, view).
 # Created At: 2026-08-05
 # Created By: Tam Khang
-# Updated At: 2026-08-05
+# Updated At: 2026-10-04
 # Updated By: Tam Khang
 
 from datetime import datetime, timezone
@@ -62,7 +62,8 @@ class AttemptService:
                 status_code=status.HTTP_409_CONFLICT,
                 detail={
                     "code": "ERR-EXE-ATTEMPT_ALREADY_OPEN",
-                    "message": "You already have an open attempt for this assignment."
+                    "message": "An in-progress attempt already exists for this assignment.",
+                    "attempt_id": str(open_attempt.attempt_id)
                 }
             )
 

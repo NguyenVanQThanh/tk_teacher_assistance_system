@@ -2,7 +2,7 @@
 # Description: API Router for StudentExerciseAttempt endpoints (F-EXE-03).
 # Created At: 2026-08-05
 # Created By: Tam Khang
-# Updated At: 2026-08-05
+# Updated At: 2026-10-03
 # Updated By: Tam Khang
 
 from typing import List, Optional
@@ -15,9 +15,10 @@ from models.models import User
 from app.modules.auth.dependencies import require_perm, get_current_user
 from app.modules.exercise.schemas import (
     AttemptStartOut, AttemptSubmitRequest, AttemptOut, AttemptListItemOut,
-    AttemptGradeUpdateRequest, GradingDashboardOut
+    AttemptGradeUpdateRequest, GradingDashboardOut, AssignmentResultSummaryOut
 )
 from app.modules.exercise.services.attempt_service import AttemptService
+from app.modules.exercise.services.assignment_service import AssignmentService
 
 router = APIRouter(tags=["student-attempts"])
 
@@ -63,6 +64,29 @@ def start_attempt(
     Start an exercise attempt for an assignment. Requires EXE_ATTEMPT_SUBMIT permission.
     """
     return service.start_attempt(assignment_id, current_user)
+
+
+@router.get(
+    "/api/v1/assignments/{assignment_id}/attempts",
+    response_model=AssignmentResultSummaryOut,
+    dependencies=[Depends(require_perm("EXE_ATTEMPT_VIEW"))]
+)
+def get_assignment_attempts_history(
+    assignment_id: UUID,
+    student_id: Optional[UUID] = Query(None, description="Optional student ID filter for teachers"),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """
+    Retrieve assignment details and all student attempts history with cognitive breakdown.
+    Requires EXE_ATTEMPT_VIEW permission.
+    """
+    assignment_service = AssignmentService(db)
+    return assignment_service.get_assignment_result_summary(
+        assignment_id=assignment_id,
+        current_user=current_user,
+        student_id=student_id
+    )
 
 
 @router.put(

@@ -2,7 +2,7 @@
 # Description: Integration & Unit tests for F-EXE-01 Exercise Bank module (CRUD, scoping, soft-delete, restore, validation).
 # Created At: 2026-07-31
 # Created By: Tam Khang
-# Updated At: 2026-07-31
+# Updated At: 2026-10-03
 # Updated By: Tam Khang
 
 import uuid
@@ -23,6 +23,14 @@ def get_teacher_token(client: TestClient) -> str:
     resp = client.post(
         "/api/v1/auth/login",
         json={"phone": "0912345678", "password": "password123"}
+    )
+    return resp.json()["access_token"]
+
+
+def get_student_token(client: TestClient) -> str:
+    resp = client.post(
+        "/api/v1/auth/login",
+        json={"phone": "0934567890", "password": "password123"}
     )
     return resp.json()["access_token"]
 
@@ -157,3 +165,87 @@ class TestExerciseBankModule:
         )
         assert fail_ex.status_code == status.HTTP_403_FORBIDDEN
         assert fail_ex.json()["detail"]["code"] == "ERR-EXE-INVALID_SUBJECT_SCOPE"
+
+    def test_ai_exercise_generation_and_taking_flow(self, client: TestClient):
+        # 1. Login as Student
+        student_token = get_student_token(client)
+        student_headers = {"Authorization": f"Bearer {student_token}"}
+
+        # 2. Call POST /api/v1/exercises/ai-generate to generate and persist real exercise
+        payload = {
+            "subject_name": "Lịch sử",
+            "grade_name": "Lớp 12",
+            "topic_prompt": "Cách mạng tháng Tám năm 1945",
+            "part1_count": 4,
+            "part2_count": 1,
+            "part3_count": 1,
+            "duration_minutes": 45
+        }
+        gen_resp = client.post(
+            "/api/v1/exercises/ai-generate",
+            json=payload,
+            headers=student_headers
+        )
+        assert gen_resp.status_code == status.HTTP_201_CREATED
+        gen_data = gen_resp.json()
+
+        exercise_id = gen_data["exercise_id"]
+        assignment_id = gen_data["assignment_id"]
+        assert gen_data["total_questions"] == 6
+        assert "Lịch sử" in gen_data["title"]
+
+        # 3. Verify exercise details and questions exist in DB
+        detail_resp = client.get(
+            f"/api/v1/exercises/{exercise_id}",
+            headers=student_headers
+        )
+        assert detail_resp.status_code == status.HTTP_200_OK
+        ex_detail = detail_resp.json()
+        assert len(ex_detail["questions"]) == 6
+
+        # Check part 1 questions have answer options
+        mc_questions = [q for q in ex_detail["questions"] if q["question_type"] == "MultipleChoice"]
+        assert len(mc_questions) == 4
+        for q in mc_questions:
+            assert len(q["answer_options"]) == 4
+
+        # 4. Student starts attempt for this assignment
+        start_resp = client.post(
+            f"/api/v1/assignments/{assignment_id}/attempts",
+            headers=student_headers
+        )
+        assert start_resp.status_code == status.HTTP_201_CREATED
+        attempt_id = start_resp.json()["attempt_id"]
+
+        # 5. Student submits answers
+        # Pick first option for first MC question
+        q1 = mc_questions[0]
+        chosen_opt = q1["answer_options"][0]["option_id"]
+        submit_payload = {
+            "answers": [
+                {
+                    "question_id": q1["question_id"],
+                    "answer_option_id": chosen_opt
+                }
+            ]
+        }
+        sub_resp = client.put(
+            f"/api/v1/attempts/{attempt_id}/submit",
+            json=submit_payload,
+            headers=student_headers
+        )
+        assert sub_resp.status_code == status.HTTP_200_OK
+        sub_data = sub_resp.json()
+        assert sub_data["is_finished"] is True
+        assert sub_data["score"] is not None
+
+        # 6. Verify attempt appears in assignments feed and attempt list
+        att_list_resp = client.get(
+            "/api/v1/attempts",
+            headers=student_headers
+        )
+        assert att_list_resp.status_code == status.HTTP_200_OK
+        all_attempts = att_list_resp.json()
+        matched = next((a for a in all_attempts if a["attempt_id"] == attempt_id), None)
+        assert matched is not None
+        assert matched["is_finished"] is True
