@@ -1,8 +1,8 @@
 // File Name: EditDocumentModal.jsx
-// Description: Full-featured interactive modal dialog matching Image 1 exactly with left question list (5 questions), right selected question LaTeX editor, live KaTeX preview, Desmos SVG attachment, formula toolbar, and save synchronization.
+// Description: Full-featured interactive modal dialog matching Image 1 exactly with left question list, right selected question LaTeX editor, live KaTeX preview, Desmos SVG attachment, formula toolbar, and save synchronization.
 // Created At: 2026-09-12
 // Created By: Tam Khang
-// Updated At: 2026-09-13
+// Updated At: 2026-10-06
 // Updated By: Tam Khang
 
 import React, { useState, useEffect, useRef } from 'react';
@@ -22,11 +22,87 @@ import {
   ListOrdered,
   FileCode2,
   ListChecks,
-  Info
+  Info,
+  Trash2,
+  Loader2
 } from 'lucide-react';
+import { exercisesApi, questionsApi } from '../../services/api';
 import MathRenderer from '../common/MathRenderer';
 import AddQuestionModal from './AddQuestionModal';
 import './EditDocumentModal.css';
+
+const isUuid = (val) =>
+  typeof val === 'string' &&
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(val);
+
+const buildQuestionPayload = (q, displayOrder) => {
+  let difficulty = 'NhanBiet';
+  const levelStr = String(q.level || q.levelRange || '').toLowerCase();
+  if (levelStr.includes('thông hiểu') || levelStr.includes('comprehension')) {
+    difficulty = 'ThongHieu';
+  } else if (levelStr.includes('vận dụng') || levelStr.includes('application')) {
+    difficulty = 'VanDung';
+  }
+
+  let qType = 'MultipleChoice';
+  const rawType = String(q.questionType || '').toLowerCase();
+  if (rawType.includes('true_false') || rawType.includes('truefalse')) {
+    qType = 'TrueFalse';
+  } else if (rawType.includes('short_answer') || rawType.includes('shortanswer')) {
+    qType = 'ShortAnswer';
+  }
+
+  let optionsPayload = [];
+  if (qType === 'MultipleChoice') {
+    const correctKey = q.correctOption || 'A';
+    optionsPayload = (q.options || []).map((opt, idx) => ({
+      content: opt.text?.trim() || `Lựa chọn ${opt.key || String.fromCharCode(65 + idx)}`,
+      is_correct: opt.key === correctKey || opt.isCorrect === true,
+      display_order: idx + 1
+    }));
+    if (optionsPayload.length < 2) {
+      optionsPayload = [
+        { content: 'Lựa chọn A', is_correct: true, display_order: 1 },
+        { content: 'Lựa chọn B', is_correct: false, display_order: 2 }
+      ];
+    }
+  } else if (qType === 'TrueFalse') {
+    if (Array.isArray(q.tfItems) && q.tfItems.length > 0) {
+      optionsPayload = q.tfItems.map((item, idx) => ({
+        content: `${item.key || String.fromCharCode(97 + idx)}) ${item.text || ''}`.trim(),
+        is_correct: Boolean(item.isCorrect),
+        display_order: idx + 1
+      }));
+    } else if (Array.isArray(q.options) && q.options.length > 0) {
+      optionsPayload = q.options.map((opt, idx) => ({
+        content: opt.text?.trim() || `Mệnh đề ${opt.key || idx + 1}`,
+        is_correct: Boolean(opt.isCorrect),
+        display_order: idx + 1
+      }));
+    } else {
+      const isTrue = q.correctOption === 'true' || q.correctOption === 'Đúng' || q.correctAnswer === 'true';
+      optionsPayload = [
+        {
+          content: `a) ${q.content?.trim() || 'Mệnh đề kiểm tra'}`,
+          is_correct: isTrue,
+          display_order: 1
+        }
+      ];
+    }
+  }
+
+  return {
+    content: (q.content || 'Nội dung câu hỏi').trim(),
+    content_latex: (q.content || '').trim(),
+    content_markdown: (q.content || '').trim(),
+    question_type: qType,
+    difficulty: difficulty,
+    correct_answer: q.correctOption || q.shortAnswerExpected || (qType === 'TrueFalse' ? 'Đúng' : 'A'),
+    explanation: q.solutionGuide?.trim() || null,
+    display_order: displayOrder,
+    answer_options: optionsPayload.length > 0 ? optionsPayload : undefined
+  };
+};
 
 export default function EditDocumentModal({ isOpen, doc, onClose, onSave }) {
   if (!isOpen || !doc) return null;
@@ -44,6 +120,12 @@ export default function EditDocumentModal({ isOpen, doc, onClose, onSave }) {
   const [durationMinutes, setDurationMinutes] = useState('45');
   const [maxScore, setMaxScore] = useState('10.0 điểm');
   const [isAddQuestionModalOpen, setIsAddQuestionModalOpen] = useState(false);
+
+  // Backend Sync States
+  const [isLoadingBackend, setIsLoadingBackend] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+  const [deletedQuestionIds, setDeletedQuestionIds] = useState([]);
+  const [saveStatusText, setSaveStatusText] = useState('');
 
   // Initial 5 Questions Matching Image 1 & 2
   const initialQuestions = [
@@ -250,23 +332,103 @@ Tam giác vuông SAB tại A: tan(∠SBA) = SA / AB = a√3 / a = √3 => ∠SBA
   const [questions, setQuestions] = useState(initialQuestions);
   const [selectedQuestionId, setSelectedQuestionId] = useState(1);
 
+  // Load real questions from backend when modal opens
+  useEffect(() => {
+    if (!isOpen || !doc) return;
+    let isMounted = true;
+    const targetId = doc.id || doc.exercise_id;
+
+    if (isUuid(targetId)) {
+      setIsLoadingBackend(true);
+      exercisesApi.getExerciseDetail(targetId)
+        .then((detail) => {
+          if (!isMounted || !detail) return;
+          if (detail.title) setDocTitle(detail.title);
+          if (Array.isArray(detail.questions) && detail.questions.length > 0) {
+            const mapped = detail.questions.map((q, idx) => {
+              const letters = ['A', 'B', 'C', 'D', 'E', 'F'];
+              const options = (q.answer_options || []).map((opt, oIdx) => ({
+                id: opt.option_id,
+                key: letters[oIdx] || String(oIdx + 1),
+                text: opt.content,
+                isCorrect: Boolean(opt.is_correct)
+              }));
+              const correctOpt = options.find(o => o.isCorrect)?.key || q.correct_answer || 'A';
+              let levelText = 'Nhận biết';
+              if (q.difficulty === 'ThongHieu') levelText = 'Thông hiểu';
+              else if (q.difficulty === 'VanDung') levelText = 'Vận dụng';
+
+              return {
+                id: q.question_id,
+                backendQuestionId: q.question_id,
+                number: q.display_order || idx + 1,
+                level: levelText,
+                levelRange: `${levelText} (0.0 - 10.0)`,
+                score: '2.0 điểm',
+                suggestedTime: '5 phút',
+                previewSnippet: q.content ? q.content.slice(0, 120) + (q.content.length > 120 ? '...' : '') : '',
+                formulaMeta: q.content?.includes('$') ? 'Chứa công thức LaTeX' : 'Văn bản thường',
+                answersMeta: `${options.length} đáp án (${correctOpt}*)`,
+                content: q.content || q.content_latex || '',
+                questionType: q.question_type || 'MultipleChoice',
+                correctOption: correctOpt,
+                options: options.length > 0 ? options : [
+                  { key: 'A', text: '', isCorrect: true },
+                  { key: 'B', text: '', isCorrect: false },
+                  { key: 'C', text: '', isCorrect: false },
+                  { key: 'D', text: '', isCorrect: false }
+                ],
+                solutionGuide: q.explanation || ''
+              };
+            });
+            setQuestions(mapped);
+            if (mapped.length > 0) {
+              const firstQ = mapped[0];
+              setSelectedQuestionId(firstQ.id);
+              setCurrentLevel(firstQ.levelRange || `${firstQ.level || 'Nhận biết'} (0.0 - 10.0)`);
+              setCurrentScore(firstQ.score || '2.0 điểm');
+              setCurrentContent(firstQ.content || '');
+              setCurrentOptions(firstQ.options || [
+                { key: 'A', text: '', isCorrect: true },
+                { key: 'B', text: '', isCorrect: false },
+                { key: 'C', text: '', isCorrect: false },
+                { key: 'D', text: '', isCorrect: false }
+              ]);
+              setCurrentCorrectOption(firstQ.correctOption || 'A');
+              setCurrentSolutionGuide(firstQ.solutionGuide || '');
+            }
+          }
+          setDeletedQuestionIds([]);
+        })
+        .catch((err) => {
+          console.warn('Could not load exercise questions from backend:', err);
+        })
+        .finally(() => {
+          if (isMounted) setIsLoadingBackend(false);
+        });
+    }
+    return () => {
+      isMounted = false;
+    };
+  }, [isOpen, doc]);
+
   // Active question being edited in right panel
-  const activeQuestion = questions.find(q => q.id === selectedQuestionId) || questions[0];
+  const activeQuestion = questions.find(q => q.id === selectedQuestionId) || questions[0] || {};
 
   // Editor states for active question
-  const [currentLevel, setCurrentLevel] = useState(activeQuestion.levelRange);
-  const [currentScore, setCurrentScore] = useState(activeQuestion.score);
-  const [currentContent, setCurrentContent] = useState(activeQuestion.content);
+  const [currentLevel, setCurrentLevel] = useState(activeQuestion?.levelRange || 'Nhận biết (0.0 - 10.0)');
+  const [currentScore, setCurrentScore] = useState(activeQuestion?.score || '2.0 điểm');
+  const [currentContent, setCurrentContent] = useState(activeQuestion?.content || '');
   const [currentOptions, setCurrentOptions] = useState(
-    activeQuestion.options || [
+    activeQuestion?.options || [
       { key: 'A', text: 'm ∈ (-1; 4) \\ {0; 3}' },
       { key: 'B', text: 'm ∈ [-2; 5)' },
       { key: 'C', text: 'm ∈ (0; 3) ∪ {4}' },
       { key: 'D', text: 'm ∈ (-∞; -1) ∪ (4; +∞)' }
     ]
   );
-  const [currentCorrectOption, setCurrentCorrectOption] = useState(activeQuestion.correctOption || 'A');
-  const [currentSolutionGuide, setCurrentSolutionGuide] = useState(activeQuestion.solutionGuide || '');
+  const [currentCorrectOption, setCurrentCorrectOption] = useState(activeQuestion?.correctOption || 'A');
+  const [currentSolutionGuide, setCurrentSolutionGuide] = useState(activeQuestion?.solutionGuide || '');
   const [saveToast, setSaveToast] = useState(false);
   const textareaRef = useRef(null);
   const isSwitchingRef = useRef(false);
@@ -277,21 +439,21 @@ Tam giác vuông SAB tại A: tan(∠SBA) = SA / AB = a√3 / a = √3 => ∠SBA
     setSelectedQuestionId(qId);
     const targetQ = questions.find(q => q.id === qId);
     if (targetQ) {
-      setCurrentLevel(targetQ.levelRange);
-      setCurrentScore(targetQ.score);
-      setCurrentContent(targetQ.content);
+      setCurrentLevel(targetQ.levelRange || `${targetQ.level || 'Nhận biết'} (0.0 - 10.0)`);
+      setCurrentScore(targetQ.score || '2.0 điểm');
+      setCurrentContent(targetQ.content || '');
       setCurrentOptions(targetQ.options || [
-        { key: 'A', text: '' },
-        { key: 'B', text: '' },
-        { key: 'C', text: '' },
-        { key: 'D', text: '' }
+        { key: 'A', text: '', isCorrect: true },
+        { key: 'B', text: '', isCorrect: false },
+        { key: 'C', text: '', isCorrect: false },
+        { key: 'D', text: '', isCorrect: false }
       ]);
-      setCurrentCorrectOption(targetQ.correctOption || null);
+      setCurrentCorrectOption(targetQ.correctOption || 'A');
       setCurrentSolutionGuide(targetQ.solutionGuide || '');
     }
     setTimeout(() => {
       isSwitchingRef.current = false;
-    }, 60);
+    }, 80);
   };
 
   // Real-time synchronization of editor fields into questions list
@@ -559,29 +721,59 @@ Tam giác vuông SAB tại A: tan(∠SBA) = SA / AB = a√3 / a = √3 => ∠SBA
     }, 50);
   };
 
-  // Save changes to current question in list
-  const handleSaveActiveQuestion = () => {
+  // Save changes to current question in list and sync with DB if real exercise
+  const handleSaveActiveQuestion = async () => {
+    const currentQData = {
+      levelRange: currentLevel,
+      level: getSimpleLevel(currentLevel),
+      score: currentScore,
+      content: currentContent,
+      options: currentOptions,
+      correctOption: currentCorrectOption,
+      solutionGuide: currentSolutionGuide,
+      answersMeta: currentCorrectOption 
+        ? `4 đáp án (${currentCorrectOption}*)` 
+        : '4 đáp án (Chưa chọn)',
+      previewSnippet: currentContent.split('\n').filter(l => l.trim().length > 0)[0] || 'Nội dung câu hỏi...'
+    };
+
     setQuestions(prev => prev.map(q => {
       if (q.id === activeQuestion.id) {
-        return {
-          ...q,
-          levelRange: currentLevel,
-          level: currentLevel.split(' ')[0],
-          score: currentScore,
-          content: currentContent,
-          options: currentOptions,
-          correctOption: currentCorrectOption,
-          solutionGuide: currentSolutionGuide,
-          answersMeta: currentCorrectOption 
-            ? `4 đáp án (${currentCorrectOption}*)` 
-            : '4 đáp án (Chưa chọn)',
-          previewSnippet: currentContent.split('\n')[1] || currentContent.slice(0, 80)
-        };
+        return { ...q, ...currentQData };
       }
       return q;
     }));
+
+    // Directly save/update this question to DB if attached to real exercise
+    const targetId = doc.id || doc.exercise_id;
+    if (isUuid(targetId)) {
+      const qToSave = { ...activeQuestion, ...currentQData };
+      const qIndex = questions.findIndex(q => q.id === activeQuestion.id);
+      const payload = buildQuestionPayload(qToSave, qIndex !== -1 ? qIndex + 1 : 1);
+      try {
+        if (isUuid(activeQuestion.backendQuestionId || activeQuestion.id)) {
+          await questionsApi.updateQuestion(activeQuestion.backendQuestionId || activeQuestion.id, payload);
+          setSaveStatusText('Đã lưu vào DB!');
+        } else {
+          const created = await exercisesApi.addQuestion(targetId, payload);
+          if (created?.question_id) {
+            setQuestions(prev => prev.map(q => q.id === activeQuestion.id ? { ...q, id: created.question_id, backendQuestionId: created.question_id } : q));
+          }
+          setSaveStatusText('Đã thêm mới vào DB!');
+        }
+      } catch (err) {
+        console.error('Failed to save question to DB:', err);
+        setSaveStatusText('Lỗi lưu DB');
+      }
+    } else {
+      setSaveStatusText('Đã lưu câu hỏi!');
+    }
+
     setSaveToast(true);
-    setTimeout(() => setSaveToast(false), 2000);
+    setTimeout(() => {
+      setSaveToast(false);
+      setSaveStatusText('');
+    }, 2200);
   };
 
   // Keyboard shortcut Ctrl + S
@@ -597,8 +789,8 @@ Tam giác vuông SAB tại A: tan(∠SBA) = SA / AB = a√3 / a = √3 => ∠SBA
   }, [currentLevel, currentScore, currentContent, currentOptions, currentCorrectOption, currentSolutionGuide, activeQuestion.id]);
 
   // Add new question handler
-  const handleAddNewQuestion = () => {
-    const newId = Date.now();
+  const handleAddNewQuestion = async () => {
+    const newId = `new-${Date.now()}`;
     const newNum = questions.length + 1;
     const newQ = {
       id: newId,
@@ -622,30 +814,142 @@ Tam giác vuông SAB tại A: tan(∠SBA) = SA / AB = a√3 / a = √3 => ∠SBA
       ],
       solutionGuide: ''
     };
+
+    const targetId = doc.id || doc.exercise_id;
+    if (isUuid(targetId)) {
+      try {
+        const payload = buildQuestionPayload(newQ, newNum);
+        const created = await exercisesApi.addQuestion(targetId, payload);
+        if (created?.question_id) {
+          newQ.id = created.question_id;
+          newQ.backendQuestionId = created.question_id;
+        }
+      } catch (err) {
+        console.error('Failed to add new question to backend:', err);
+      }
+    }
+
     setQuestions([...questions, newQ]);
-    handleSelectQuestion(newId);
+    handleSelectQuestion(newQ.id);
   };
 
-  const handleSaveFromAddModal = (newQuestionData) => {
+  // Delete question handler
+  const handleDeleteQuestion = async (qId) => {
+    if (questions.length <= 1) {
+      alert('Đề thi cần có ít nhất 1 câu hỏi.');
+      return;
+    }
+    const targetId = doc.id || doc.exercise_id;
+    const targetQ = questions.find(q => q.id === qId);
+    const backendQId = targetQ?.backendQuestionId || (isUuid(qId) ? qId : null);
+
+    if (backendQId && isUuid(targetId)) {
+      try {
+        await questionsApi.deleteQuestion(backendQId);
+        setDeletedQuestionIds(prev => [...prev, backendQId]);
+      } catch (err) {
+        console.error('Failed to delete question from backend:', err);
+      }
+    }
+
+    const remaining = questions.filter(q => q.id !== qId);
+    setQuestions(remaining);
+    if (selectedQuestionId === qId && remaining.length > 0) {
+      handleSelectQuestion(remaining[0].id);
+    }
+  };
+
+  const handleSaveFromAddModal = async (newQuestionData) => {
+    const targetId = doc.id || doc.exercise_id;
+    if (isUuid(targetId)) {
+      try {
+        const payload = buildQuestionPayload(newQuestionData, questions.length + 1);
+        const created = await exercisesApi.addQuestion(targetId, payload);
+        if (created?.question_id) {
+          newQuestionData.id = created.question_id;
+          newQuestionData.backendQuestionId = created.question_id;
+        }
+      } catch (err) {
+        console.error('Failed to add question from modal to backend:', err);
+      }
+    }
     setQuestions((prev) => [...prev, newQuestionData]);
-    setSelectedQuestionId(newQuestionData.id);
-    setActiveQuestion(newQuestionData);
-    setCurrentLevel(newQuestionData.levelRange || newQuestionData.level);
-    setCurrentScore(newQuestionData.score);
-    setCurrentTime(newQuestionData.suggestedTime);
-    setCurrentContent(newQuestionData.content);
-    setCurrentOptions(newQuestionData.options || []);
-    setCurrentCorrectOption(newQuestionData.correctOption || null);
-    setCurrentSolutionGuide(newQuestionData.solutionGuide || '');
+    handleSelectQuestion(newQuestionData.id);
   };
 
-  const handleSaveAndContinueFromAddModal = (newQuestionData) => {
+  const handleSaveAndContinueFromAddModal = async (newQuestionData) => {
+    const targetId = doc.id || doc.exercise_id;
+    if (isUuid(targetId)) {
+      try {
+        const payload = buildQuestionPayload(newQuestionData, questions.length + 1);
+        const created = await exercisesApi.addQuestion(targetId, payload);
+        if (created?.question_id) {
+          newQuestionData.id = created.question_id;
+          newQuestionData.backendQuestionId = created.question_id;
+        }
+      } catch (err) {
+        console.error('Failed to add question from modal to backend:', err);
+      }
+    }
     setQuestions((prev) => [...prev, newQuestionData]);
   };
 
-  // Main Save Handler
-  const handleMainSave = () => {
-    handleSaveActiveQuestion();
+  // Main Save Handler with Full Backend Persistence
+  const handleMainSave = async () => {
+    setIsSaving(true);
+    const targetId = doc.id || doc.exercise_id;
+
+    if (isUuid(targetId)) {
+      try {
+        // 1. Update exercise title if modified
+        if (docTitle.trim() && docTitle.trim() !== doc.title) {
+          try {
+            await exercisesApi.updateExercise(targetId, { title: docTitle.trim() });
+          } catch (e) {
+            console.warn('Could not update exercise title in backend:', e);
+          }
+        }
+
+        // 2. Ensure current active question has latest form state
+        const activeIdx = questions.findIndex(q => q.id === activeQuestion?.id);
+        const upToDateQuestions = questions.map((q, idx) => {
+          if (idx === activeIdx) {
+            return {
+              ...q,
+              levelRange: currentLevel,
+              level: getSimpleLevel(currentLevel),
+              score: currentScore,
+              content: currentContent,
+              options: currentOptions,
+              correctOption: currentCorrectOption,
+              solutionGuide: currentSolutionGuide,
+            };
+          }
+          return q;
+        });
+
+        // 3. Batch save/update each question
+        for (let i = 0; i < upToDateQuestions.length; i++) {
+          const q = upToDateQuestions[i];
+          const payload = buildQuestionPayload(q, i + 1);
+          const backendQId = q.backendQuestionId || (isUuid(q.id) ? q.id : null);
+          if (backendQId) {
+            await questionsApi.updateQuestion(backendQId, payload);
+          } else {
+            const created = await exercisesApi.addQuestion(targetId, payload);
+            if (created?.question_id) {
+              q.id = created.question_id;
+              q.backendQuestionId = created.question_id;
+            }
+          }
+        }
+      } catch (err) {
+        console.error('Failed to sync all changes to backend:', err);
+      } finally {
+        setIsSaving(false);
+      }
+    }
+
     const updated = {
       ...doc,
       title: docTitle,
@@ -657,7 +961,7 @@ Tam giác vuông SAB tại A: tan(∠SBA) = SA / AB = a√3 / a = √3 => ∠SBA
       updatedAt: new Date().toISOString()
     };
     if (onSave) {
-      onSave(updated);
+      await onSave(updated);
     }
     onClose();
   };
@@ -713,6 +1017,7 @@ Tam giác vuông SAB tại A: tan(∠SBA) = SA / AB = a√3 / a = √3 => ∠SBA
               type="button" 
               className="btn-header-close"
               onClick={onClose}
+              disabled={isSaving}
             >
               <X size={15} />
               <span>Đóng</span>
@@ -721,9 +1026,19 @@ Tam giác vuông SAB tại A: tan(∠SBA) = SA / AB = a√3 / a = √3 => ∠SBA
               type="button" 
               className="btn-header-save"
               onClick={handleMainSave}
+              disabled={isSaving}
             >
-              <Save size={16} />
-              <span>Lưu & Cập nhật</span>
+              {isSaving ? (
+                <>
+                  <Loader2 size={16} className="animate-spin" />
+                  <span>Đang lưu DB...</span>
+                </>
+              ) : (
+                <>
+                  <Save size={16} />
+                  <span>Lưu & Cập nhật</span>
+                </>
+              )}
             </button>
           </div>
         </header>
@@ -880,7 +1195,9 @@ Tam giác vuông SAB tại A: tan(∠SBA) = SA / AB = a√3 / a = √3 => ∠SBA
                   <ListOrdered size={16} className="list-icon" />
                   <h3 className="list-main-title">
                     <span>Danh sách câu hỏi đề thi</span>
-                    <span className="list-title-count">({questions.length} câu hỏi - 10.0 điểm)</span>
+                    <span className="list-title-count">
+                      {isLoadingBackend ? `(${questions.length} câu hỏi • Đang tải từ DB...)` : `(${questions.length} câu hỏi - 10.0 điểm)`}
+                    </span>
                   </h3>
                 </div>
                 <button 
@@ -942,7 +1259,7 @@ Tam giác vuông SAB tại A: tan(∠SBA) = SA / AB = a√3 / a = √3 => ∠SBA
               <div className="editor-col-top-bar">
                 <div className="editor-col-title-left">
                   <FileEdit size={16} className="edit-pencil-icon" />
-                  <span className="editor-q-label">Chỉnh sửa Câu {activeQuestion.number}</span>
+                  <span className="editor-q-label">Chỉnh sửa Câu {activeQuestion?.number || 1}</span>
 
                   {/* Level dropdown on the same line without score range */}
                   <div className="editor-level-inline-wrap" title="Chọn cấp độ tư duy">
@@ -971,14 +1288,39 @@ Tam giác vuông SAB tại A: tan(∠SBA) = SA / AB = a√3 / a = √3 => ∠SBA
                   </div>
                 </div>
 
-                <button 
-                  type="button" 
-                  className="btn-save-single-question"
-                  onClick={handleSaveActiveQuestion}
-                >
-                  <Save size={14} />
-                  <span>{saveToast ? 'Đã lưu!' : 'Lưu thay đổi câu hỏi'}</span>
-                </button>
+                <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                  <button 
+                    type="button" 
+                    className="btn-delete-active-q"
+                    onClick={() => handleDeleteQuestion(activeQuestion?.id)}
+                    title="Xóa câu hỏi này khỏi đề thi"
+                    style={{
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '4px',
+                      padding: '5px 9px',
+                      borderRadius: '6px',
+                      border: '1px solid #FECACA',
+                      background: '#FEF2F2',
+                      color: '#DC2626',
+                      fontSize: '12px',
+                      fontWeight: 500,
+                      cursor: 'pointer'
+                    }}
+                  >
+                    <Trash2 size={13} />
+                    <span>Xóa câu hỏi</span>
+                  </button>
+
+                  <button 
+                    type="button" 
+                    className="btn-save-single-question"
+                    onClick={handleSaveActiveQuestion}
+                  >
+                    <Save size={14} />
+                    <span>{saveToast ? (saveStatusText || 'Đã lưu!') : 'Lưu thay đổi câu hỏi'}</span>
+                  </button>
+                </div>
               </div>
 
               {/* LaTeX Textarea Section */}
@@ -1076,17 +1418,17 @@ Tam giác vuông SAB tại A: tan(∠SBA) = SA / AB = a√3 / a = √3 => ∠SBA
                   {/* Dynamic Question Header Lead */}
                   <div className="preview-header-lead-row">
                     <span className="preview-qnum-lead">
-                      Câu {activeQuestion.number} ({getSimpleLevel(currentLevel)} - {currentScore}):
+                      Câu {activeQuestion?.number || 1} ({getSimpleLevel(currentLevel)} - {currentScore}):
                     </span>
                   </div>
 
                   {/* Dynamic KaTeX live rendered content */}
                   <div className="preview-dynamic-body">
-                    {renderLiveContent(cleanContentForPreview(currentContent, activeQuestion.number))}
+                    {renderLiveContent(cleanContentForPreview(currentContent, activeQuestion?.number || 1))}
                   </div>
 
                   {/* SVG Attachment Banner */}
-                  {activeQuestion.attachmentName && (
+                  {activeQuestion?.attachmentName && (
                     <div className="preview-svg-attachment-banner">
                       <div className="attachment-left-info">
                         <Link2 size={16} className="attachment-link-icon" />
@@ -1155,7 +1497,7 @@ Tam giác vuông SAB tại A: tan(∠SBA) = SA / AB = a√3 / a = √3 => ∠SBA
                   onClick={handleSaveActiveQuestion}
                 >
                   <Save size={15} />
-                  <span>{saveToast ? 'Đã lưu câu hỏi!' : 'Lưu thay đổi câu hỏi'}</span>
+                  <span>{saveToast ? (saveStatusText || 'Đã lưu câu hỏi!') : 'Lưu thay đổi câu hỏi'}</span>
                 </button>
                 <span className="ctrl-s-hint">
                   <Info size={14} className="info-icon" />
@@ -1180,6 +1522,7 @@ Tam giác vuông SAB tại A: tan(∠SBA) = SA / AB = a√3 / a = √3 => ∠SBA
               type="button" 
               className="btn-footer-cancel"
               onClick={onClose}
+              disabled={isSaving}
             >
               Hủy bỏ
             </button>
@@ -1187,9 +1530,19 @@ Tam giác vuông SAB tại A: tan(∠SBA) = SA / AB = a√3 / a = √3 => ∠SBA
               type="button" 
               className="btn-footer-confirm"
               onClick={handleMainSave}
+              disabled={isSaving}
             >
-              <Check size={16} />
-              <span>Xác nhận lưu thay đổi</span>
+              {isSaving ? (
+                <>
+                  <Loader2 size={16} className="animate-spin" />
+                  <span>Đang lưu DB...</span>
+                </>
+              ) : (
+                <>
+                  <Check size={16} />
+                  <span>Xác nhận lưu thay đổi</span>
+                </>
+              )}
             </button>
           </div>
         </footer>

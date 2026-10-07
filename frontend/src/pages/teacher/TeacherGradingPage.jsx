@@ -660,11 +660,37 @@ export default function TeacherGradingPage() {
   }, [filteredSubmissions, currentPage, itemsPerPage]);
 
   const handleExportReport = () => {
-    setToastMessage('Đang xuất file báo cáo chấm điểm (Excel/PDF)...');
-    setTimeout(() => {
-      setToastMessage('Xuất báo cáo thành công!');
-      setTimeout(() => setToastMessage(null), 3000);
-    }, 1000);
+    try {
+      const headers = ['Mã bài làm', 'Họ và tên học sinh', 'Lớp', 'Môn học', 'Đề bài', 'Điểm số', 'Trạng thái', 'Nhận xét', 'Thời gian nộp'];
+      const rows = filteredSubmissions.map((s) => [
+        `"${s.id || s.attempt_id || ''}"`,
+        `"${(s.studentName || '').replace(/"/g, '""')}"`,
+        `"${(s.className || '').replace(/"/g, '""')}"`,
+        `"${(s.subjectName || s.subject || '').replace(/"/g, '""')}"`,
+        `"${(s.exerciseTitle || '').replace(/"/g, '""')}"`,
+        `"${s.score !== null && s.score !== undefined ? s.score : ''}"`,
+        `"${(s.statusLabel || s.status || '').replace(/"/g, '""')}"`,
+        `"${(s.feedback || '').replace(/"/g, '""')}"`,
+        `"${(s.submittedTime || '').replace(/"/g, '""')}"`
+      ]);
+
+      const csvContent = '\uFEFF' + [headers.join(','), ...rows.map(r => r.join(','))].join('\r\n');
+      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.setAttribute('href', url);
+      link.setAttribute('download', `Bang_Diem_Hoc_Sinh_${new Date().toISOString().slice(0, 10)}.csv`);
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+
+      setToastMessage('Đã xuất file bảng điểm (Excel/CSV) thành công!');
+    } catch (err) {
+      console.error('Export error:', err);
+      setToastMessage('Lỗi khi xuất bảng điểm.');
+    }
+    setTimeout(() => setToastMessage(null), 3500);
   };
 
   return (

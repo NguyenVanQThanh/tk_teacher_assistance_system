@@ -373,18 +373,21 @@ export default function TeacherClassDetailPage() {
             <table className="roster-table">
               <thead>
                 <tr>
-                  <th className="th-name" style={{ width: '40%' }}>Tên đề bài tập</th>
-                  <th style={{ width: '15%' }}>Số câu hỏi</th>
-                  <th style={{ width: '18%' }}>Thời gian giao</th>
-                  <th style={{ width: '18%' }}>Hạn nộp bài</th>
-                  <th style={{ width: '15%' }}>Trạng thái</th>
-                  <th style={{ width: '10%', textAlign: 'center' }}>Thao tác</th>
+                  <th className="th-name" style={{ width: '32%' }}>Tên đề bài tập</th>
+                  <th style={{ width: '12%' }}>Số câu hỏi</th>
+                  <th style={{ width: '15%' }}>Hạn nộp bài</th>
+                  <th style={{ width: '16%' }}>Tiến độ nộp bài</th>
+                  <th style={{ width: '13%' }}>Trạng thái</th>
+                  <th style={{ width: '12%', textAlign: 'center' }}>Thao tác</th>
                 </tr>
               </thead>
               <tbody>
                 {filteredAssignments.length > 0 ? (
                   filteredAssignments.map((assign) => {
                     const expired = isDueExpired(assign.due_at);
+                    const subCount = assign.submission_count ?? 0;
+                    const totCount = assign.total_students || students.length || 25;
+                    const pct = Math.round((subCount / totCount) * 100);
                     return (
                       <tr key={assign.assignment_id} className="roster-row">
                         <td className="td-name">
@@ -400,11 +403,18 @@ export default function TeacherClassDetailPage() {
                             {assign.total_questions ? `${assign.total_questions} câu` : '--'}
                           </span>
                         </td>
-                        <td style={{ fontSize: '13px', color: '#4b5563' }}>
-                          {formatDateTime(assign.assigned_at)}
-                        </td>
                         <td style={{ fontSize: '13px', color: expired ? '#dc2626' : '#1e293b', fontWeight: expired ? 600 : 500 }}>
                           {formatDateTime(assign.due_at)}
+                        </td>
+                        <td>
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                            <span style={{ fontSize: '12px', fontWeight: 600, color: '#374151' }}>
+                              {subCount}/{totCount} ({pct}%)
+                            </span>
+                            <div style={{ width: '80px', height: '6px', background: '#e5e7eb', borderRadius: '3px', overflow: 'hidden' }}>
+                              <div style={{ width: `${pct}%`, height: '100%', background: '#6366f1', borderRadius: '3px' }} />
+                            </div>
+                          </div>
                         </td>
                         <td>
                           <span className={`status-pill ${expired ? 'pill-expired' : 'pill-active'}`}>

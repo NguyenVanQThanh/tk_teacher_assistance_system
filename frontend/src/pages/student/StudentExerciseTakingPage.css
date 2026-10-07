@@ -3,7 +3,7 @@ File Name: StudentExerciseTakingPage.css
 Description: Examination taking stylesheet supporting 3 question types: Multiple Choice, True/False, and Short Answer with virtual keypad.
 Created At: 2026-09-07
 Created By: Tam Khang
-Updated At: 2026-09-12
+Updated At: 2026-10-04
 Updated By: Tam Khang
 */
 
@@ -528,11 +528,14 @@ Updated By: Tam Khang
 }
 
 .question-statement-text {
-  font-size: 15.5px;
+  font-family: 'Times New Roman', 'KaTeX_Main', 'Cambria', Times, serif;
+  font-size: 17px;
   line-height: 1.65;
   color: #1E293B;
-  font-weight: 500;
+  font-weight: 400;
   margin: 0;
+  letter-spacing: 0.01em;
+  -webkit-font-smoothing: antialiased;
 }
 
 /* Math & Geometry Illustration */
@@ -562,10 +565,12 @@ Updated By: Tam Khang
 }
 
 .question-prompt-label {
-  font-size: 14.5px;
+  font-family: 'Times New Roman', 'KaTeX_Main', 'Cambria', Times, serif;
+  font-size: 16.5px;
   font-weight: 700;
   color: #1E293B;
   margin: 0 0 10px 0;
+  letter-spacing: 0.01em;
 }
 
 /* ============================================================ */
@@ -625,9 +630,13 @@ Updated By: Tam Khang
 }
 
 .option-content-text {
-  font-size: 14.5px;
+  font-family: 'Times New Roman', 'KaTeX_Main', 'Cambria', Times, serif;
+  font-size: 16.5px;
   color: #1E293B;
-  font-weight: 500;
+  font-weight: 400;
+  line-height: 1.55;
+  letter-spacing: 0.01em;
+  -webkit-font-smoothing: antialiased;
 }
 
 /* ============================================================ */
@@ -696,9 +705,13 @@ Updated By: Tam Khang
 }
 
 .tf-sub-text {
-  font-size: 14.5px;
+  font-family: 'Times New Roman', 'KaTeX_Main', 'Cambria', Times, serif;
+  font-size: 16px;
   color: #1E293B;
-  line-height: 1.5;
+  line-height: 1.55;
+  font-weight: 400;
+  letter-spacing: 0.01em;
+  -webkit-font-smoothing: antialiased;
 }
 
 .tf-toggle-actions {
@@ -1847,3 +1860,303 @@ Updated By: Tam Khang
     grid-template-columns: 1fr;
   }
 }
+
+/* ============================================================ */
+/* REVIEW MODE STYLES & FEEDBACK ENHANCEMENTS */
+/* ============================================================ */
+.option-select-box.review-correct-option {
+  border-color: #10B981 !important;
+  background-color: #ECFDF5 !important;
+  box-shadow: 0 0 0 2px rgba(16, 185, 129, 0.2) !important;
+}
+
+.option-select-box.review-wrong-option {
+  border-color: #EF4444 !important;
+  background-color: #FEF2F2 !important;
+  box-shadow: 0 0 0 2px rgba(239, 68, 68, 0.15) !important;
+}
+
+.option-select-box.review-correct-option .option-letter-badge {
+  background-color: #10B981;
+  border-color: #10B981;
+  color: #FFFFFF;
+}
+
+.option-select-box.review-wrong-option .option-letter-badge {
+  background-color: #EF4444;
+  border-color: #EF4444;
+  color: #FFFFFF;
+}
+
+.review-badge-tag {
+  margin-left: auto;
+  font-size: 11.5px;
+  font-weight: 700;
+  padding: 4px 10px;
+  border-radius: 6px;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.review-badge-tag.correct-tag {
+  background-color: #D1FAE5;
+  color: #065F46;
+  border: 1px solid #A7F3D0;
+}
+
+.review-badge-tag.wrong-tag {
+  background-color: #FEE2E2;
+  color: #991B1B;
+  border: 1px solid #FECACA;
+}
+
+.tf-item-row.tf-review-correct {
+  border-color: #86EFAC !important;
+  background-color: #F0FDF4 !important;
+}
+
+.tf-item-row.tf-review-wrong {
+  border-color: #FCA5A5 !important;
+  background-color: #FEF2F2 !important;
+}
+
+.tf-key-verdict-pill {
+  font-size: 11.5px;
+  font-weight: 700;
+  padding: 3px 8px;
+  border-radius: 6px;
+  display: inline-flex;
+  align-items: center;
+  margin-left: 8px;
+}
+
+.tf-key-verdict-pill.pill-true {
+  background-color: #D1FAE5;
+  color: #065F46;
+  border: 1px solid #A7F3D0;
+}
+
+.tf-key-verdict-pill.pill-false {
+  background-color: #FEE2E2;
+  color: #991B1B;
+  border: 1px solid #FECACA;
+}
+
+.tf-btn.highlight-correct {
+  border-color: #10B981 !important;
+  background-color: #D1FAE5 !important;
+  color: #065F46 !important;
+  font-weight: 700;
+}
+
+.tf-btn.user-correct {
+  border-color: #10B981 !important;
+  background-color: #D1FAE5 !important;
+  color: #065F46 !important;
+  box-shadow: 0 0 0 2px rgba(16, 185, 129, 0.25) !important;
+  font-weight: 700 !important;
+}
+
+.tf-btn.user-wrong {
+  border-color: #EF4444 !important;
+  background-color: #FEE2E2 !important;
+  color: #DC2626 !important;
+  box-shadow: 0 0 0 2px rgba(239, 68, 68, 0.25) !important;
+  font-weight: 700 !important;
+}
+
+.tf-btn.faded {
+  opacity: 0.35 !important;
+  cursor: default !important;
+  background-color: #F8FAFC !important;
+  border-color: #E2E8F0 !important;
+  color: #94A3B8 !important;
+  box-shadow: none !important;
+}
+
+.short-answer-review-comparison {
+  margin-top: 14px;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+.comparison-box {
+  padding: 12px 16px;
+  border-radius: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.comparison-box.student-ans-box {
+  background-color: #F8FAFC;
+  border: 1.5px solid #E2E8F0;
+}
+
+.comparison-box.student-ans-box.sa-wrong {
+  border-color: #EF4444 !important;
+  background-color: #FEF2F2 !important;
+}
+
+.comparison-box.student-ans-box.sa-wrong .comparison-value {
+  color: #DC2626 !important;
+}
+
+.comparison-box.student-ans-box.sa-wrong .comparison-label {
+  color: #B91C1C !important;
+}
+
+.comparison-box.student-ans-box.sa-correct {
+  border-color: #10B981 !important;
+  background-color: #F0FDF4 !important;
+}
+
+.comparison-box.student-ans-box.sa-correct .comparison-value {
+  color: #065F46 !important;
+}
+
+.comparison-box.student-ans-box.sa-correct .comparison-label {
+  color: #047857 !important;
+}
+
+.comparison-box.correct-ans-box {
+  background-color: #ECFDF5;
+  border: 1.5px solid #A7F3D0;
+}
+
+.comparison-label {
+  font-size: 12px;
+  color: #64748B;
+  font-weight: 600;
+}
+
+.comparison-box.correct-ans-box .comparison-label {
+  color: #047857;
+}
+
+.comparison-value {
+  font-size: 15px;
+  font-weight: 800;
+  color: #1E293B;
+}
+
+.comparison-box.correct-ans-box .comparison-value {
+  color: #065F46;
+}
+
+.review-solution-guide-card {
+  margin-top: 20px;
+  background: linear-gradient(180deg, #FAF5FF 0%, #FFFFFF 100%);
+  border: 1.5px solid #DDD6FE;
+  border-radius: 12px;
+  padding: 16px 20px;
+  box-shadow: 0 2px 8px rgba(101, 73, 166, 0.05);
+}
+
+.solution-guide-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: #6549A6;
+  font-size: 14.5px;
+  font-weight: 700;
+  margin-bottom: 10px;
+}
+
+.solution-guide-body {
+  font-family: 'Times New Roman', 'KaTeX_Main', 'Cambria', Times, serif;
+  font-size: 16px;
+  line-height: 1.65;
+  color: #334155;
+  -webkit-font-smoothing: antialiased;
+}
+
+.palette-num-btn.review-correct {
+  border-color: #10B981 !important;
+  background-color: #ECFDF5 !important;
+  color: #065F46 !important;
+}
+
+.palette-num-btn.review-wrong {
+  border-color: #EF4444 !important;
+  background-color: #FEF2F2 !important;
+  color: #991B1B !important;
+}
+
+.review-dot {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+}
+
+.review-dot.correct {
+  background-color: #10B981;
+}
+
+.review-dot.wrong {
+  background-color: #EF4444;
+}
+
+.palette-review-legend {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 12px;
+  background-color: #F8FAFC;
+  border: 1px solid #E2E8F0;
+  border-radius: 8px;
+  margin-bottom: 12px;
+  font-size: 11.5px;
+  font-weight: 600;
+  color: #475569;
+}
+
+.legend-item {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.legend-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+}
+
+.legend-dot.dot-correct {
+  background-color: #10B981;
+}
+
+.legend-dot.dot-wrong {
+  background-color: #EF4444;
+}
+
+.legend-dot.dot-pending {
+  background-color: #F59E0B;
+}
+
+.btn-banner-view-score {
+  background-color: #FFFFFF;
+  border: 1px solid #DDD6FE;
+  color: #6549A6;
+  font-size: 12px;
+  font-weight: 700;
+  padding: 4px 12px;
+  border-radius: 6px;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  transition: all 0.15s ease;
+}
+
+.btn-banner-view-score:hover {
+  background-color: #F3E8FF;
+  border-color: #C084FC;
+}
+

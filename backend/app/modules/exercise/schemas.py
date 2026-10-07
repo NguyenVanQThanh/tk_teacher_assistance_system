@@ -276,6 +276,8 @@ class CursorPaginatedExerciseOut(BaseModel):
 class AssignmentCreate(BaseModel):
     exercise_id: UUID = Field(..., description="Exercise UUID")
     due_at: datetime = Field(..., description="Assignment due date")
+    duration_minutes: Optional[int] = Field(45, description="Duration in minutes (10 - 180)")
+    max_attempts: Optional[int] = Field(1, description="Max allowed attempts (1 - 10)")
 
     @field_validator("due_at")
     @classmethod
@@ -303,6 +305,9 @@ class AssignmentOut(BaseModel):
     duration_minutes: Optional[int] = 45
     max_attempts: Optional[int] = 1
     completed_attempts_count: Optional[int] = 0
+    submission_count: Optional[int] = 0
+    total_students: Optional[int] = 0
+    completion_rate: Optional[float] = 0.0
     is_finished: Optional[bool] = False
     latest_score: Optional[float] = None
     feed_status: Optional[str] = None
@@ -320,6 +325,9 @@ class AssignmentOut(BaseModel):
             teacher_name = getattr(data.assigner, "full_name", None) if hasattr(data, "assigner") and data.assigner else None
             subject_id = getattr(data.exercise, "subject_id", None)
             is_exam = "đề thi" in (data.exercise.title or "").lower()
+            ai_meta = getattr(data.exercise, "ai_metadata", {}) or {}
+            custom_duration = ai_meta.get("duration_minutes", 45)
+            custom_attempts = ai_meta.get("max_attempts", 1 if is_exam else 3)
             return {
                 "assignment_id": data.assignment_id,
                 "class_id": data.class_id,
@@ -333,9 +341,12 @@ class AssignmentOut(BaseModel):
                 "class_name": class_name,
                 "subject_id": subject_id,
                 "teacher_name": teacher_name,
-                "duration_minutes": 45,
-                "max_attempts": 1 if is_exam else 3,
+                "duration_minutes": custom_duration,
+                "max_attempts": custom_attempts,
                 "completed_attempts_count": 0,
+                "submission_count": len(getattr(data, "attempts", [])) if hasattr(data, "attempts") else 0,
+                "total_students": 25,
+                "completion_rate": 0.0,
                 "is_finished": False,
                 "latest_score": None,
                 "feed_status": "active",
@@ -462,6 +473,8 @@ class AttemptGradeUpdateRequest(BaseModel):
     score: float = Field(..., ge=0.0, le=10.0, description="Updated score from 0.0 to 10.0")
     feedback: Optional[str] = Field(None, max_length=2000, description="Teacher feedback / notes")
     detailed_results: Optional[Any] = Field(None, description="Optional updated detailed question results")
+    status: Optional[str] = Field("approved", description="Grading workflow status: pending_grading, pending_review, approved")
+    is_published: Optional[bool] = Field(True, description="Publish finalized score to student")
 
 
 class GradingScoreDistribution(BaseModel):

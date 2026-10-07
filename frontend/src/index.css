@@ -1,9 +1,9 @@
 /*
 File Name: index.css
-Description: Global CSS reset and baseline typography using Be Vietnam Pro font.
+Description: Global CSS reset, baseline typography, and academic math font harmonization.
 Created At: 2026-08-30
 Created By: Tam Khang
-Updated At: 2026-08-30
+Updated At: 2026-10-04
 Updated By: Tam Khang
 */
 
@@ -46,3 +46,21 @@ html, body {
   display: flex;
   flex-direction: column;
 }
+
+/* ============================================================ */
+/* Academic & Mathematical Exam Typography Harmonization        */
+/* Matches standard Vietnamese national exam formatting (Image 3)*/
+/* ============================================================ */
+.math-renderer-wrapper,
+.math-serif-content {
+  font-family: 'Times New Roman', 'KaTeX_Main', 'Cambria', Times, serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  letter-spacing: 0.008em;
+}
+
+.math-renderer-wrapper .katex {
+  font-size: 1.05em;
+  font-family: 'KaTeX_Main', 'Times New Roman', Times, serif;
+}
+

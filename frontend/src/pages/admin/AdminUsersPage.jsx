@@ -464,6 +464,8 @@ export default function AdminUsersPage() {
     fetchUsers();
   }, [fetchUsers]);
 
+  const [codeCheckResult, setCodeCheckResult] = useState({ available: true, message: 'Mã hợp lệ & khả dụng trên hệ thống' });
+
   // Auto-generate code from backend (guaranteed unique, read-only in input)
   const handleAutoGenerateCode = async (roleOverride) => {
     const roleToUse = roleOverride || newUserForm.roleType;
@@ -471,6 +473,14 @@ export default function AdminUsersPage() {
       const res = await adminUsersApi.generateCode(roleToUse);
       if (res && res.code) {
         setNewUserForm(prev => ({ ...prev, code: res.code }));
+        // Verify collision against Backend DB
+        const checkRes = await adminUsersApi.checkCode(res.code).catch(() => null);
+        if (checkRes) {
+          setCodeCheckResult({
+            available: checkRes.available,
+            message: checkRes.available ? 'Mã hợp lệ & khả dụng trên hệ thống' : 'Mã đã tồn tại trong cơ sở dữ liệu'
+          });
+        }
         showToast(`Đã tự động tạo mã định danh duy nhất: ${res.code}`);
         return;
       }
@@ -479,7 +489,15 @@ export default function AdminUsersPage() {
       const prefix = roleToUse === 'teacher' ? 'GV' : 'HS';
       const year = new Date().getFullYear();
       const rand = Math.floor(1000 + Math.random() * 9000);
-      setNewUserForm(prev => ({ ...prev, code: `${prefix}${year}${rand}` }));
+      const fallbackCode = `${prefix}${year}${rand}`;
+      setNewUserForm(prev => ({ ...prev, code: fallbackCode }));
+      const checkRes = await adminUsersApi.checkCode(fallbackCode).catch(() => null);
+      if (checkRes) {
+        setCodeCheckResult({
+          available: checkRes.available,
+          message: checkRes.available ? 'Mã hợp lệ & khả dụng trên hệ thống' : 'Mã đã tồn tại trong cơ sở dữ liệu'
+        });
+      }
     }
   };
 
@@ -1686,8 +1704,8 @@ export default function AdminUsersPage() {
                         <CheckCircle2 size={16} />
                       </span>
                     </div>
-                    <span className="input-helper-text" style={{ fontSize: '11px', color: '#6B7280' }}>
-                      Mã tự động tạo theo chuẩn hệ thống, chống trùng lặp.
+                    <span className="input-helper-text" style={{ fontSize: '11px', color: codeCheckResult?.available ? '#10B981' : '#EF4444' }}>
+                      {codeCheckResult?.message || 'Mã tự động tạo theo chuẩn hệ thống, chống trùng lặp.'}
                     </span>
                   </div>
 

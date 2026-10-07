@@ -97,7 +97,18 @@ class AssignmentService:
                 }
             )
 
-        # 5. Create class assignment
+        # 5. Save duration_minutes and max_attempts to exercise metadata if provided
+        if payload.duration_minutes or payload.max_attempts:
+            curr_meta = dict(exercise.ai_metadata or {})
+            if payload.duration_minutes:
+                curr_meta["duration_minutes"] = payload.duration_minutes
+            if payload.max_attempts:
+                curr_meta["max_attempts"] = payload.max_attempts
+            exercise.ai_metadata = curr_meta
+            self.db.add(exercise)
+            self.db.flush()
+
+        # 6. Create class assignment
         assignment = ClassAssignment(
             class_id=class_id,
             exercise_id=payload.exercise_id,

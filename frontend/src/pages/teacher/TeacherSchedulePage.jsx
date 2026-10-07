@@ -5,7 +5,7 @@
 // Updated At: 2026-09-27
 // Updated By: Tam Khang
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { 
   ChevronLeft, 
   ChevronRight, 
@@ -21,6 +21,7 @@ import {
   AlertCircle,
   Trash2
 } from 'lucide-react';
+import { teacherApi } from '../../services/api';
 import './TeacherSchedulePage.css';
 
 export default function TeacherSchedulePage() {
@@ -151,6 +152,38 @@ export default function TeacherSchedulePage() {
       badgeTextColor: '#DC2626'
     }
   ]);
+
+  useEffect(() => {
+    let isMounted = true;
+    async function loadSchedule() {
+      try {
+        const data = await teacherApi.getSchedule();
+        if (isMounted && data?.items?.length) {
+          // Merge or set items
+          const mapped = data.items.map((item, idx) => ({
+            id: item.id || 100 + idx,
+            year: 2023,
+            month: 9,
+            day: item.day_of_week === 2 ? 15 : item.day_of_week === 4 ? 17 : 19,
+            title: `${item.subject_name} (${item.room})`,
+            className: item.class_name,
+            grade: item.class_name.startsWith('12') ? '12' : item.class_name.startsWith('11') ? '11' : '10',
+            startTime: item.start_time,
+            endTime: item.end_time,
+            urgency: item.urgency || 'teaching',
+            accentColor: item.urgency === 'critical' ? '#EF4444' : item.urgency === 'high' ? '#F59E0B' : '#3B82F6',
+            badgeColor: item.urgency === 'critical' ? '#FEE2E2' : item.urgency === 'high' ? '#FEF3C7' : '#EFF6FF',
+            badgeTextColor: item.urgency === 'critical' ? '#DC2626' : item.urgency === 'high' ? '#D97706' : '#2563EB',
+          }));
+          setScheduleList(prev => [...prev, ...mapped.filter(m => !prev.some(p => p.id === m.id))]);
+        }
+      } catch (err) {
+        console.warn('Teacher schedule fetched fallback to defaults:', err);
+      }
+    }
+    loadSchedule();
+    return () => { isMounted = false; };
+  }, []);
 
   const monthNames = [
     'Tháng 1', 'Tháng 2', 'Tháng 3', 'Tháng 4', 'Tháng 5', 'Tháng 6',

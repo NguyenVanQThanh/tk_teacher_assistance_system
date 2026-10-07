@@ -11,13 +11,25 @@ import './PendingStudentAssignmentsCard.css';
 
 export default function PendingStudentAssignmentsCard({ 
   isActive = false, 
-  onClickCard 
+  onClickCard,
+  assignments = null
 }) {
-  const classroomCount = 3;
+  const dynamicTasks = Array.isArray(assignments) && assignments.length > 0
+    ? assignments.slice(0, 3).map((a, idx) => ({
+        id: a.assignment_id || idx,
+        title: a.title,
+        type: 'classroom',
+        typeLabel: a.subject_name || 'Trên lớp',
+        dueLabel: a.is_overdue ? 'Đã quá hạn' : (a.due_at ? `Hạn: ${new Date(a.due_at).toLocaleDateString('vi-VN')}` : 'Đến hạn'),
+        isOverdue: Boolean(a.is_overdue)
+      }))
+    : null;
+
+  const classroomCount = dynamicTasks ? assignments.length : 3;
   const aiGeneratedCount = 2;
   const totalCount = classroomCount + aiGeneratedCount;
 
-  const tasks = [
+  const tasks = dynamicTasks || [
     {
       id: 1,
       title: 'Toán 12: Đạo hàm & Khảo sát hàm số',

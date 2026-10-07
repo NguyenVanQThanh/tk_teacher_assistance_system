@@ -2,7 +2,7 @@
 // Description: Full-page direct exercise creation layout connected to backend APIs (Multiple Choice, True/False, Short Answer).
 // Created At: 2026-08-30
 // Created By: Tam Khang
-// Updated At: 2026-09-01
+// Updated At: 2026-10-06
 // Updated By: Tam Khang
 
 import React, { useState, useEffect } from 'react';
@@ -195,13 +195,13 @@ export default function CreateExerciseManualPage() {
   const mapCognitiveLevel = (levelKey) => {
     switch (levelKey) {
       case 'knowledge':
-        return 'Nhận biết';
+        return 'NhanBiet';
       case 'comprehension':
-        return 'Thông hiểu';
+        return 'ThongHieu';
       case 'application':
-        return 'Vận dụng';
+        return 'VanDung';
       default:
-        return 'Nhận biết';
+        return 'NhanBiet';
     }
   };
 
@@ -277,6 +277,13 @@ export default function CreateExerciseManualPage() {
           difficulty: mapCognitiveLevel(q.cognitiveLevel),
           correct_answer: q.correctAnswer === 'true' ? 'Đúng' : 'Sai',
           display_order: currentOrder++,
+          answer_options: [
+            {
+              content: `a) ${q.content.trim()}`,
+              is_correct: q.correctAnswer === 'true',
+              display_order: 1,
+            },
+          ],
         });
       }
 

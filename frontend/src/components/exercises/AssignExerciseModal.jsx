@@ -35,6 +35,8 @@ export default function AssignExerciseModal({ isOpen, onClose, exercise, onAssig
   };
 
   const [dueAt, setDueAt] = useState(getDefaultDueDate(7));
+  const [durationMinutes, setDurationMinutes] = useState(45);
+  const [maxAttempts, setMaxAttempts] = useState(1);
   const [submitting, setSubmitting] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
   const [successMessage, setSuccessMessage] = useState('');
@@ -109,6 +111,8 @@ export default function AssignExerciseModal({ isOpen, onClose, exercise, onAssig
       const results = await assignmentsApi.assignToMultipleClasses(selectedClassIds, {
         exercise_id: exercise.id || exercise.raw?.exercise_id,
         due_at: dueDateObj.toISOString(),
+        duration_minutes: Number(durationMinutes) || 45,
+        max_attempts: Number(maxAttempts) || 1,
       });
 
       const successes = results.filter(r => r.success);
@@ -313,6 +317,42 @@ export default function AssignExerciseModal({ isOpen, onClose, exercise, onAssig
               >
                 2 tuần
               </button>
+            </div>
+          </div>
+
+          {/* Time Limit & Max Attempts Configuration Row */}
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '20px' }}>
+            <div className="assign-form-group" style={{ marginBottom: 0 }}>
+              <label className="assign-label" htmlFor="duration-input">
+                <Clock size={16} />
+                <span>Thời gian làm bài (phút):</span>
+              </label>
+              <input
+                id="duration-input"
+                type="number"
+                min="5"
+                max="180"
+                className="assign-datetime-input"
+                value={durationMinutes}
+                onChange={(e) => setDurationMinutes(e.target.value)}
+                required
+              />
+            </div>
+            <div className="assign-form-group" style={{ marginBottom: 0 }}>
+              <label className="assign-label" htmlFor="max-attempts-input">
+                <Sparkles size={16} />
+                <span>Số lần làm bài tối đa:</span>
+              </label>
+              <input
+                id="max-attempts-input"
+                type="number"
+                min="1"
+                max="10"
+                className="assign-datetime-input"
+                value={maxAttempts}
+                onChange={(e) => setMaxAttempts(e.target.value)}
+                required
+              />
             </div>
           </div>
 

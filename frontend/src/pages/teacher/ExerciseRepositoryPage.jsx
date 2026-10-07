@@ -2,7 +2,7 @@
 // Description: Teacher Exercise Repository Page connected to backend RESTful APIs with Cursor-based Keyset Pagination, centered delete confirmation modal, and toast notifications.
 // Created At: 2026-08-30
 // Created By: Tam Khang
-// Updated At: 2026-09-12
+// Updated At: 2026-10-06
 // Updated By: Tam Khang
 
 import React, { useState, useEffect, useCallback, useRef } from 'react';
@@ -64,9 +64,10 @@ export default function ExerciseRepositoryPage() {
     }, 2800);
   };
 
-  const handleSaveEditedExercise = (updated) => {
-    setExercises((prev) => prev.map((ex) => (ex.id === updated.id ? { ...ex, ...updated } : ex)));
-    showToast(`Đã lưu và cập nhật nội dung "${updated.title}" thành công!`, 'success', 'Cập nhật thành công');
+  const handleSaveEditedExercise = async (updated) => {
+    const currentCursor = cursorHistory[currentPage - 1] || null;
+    await loadExercises(currentCursor, 'next', currentPage);
+    showToast(`Đã lưu và cập nhật nội dung "${updated.title}" vào cơ sở dữ liệu thành công!`, 'success', 'Cập nhật thành công');
   };
 
   const [exercises, setExercises] = useState([]);

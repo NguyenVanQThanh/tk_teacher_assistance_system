@@ -10,8 +10,10 @@ from sqlalchemy.orm import Session
 
 from app.core.database import get_db
 from app.core.rate_limit import check_rate_limit, record_login_failure, reset_login_failures
-from models.models import User, Role
-from app.modules.auth.schemas import LoginRequest, LoginResponse, UserProfileOut, ChangePasswordRequest, RegisterRequest
+from models.models import User, Role, StudentClass, Class, TeacherSubject, Subject
+from app.modules.auth.schemas import (
+    LoginRequest, LoginResponse, UserProfileOut, ChangePasswordRequest, RegisterRequest, UserProfileUpdateRequest
+)
 from app.modules.auth.services.auth_service import AuthService
 from app.modules.auth.services.password_service import PasswordService
 from app.modules.auth.dependencies import get_current_user, require_perm
@@ -55,20 +57,70 @@ def login(request_data: LoginRequest, db: Session = Depends(get_db)):
 @router.get("/me", response_model=UserProfileOut, dependencies=[Depends(require_perm("AUTH_ME_VIEW"))])
 def get_me(current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
     """
-    Retrieve the current authenticated user profile.
+    Retrieve the current authenticated user profile including student enrollment code, class, and teacher subjects.
     Requires AUTH_ME_VIEW permission.
     """
     role = db.query(Role).filter(Role.role_id == current_user.role_id).first()
     role_name = role.name if role else "User"
-    
+
+    student_code = None
+    class_id = None
+    class_name = None
+    teaching_subjects = None
+
+    if role_name == "Student":
+        sc = db.query(StudentClass, Class).join(
+            Class, StudentClass.class_id == Class.class_id
+        ).filter(
+            StudentClass.student_id == current_user.user_id,
+            StudentClass.status != "DELETED"
+        ).first()
+        if sc:
+            student_class_record, class_record = sc
+            student_code = student_class_record.student_code
+            class_id = class_record.class_id
+            class_name = class_record.class_name
+    elif role_name in ["Teacher", "HomeroomTeacher"]:
+        ts_records = db.query(Subject.subject_name).join(
+            TeacherSubject, TeacherSubject.subject_id == Subject.subject_id
+        ).filter(
+            TeacherSubject.teacher_id == current_user.user_id,
+            TeacherSubject.status != "DELETED"
+        ).all()
+        teaching_subjects = [row[0] for row in ts_records] if ts_records else ["Toán học"]
+
     return UserProfileOut(
         user_id=current_user.user_id,
         full_name=current_user.full_name,
         role=role_name,
         email=current_user.email,
         phone=current_user.phone,
-        status=current_user.status
+        status=current_user.status,
+        student_code=student_code,
+        class_id=class_id,
+        class_name=class_name,
+        teaching_subjects=teaching_subjects
     )
+
+@router.put("/profile", response_model=UserProfileOut, dependencies=[Depends(require_perm("AUTH_ME_VIEW"))])
+def update_profile(
+    payload: UserProfileUpdateRequest,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Update personal profile information for current authenticated user.
+    """
+    if payload.full_name:
+        current_user.full_name = payload.full_name.strip()
+    if payload.email is not None:
+        current_user.email = payload.email.strip() if payload.email else None
+    if payload.phone:
+        current_user.phone = payload.phone.strip()
+    
+    db.commit()
+    db.refresh(current_user)
+    return get_me(current_user=current_user, db=db)
 
 @router.post("/logout")
 def logout(current_user: User = Depends(get_current_user)):

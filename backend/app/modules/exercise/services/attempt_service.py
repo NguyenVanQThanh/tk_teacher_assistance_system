@@ -275,7 +275,8 @@ class AttemptService:
             attempt=attempt,
             score=payload.score,
             feedback=payload.feedback,
-            detailed_results=payload.detailed_results
+            detailed_results=payload.detailed_results,
+            status=payload.status
         )
 
     def get_grading_dashboard(self, current_user: User) -> "GradingDashboardOut":

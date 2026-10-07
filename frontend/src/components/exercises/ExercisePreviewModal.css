@@ -3,7 +3,7 @@ File Name: ExercisePreviewModal.css
 Description: Stylesheet for ExercisePreviewModal component with interactive questions and assign actions.
 Created At: 2026-08-30
 Created By: Tam Khang
-Updated At: 2026-08-30
+Updated At: 2026-10-04
 Updated By: Tam Khang
 */
 
@@ -93,11 +93,13 @@ Updated By: Tam Khang
 }
 
 .q-text {
-  font-size: 14px;
-  font-weight: 600;
+  font-family: 'Times New Roman', 'KaTeX_Main', 'Cambria', Times, serif;
+  font-size: 15.5px;
+  font-weight: 500;
   color: #1D1928;
-  line-height: 22px;
+  line-height: 24px;
   margin: 0;
+  -webkit-font-smoothing: antialiased;
 }
 
 .options-grid {
@@ -114,9 +116,11 @@ Updated By: Tam Khang
   background-color: #F8F7FA;
   border: 1px solid #EBE8F0;
   border-radius: 8px;
-  font-size: 13.5px;
+  font-family: 'Times New Roman', 'KaTeX_Main', 'Cambria', Times, serif;
+  font-size: 15px;
   color: #1D1928;
   position: relative;
+  -webkit-font-smoothing: antialiased;
 }
 
 .option-item.is-correct {

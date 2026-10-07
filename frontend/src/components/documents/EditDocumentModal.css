@@ -2,7 +2,7 @@
 /* Description: Stylesheet matching Image 1 exactly for document & exercise edit modal with two-column split layout (left: 5 questions list, right: question editor & live KaTeX preview). */
 /* Created At: 2026-09-12 */
 /* Created By: Tam Khang */
-/* Updated At: 2026-09-13 */
+/* Updated At: 2026-10-06 */
 /* Updated By: Tam Khang */
 
 .edit-modal-backdrop {
@@ -25,10 +25,11 @@
 }
 
 .edit-modal-dialog {
-  width: 1260px;
+  width: 1360px;
   max-width: 96vw;
   max-height: 94vh;
   height: 92vh;
+  min-width: 780px;
   background-color: #FFFFFF;
   border-radius: 18px;
   box-shadow: 0 25px 60px -15px rgba(15, 23, 42, 0.35), 0 0 0 1px rgba(0, 0, 0, 0.04);
@@ -537,11 +538,12 @@
 /* ============================================================ */
 .edit-modal-split-body {
   display: grid;
-  grid-template-columns: 460px 1fr;
+  grid-template-columns: 430px minmax(0, 1fr);
   gap: 16px;
   padding: 14px 24px;
   background-color: #FFFFFF;
   flex-shrink: 0;
+  min-width: 0;
 }
 
 /* ------------------------------------------------------------ */
@@ -792,6 +794,7 @@
   flex-direction: column;
   gap: 10px;
   min-height: 0;
+  min-width: 0;
   overflow-y: auto;
   padding-right: 4px;
 }
@@ -1519,16 +1522,32 @@
 }
 
 /* ============================================================ */
-/* RESPONSIVE */
+/* RESPONSIVE & LAYOUT INTEGRITY */
 /* ============================================================ */
-@media (max-width: 1024px) {
+@media (max-width: 1200px) {
+  .edit-modal-split-body {
+    grid-template-columns: 370px minmax(0, 1fr);
+    gap: 12px;
+    padding: 12px 18px;
+  }
+}
+
+@media (max-width: 900px) {
+  .edit-modal-split-body {
+    grid-template-columns: 310px minmax(0, 1fr);
+    gap: 10px;
+    padding: 10px 14px;
+  }
+}
+
+@media (max-width: 640px) {
+  .edit-modal-dialog {
+    min-width: 0;
+  }
   .edit-modal-split-body {
     grid-template-columns: 1fr;
     overflow-y: auto;
   }
-}
-
-@media (max-width: 768px) {
   .edit-modal-header {
     flex-direction: column;
     align-items: flex-start;

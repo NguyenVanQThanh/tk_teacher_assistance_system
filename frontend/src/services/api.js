@@ -2,7 +2,7 @@
 // Description: Centralized Axios API client configuration with token management, academic, and assignment service APIs.
 // Created At: 2026-08-30
 // Created By: Tam Khang
-// Updated At: 2026-09-30
+// Updated At: 2026-10-03
 // Updated By: Tam Khang
 
 import axios from 'axios';
@@ -49,6 +49,10 @@ export const authApi = {
   },
   changePassword: async (passwords) => {
     const response = await api.post('/api/v1/auth/change-password', passwords);
+    return response.data;
+  },
+  updateProfile: async (profileData) => {
+    const response = await api.put('/api/v1/auth/profile', profileData);
     return response.data;
   },
   logout: async () => {
@@ -133,6 +137,10 @@ export const exercisesApi = {
     const response = await api.post(`/api/v1/exercises/${exerciseId}/questions`, data);
     return response.data;
   },
+  generateAiExercise: async (data) => {
+    const response = await api.post('/api/v1/exercises/ai-generate', data);
+    return response.data;
+  },
 };
 
 export const questionsApi = {
@@ -163,6 +171,21 @@ export const assignmentsApi = {
     );
     return Promise.all(promises);
   },
+  getAssignments: async (params = {}) => {
+    try {
+      const response = await api.get('/api/v1/assignments', { params });
+      return response.data;
+    } catch (err) {
+      if (err.response?.status === 404) {
+        const classesRes = await api.get('/api/v1/classes');
+        const classes = Array.isArray(classesRes.data) ? classesRes.data : [];
+        const promises = classes.map(c => api.get(`/api/v1/classes/${c.class_id}/assignments`).then(r => r.data).catch(() => []));
+        const res = await Promise.all(promises);
+        return res.flat();
+      }
+      throw err;
+    }
+  },
   getClassAssignments: async (classId) => {
     const response = await api.get(`/api/v1/classes/${classId}/assignments`);
     return response.data;
@@ -172,6 +195,10 @@ export const assignmentsApi = {
   },
   restoreAssignment: async (assignmentId) => {
     const response = await api.post(`/api/v1/assignments/${assignmentId}/restore`);
+    return response.data;
+  },
+  getAssignmentResult: async (assignmentId, params = {}) => {
+    const response = await api.get(`/api/v1/assignments/${assignmentId}/result`, { params });
     return response.data;
   },
 };
@@ -203,6 +230,10 @@ export const attemptsApi = {
   },
   updateGrade: async (attemptId, data) => {
     const response = await api.put(`/api/v1/attempts/${attemptId}/grade`, data);
+    return response.data;
+  },
+  getAssignmentAttempts: async (assignmentId, params = {}) => {
+    const response = await api.get(`/api/v1/assignments/${assignmentId}/attempts`, { params });
     return response.data;
   },
 };
@@ -325,6 +356,20 @@ export const adminDashboardApi = {
     const response = await api.get('/api/v1/admin/dashboard/audit-logs', {
       params: { limit },
     });
+    return response.data;
+  },
+};
+
+export const studentApi = {
+  getDashboard: async () => {
+    const response = await api.get('/api/v1/student/dashboard');
+    return response.data;
+  },
+};
+
+export const teacherApi = {
+  getSchedule: async () => {
+    const response = await api.get('/api/v1/teacher/schedule');
     return response.data;
   },
 };
