@@ -2,7 +2,7 @@
 // Description: Interactive student examination interface supporting 3 question types: Multiple Choice (4 options), True/False (4 sub-items), and Short Answer (with on-screen numpad helper).
 // Created At: 2026-09-07
 // Created By: Tam Khang
-// Updated At: 2026-10-04
+// Updated At: 2026-10-11
 // Updated By: Tam Khang
 
 import React, { useState, useEffect, useMemo } from 'react';
@@ -173,8 +173,17 @@ export default function StudentExerciseTakingPage() {
             const openAttempt = matchingAttempts.find(a => !a.is_finished);
             const finishedAttempt = matchingAttempts.find(a => a.is_finished);
             
-            // Only enter review mode if specifically requested or if finished and NOT a retake/open attempt
-            const reviewTarget = specifiedAttempt?.is_finished ? specifiedAttempt : (!isRetake && !openAttempt && finishedAttempt ? finishedAttempt : null);
+            const isExamExercise = Boolean(
+              backendExercise?.category === 'exam' ||
+              (backendExercise?.title || '').toLowerCase().includes('đề thi') ||
+              (location.state?.title || '').toLowerCase().includes('đề thi')
+            );
+            const isExamLocked = isExamExercise && finishedAttempt && !openAttempt;
+
+            // Only enter review mode if specifically requested or if finished and NOT a retake/open attempt (exams can never be retaken once finished)
+            const reviewTarget = specifiedAttempt?.is_finished 
+              ? specifiedAttempt 
+              : (isExamLocked ? finishedAttempt : (!isRetake && !openAttempt && finishedAttempt ? finishedAttempt : null));
 
             if (reviewTarget && reviewTarget.is_finished) {
               let fullAttempt = reviewTarget;
@@ -747,9 +756,19 @@ export default function StudentExerciseTakingPage() {
           ? Number(submitRes.score).toFixed(2) 
           : ((answeredCount / totalQuestions) * 10).toFixed(2);
 
-        // Clear draft on successful submit
+        // Clear draft and exercises session cache on successful submit
         try {
           sessionStorage.removeItem(`tk_exam_draft_${currentExamId}`);
+          let currentUserId = 'default';
+          try {
+            const rawUser = localStorage.getItem('user_info');
+            if (rawUser) {
+              const u = JSON.parse(rawUser);
+              currentUserId = u.user_id || u.id || 'default';
+            }
+          } catch (e) {}
+          sessionStorage.removeItem(`tk_student_assignments_session_${currentUserId}`);
+          sessionStorage.removeItem(`tk_student_attempts_session_${currentUserId}`);
         } catch (e) {}
 
         const resultData = {

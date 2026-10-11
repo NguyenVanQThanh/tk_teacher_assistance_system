@@ -1,12 +1,13 @@
 // File Name: PendingStudentAssignmentsCard.jsx
-// Description: Card widget showing categorized pending homework assignments (Classroom vs AI Generated) with counts, badges, and interactive selection to display details in flexible container.
+// Description: Card widget showing categorized pending homework assignments (Classroom vs AI Generated) with counts, badges, and interactive selection.
 // Created At: 2026-09-07
 // Created By: Tam Khang
-// Updated At: 2026-09-27
+// Updated At: 2026-10-11
 // Updated By: Tam Khang
 
 import React from 'react';
-import { BookOpen, Sparkles, ChevronRight, AlertCircle, ArrowUpRight } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+import { BookOpen, Sparkles, ChevronRight, AlertCircle } from 'lucide-react';
 import './PendingStudentAssignmentsCard.css';
 
 export default function PendingStudentAssignmentsCard({ 
@@ -48,10 +49,40 @@ export default function PendingStudentAssignmentsCard({
     }
   ];
 
+  const navigate = useNavigate();
+
   const handleCardClick = (e) => {
     if (onClickCard) {
       onClickCard();
     }
+  };
+
+  const handleOpenTask = (e, task) => {
+    e.stopPropagation();
+    navigate('/student/exercises', {
+      state: {
+        searchTitle: task.title,
+        autoOpenTitle: task.title,
+        autoOpenId: task.id || task.assignment_id,
+        fallbackExercise: {
+          id: task.id || task.assignment_id,
+          assignment_id: task.assignment_id || task.id,
+          exercise_id: task.exercise_id || task.id,
+          title: task.title,
+          teacher: 'Giáo viên bộ môn',
+          subject: task.subject || 'Toán học',
+          questionsCount: '20 câu hỏi',
+          total_questions: 20,
+          duration: '45 phút',
+          deadline: task.dueLabel || '16:59 11/10/2026',
+          status: 'active',
+          statusLabel: 'Đang mở',
+          isRealBackend: Boolean(task.assignment_id),
+          category: 'class_exercise',
+          categoryLabel: 'Bài tập trên lớp'
+        }
+      }
+    });
   };
 
   return (
@@ -102,7 +133,13 @@ export default function PendingStudentAssignmentsCard({
       {/* Assignment Quick Preview List */}
       <div className="assignments-list">
         {tasks.map(task => (
-          <div key={task.id} className="assignment-item-row">
+          <div 
+            key={task.id} 
+            className="assignment-item-row"
+            onClick={(e) => handleOpenTask(e, task)}
+            title="Bấm để lọc bài tập này trong Kho bài tập"
+            style={{ cursor: 'pointer' }}
+          >
             <div className="assignment-checkbox-custom" />
             <div className="assignment-info">
               <div className="assignment-name-row">
@@ -118,14 +155,6 @@ export default function PendingStudentAssignmentsCard({
             </div>
           </div>
         ))}
-      </div>
-
-      {/* Footer prompt to open detail */}
-      <div className="pending-card-footer-prompt">
-        <span className="footer-prompt-text">
-          {isActive ? 'Đang xem chi tiết bên phải' : 'Xem chi tiết các bài tập'}
-        </span>
-        <ArrowUpRight size={14} className="prompt-arrow-icon" />
       </div>
     </div>
   );

@@ -187,6 +187,8 @@ Updated By: Tam Khang
   align-items: center;
   justify-content: space-between;
   gap: 6px;
+  width: 100%;
+  min-width: 0;
 }
 
 .assignment-name {
@@ -196,6 +198,8 @@ Updated By: Tam Khang
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  flex: 1;
+  min-width: 0;
 }
 
 .assignment-tag-type {

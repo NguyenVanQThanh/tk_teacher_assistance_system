@@ -3,12 +3,13 @@ File Name: StudentExercisesPage.css
 Description: Styling for Student exercise repository page with filter card, tabs, exercise cards, and AI-powered exercise generation modal.
 Created At: 2026-09-07
 Created By: Tam Khang
-Updated At: 2026-10-02
+Updated At: 2026-10-11
 Updated By: Tam Khang
 */
 
 .student-exercises-container {
   padding: 24px 32px 40px;
+  width: 100%;
   box-sizing: border-box;
   font-family: 'Be Vietnam Pro', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
   color: #1D1928;
@@ -315,12 +316,60 @@ Updated By: Tam Khang
   box-shadow: 0 4px 12px rgba(107, 70, 193, 0.25);
 }
 
+.filter-refresh-group {
+  display: flex;
+  align-items: flex-end;
+  height: 42px;
+}
+
+.btn-filter-refresh {
+  height: 42px;
+  padding: 0 16px;
+  background-color: #F8FAFC;
+  color: #475569;
+  border: 1px solid #E2E8F0;
+  border-radius: 10px;
+  font-size: 13.5px;
+  font-weight: 600;
+  font-family: inherit;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  white-space: nowrap;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  box-sizing: border-box;
+}
+
+.btn-filter-refresh:hover:not(:disabled) {
+  background-color: #F1F5F9;
+  border-color: #CBD5E1;
+  color: #1E293B;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.04);
+}
+
+.btn-filter-refresh:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.icon-spin {
+  animation: filterSpin 1s linear infinite;
+}
+
+@keyframes filterSpin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
 /* Exercises Cards Grid */
 .exercises-cards-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(280px, 320px));
+  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
   gap: 24px;
   margin-bottom: 32px;
+  width: 100%;
+  box-sizing: border-box;
 }
 
 .student-assignment-card {
@@ -1861,5 +1910,29 @@ Updated By: Tam Khang
 .btn-modal-retake-purple:hover {
   background: linear-gradient(135deg, #523591, #3B2274);
   transform: translateY(-1px);
+}
+
+.modal-exam-locked-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  font-weight: 700;
+  color: #DC2626;
+  background-color: #FEF2F2;
+  border: 1px solid #FECACA;
+  padding: 0 16px;
+  height: 42px;
+  border-radius: 10px;
+  user-select: none;
+}
+
+.attempts-exam-limit-pill {
+  color: #DC2626 !important;
+  background-color: #FEF2F2 !important;
+  border: 1px solid #FECACA !important;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
 }
 

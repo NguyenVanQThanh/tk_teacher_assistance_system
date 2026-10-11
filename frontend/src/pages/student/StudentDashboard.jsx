@@ -2,7 +2,7 @@
 // Description: Student Dashboard featuring interactive study schedule synchronization, categorized pending assignments, flexible right container switching between daily schedule and detailed pending assignments, and full-screen cognitive radar modal.
 // Created At: 2026-09-07
 // Created By: Tam Khang
-// Updated At: 2026-09-27
+// Updated At: 2026-10-11
 // Updated By: Tam Khang
 
 import React, { useState, useEffect } from 'react';
@@ -17,8 +17,15 @@ import { studentApi } from '../../services/api';
 import './StudentDashboard.css';
 
 export default function StudentDashboard() {
-  // Currently selected calendar day (defaults to 8 matching Image 1)
-  const [selectedDay, setSelectedDay] = useState(8);
+  // Selected calendar date synchronized with real system date
+  const [selectedDate, setSelectedDate] = useState(() => {
+    const now = new Date();
+    return {
+      day: now.getDate(),
+      month: now.getMonth() + 1,
+      year: now.getFullYear()
+    };
+  });
   
   // Flexible right container active view: 'schedule' | 'assignments'
   const [activeRightPanel, setActiveRightPanel] = useState('schedule');
@@ -51,8 +58,8 @@ export default function StudentDashboard() {
   }, []);
 
   // Triggered when a calendar day is clicked in StudentScheduleCard
-  const handleSelectDay = (day) => {
-    setSelectedDay(day);
+  const handleSelectDate = (dateObj) => {
+    setSelectedDate(dateObj);
     setActiveRightPanel('schedule');
   };
 
@@ -92,10 +99,11 @@ export default function StudentDashboard() {
             assignments={dashboardData?.upcoming_assignments}
           />
           <StudentScheduleCard 
-            selectedDay={selectedDay}
-            onSelectDay={handleSelectDay}
+            selectedDate={selectedDate}
+            onSelectDate={handleSelectDate}
             isActive={activeRightPanel === 'schedule'}
             onClickCard={() => setActiveRightPanel('schedule')}
+            assignments={dashboardData?.upcoming_assignments}
           />
 
           {/* Row 2: Bài tập trên lớp (Interactive Radar - Click to open full dialog modal) */}
@@ -138,14 +146,16 @@ export default function StudentDashboard() {
           {activeRightPanel === 'schedule' ? (
             <div className="right-panel-content-body">
               <StudentScheduleDetailCard 
-                selectedDay={selectedDay}
-                selectedMonth="Thg 3"
+                selectedDate={selectedDate}
+                weeklySchedule={dashboardData?.weekly_schedule}
+                upcomingAssignments={dashboardData?.upcoming_assignments}
               />
             </div>
           ) : (
             <div className="right-panel-content-body">
               <StudentPendingAssignmentsDetailCard 
                 onSwitchToSchedule={() => setActiveRightPanel('schedule')}
+                assignments={dashboardData?.upcoming_assignments}
               />
             </div>
           )}

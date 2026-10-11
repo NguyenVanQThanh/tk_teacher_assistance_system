@@ -1,8 +1,8 @@
 // File Name: StudentPendingAssignmentsDetailCard.jsx
-// Description: Detailed pending assignments panel for student dashboard, categorized into classroom exercises and AI-generated exercises with filtering, status tracking, and quick actions.
+// Description: Detailed pending assignments panel for student dashboard with quick exercise opening and filtering.
 // Created At: 2026-09-27
 // Created By: Tam Khang
-// Updated At: 2026-09-27
+// Updated At: 2026-10-11
 // Updated By: Tam Khang
 
 import React, { useState } from 'react';
@@ -103,9 +103,37 @@ const PENDING_ASSIGNMENTS_DATA = [
   }
 ];
 
-export default function StudentPendingAssignmentsDetailCard({ onSwitchToSchedule }) {
+export default function StudentPendingAssignmentsDetailCard({ onSwitchToSchedule, assignments = null }) {
   const navigate = useNavigate();
   const [filterType, setFilterType] = useState('all'); // 'all' | 'classroom' | 'ai_generated'
+
+  const handleOpenExercise = (assignment) => {
+    const isAi = assignment.type === 'ai_generated';
+    navigate('/student/exercises', {
+      state: {
+        searchTitle: assignment.title,
+        autoOpenTitle: assignment.title,
+        autoOpenId: assignment.id || assignment.assignment_id,
+        fallbackExercise: {
+          id: assignment.id || assignment.assignment_id,
+          assignment_id: assignment.assignment_id || assignment.id,
+          exercise_id: assignment.exercise_id || assignment.id,
+          title: assignment.title,
+          teacher: assignment.teacher || 'Giáo viên bộ môn',
+          subject: assignment.subject || 'Toán học',
+          questionsCount: assignment.questionCount ? `${assignment.questionCount} câu hỏi` : '20 câu hỏi',
+          total_questions: assignment.questionCount || 20,
+          duration: assignment.duration || '45 phút',
+          deadline: assignment.dueDate || assignment.dueLabel || '16:59 11/10/2026',
+          status: 'active',
+          statusLabel: 'Đang mở',
+          isRealBackend: Boolean(assignment.assignment_id),
+          category: isAi ? 'ai_generated' : 'class_exercise',
+          categoryLabel: isAi ? 'Bài tập tạo sinh AI' : 'Bài tập trên lớp'
+        }
+      }
+    });
+  };
 
   const filteredAssignments = PENDING_ASSIGNMENTS_DATA.filter(item => {
     if (filterType === 'all') return true;
@@ -206,7 +234,8 @@ export default function StudentPendingAssignmentsDetailCard({ onSwitchToSchedule
                   <button 
                     type="button" 
                     className={`btn-start-assignment ${isAi ? 'btn-ai-style' : 'btn-class-style'}`}
-                    onClick={() => navigate(assignment.link)}
+                    onClick={() => handleOpenExercise(assignment)}
+                    title="Lọc và mở chi tiết bài tập này trong Kho bài tập"
                   >
                     <span>{isAi ? 'Luyện tập ngay' : 'Làm bài ngay'}</span>
                     <ArrowRight size={13} />

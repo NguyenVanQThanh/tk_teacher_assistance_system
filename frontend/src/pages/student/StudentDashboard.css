@@ -1,37 +1,44 @@
 /*
 File Name: StudentDashboard.css
-Description: Responsive layout styles for Student Dashboard matching the exact mockup.
+Description: Responsive layout styles for Student Dashboard with balanced 3-column distribution (3.5 : 3.0 : 3.5).
 Created At: 2026-09-07
 Created By: Tam Khang
-Updated At: 2026-09-27
+Updated At: 2026-10-11
 Updated By: Tam Khang
 */
 
 .student-dashboard-page {
-  padding: 24px 32px 40px;
+  padding: 24px 28px 40px;
+  width: 100%;
+  max-width: 100%;
   box-sizing: border-box;
   font-family: 'Be Vietnam Pro', -apple-system, BlinkMacSystemFont, sans-serif;
   animation: pageFadeIn 0.3s ease-out;
+  overflow-x: hidden;
 }
 
 .student-dashboard-grid-layout {
   display: grid;
-  grid-template-columns: 1.9fr 1.1fr;
-  gap: 24px;
+  grid-template-columns: minmax(0, 3.5fr) minmax(0, 3fr) minmax(0, 3.5fr);
+  gap: 18px;
   align-items: start;
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
 }
 
 .student-dashboard-main-columns {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 24px;
-  align-items: start;
+  display: contents;
 }
 
 .student-dashboard-right-panel {
+  grid-column: 3;
+  grid-row: 1 / span 3;
   display: flex;
   flex-direction: column;
   gap: 12px;
+  min-width: 0;
+  width: 100%;
 }
 
 /* Right Panel Switcher Bar */
@@ -94,9 +101,20 @@ Updated By: Tam Khang
   to { opacity: 1; transform: translateY(0); }
 }
 
-@media (max-width: 1200px) {
+@media (max-width: 1024px) {
   .student-dashboard-grid-layout {
     grid-template-columns: 1fr;
+  }
+
+  .student-dashboard-main-columns {
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+  }
+
+  .student-dashboard-right-panel {
+    grid-column: auto;
+    grid-row: auto;
   }
 }
 
@@ -106,7 +124,6 @@ Updated By: Tam Khang
   }
 
   .student-dashboard-main-columns {
-    grid-template-columns: 1fr;
     gap: 16px;
   }
 }

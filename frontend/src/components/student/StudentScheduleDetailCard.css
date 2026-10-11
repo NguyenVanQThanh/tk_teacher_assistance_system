@@ -50,47 +50,70 @@ Updated By: Tam Khang
   box-shadow: 0 2px 10px rgba(0, 0, 0, 0.02);
   display: flex;
   flex-direction: column;
+  box-sizing: border-box;
+  width: 100%;
+  min-width: 0;
+  overflow: hidden;
 }
 
 .schedule-today-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  margin-bottom: 18px;
+  margin-bottom: 14px;
+  gap: 8px;
+  width: 100%;
+  min-width: 0;
 }
 
 .schedule-today-title {
-  font-size: 17px;
+  font-size: 16px;
   font-weight: 700;
   color: #1E293B;
   margin: 0;
   letter-spacing: -0.2px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
 }
 
 .schedule-date-badge {
   background-color: #F3E8FF;
   color: #7C3AED;
-  font-size: 13px;
+  font-size: 12px;
   font-weight: 600;
-  padding: 4px 12px;
+  padding: 3px 10px;
   border-radius: 8px;
+  white-space: nowrap;
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
 }
 
 .schedule-today-items-list {
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 10px;
+  width: 100%;
+  min-width: 0;
 }
 
 .schedule-item-box {
   background-color: #FAFAFC;
   border: 1px solid #E2E8F0;
   border-radius: 12px;
-  padding: 14px 16px;
+  padding: 12px 14px;
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 8px;
   transition: transform 0.15s ease, box-shadow 0.15s ease;
+  box-sizing: border-box;
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  overflow: hidden;
 }
 
 .schedule-item-box:hover {
@@ -112,38 +135,53 @@ Updated By: Tam Khang
 
 .schedule-item-top-row {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   justify-content: space-between;
   gap: 8px;
+  width: 100%;
+  min-width: 0;
 }
 
 .schedule-item-name {
-  font-size: 15px;
+  font-size: 13.5px;
   font-weight: 700;
   color: #0F172A;
   margin: 0;
+  flex: 1;
+  min-width: 0;
+  line-height: 1.4;
+  word-break: break-word;
+  overflow-wrap: anywhere;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .schedule-item-tags {
   display: flex;
   align-items: center;
   gap: 6px;
+  flex-shrink: 0;
 }
 
 .class-code-tag {
   background-color: #F1F5F9;
   color: #475569;
-  font-size: 12px;
+  font-size: 11.5px;
   font-weight: 600;
-  padding: 2px 8px;
+  padding: 2px 7px;
   border-radius: 6px;
+  white-space: nowrap;
 }
 
 .status-type-badge {
-  font-size: 12px;
+  font-size: 11.5px;
   font-weight: 600;
-  padding: 2px 8px;
+  padding: 2px 7px;
   border-radius: 6px;
+  white-space: nowrap;
 }
 
 .status-type-badge.badge-blue {
@@ -161,12 +199,24 @@ Updated By: Tam Khang
   color: #059669;
 }
 
+.status-type-badge.badge-red {
+  background-color: #FEE2E2;
+  color: #DC2626;
+}
+
+.schedule-time-card.card-accent-red,
+.schedule-item-box.border-accent-red {
+  border-left: 4px solid #EF4444;
+}
+
 .schedule-item-meta-row {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  font-size: 13px;
+  font-size: 12.5px;
   color: #64748B;
+  width: 100%;
+  min-width: 0;
 }
 
 .schedule-meta-point {
@@ -318,6 +368,9 @@ Updated By: Tam Khang
   line-height: 1.5;
   font-family: inherit;
   font-weight: 500;
+  min-width: 0;
+  word-break: break-word;
+  overflow-wrap: break-word;
 }
 
 .single-note-item .btn-delete-note {
@@ -340,3 +393,144 @@ Updated By: Tam Khang
   background-color: #FEE2E2;
   opacity: 1;
 }
+
+.empty-notes-hint {
+  padding: 12px;
+  text-align: center;
+  font-size: 12.5px;
+  color: #94A3B8;
+  background-color: #F8FAFC;
+  border-radius: 8px;
+}
+
+/* Add schedule modal overlay */
+.add-schedule-modal-overlay {
+  position: fixed;
+  inset: 0;
+  background-color: rgba(15, 23, 42, 0.45);
+  backdrop-filter: blur(3px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  padding: 20px;
+}
+
+.add-schedule-modal-box {
+  background-color: #FFFFFF;
+  border-radius: 16px;
+  width: 100%;
+  max-width: 440px;
+  padding: 22px 24px;
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.15);
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  animation: modalScaleUp 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes modalScaleUp {
+  from { transform: scale(0.95); opacity: 0; }
+  to { transform: scale(1); opacity: 1; }
+}
+
+.modal-header-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.modal-title {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 700;
+  color: #1E293B;
+}
+
+.btn-close-modal {
+  border: none;
+  background: transparent;
+  color: #94A3B8;
+  cursor: pointer;
+  padding: 4px;
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.modal-schedule-form {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.form-group-item {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  flex: 1;
+}
+
+.form-group-item label {
+  font-size: 12.5px;
+  font-weight: 600;
+  color: #475569;
+}
+
+.form-group-item input {
+  padding: 9px 12px;
+  border: 1.5px solid #E2E8F0;
+  border-radius: 8px;
+  font-size: 13.5px;
+  outline: none;
+  font-family: inherit;
+  transition: border-color 0.2s;
+}
+
+.form-group-item input:focus {
+  border-color: #7C3AED;
+}
+
+.form-group-row {
+  display: flex;
+  gap: 12px;
+}
+
+.modal-actions-row {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 6px;
+}
+
+.btn-cancel-modal {
+  padding: 8px 16px;
+  border: 1px solid #E2E8F0;
+  background: #FFFFFF;
+  color: #64748B;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.btn-submit-modal {
+  padding: 8px 16px;
+  border: none;
+  background: #7C3AED;
+  color: #FFFFFF;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.btn-submit-modal:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
