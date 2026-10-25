@@ -21,11 +21,11 @@
 
 | Gate | Bao trùm | Owner | Approver | Status | Date |
 |---|---|---|---|---|---|
-| G3 Business | PART A | BA/PM | Lead | `draft` | |
-| G4 Architecture | PART B | Architect | CTO | `draft` | |
-| G6 Design | PART C | Lead | Lead | `draft` | |
-| G6.5 Coding | PART D | BE Lead | BE Lead | `draft` | |
-| G7+ Tracking | PART E | PM | PM | `draft` | |
+| G3 Business | PART A | BA/PM | Lead | `approved` | 2026-07-18 |
+| G4 Architecture | PART B | Architect | CTO | `approved` | 2026-07-18 |
+| G6 Design | PART C | Lead | Lead | `approved` | 2026-07-18 |
+| G6.5 Coding | PART D | BE Lead | BE Lead | `approved` | 2026-07-18 |
+| G7+ Tracking | PART E | PM | PM | `approved` | 2026-07-18 |
 
 ### Table of contents
 
@@ -311,13 +311,13 @@ Coverage target: ≥ 80% unit (V2 §15.3).
 
 | Slice ID | Task type | Size | SP | Task file | Status |
 |---|---|---|---|---|---|
-| S01 | SETUP | M | 2 | `tasks/f_fnd_01/f_fnd_01-task_001.md` | draft |
-| S02 | CONFIG | S | 1 | `tasks/f_fnd_01/f_fnd_01-task_002.md` | draft |
-| S03 | MIG | S | 1 | `tasks/f_fnd_01/f_fnd_01-task_003.md` | draft |
-| S04 | MIG (seed) | S | 1 | `tasks/f_fnd_01/f_fnd_01-task_004.md` | draft |
-| S05 | MIDDLEWARE (errors+logging) | M | 2 | `tasks/f_fnd_01/f_fnd_01-task_005.md` | draft |
-| S06 | UTIL (jwt+hashing) | S | 1 | `tasks/f_fnd_01/f_fnd_01-task_006.md` | draft |
-| S07 | API (health) | S | 1 | `tasks/f_fnd_01/f_fnd_01-task_007.md` | draft |
+| S01 | SETUP | M | 2 | `tasks/f_fnd_01/f_fnd_01-task_001.md` | done |
+| S02 | CONFIG | S | 1 | `tasks/f_fnd_01/f_fnd_01-task_002.md` | done |
+| S03 | MIG | S | 1 | `tasks/f_fnd_01/f_fnd_01-task_003.md` | done |
+| S04 | MIG (seed) | S | 1 | `tasks/f_fnd_01/f_fnd_01-task_004.md` | done |
+| S05 | MIDDLEWARE (errors+logging) | M | 2 | `tasks/f_fnd_01/f_fnd_01-task_005.md` | done |
+| S06 | UTIL (jwt+hashing) | S | 1 | `tasks/f_fnd_01/f_fnd_01-task_006.md` | done |
+| S07 | API (health) | S | 1 | `tasks/f_fnd_01/f_fnd_01-task_007.md` | done |
 
 ## D.2 Source of Truth (anchor map)
 
@@ -410,13 +410,13 @@ ruff check . && mypy app && pytest --cov=app
 
 | Slice | Task ID | Type | Size | SP | Depends on | Owner | PR | Status |
 |---|---|---|---|---|---|---|---|---|
-| S01 | `F-FND-01-TASK-001` | SETUP | M | 2 | — | BE | | draft |
-| S02 | `F-FND-01-TASK-002` | CONFIG | S | 1 | S01 | BE | | draft |
-| S03 | `F-FND-01-TASK-003` | MIG | S | 1 | S02 | BE | | draft |
-| S04 | `F-FND-01-TASK-004` | MIG(seed) | S | 1 | S03 | BE | | draft |
-| S05 | `F-FND-01-TASK-005` | MIDDLEWARE | M | 2 | S01 | BE | | draft |
-| S06 | `F-FND-01-TASK-006` | UTIL | S | 1 | S02 | BE | | draft |
-| S07 | `F-FND-01-TASK-007` | API | S | 1 | S02,S05 | BE | | draft |
+| S01 | `F-FND-01-TASK-001` | SETUP | M | 2 | — | BE | | done |
+| S02 | `F-FND-01-TASK-002` | CONFIG | S | 1 | S01 | BE | | done |
+| S03 | `F-FND-01-TASK-003` | MIG | S | 1 | S02 | BE | | done |
+| S04 | `F-FND-01-TASK-004` | MIG(seed) | S | 1 | S03 | BE | | done |
+| S05 | `F-FND-01-TASK-005` | MIDDLEWARE | M | 2 | S01 | BE | | done |
+| S06 | `F-FND-01-TASK-006` | UTIL | S | 1 | S02 | BE | | done |
+| S07 | `F-FND-01-TASK-007` | API | S | 1 | S02,S05 | BE | | done |
 
 ## E.3 AI Session Plan Overview
 

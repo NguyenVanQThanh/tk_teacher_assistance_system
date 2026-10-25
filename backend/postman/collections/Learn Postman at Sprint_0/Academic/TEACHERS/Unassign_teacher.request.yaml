@@ -1,0 +1,19 @@
+$kind: http-request
+name: Unassign_teacher
+url: "{{BASE_URL}}/classes/:class_id/teacher-subjects/:teacher_id/:subject_id"
+method: DELETE
+pathVariables:
+  - key: class_id
+    value: 4da6d444-db22-4980-aa7d-f61235d04a41
+    description: ""
+  - key: teacher_id
+    value: 808c8232-f550-4a89-abfe-5372ed77a36e
+    description: ""
+  - key: subject_id
+    value: 2632d783-0070-4d4d-be6f-fa5804316659
+    description: ""
+auth:
+  type: bearer
+  credentials:
+    token: "{{supabase_service_role_api_key_10q6}}"
+order: 1278092435706

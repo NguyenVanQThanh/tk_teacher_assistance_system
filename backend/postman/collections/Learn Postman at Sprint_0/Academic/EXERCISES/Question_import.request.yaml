@@ -1,0 +1,29 @@
+$kind: http-request
+name: Question_import
+url: "{{BASE_URL}}/exercises/3ad4c004-9616-4ee1-9b88-e281596bfa7b/questions/import"
+method: POST
+body:
+  type: formdata
+  content:
+    - type: file
+      key: question_file
+      src:
+        - /C:/Users/LENOVO/Downloads/de_kiem_tra_toan_12_4_trang_da_sua_cau_12_latex.pdf
+      description: ""
+      disabled: false
+    - type: file
+      key: answer_file
+      src:
+        - /C:/Users/LENOVO/Downloads/dap_an_toan_12_2_trang_khong_tom_tat_1.pdf
+      description: ""
+      disabled: false
+    - type: text
+      key: test_code
+      value: "123"
+      description: ""
+      disabled: false
+auth:
+  type: bearer
+  credentials:
+    token: "{{ACCESS_TOKEN}}"
+order: 4503598877692367

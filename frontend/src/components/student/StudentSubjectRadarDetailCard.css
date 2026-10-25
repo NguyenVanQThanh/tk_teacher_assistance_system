@@ -1,0 +1,436 @@
+/*
+File Name: StudentSubjectRadarDetailCard.css
+Description: Styling for Subject-specific cognitive triangular radar charts and assignments table matching Image 3.
+Created At: 2026-09-13
+Created By: Tam Khang
+Updated At: 2026-09-13
+Updated By: Tam Khang
+*/
+
+.student-subject-radar-detail-wrapper {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  width: 100%;
+}
+
+/* Top Navigation Bar */
+.subject-detail-top-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 4px 0 8px 0;
+  border-bottom: 1px solid #EBE8F0;
+}
+
+.top-bar-left {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.btn-back-to-dashboard {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background-color: #F1F5F9;
+  color: #475569;
+  border: 1px solid #E2E8F0;
+  border-radius: 8px;
+  padding: 6px 12px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.btn-back-to-dashboard:hover {
+  background-color: #EDE9FE;
+  color: #6D28D9;
+  border-color: #DDD6FE;
+}
+
+.subject-detail-main-heading {
+  font-size: 17px;
+  font-weight: 700;
+  color: #1E293B;
+  margin: 0;
+}
+
+.highlight-subject-name {
+  color: #7C3AED;
+}
+
+.subject-quick-tabs-list {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.subject-tab-pill-btn {
+  background-color: #F8FAFC;
+  color: #475569;
+  border: 1px solid #E2E8F0;
+  border-radius: 8px;
+  padding: 5px 10px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  font-family: inherit;
+}
+
+.subject-tab-pill-btn:hover {
+  background-color: #F3E8FF;
+  color: #7C3AED;
+  border-color: #DDD6FE;
+}
+
+.subject-tab-pill-btn.is-active {
+  background-color: #7C3AED;
+  color: #FFFFFF;
+  border-color: #7C3AED;
+  box-shadow: 0 2px 6px rgba(124, 58, 237, 0.25);
+}
+
+.btn-expand-full-radar {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background-color: #FAF5FF;
+  color: #7C3AED;
+  border: 1px solid #E9D5FF;
+  border-radius: 8px;
+  padding: 6px 12px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.btn-expand-full-radar:hover {
+  background-color: #7C3AED;
+  color: #FFFFFF;
+}
+
+/* Two Radar Cards Row */
+.subject-radar-two-cards-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+}
+
+@media (max-width: 900px) {
+  .subject-radar-two-cards-row {
+    grid-template-columns: 1fr;
+  }
+}
+
+.subject-radar-stat-card {
+  background-color: #FFFFFF;
+  border: 1px solid #EBE8F0;
+  border-radius: 16px;
+  padding: 20px 22px;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.02);
+  display: flex;
+  flex-direction: column;
+}
+
+.stat-card-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 14px;
+}
+
+.card-header-left {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.card-icon-box {
+  width: 38px;
+  height: 38px;
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.card-icon-box.purple-bg {
+  background-color: #F3E8FF;
+}
+
+.card-icon-box.blue-bg {
+  background-color: #EFF6FF;
+}
+
+.icon-purple {
+  color: #7C3AED;
+}
+
+.icon-blue {
+  color: #2563EB;
+}
+
+.stat-card-title {
+  font-size: 16px;
+  font-weight: 700;
+  color: #0F172A;
+  margin: 0 0 3px 0;
+}
+
+.stat-card-subtitle {
+  font-size: 12.5px;
+  color: #64748B;
+  margin: 0;
+}
+
+.card-stat-pill {
+  font-size: 12px;
+  font-weight: 600;
+  padding: 4px 10px;
+  border-radius: 8px;
+  white-space: nowrap;
+}
+
+.card-stat-pill.pill-purple {
+  background-color: #F3E8FF;
+  color: #7C3AED;
+}
+
+.card-stat-pill.pill-blue {
+  background-color: #EFF6FF;
+  color: #2563EB;
+}
+
+.stat-card-body-content {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 24px;
+  width: 100%;
+}
+
+.triangular-radar-wrapper {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 240px !important;
+  min-width: 240px !important;
+  max-width: 240px !important;
+  height: 200px !important;
+  min-height: 200px !important;
+  flex: 0 0 240px !important;
+}
+
+.triangular-radar-wrapper svg {
+  width: 240px !important;
+  min-width: 240px !important;
+  max-width: 240px !important;
+  height: 200px !important;
+  min-height: 200px !important;
+  display: block;
+}
+
+.stat-metrics-column {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  width: 160px !important;
+  min-width: 160px !important;
+  max-width: 160px !important;
+  flex: 0 0 160px !important;
+}
+
+.metric-row-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13.5px;
+  color: #334155;
+}
+
+.metric-bullet {
+  font-size: 18px;
+  line-height: 1;
+}
+
+.metric-bullet.purple-bullet {
+  color: #7C3AED;
+}
+
+.metric-bullet.blue-bullet {
+  color: #2563EB;
+}
+
+.metric-label {
+  flex: 1;
+}
+
+.metric-score {
+  font-weight: 700;
+  color: #0F172A;
+}
+
+/* Exercises Scores Table Card */
+.subject-exercises-score-table-card {
+  background-color: #FFFFFF;
+  border: 1px solid #EBE8F0;
+  border-radius: 16px;
+  padding: 22px 24px;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.02);
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.table-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.table-title-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 4px;
+}
+
+.icon-purple-title {
+  color: #7C3AED;
+}
+
+.table-card-main-title {
+  font-size: 17px;
+  font-weight: 700;
+  color: #0F172A;
+  margin: 0;
+}
+
+.table-count-pill {
+  background-color: #F3E8FF;
+  color: #7C3AED;
+  font-size: 12px;
+  font-weight: 600;
+  padding: 2px 8px;
+  border-radius: 6px;
+}
+
+.table-card-subtitle {
+  font-size: 13px;
+  color: #64748B;
+  margin: 0;
+}
+
+.table-responsive-wrapper {
+  overflow-x: auto;
+  border-radius: 12px;
+  border: 1px solid #F1F5F9;
+}
+
+.subject-score-data-table {
+  width: 100%;
+  border-collapse: collapse;
+  text-align: left;
+}
+
+.subject-score-data-table thead {
+  background-color: #F8FAFC;
+}
+
+.subject-score-data-table th {
+  padding: 12px 16px;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: #64748B;
+  border-bottom: 1px solid #E2E8F0;
+  white-space: nowrap;
+}
+
+.table-data-row {
+  border-bottom: 1px solid #F1F5F9;
+  transition: background-color 0.15s ease;
+}
+
+.table-data-row:last-child {
+  border-bottom: none;
+}
+
+.table-data-row:hover {
+  background-color: #FDFBFF;
+}
+
+.subject-score-data-table td {
+  padding: 14px 16px;
+  vertical-align: middle;
+}
+
+.exercise-row-title {
+  font-size: 14px;
+  font-weight: 700;
+  color: #1E293B;
+}
+
+.attempt-count-pill {
+  background-color: #F5F3FF;
+  color: #7C3AED;
+  font-size: 12px;
+  font-weight: 600;
+  padding: 4px 10px;
+  border-radius: 8px;
+  display: inline-block;
+}
+
+.scores-chips-group {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.score-chip-badge {
+  background-color: #F8FAFC;
+  color: #475569;
+  border: 1px solid #E2E8F0;
+  font-size: 12px;
+  padding: 3px 8px;
+  border-radius: 6px;
+}
+
+.score-chip-badge.chip-bold {
+  color: #0F172A;
+  font-weight: 700;
+  border-color: #CBD5E1;
+}
+
+.highest-score-pill {
+  background-color: #FAF5FF;
+  color: #7C3AED;
+  border: 1px solid #E9D5FF;
+  font-size: 13px;
+  font-weight: 700;
+  padding: 3px 12px;
+  border-radius: 8px;
+  display: inline-block;
+}
+
+.status-completed-pill {
+  background-color: #ECFDF5;
+  color: #059669;
+  font-size: 12px;
+  font-weight: 600;
+  padding: 4px 12px;
+  border-radius: 16px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.icon-check-double {
+  color: #059669;
+}

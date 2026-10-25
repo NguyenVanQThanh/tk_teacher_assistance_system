@@ -1,0 +1,20 @@
+$kind: http-request
+name: Create_classes
+url: "{{BASE_URL}}/classes"
+method: POST
+body:
+  type: json
+  content: "{\r
+
+    \    \"class_name\": \"11a2\",\r
+
+    \    \"school_year\": \"2026-2027\",\r
+
+    \    \"homeroom_teacher_id\": null\r
+
+    }"
+auth:
+  type: bearer
+  credentials:
+    token: "{{json_web_token_10q6}}"
+order: 1784824552838

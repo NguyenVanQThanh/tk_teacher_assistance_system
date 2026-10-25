@@ -1,0 +1,648 @@
+/*
+File Name: QADiscussionModal.css
+Description: Styling for Q&A discussion modal, question navigation, explanation, and discussion thread matching Image 2 visual design.
+Created At: 2026-09-13
+Created By: Tam Khang
+Updated At: 2026-09-13
+Updated By: Tam Khang
+*/
+
+.qa-modal-backdrop {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  background-color: rgba(15, 23, 42, 0.55);
+  backdrop-filter: blur(4px);
+  z-index: 99999;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  box-sizing: border-box;
+  animation: qaModalFadeIn 0.2s ease-out;
+  font-family: 'Be Vietnam Pro', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+}
+
+@keyframes qaModalFadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.qa-modal-container {
+  width: 100%;
+  max-width: 1240px;
+  height: 92vh;
+  background-color: #FFFFFF;
+  border-radius: 16px;
+  display: flex;
+  overflow: hidden;
+  box-shadow: 0 25px 60px -15px rgba(0, 0, 0, 0.25);
+  border: 1px solid #E2E8F0;
+  animation: qaModalScaleUp 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes qaModalScaleUp {
+  from {
+    opacity: 0;
+    transform: scale(0.96) translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+/* ==========================================
+   1. LEFT COLUMN: Danh sách câu hỏi
+   ========================================== */
+.qa-sidebar-palette {
+  width: 215px;
+  background-color: #FFFFFF;
+  border-right: 1px solid #EBE8F0;
+  padding: 20px 16px;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  flex-shrink: 0;
+  overflow-y: auto;
+}
+
+.qa-palette-title {
+  font-size: 14px;
+  font-weight: 700;
+  color: #1E293B;
+  margin: 0 0 10px 0;
+}
+
+.qa-legend-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 11px;
+  color: #64748B;
+  margin-bottom: 20px;
+}
+
+.qa-legend-item {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.qa-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.qa-dot.green { background-color: #10B981; }
+.qa-dot.blue { background-color: #2563EB; }
+.qa-dot.red { 
+  background-color: #EF4444; 
+}
+
+.qa-numbers-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 10px;
+}
+
+.qa-num-cell {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  border: 1.5px solid #E2E8F0;
+  background-color: #FFFFFF;
+  color: #64748B;
+  font-size: 13px;
+  font-weight: 500;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  font-family: inherit;
+  padding: 0;
+}
+
+.qa-num-cell:hover {
+  border-color: #7C3AED;
+  color: #7C3AED;
+}
+
+.qa-num-cell.completed {
+  border-color: #10B981;
+  color: #10B981;
+  background-color: #FFFFFF;
+}
+
+.qa-num-cell.review {
+  border-color: #EF4444;
+  color: #EF4444;
+  background-color: #FFFFFF;
+}
+
+.qa-num-cell.active {
+  background-color: #2563EB;
+  border-color: #2563EB;
+  color: #FFFFFF;
+  font-weight: 700;
+  box-shadow: 0 2px 8px rgba(37, 99, 235, 0.35);
+}
+
+/* ==========================================
+   2. CENTER COLUMN: Nội dung câu hỏi & Giải thích
+   ========================================== */
+.qa-center-viewport {
+  flex: 1;
+  padding: 24px;
+  box-sizing: border-box;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  background-color: #FFFFFF;
+  border-right: 1px solid #EBE8F0;
+}
+
+.qa-question-card {
+  border: 1px solid #EBE8F0;
+  border-radius: 16px;
+  padding: 20px 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  background-color: #FFFFFF;
+}
+
+.qa-question-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.qa-question-title {
+  font-size: 18px;
+  font-weight: 800;
+  color: #4D308D;
+  margin: 0;
+}
+
+.qa-subject-pill {
+  background-color: #EDE9FE;
+  color: #6D28D9;
+  padding: 5px 14px;
+  border-radius: 9999px;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.qa-statement-text {
+  font-size: 14.5px;
+  line-height: 1.65;
+  color: #1E293B;
+  margin: 0;
+}
+
+/* Parabola Graph Window Frame */
+.qa-graph-window-card {
+  background-color: #FFFFFF;
+  border: 1px solid #E2E8F0;
+  border-radius: 10px;
+  overflow: hidden;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.03);
+  max-width: 440px;
+  margin: 0 auto;
+  width: 100%;
+}
+
+.qa-graph-window-header {
+  background-color: #F8FAFC;
+  border-bottom: 1px solid #E2E8F0;
+  padding: 6px 14px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 11px;
+}
+
+.qa-graph-back-link {
+  color: #64748B;
+  font-size: 10.5px;
+  cursor: pointer;
+}
+
+.qa-graph-window-title {
+  font-weight: 600;
+  color: #334155;
+  font-size: 11px;
+}
+
+.qa-graph-window-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background-color: #CBD5E1;
+}
+
+.qa-graph-canvas-box {
+  padding: 12px 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background-color: #FFFFFF;
+}
+
+/* Options */
+.qa-options-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.qa-option-row {
+  border: 1px solid #E2E8F0;
+  border-radius: 10px;
+  padding: 12px 18px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background-color: #FFFFFF;
+  transition: all 0.15s ease;
+}
+
+.qa-option-row.correct {
+  border: 1.5px solid #10B981;
+  background-color: #F0FDF4;
+}
+
+.qa-option-left {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.qa-radio-circle {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  border: 1.5px solid #CBD5E1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.qa-radio-circle.checked {
+  border-color: #10B981;
+}
+
+.qa-radio-dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background-color: #10B981;
+}
+
+.qa-option-label {
+  font-size: 14px;
+  color: #1E293B;
+}
+
+.qa-option-row.correct .qa-option-label {
+  color: #065F46;
+  font-weight: 600;
+}
+
+.qa-check-icon {
+  color: #10B981;
+  flex-shrink: 0;
+}
+
+/* Detailed Explanation Box */
+.qa-explanation-card {
+  background-color: #FAF5FF;
+  border: 1px solid #EDE9FE;
+  border-radius: 14px;
+  padding: 18px 22px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.qa-explanation-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14.5px;
+  font-weight: 800;
+  color: #4D308D;
+}
+
+.qa-explanation-body {
+  font-size: 13.5px;
+  line-height: 1.65;
+  color: #334155;
+  white-space: pre-line;
+  font-family: inherit;
+}
+
+/* Navigation Buttons */
+.qa-nav-buttons-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: auto;
+  padding-top: 10px;
+}
+
+.qa-btn-prev {
+  height: 38px;
+  padding: 0 16px;
+  background-color: #FFFFFF;
+  border: 1.5px solid #64748B;
+  color: #334155;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  font-family: inherit;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  transition: all 0.15s ease;
+}
+
+.qa-btn-prev:hover:not(:disabled) {
+  background-color: #F8FAFC;
+  border-color: #475569;
+}
+
+.qa-btn-prev:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.qa-btn-next {
+  height: 38px;
+  padding: 0 20px;
+  background-color: #5B21B6;
+  border: none;
+  color: #FFFFFF;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  font-family: inherit;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  transition: all 0.15s ease;
+}
+
+.qa-btn-next:hover:not(:disabled) {
+  background-color: #4C1D95;
+}
+
+.qa-btn-next:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* ==========================================
+   3. RIGHT COLUMN: Thảo luận (Chat Drawer)
+   ========================================== */
+.qa-discussion-drawer {
+  width: 320px;
+  background-color: #FFFFFF;
+  display: flex;
+  flex-direction: column;
+  flex-shrink: 0;
+}
+
+.qa-drawer-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 20px;
+  border-bottom: 1px solid #EBE8F0;
+}
+
+.qa-drawer-title-group {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14.5px;
+  font-weight: 800;
+  color: #1E1B4B;
+}
+
+.qa-btn-close {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  border: none;
+  background-color: #F1ECFA;
+  color: #4D308D;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.qa-btn-close:hover {
+  background-color: #E2D7F5;
+}
+
+.qa-messages-thread {
+  flex: 1;
+  padding: 16px 18px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.qa-message-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+}
+
+.qa-msg-avatar {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  font-weight: 800;
+  flex-shrink: 0;
+}
+
+.qa-msg-avatar.purple-light {
+  background-color: #EDE9FE;
+  color: #7C3AED;
+}
+
+.qa-msg-avatar.purple-dark {
+  background-color: #6D28D9;
+  color: #FFFFFF;
+}
+
+.qa-msg-avatar.teacher-avatar {
+  background-color: #EDE9FE;
+  color: #7C3AED;
+  font-size: 16px;
+}
+
+.qa-msg-content-block {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  flex: 1;
+}
+
+.qa-msg-author-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.qa-msg-author-name {
+  font-size: 12.5px;
+  font-weight: 700;
+  color: #1E293B;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.qa-verified-badge {
+  color: #2563EB;
+}
+
+.qa-msg-time {
+  font-size: 11px;
+  color: #64748B;
+}
+
+.qa-msg-bubble {
+  background-color: #F8FAFC;
+  border: 1px solid #F1F5F9;
+  border-radius: 12px;
+  padding: 10px 14px;
+  font-size: 13px;
+  line-height: 1.55;
+  color: #334155;
+}
+
+.qa-msg-bubble.teacher-highlight {
+  background-color: #F3EAFF;
+  border: 1px solid #EDE9FE;
+  color: #2E1065;
+}
+
+/* Chat Input Footer matching Image 2 */
+.qa-drawer-input-footer {
+  padding: 16px 18px;
+  background-color: #FFFFFF;
+  border-top: 1px solid #F1F5F9;
+}
+
+.qa-chat-composer {
+  border: 1px solid #E2E8F0;
+  border-radius: 12px;
+  padding: 10px 12px;
+  background-color: #FFFFFF;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  transition: border-color 0.15s ease;
+}
+
+.qa-chat-composer:focus-within {
+  border-color: #7C3AED;
+}
+
+.qa-chat-textarea {
+  width: 100%;
+  border: none;
+  outline: none;
+  resize: none;
+  font-size: 13px;
+  font-family: inherit;
+  color: #1E293B;
+  background: transparent;
+  box-sizing: border-box;
+}
+
+.qa-chat-textarea::placeholder {
+  color: #94A3B8;
+}
+
+.qa-composer-actions {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.qa-btn-send-msg {
+  width: 32px;
+  height: 28px;
+  background-color: #5B21B6;
+  border: none;
+  border-radius: 6px;
+  color: #FFFFFF;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.qa-btn-send-msg:hover {
+  background-color: #4C1D95;
+}
+
+.qa-teacher-tag {
+  background-color: #EDE9FE;
+  color: #6D28D9;
+  font-size: 11px;
+  font-weight: 700;
+  padding: 2px 8px;
+  border-radius: 9999px;
+  border: 1px solid #DDD6FE;
+  letter-spacing: 0.2px;
+}
+
+.qa-teacher-composer-tools {
+  display: flex;
+  align-items: center;
+  margin-bottom: 8px;
+}
+
+.qa-btn-insert-solution {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 10px;
+  border-radius: 6px;
+  background-color: #F5EEFF;
+  border: 1px dashed #C4B5FD;
+  color: #6D28D9;
+  font-size: 11.5px;
+  font-weight: 600;
+  cursor: pointer;
+  font-family: inherit;
+  transition: all 0.15s ease;
+}
+
+.qa-btn-insert-solution:hover {
+  background-color: #EDE9FE;
+  border-color: #8B5CF6;
+}

@@ -1,0 +1,512 @@
+/*
+File Name: QADiscussionModal.css
+Description: Styling for Q&A discussion, exercise explanation, and teacher response modal.
+Created At: 2026-09-07
+Created By: Tam Khang
+Updated At: 2026-09-07
+Updated By: Tam Khang
+*/
+
+.qa-modal-backdrop {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  background-color: rgba(15, 23, 42, 0.65);
+  backdrop-filter: blur(4px);
+  z-index: 9999;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  box-sizing: border-box;
+  animation: modalFadeIn 0.25s ease-out;
+  font-family: 'Be Vietnam Pro', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+}
+
+@keyframes modalFadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.qa-modal-container {
+  width: 100%;
+  max-width: 1240px;
+  height: 90vh;
+  background-color: #FFFFFF;
+  border-radius: 20px;
+  display: flex;
+  overflow: hidden;
+  box-shadow: 0 25px 60px rgba(0, 0, 0, 0.25);
+  border: 1px solid #EBE8F0;
+  animation: modalScaleUp 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes modalScaleUp {
+  from {
+    opacity: 0;
+    transform: scale(0.95) translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+/* ==========================================
+   LEFT COLUMN: Danh sách câu hỏi
+   ========================================== */
+.qa-sidebar-palette {
+  width: 220px;
+  background-color: #FFFFFF;
+  border-right: 1px solid #EBE8F0;
+  padding: 20px 16px;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  flex-shrink: 0;
+  overflow-y: auto;
+}
+
+.qa-palette-title {
+  font-size: 14px;
+  font-weight: 800;
+  color: #1E1B4B;
+  margin: 0 0 12px 0;
+}
+
+.qa-legend-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  font-size: 11px;
+  color: #64748B;
+  margin-bottom: 18px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid #F1F5F9;
+}
+
+.qa-legend-item {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.qa-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+}
+
+.qa-dot.green { background-color: #10B981; }
+.qa-dot.blue { background-color: #2563EB; }
+.qa-dot.red { background-color: #EF4444; }
+
+.qa-numbers-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 8px;
+}
+
+.qa-num-cell {
+  height: 34px;
+  border-radius: 50%;
+  border: 1.5px solid #E2E8F0;
+  background-color: #FFFFFF;
+  color: #475569;
+  font-size: 12px;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.qa-num-cell:hover {
+  border-color: #7C3AED;
+  color: #4D308D;
+}
+
+.qa-num-cell.completed {
+  border-color: #10B981;
+  color: #10B981;
+}
+
+.qa-num-cell.review {
+  border-color: #EF4444;
+  color: #EF4444;
+}
+
+.qa-num-cell.active {
+  background-color: #2563EB;
+  border-color: #2563EB;
+  color: #FFFFFF;
+  font-weight: 700;
+  box-shadow: 0 2px 8px rgba(37, 99, 235, 0.3);
+}
+
+/* ==========================================
+   CENTER COLUMN: Nội dung câu hỏi & Giải thích
+   ========================================== */
+.qa-center-viewport {
+  flex: 1;
+  padding: 24px;
+  box-sizing: border-box;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  background-color: #FFFFFF;
+  border-right: 1px solid #EBE8F0;
+}
+
+.qa-question-card {
+  border: 1px solid #EBE8F0;
+  border-radius: 16px;
+  padding: 20px 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  background-color: #FFFFFF;
+}
+
+.qa-question-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.qa-question-title {
+  font-size: 18px;
+  font-weight: 800;
+  color: #4D308D;
+  margin: 0;
+}
+
+.qa-subject-pill {
+  background-color: #F3EAFF;
+  color: #7C3AED;
+  padding: 4px 12px;
+  border-radius: 9999px;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.qa-statement-text {
+  font-size: 14.5px;
+  line-height: 1.65;
+  color: #1E293B;
+  margin: 0;
+}
+
+/* Graph Preview Frame */
+.qa-graph-preview-box {
+  background-color: #FFFFFF;
+  border: 1px solid #E2E8F0;
+  border-radius: 12px;
+  padding: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.02);
+}
+
+.qa-options-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.qa-option-row {
+  border: 1px solid #E2E8F0;
+  border-radius: 10px;
+  padding: 12px 16px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 14px;
+  color: #1E293B;
+  transition: all 0.15s ease;
+  background-color: #FFFFFF;
+}
+
+.qa-option-row.correct {
+  border-color: #10B981;
+  background-color: #F0FDF4;
+  color: #065F46;
+  font-weight: 600;
+}
+
+.qa-option-left {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.qa-radio-circle {
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  border: 2px solid #CBD5E1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.qa-option-row.correct .qa-radio-circle {
+  border-color: #10B981;
+}
+
+.qa-radio-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background-color: #10B981;
+}
+
+.qa-check-icon {
+  color: #10B981;
+}
+
+/* Detailed Explanation Box */
+.qa-explanation-card {
+  background-color: #FAF5FF;
+  border: 1px solid #EDE9FE;
+  border-radius: 14px;
+  padding: 18px 22px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.qa-explanation-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14.5px;
+  font-weight: 800;
+  color: #4D308D;
+}
+
+.qa-explanation-body {
+  font-size: 13.5px;
+  line-height: 1.65;
+  color: #334155;
+  white-space: pre-line;
+  font-family: inherit;
+}
+
+/* Navigation Buttons */
+.qa-nav-buttons-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: auto;
+  padding-top: 12px;
+}
+
+.qa-btn-prev {
+  height: 38px;
+  padding: 0 16px;
+  background-color: #FFFFFF;
+  border: 1.5px solid #4D308D;
+  color: #4D308D;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  font-family: inherit;
+}
+
+.qa-btn-next {
+  height: 38px;
+  padding: 0 18px;
+  background-color: #4D308D;
+  border: none;
+  color: #FFFFFF;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  font-family: inherit;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+/* ==========================================
+   RIGHT COLUMN: Thảo luận (Chat Drawer)
+   ========================================== */
+.qa-discussion-drawer {
+  width: 320px;
+  background-color: #FFFFFF;
+  display: flex;
+  flex-direction: column;
+  flex-shrink: 0;
+}
+
+.qa-drawer-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 18px 20px;
+  border-bottom: 1px solid #EBE8F0;
+}
+
+.qa-drawer-title-group {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 15px;
+  font-weight: 800;
+  color: #1E1B4B;
+}
+
+.qa-btn-close {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  border: none;
+  background-color: #F1ECFA;
+  color: #4D308D;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.qa-btn-close:hover {
+  background-color: #E2D7F5;
+}
+
+.qa-messages-thread {
+  flex: 1;
+  padding: 16px 20px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.qa-message-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+}
+
+.qa-msg-avatar {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  font-weight: 800;
+  flex-shrink: 0;
+}
+
+.qa-msg-avatar.purple-light {
+  background-color: #EDE9FE;
+  color: #7C3AED;
+}
+
+.qa-msg-avatar.purple-dark {
+  background-color: #6D28D9;
+  color: #FFFFFF;
+}
+
+.qa-msg-avatar.teacher-img {
+  background: linear-gradient(135deg, #3B82F6, #1D4ED8);
+  color: #FFFFFF;
+}
+
+.qa-msg-content-block {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  flex: 1;
+}
+
+.qa-msg-author-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: #64748B;
+}
+
+.qa-msg-author-name {
+  font-weight: 700;
+  color: #1E293B;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.qa-verified-badge {
+  color: #3B82F6;
+}
+
+.qa-msg-bubble {
+  padding: 12px 14px;
+  border-radius: 12px;
+  font-size: 13px;
+  line-height: 1.55;
+  color: #1E293B;
+  background-color: #F8FAFC;
+  border: 1px solid #E2E8F0;
+}
+
+.qa-msg-bubble.teacher-highlight {
+  background-color: #F3E8FF;
+  border-color: #E9D5FF;
+  color: #3B0764;
+}
+
+/* Chat Input Footer */
+.qa-drawer-input-footer {
+  padding: 16px 20px;
+  border-top: 1px solid #EBE8F0;
+}
+
+.qa-chat-input-box {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  border: 1px solid #E2E8F0;
+  border-radius: 10px;
+  padding: 6px 12px;
+  background-color: #FFFFFF;
+}
+
+.qa-chat-input-field {
+  flex: 1;
+  border: none;
+  background: transparent;
+  outline: none;
+  font-size: 13px;
+  font-family: inherit;
+  color: #1E293B;
+}
+
+.qa-btn-send-msg {
+  border: none;
+  background-color: #4D308D;
+  color: #FFFFFF;
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.qa-btn-send-msg:hover {
+  background-color: #3B2170;
+}

@@ -1,0 +1,600 @@
+[
+  {
+    "user_id": "933ec651-ecf2-4b43-9676-a987c29d2dad",
+    "phone": "0999000001",
+    "email": "admin@school.com",
+    "full_name": "Quản trị viên Hệ thống",
+    "role_name": "Admin",
+    "password_plain": "Admin@1234"
+  },
+  {
+    "user_id": "808c8232-f550-4a89-abfe-5372ed77a36e",
+    "phone": "0999000002",
+    "email": "teacher@school.com",
+    "full_name": "Sample Teacher (Thầy Nguyễn Văn A)",
+    "role_name": "Teacher",
+    "password_plain": "Teacher@1234"
+  },
+  {
+    "user_id": "6fdaa96a-7584-405c-8707-b7d6257e80b9",
+    "phone": "0999000004",
+    "email": "teacher_an@school.com",
+    "full_name": "Thầy Nguyễn Văn An",
+    "role_name": "Teacher",
+    "password_plain": "Teacher@1234"
+  },
+  {
+    "user_id": "79c19852-6f5c-4f59-b4dc-fe70572b90a6",
+    "phone": "0999000005",
+    "email": "teacher_mai@school.com",
+    "full_name": "Cô Trần Thị Mai",
+    "role_name": "Teacher",
+    "password_plain": "Teacher@1234"
+  },
+  {
+    "user_id": "69105c6b-8e25-422b-90f5-011f518fe59d",
+    "phone": "0999000006",
+    "email": "teacher_long@school.com",
+    "full_name": "Thầy Lê Hoàng Long",
+    "role_name": "Teacher",
+    "password_plain": "Teacher@1234"
+  },
+  {
+    "user_id": "8f6729c3-6c8e-4047-8bd6-20b831bc4375",
+    "phone": "0999000007",
+    "email": "teacher_trang@school.com",
+    "full_name": "Cô Phạm Thu Trang",
+    "role_name": "Teacher",
+    "password_plain": "Teacher@1234"
+  },
+  {
+    "user_id": "8da6124a-417b-4ddd-96d7-a53599e557a3",
+    "phone": "0999100001",
+    "email": "student01@school.com",
+    "full_name": "Nguyễn Hoàng Nam",
+    "role_name": "Student",
+    "student_code": "HS12001",
+    "class_name": "12A1",
+    "password_plain": "Student@1234"
+  },
+  {
+    "user_id": "b051b515-3d88-4ecb-a228-dc853d319031",
+    "phone": "0999100002",
+    "email": "student02@school.com",
+    "full_name": "Trần Thị Mai Anh",
+    "role_name": "Student",
+    "student_code": "HS12002",
+    "class_name": "12A1",
+    "password_plain": "Student@1234"
+  },
+  {
+    "user_id": "a28f5d7e-6f70-4b55-b675-357e7b3c3786",
+    "phone": "0999100003",
+    "email": "student03@school.com",
+    "full_name": "Lê Văn Đức",
+    "role_name": "Student",
+    "student_code": "HS12003",
+    "class_name": "12A1",
+    "password_plain": "Student@1234"
+  },
+  {
+    "user_id": "d37c57b6-1ee1-407f-8b0e-94137d869e41",
+    "phone": "0999100004",
+    "email": "student04@school.com",
+    "full_name": "Phạm Minh Tuấn",
+    "role_name": "Student",
+    "student_code": "HS12004",
+    "class_name": "12A1",
+    "password_plain": "Student@1234"
+  },
+  {
+    "user_id": "1f8e2bb6-4c5f-4ba9-9115-6520ec8b3a85",
+    "phone": "0999100005",
+    "email": "student05@school.com",
+    "full_name": "Đặng Thu Thảo",
+    "role_name": "Student",
+    "student_code": "HS12005",
+    "class_name": "12A1",
+    "password_plain": "Student@1234"
+  },
+  {
+    "user_id": "187278e8-542f-4462-85a6-c72efd023ab2",
+    "phone": "0999100006",
+    "email": "student06@school.com",
+    "full_name": "Vũ Hoàng Long",
+    "role_name": "Student",
+    "student_code": "HS12006",
+    "class_name": "12A1",
+    "password_plain": "Student@1234"
+  },
+  {
+    "user_id": "96c3741e-47a3-4257-9e2c-3d9ae4292411",
+    "phone": "0999100007",
+    "email": "student07@school.com",
+    "full_name": "Bùi Phương Linh",
+    "role_name": "Student",
+    "student_code": "HS12007",
+    "class_name": "12A1",
+    "password_plain": "Student@1234"
+  },
+  {
+    "user_id": "a7a15de9-4ee3-476d-9dff-88557563d563",
+    "phone": "0999100008",
+    "email": "student08@school.com",
+    "full_name": "Hoàng Quốc Bảo",
+    "role_name": "Student",
+    "student_code": "HS12008",
+    "class_name": "12A1",
+    "password_plain": "Student@1234"
+  },
+  {
+    "user_id": "d24a8983-76c7-4624-8ab7-71c36848b2c6",
+    "phone": "0999100009",
+    "email": "student09@school.com",
+    "full_name": "Đỗ Thị Kim Oanh",
+    "role_name": "Student",
+    "student_code": "HS12009",
+    "class_name": "12A1",
+    "password_plain": "Student@1234"
+  },
+  {
+    "user_id": "09788506-7719-42ed-824c-c812ae93fd1c",
+    "phone": "0999100010",
+    "email": "student10@school.com",
+    "full_name": "Phan Gia Huy",
+    "role_name": "Student",
+    "student_code": "HS12010",
+    "class_name": "12A1",
+    "password_plain": "Student@1234"
+  },
+  {
+    "user_id": "4dfb4cbe-518e-4087-84c0-285aab77eabc",
+    "phone": "0999100011",
+    "email": "student11@school.com",
+    "full_name": "Ngô Thành Đạt",
+    "role_name": "Student",
+    "student_code": "HS12011",
+    "class_name": "12A1",
+    "password_plain": "Student@1234"
+  },
+  {
+    "user_id": "4bfd2233-780c-4a7d-af17-1c14e66f4d56",
+    "phone": "0999100012",
+    "email": "student12@school.com",
+    "full_name": "Lý Thanh Thảo",
+    "role_name": "Student",
+    "student_code": "HS12012",
+    "class_name": "12A1",
+    "password_plain": "Student@1234"
+  },
+  {
+    "user_id": "2967dfb8-9e0a-4339-8b4a-84cf1f9768ff",
+    "phone": "0999100013",
+    "email": "student13@school.com",
+    "full_name": "Trương Tấn Sang",
+    "role_name": "Student",
+    "student_code": "HS12013",
+    "class_name": "12A1",
+    "password_plain": "Student@1234"
+  },
+  {
+    "user_id": "47e53cbf-9f39-4bd9-945f-cf07406370ae",
+    "phone": "0999100014",
+    "email": "student14@school.com",
+    "full_name": "Dương Ngọc Ánh",
+    "role_name": "Student",
+    "student_code": "HS12014",
+    "class_name": "12A1",
+    "password_plain": "Student@1234"
+  },
+  {
+    "user_id": "3d2321fa-ac1d-4423-bf3d-383dd3bf5eaf",
+    "phone": "0999100015",
+    "email": "student15@school.com",
+    "full_name": "Hồ Minh Quân",
+    "role_name": "Student",
+    "student_code": "HS12015",
+    "class_name": "12A1",
+    "password_plain": "Student@1234"
+  },
+  {
+    "user_id": "1f25216a-4ff1-4079-9459-323bed6b42f1",
+    "phone": "0999100016",
+    "email": "student16@school.com",
+    "full_name": "Lâm Quốc Cường",
+    "role_name": "Student",
+    "student_code": "HS12016",
+    "class_name": "12A1",
+    "password_plain": "Student@1234"
+  },
+  {
+    "user_id": "063fc6c6-aac7-4131-9f82-a76578fef5f7",
+    "phone": "0999100017",
+    "email": "student17@school.com",
+    "full_name": "Võ Thị Tuyết",
+    "role_name": "Student",
+    "student_code": "HS12017",
+    "class_name": "12A1",
+    "password_plain": "Student@1234"
+  },
+  {
+    "user_id": "4a24192e-71b4-421e-b00e-42d4486784b5",
+    "phone": "0999100018",
+    "email": "student18@school.com",
+    "full_name": "Đoàn Văn Hậu",
+    "role_name": "Student",
+    "student_code": "HS12018",
+    "class_name": "12A1",
+    "password_plain": "Student@1234"
+  },
+  {
+    "user_id": "590e30d0-2e4a-4456-a230-3008a000ed17",
+    "phone": "0999100019",
+    "email": "student19@school.com",
+    "full_name": "Chu Quang Khải",
+    "role_name": "Student",
+    "student_code": "HS12019",
+    "class_name": "12A1",
+    "password_plain": "Student@1234"
+  },
+  {
+    "user_id": "208c8d68-abf6-45eb-b494-9998df78e369",
+    "phone": "0999100020",
+    "email": "student20@school.com",
+    "full_name": "Đinh Bích Phương",
+    "role_name": "Student",
+    "student_code": "HS12020",
+    "class_name": "12A1",
+    "password_plain": "Student@1234"
+  },
+  {
+    "user_id": "b0a860aa-0d9c-4a0c-9ea7-885a34564c4e",
+    "phone": "0999100021",
+    "email": "student21@school.com",
+    "full_name": "Nguyễn Anh Dũng",
+    "role_name": "Student",
+    "student_code": "HS11021",
+    "class_name": "11B2",
+    "password_plain": "Student@1234"
+  },
+  {
+    "user_id": "1048ac37-d718-4a68-bbca-d49571790efc",
+    "phone": "0999100022",
+    "email": "student22@school.com",
+    "full_name": "Phạm Thúy Hằng",
+    "role_name": "Student",
+    "student_code": "HS11022",
+    "class_name": "11B2",
+    "password_plain": "Student@1234"
+  },
+  {
+    "user_id": "93febcdf-1dd9-432f-ad6c-f0524f4fa985",
+    "phone": "0999100023",
+    "email": "student23@school.com",
+    "full_name": "Lê Hoàng Yến",
+    "role_name": "Student",
+    "student_code": "HS11023",
+    "class_name": "11B2",
+    "password_plain": "Student@1234"
+  },
+  {
+    "user_id": "fa41f53a-983e-4d67-8338-a845b2e35414",
+    "phone": "0999100024",
+    "email": "student24@school.com",
+    "full_name": "Trần Đình Trọng",
+    "role_name": "Student",
+    "student_code": "HS11024",
+    "class_name": "11B2",
+    "password_plain": "Student@1234"
+  },
+  {
+    "user_id": "18b71af6-89db-42e3-9df8-1b06be83f14f",
+    "phone": "0999100025",
+    "email": "student25@school.com",
+    "full_name": "Bùi Tiến Dũng",
+    "role_name": "Student",
+    "student_code": "HS11025",
+    "class_name": "11B2",
+    "password_plain": "Student@1234"
+  },
+  {
+    "user_id": "95b62823-d1b6-457c-8429-015bb197718d",
+    "phone": "0999100026",
+    "email": "student26@school.com",
+    "full_name": "Nguyễn Công Phượng",
+    "role_name": "Student",
+    "student_code": "HS11026",
+    "class_name": "11B2",
+    "password_plain": "Student@1234"
+  },
+  {
+    "user_id": "a0ddfcb9-10a1-4d18-a897-381217f1507a",
+    "phone": "0999100027",
+    "email": "student27@school.com",
+    "full_name": "Nguyễn Quang Hải",
+    "role_name": "Student",
+    "student_code": "HS11027",
+    "class_name": "11B2",
+    "password_plain": "Student@1234"
+  },
+  {
+    "user_id": "3bb069c8-a97d-4e5e-8dfa-51d280916cf5",
+    "phone": "0999100028",
+    "email": "student28@school.com",
+    "full_name": "Vũ Văn Thanh",
+    "role_name": "Student",
+    "student_code": "HS11028",
+    "class_name": "11B2",
+    "password_plain": "Student@1234"
+  },
+  {
+    "user_id": "c82b3346-00aa-4842-ba0d-f8d75adf8a7d",
+    "phone": "0999100029",
+    "email": "student29@school.com",
+    "full_name": "Lương Xuân Trường",
+    "role_name": "Student",
+    "student_code": "HS11029",
+    "class_name": "11B2",
+    "password_plain": "Student@1234"
+  },
+  {
+    "user_id": "73398d4a-8a07-4beb-93a1-6888b729e9ee",
+    "phone": "0999100030",
+    "email": "student30@school.com",
+    "full_name": "Phan Văn Đức",
+    "role_name": "Student",
+    "student_code": "HS11030",
+    "class_name": "11B2",
+    "password_plain": "Student@1234"
+  },
+  {
+    "user_id": "7a73f94c-70cc-4435-a486-2f19433225a1",
+    "phone": "0999100031",
+    "email": "student31@school.com",
+    "full_name": "Hà Đức Chinh",
+    "role_name": "Student",
+    "student_code": "HS11031",
+    "class_name": "11B2",
+    "password_plain": "Student@1234"
+  },
+  {
+    "user_id": "46906f69-129c-4c1d-a356-64a44a3cf68f",
+    "phone": "0999100032",
+    "email": "student32@school.com",
+    "full_name": "Đỗ Duy Mạnh",
+    "role_name": "Student",
+    "student_code": "HS11032",
+    "class_name": "11B2",
+    "password_plain": "Student@1234"
+  },
+  {
+    "user_id": "4ade4c84-2f06-4ca2-9cf3-dfa6bd3f3f79",
+    "phone": "0999100033",
+    "email": "student33@school.com",
+    "full_name": "Nguyễn Tuấn Anh",
+    "role_name": "Student",
+    "student_code": "HS11033",
+    "class_name": "11B2",
+    "password_plain": "Student@1234"
+  },
+  {
+    "user_id": "8746148c-56c5-4f5d-9684-7edf6f80162d",
+    "phone": "0999100034",
+    "email": "student34@school.com",
+    "full_name": "Nguyễn Phong Hồng Duy",
+    "role_name": "Student",
+    "student_code": "HS11034",
+    "class_name": "11B2",
+    "password_plain": "Student@1234"
+  },
+  {
+    "user_id": "77fd0551-7ca4-4b30-8723-ae66188fd176",
+    "phone": "0999100035",
+    "email": "student35@school.com",
+    "full_name": "Bùi Hoàng Việt Anh",
+    "role_name": "Student",
+    "student_code": "HS11035",
+    "class_name": "11B2",
+    "password_plain": "Student@1234"
+  },
+  {
+    "user_id": "956661df-c748-4821-9351-26fae8bba5dc",
+    "phone": "0999100036",
+    "email": "student36@school.com",
+    "full_name": "Nguyễn Thanh Bình",
+    "role_name": "Student",
+    "student_code": "HS11036",
+    "class_name": "11B2",
+    "password_plain": "Student@1234"
+  },
+  {
+    "user_id": "67d28b31-9c7b-4e1e-902e-6b2ba4547700",
+    "phone": "0999100037",
+    "email": "student37@school.com",
+    "full_name": "Nhâm Mạnh Dũng",
+    "role_name": "Student",
+    "student_code": "HS11037",
+    "class_name": "11B2",
+    "password_plain": "Student@1234"
+  },
+  {
+    "user_id": "deca3555-c62c-48ff-a489-cc7008ace688",
+    "phone": "0999100038",
+    "email": "student38@school.com",
+    "full_name": "Khuất Văn Khang",
+    "role_name": "Student",
+    "student_code": "HS11038",
+    "class_name": "11B2",
+    "password_plain": "Student@1234"
+  },
+  {
+    "user_id": "12725076-4043-46f5-a8a2-59c96c92b3a4",
+    "phone": "0999100039",
+    "email": "student39@school.com",
+    "full_name": "Nguyễn Văn Toàn",
+    "role_name": "Student",
+    "student_code": "HS10039",
+    "class_name": "10A3",
+    "password_plain": "Student@1234"
+  },
+  {
+    "user_id": "d4b1d73b-0f58-4595-a757-ba3f61f828a1",
+    "phone": "0999100040",
+    "email": "student40@school.com",
+    "full_name": "Phạm Tuấn Hải",
+    "role_name": "Student",
+    "student_code": "HS10040",
+    "class_name": "10A3",
+    "password_plain": "Student@1234"
+  },
+  {
+    "user_id": "d50948b0-eed3-44e9-9960-e7fca4d4ff4f",
+    "phone": "0999100041",
+    "email": "student41@school.com",
+    "full_name": "Hồ Tấn Tài",
+    "role_name": "Student",
+    "student_code": "HS10041",
+    "class_name": "10A3",
+    "password_plain": "Student@1234"
+  },
+  {
+    "user_id": "5bc86ea7-528f-432d-96ff-80690a5dcb3c",
+    "phone": "0999100042",
+    "email": "student42@school.com",
+    "full_name": "Trần Nguyên Mạnh",
+    "role_name": "Student",
+    "student_code": "HS10042",
+    "class_name": "10A3",
+    "password_plain": "Student@1234"
+  },
+  {
+    "user_id": "1faa6e51-c6c7-45e9-ad4c-39547b9b9a31",
+    "phone": "0999100043",
+    "email": "student43@school.com",
+    "full_name": "Đặng Văn Lâm",
+    "role_name": "Student",
+    "student_code": "HS10043",
+    "class_name": "10A3",
+    "password_plain": "Student@1234"
+  },
+  {
+    "user_id": "1a676f29-3e96-435f-8205-fcfce621038b",
+    "phone": "0999100044",
+    "email": "student44@school.com",
+    "full_name": "Bùi Tấn Trường",
+    "role_name": "Student",
+    "student_code": "HS10044",
+    "class_name": "10A3",
+    "password_plain": "Student@1234"
+  },
+  {
+    "user_id": "932b87c0-f349-443e-8e7a-632a05d0e24e",
+    "phone": "0999100045",
+    "email": "student45@school.com",
+    "full_name": "Nguyễn Đức Chiến",
+    "role_name": "Student",
+    "student_code": "HS10045",
+    "class_name": "10A3",
+    "password_plain": "Student@1234"
+  },
+  {
+    "user_id": "b52f058f-b2a0-438b-8329-dd9edbc46b0b",
+    "phone": "0999100046",
+    "email": "student46@school.com",
+    "full_name": "Trương Văn Thái Quý",
+    "role_name": "Student",
+    "student_code": "HS10046",
+    "class_name": "10A3",
+    "password_plain": "Student@1234"
+  },
+  {
+    "user_id": "89f327a4-83fb-448b-bb57-519ff06bb399",
+    "phone": "0999100047",
+    "email": "student47@school.com",
+    "full_name": "Lê Văn Xuân",
+    "role_name": "Student",
+    "student_code": "HS10047",
+    "class_name": "10A3",
+    "password_plain": "Student@1234"
+  },
+  {
+    "user_id": "2f31200e-4d61-4782-ab4c-b5c03a750368",
+    "phone": "0999100048",
+    "email": "student48@school.com",
+    "full_name": "Dụng Quang Nho",
+    "role_name": "Student",
+    "student_code": "HS10048",
+    "class_name": "10A3",
+    "password_plain": "Student@1234"
+  },
+  {
+    "user_id": "21c7e3f0-a963-4875-8a68-9612634b964c",
+    "phone": "0999100049",
+    "email": "student49@school.com",
+    "full_name": "Trần Danh Trung",
+    "role_name": "Student",
+    "student_code": "HS10049",
+    "class_name": "10A3",
+    "password_plain": "Student@1234"
+  },
+  {
+    "user_id": "370d01be-2693-4971-8fb5-e8f82f1a6607",
+    "phone": "0999100050",
+    "email": "student50@school.com",
+    "full_name": "Mai Xuân Quyết",
+    "role_name": "Student",
+    "student_code": "HS10050",
+    "class_name": "10A3",
+    "password_plain": "Student@1234"
+  },
+  {
+    "user_id": "625ba8a0-87f9-4eed-ab4c-5dd9dab5002f",
+    "phone": "0999100051",
+    "email": "student51@school.com",
+    "full_name": "Lê Minh Bình",
+    "role_name": "Student",
+    "student_code": "HS10051",
+    "class_name": "10A3",
+    "password_plain": "Student@1234"
+  },
+  {
+    "user_id": "7c8d9175-7e1e-48b4-b0fe-671a16b5fcb7",
+    "phone": "0999100052",
+    "email": "student52@school.com",
+    "full_name": "Nguyễn Hữu Thắng",
+    "role_name": "Student",
+    "student_code": "HS10052",
+    "class_name": "10A3",
+    "password_plain": "Student@1234"
+  },
+  {
+    "user_id": "3d20a39d-e433-4e91-87bb-ff33a755d7ac",
+    "phone": "0999100053",
+    "email": "student53@school.com",
+    "full_name": "Trần Bảo Toàn",
+    "role_name": "Student",
+    "student_code": "HS10053",
+    "class_name": "10A3",
+    "password_plain": "Student@1234"
+  },
+  {
+    "user_id": "a7f69b93-c8a1-4f71-a71e-4b634e4d1577",
+    "phone": "0999100054",
+    "email": "student54@school.com",
+    "full_name": "Lê Xuân Tú",
+    "role_name": "Student",
+    "student_code": "HS10054",
+    "class_name": "10A3",
+    "password_plain": "Student@1234"
+  },
+  {
+    "user_id": "ab00ab3e-638f-4716-bc64-3365e33bc21e",
+    "phone": "0999100055",
+    "email": "student55@school.com",
+    "full_name": "Nguyễn Văn Tùng",
+    "role_name": "Student",
+    "student_code": "HS10055",
+    "class_name": "10A3",
+    "password_plain": "Student@1234"
+  }
+]

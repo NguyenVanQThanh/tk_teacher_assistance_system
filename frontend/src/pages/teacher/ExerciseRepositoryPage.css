@@ -1,0 +1,503 @@
+/*
+File Name: ExerciseRepositoryPage.css
+Description: Stylesheet for ExerciseRepositoryPage matching exact Figma design specifications and fitted into 100vh viewport.
+Created At: 2026-08-30
+Created By: Tam Khang
+Updated At: 2026-08-31
+Updated By: Tam Khang
+*/
+
+.exercise-repository-layout {
+  height: 100vh;
+  max-height: 100vh;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  background-color: #F8F7FA;
+  font-family: 'Be Vietnam Pro', sans-serif;
+  animation: pageFadeIn 0.35s ease-out;
+}
+
+.exercise-repository-body {
+  display: flex;
+  flex: 1;
+  height: calc(100vh - 64px);
+  max-height: calc(100vh - 64px);
+  overflow: hidden;
+}
+
+.exercise-repository-main {
+  flex: 1;
+  padding: 12px 24px 14px;
+  background-color: #F8F7FA;
+  display: flex;
+  flex-direction: column;
+  box-sizing: border-box;
+  overflow: hidden;
+  height: 100%;
+}
+
+/* Top bar: Breadcrumb & Create Button */
+.exercise-top-bar {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  margin-bottom: 8px;
+  flex-wrap: wrap;
+  gap: 12px;
+  flex-shrink: 0;
+}
+
+.exercise-title-group {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.breadcrumb-nav {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+}
+
+.breadcrumb-link {
+  color: #6B7280;
+  text-decoration: none;
+  transition: color 0.2s ease;
+}
+
+.breadcrumb-link:hover {
+  color: #4D308D;
+  text-decoration: underline;
+}
+
+.breadcrumb-separator {
+  color: #9CA3AF;
+}
+
+.breadcrumb-current {
+  color: #1D1928;
+  font-weight: 600;
+}
+
+.page-heading {
+  font-size: 22px;
+  font-weight: 700;
+  color: #1D1928;
+  line-height: 26px;
+  margin: 0;
+}
+
+.page-subheading {
+  font-size: 12px;
+  color: #494551;
+  margin: 2px 0 0 0;
+  line-height: 16px;
+}
+
+.btn-create-new-exercise {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 16px;
+  background: linear-gradient(90deg, #6549A6 0%, #7D49A6 100%);
+  color: #FFFFFF;
+  border: none;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 600;
+  font-family: inherit;
+  cursor: pointer;
+  box-shadow: 0 3px 10px rgba(101, 73, 166, 0.2);
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+  flex-shrink: 0;
+}
+
+.btn-create-new-exercise:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 5px 14px rgba(101, 73, 166, 0.3);
+}
+
+.btn-create-new-exercise:active {
+  transform: scale(0.98);
+}
+
+/* Grid Layout (3 columns x 2 rows = 6 items) */
+.exercise-cards-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-rows: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  margin-bottom: 8px;
+  flex: 1;
+  min-height: 0;
+}
+
+.exercise-empty-state {
+  grid-column: 1 / -1;
+  background-color: #FFFFFF;
+  border: 1px dashed #CBD5E1;
+  border-radius: 12px;
+  padding: 36px;
+  text-align: center;
+  color: #6B7280;
+  font-size: 13.5px;
+}
+
+/* Pagination Row matching Document Repository */
+.exercise-pagination-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-top: 8px;
+  padding-bottom: 2px;
+  border-top: 1px solid #EBE8F0;
+  margin-top: auto;
+  flex-shrink: 0;
+}
+
+.pagination-info {
+  font-size: 12.5px;
+  color: #494551;
+}
+
+.pagination-info strong {
+  color: #1D1928;
+}
+
+.pagination-controls {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.pagination-btn {
+  min-width: 28px;
+  height: 28px;
+  padding: 0 6px;
+  border: 1px solid #EBE8F0;
+  background-color: #FFFFFF;
+  color: #494551;
+  font-size: 12px;
+  font-weight: 500;
+  font-family: inherit;
+  border-radius: 6px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.15s ease;
+}
+
+.pagination-btn:hover:not(:disabled) {
+  border-color: #4D308D;
+  color: #4D308D;
+  background-color: #F8F1FF;
+}
+
+.pagination-btn.active {
+  background-color: #4D308D;
+  border-color: #4D308D;
+  color: #FFFFFF;
+  font-weight: 700;
+}
+
+.pagination-btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+/* Responsive */
+@media (max-width: 1200px) {
+  .exercise-repository-layout {
+    overflow-y: auto;
+  }
+  .exercise-repository-body {
+    height: auto;
+    overflow: visible;
+  }
+  .exercise-repository-main {
+    overflow: visible;
+  }
+  .exercise-cards-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-template-rows: auto;
+  }
+}
+
+@media (max-width: 768px) {
+  .exercise-cards-grid {
+    grid-template-columns: 1fr;
+  }
+  .exercise-top-bar {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+  .exercise-pagination-row {
+    flex-direction: column;
+    gap: 10px;
+    align-items: flex-start;
+  }
+}
+
+/* ============================================================ */
+/* CENTERED CONFIRMATION MODAL */
+/* ============================================================ */
+.center-confirm-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.42);
+  backdrop-filter: blur(5px);
+  -webkit-backdrop-filter: blur(5px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 99999;
+  animation: confirmFadeIn 0.2s ease-out forwards;
+}
+
+@keyframes confirmFadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.center-confirm-card {
+  background: #FFFFFF;
+  border-radius: 20px;
+  padding: 24px;
+  max-width: 440px;
+  width: 90%;
+  box-shadow: 0 25px 50px -12px rgba(15, 23, 42, 0.25), 0 0 0 1px rgba(0, 0, 0, 0.05);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 16px;
+  animation: confirmPopIn 0.28s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  font-family: 'Be Vietnam Pro', sans-serif;
+}
+
+@keyframes confirmPopIn {
+  0% {
+    opacity: 0;
+    transform: scale(0.88) translateY(16px);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+.confirm-icon-badge {
+  width: 52px;
+  height: 52px;
+  border-radius: 16px;
+  background: #FEF2F2;
+  color: #DC2626;
+  border: 1px solid #FECACA;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.confirm-content-col {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.confirm-title-text {
+  font-size: 17px;
+  font-weight: 700;
+  color: #111827;
+  margin: 0;
+}
+
+.confirm-message-text {
+  font-size: 13.5px;
+  color: #4B5563;
+  line-height: 1.5;
+  margin: 0;
+}
+
+.confirm-message-text strong {
+  color: #1F2937;
+}
+
+.confirm-actions-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  margin-top: 6px;
+}
+
+.btn-confirm-cancel {
+  flex: 1;
+  padding: 10px 16px;
+  border-radius: 10px;
+  border: 1px solid #D1D5DB;
+  background: #FFFFFF;
+  color: #374151;
+  font-size: 13.5px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.btn-confirm-cancel:hover {
+  background: #F9FAFB;
+  border-color: #9CA3AF;
+}
+
+.btn-confirm-delete {
+  flex: 1.2;
+  padding: 10px 16px;
+  border-radius: 10px;
+  border: none;
+  background: #DC2626;
+  color: #FFFFFF;
+  font-size: 13.5px;
+  font-weight: 600;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  box-shadow: 0 4px 12px rgba(220, 38, 38, 0.25);
+  transition: all 0.15s ease;
+}
+
+.btn-confirm-delete:hover {
+  background: #B91C1C;
+  transform: translateY(-1px);
+  box-shadow: 0 6px 16px rgba(220, 38, 38, 0.35);
+}
+
+/* ============================================================ */
+/* CENTERED TOAST NOTIFICATION MODAL */
+/* ============================================================ */
+.center-toast-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.32);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 99999;
+  animation: toastOverlayFadeIn 0.2s ease-out forwards;
+}
+
+@keyframes toastOverlayFadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.center-toast-card {
+  background: #FFFFFF;
+  border-radius: 16px;
+  padding: 16px 20px;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  min-width: 340px;
+  max-width: 480px;
+  box-shadow: 0 20px 45px -10px rgba(15, 23, 42, 0.25), 0 0 0 1px rgba(0, 0, 0, 0.06);
+  animation: toastCenterPop 0.28s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  position: relative;
+  font-family: 'Be Vietnam Pro', sans-serif;
+}
+
+@keyframes toastCenterPop {
+  0% {
+    opacity: 0;
+    transform: scale(0.88) translateY(12px);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+.center-toast-card.toast-type-success {
+  border-left: 4px solid #10B981;
+}
+
+.center-toast-card.toast-type-success .toast-icon-badge {
+  background-color: #ECFDF5;
+  color: #10B981;
+}
+
+.center-toast-card.toast-type-error {
+  border-left: 4px solid #EF4444;
+}
+
+.center-toast-card.toast-type-error .toast-icon-badge {
+  background-color: #FEF2F2;
+  color: #EF4444;
+}
+
+.center-toast-card.toast-type-info {
+  border-left: 4px solid #6366F1;
+}
+
+.center-toast-card.toast-type-info .toast-icon-badge {
+  background-color: #EEF2FF;
+  color: #6366F1;
+}
+
+.toast-icon-badge {
+  width: 42px;
+  height: 42px;
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.toast-content-col {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.toast-title-text {
+  font-size: 14px;
+  font-weight: 700;
+  color: #1E293B;
+  margin: 0;
+  line-height: 1.3;
+}
+
+.toast-message-text {
+  font-size: 13px;
+  font-weight: 500;
+  color: #475569;
+  margin: 0;
+  line-height: 1.4;
+}
+
+.toast-close-btn {
+  background: none;
+  border: none;
+  color: #94A3B8;
+  cursor: pointer;
+  padding: 6px;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s ease;
+  flex-shrink: 0;
+}
+
+.toast-close-btn:hover {
+  background-color: #F1F5F9;
+  color: #334155;
+}
+

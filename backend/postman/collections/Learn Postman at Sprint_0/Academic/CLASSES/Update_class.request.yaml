@@ -1,0 +1,20 @@
+$kind: http-request
+name: Update_class
+url: "{{BASE_URL}}/classes/:class_id"
+method: PUT
+pathVariables:
+  - key: class_id
+    value: b96c850b-563d-4624-912e-abccdbf9cdee
+    description: ""
+body:
+  type: json
+  content: "{\r
+
+    \    \"class_name\": \"____****@@!!$$%^11A2\"\r
+
+    }\r\n"
+auth:
+  type: bearer
+  credentials:
+    token: "{{ACCESS_TOKEN}}"
+order: 66666195047

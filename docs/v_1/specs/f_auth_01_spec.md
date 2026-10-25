@@ -21,11 +21,11 @@
 
 | Gate | Bao trùm | Owner | Approver | Status | Date |
 |---|---|---|---|---|---|
-| G3 Business | PART A | BA/PM | Lead | `draft` | |
-| G4 Architecture | PART B | Architect | CTO | `draft` | |
-| G6 Design | PART C | Lead | Lead | `draft` | |
-| G6.5 Coding | PART D | BE Lead | BE Lead | `draft` | |
-| G7+ Tracking | PART E | PM | PM | `draft` | |
+| G3 Business | PART A | BA/PM | Lead | `approved` | 2026-07-18 |
+| G4 Architecture | PART B | Architect | CTO | `approved` | 2026-07-18 |
+| G6 Design | PART C | Lead | Lead | `approved` | 2026-07-18 |
+| G6.5 Coding | PART D | BE Lead | BE Lead | `approved` | 2026-07-18 |
+| G7+ Tracking | PART E | PM | PM | `approved` | 2026-07-18 |
 
 ### Table of contents
 
@@ -366,16 +366,16 @@ Coverage target: ≥ 80% unit, ≥ 70% integration (V2 §15.3).
 
 | Slice ID | Task type | Size | SP | Task file | Status |
 |---|---|---|---|---|---|
-| S01 | SCHEMA (Pydantic) | S | 1 | `tasks/f_auth_01/f_auth_01-task_001.md` | draft |
-| S02 | REPO | S | 1 | `tasks/f_auth_01/f_auth_01-task_002.md` | draft |
-| S03 | SERVICE (login + token) | M | 3 | `tasks/f_auth_01/f_auth_01-task_003.md` | draft |
-| S04 | DEPENDENCY (get_current_user + require_perm + permission resolver/cache) | M | 3 | `tasks/f_auth_01/f_auth_01-task_004.md` | draft |
-| S05 | API (login, me, logout) | M | 2 | `tasks/f_auth_01/f_auth_01-task_005.md` | draft |
-| S06 | SERVICE+API (change-password) | S | 1 | `tasks/f_auth_01/f_auth_01-task_006.md` | draft |
-| S07 | MIDDLEWARE (rate-limit login) | S | 1 | `tasks/f_auth_01/f_auth_01-task_007.md` | draft |
-| S08 | TEST (e2e + security + rbac override) | M | 2 | `tasks/f_auth_01/f_auth_01-task_008.md` | draft |
-| S09 | MIG+SEED (3 bảng RBAC + permissions/role_permissions mặc định) | M | 2 | `tasks/f_auth_01/f_auth_01-task_009.md` | draft |
-| S10 | REPO (permission_repository: load role perms + user overrides) | S | 1 | `tasks/f_auth_01/f_auth_01-task_010.md` | draft |
+| S01 | SCHEMA (Pydantic) | S | 1 | `tasks/f_auth_01/f_auth_01-task_001.md` | done |
+| S02 | REPO | S | 1 | `tasks/f_auth_01/f_auth_01-task_002.md` | done |
+| S03 | SERVICE (login + token) | M | 3 | `tasks/f_auth_01/f_auth_01-task_003.md` | done |
+| S04 | DEPENDENCY (get_current_user + require_perm + permission resolver/cache) | M | 3 | `tasks/f_auth_01/f_auth_01-task_004.md` | done |
+| S05 | API (login, me, logout) | M | 2 | `tasks/f_auth_01/f_auth_01-task_005.md` | done |
+| S06 | SERVICE+API (change-password) | S | 1 | `tasks/f_auth_01/f_auth_01-task_006.md` | done |
+| S07 | MIDDLEWARE (rate-limit login) | S | 1 | `tasks/f_auth_01/f_auth_01-task_007.md` | done |
+| S08 | TEST (e2e + security + rbac override) | M | 2 | `tasks/f_auth_01/f_auth_01-task_008.md` | done |
+| S09 | MIG+SEED (3 bảng RBAC + permissions/role_permissions mặc định) | M | 2 | `tasks/f_auth_01/f_auth_01-task_009.md` | done |
+| S10 | REPO (permission_repository: load role perms + user overrides) | S | 1 | `tasks/f_auth_01/f_auth_01-task_010.md` | done |
 
 ## D.2 Source of Truth (anchor map)
 
@@ -475,16 +475,16 @@ ruff check . && mypy app && pytest --cov=app
 
 | Slice | Task ID | Type | Size | SP | Depends on | Owner | PR | Status |
 |---|---|---|---|---|---|---|---|---|
-| S01 | `F-AUTH-01-TASK-001` | SCHEMA | S | 1 | F-FND-01 | BE | | draft |
-| S02 | `F-AUTH-01-TASK-002` | REPO | S | 1 | S01 | BE | | draft |
-| S03 | `F-AUTH-01-TASK-003` | SERVICE | M | 3 | S02 | BE | | draft |
-| S09 | `F-AUTH-01-TASK-009` | MIG+SEED | M | 2 | F-FND-01 | BE | | draft |
-| S10 | `F-AUTH-01-TASK-010` | REPO (perm) | S | 1 | S09 | BE | | draft |
-| S04 | `F-AUTH-01-TASK-004` | DEPENDENCY | M | 3 | S03,S10 | BE | | draft |
-| S05 | `F-AUTH-01-TASK-005` | API | M | 2 | S03,S04 | BE | | draft |
-| S06 | `F-AUTH-01-TASK-006` | SERVICE+API | S | 1 | S04 | BE | | draft |
-| S07 | `F-AUTH-01-TASK-007` | MIDDLEWARE | S | 1 | S05 | BE | | draft |
-| S08 | `F-AUTH-01-TASK-008` | TEST | M | 2 | S05,S06,S07 | BE | | draft |
+| S01 | `F-AUTH-01-TASK-001` | SCHEMA | S | 1 | F-FND-01 | BE | | done |
+| S02 | `F-AUTH-01-TASK-002` | REPO | S | 1 | S01 | BE | | done |
+| S03 | `F-AUTH-01-TASK-003` | SERVICE | M | 3 | S02 | BE | | done |
+| S09 | `F-AUTH-01-TASK-009` | MIG+SEED | M | 2 | F-FND-01 | BE | | done |
+| S10 | `F-AUTH-01-TASK-010` | REPO (perm) | S | 1 | S09 | BE | | done |
+| S04 | `F-AUTH-01-TASK-004` | DEPENDENCY | M | 3 | S03,S10 | BE | | done |
+| S05 | `F-AUTH-01-TASK-005` | API | M | 2 | S03,S04 | BE | | done |
+| S06 | `F-AUTH-01-TASK-006` | SERVICE+API | S | 1 | S04 | BE | | done |
+| S07 | `F-AUTH-01-TASK-007` | MIDDLEWARE | S | 1 | S05 | BE | | done |
+| S08 | `F-AUTH-01-TASK-008` | TEST | M | 2 | S05,S06,S07 | BE | | done |
 
 ## E.3 AI Session Plan Overview
 
@@ -496,11 +496,11 @@ ruff check . && mypy app && pytest --cov=app
 
 | PART | Gate | Owner | Approver | Status | Người ACK | Ngày |
 |---|---|---|---|---|---|---|
-| A Business | G3 | BA/PM | Lead | `draft` | | |
-| B Architecture | G4 | Architect | CTO | `draft` | | |
-| C Design | G6 | Lead | Lead | `draft` | | |
-| D Coding | G6.5 | BE Lead | BE Lead | `draft` | | |
-| E Tracking | G7+ | PM | PM | `live` | | |
+| A Business | G3 | BA/PM | Lead | `approved` | | 2026-07-18 |
+| B Architecture | G4 | Architect | CTO | `approved` | | 2026-07-18 |
+| C Design | G6 | Lead | Lead | `approved` | | 2026-07-18 |
+| D Coding | G6.5 | BE Lead | BE Lead | `approved` | | 2026-07-18 |
+| E Tracking | G7+ | PM | PM | `approved` | | 2026-07-18 |
 | Feature Done | G8 | PM | PM + Tech Lead | — | | |
 
 **Update rule:** task chỉ start khi PART A+B+C+D đều `approved` **và** `F-FND-01` đã đạt G6.5.

@@ -1,4 +1,4 @@
-# Sprint 0 — Foundation & Auth
+# Sprint 0 — Foundation & Auth ✅ DONE
 
 > Path: `docs/v_1/sprints/sprint_0_overview.md` · Module(s): `foundation` + `auth`
 

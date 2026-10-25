@@ -1,0 +1,9 @@
+$kind: http-request
+name: New Request
+url: "{{BASE_URL}}/exercises/3ad4c004-9616-4ee1-9b88-e281596bfa7b/export/pdf"
+method: GET
+auth:
+  type: bearer
+  credentials:
+    token: "{{ACCESS_TOKEN}}"
+order: 4503599120136483

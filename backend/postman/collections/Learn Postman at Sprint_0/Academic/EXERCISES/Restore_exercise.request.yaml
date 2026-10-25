@@ -1,0 +1,12 @@
+$kind: http-request
+name: Restore_exercise
+url: "{{BASE_URL}}/exercises/:exercise_id/restore"
+method: POST
+pathVariables:
+  - key: exercise_id
+    value: 39b113b2-fc91-44ba-8140-28b4a64bc084
+auth:
+  type: bearer
+  credentials:
+    token: "{{ACCESS_TOKEN}}"
+order: 4408366060927904

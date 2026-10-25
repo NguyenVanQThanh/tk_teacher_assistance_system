@@ -1,0 +1,50 @@
+$kind: http-request
+name: Add_question
+url: "{{BASE_URL}}/exercises/:exercise_id/questions"
+method: POST
+pathVariables:
+  - key: exercise_id
+    value: 39b113b2-fc91-44ba-8140-28b4a64bc084
+    description: ""
+body:
+  type: json
+  content: "{\r
+
+    \  \"content\": \"1+1\",\r
+
+    \  \"question_type\": \"MultipleChoice\",\r
+
+    \  \"difficulty\": \"NhanBiet\",\r
+
+    \  \"display_order\": 1,\r
+
+    \  \"answer_options\": [\r
+
+    \    {\r
+
+    \      \"content\": \"10\",\r
+
+    \      \"is_correct\":  true,\r
+
+    \      \"display_order\": 1\r
+
+    \    },\r
+
+    \    {\r
+
+    \      \"content\": \"1\",\r
+
+    \      \"is_correct\": false,\r
+
+    \      \"display_order\": 2\r
+
+    \    }\r
+
+    \  ]\r
+
+    }\r\n"
+auth:
+  type: bearer
+  credentials:
+    token: "{{ACCESS_TOKEN}}"
+order: 4492766373414157

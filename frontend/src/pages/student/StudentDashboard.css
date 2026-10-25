@@ -1,0 +1,111 @@
+/*
+File Name: StudentDashboard.css
+Description: Responsive layout styles for Student Dashboard matching the exact mockup.
+Created At: 2026-09-07
+Created By: Tam Khang
+Updated At: 2026-09-07
+Updated By: Tam Khang
+*/
+
+.student-dashboard-page {
+  padding: 24px 32px 40px;
+  box-sizing: border-box;
+  font-family: 'Be Vietnam Pro', -apple-system, BlinkMacSystemFont, sans-serif;
+  animation: pageFadeIn 0.3s ease-out;
+}
+
+.student-dashboard-grid-layout {
+  display: grid;
+  grid-template-columns: 2.1fr 1fr;
+  gap: 24px;
+  align-items: stretch;
+}
+
+.student-dashboard-main-columns {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 24px;
+}
+
+.student-dashboard-right-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+/* Right Panel Switcher Bar */
+.right-panel-switcher-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background-color: #FFFFFF;
+  border: 1px solid #EBE8F0;
+  border-radius: 12px;
+  padding: 5px;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.02);
+}
+
+.switcher-tabs-group {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  width: 100%;
+}
+
+.panel-switch-tab {
+  flex: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 8px 10px;
+  border-radius: 8px;
+  border: none;
+  background: transparent;
+  color: #64748B;
+  font-size: 12.5px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  white-space: nowrap;
+  font-family: inherit;
+}
+
+.panel-switch-tab:hover:not(.is-active) {
+  background-color: #F8FAFC;
+  color: #1E293B;
+}
+
+.panel-switch-tab.is-active {
+  background-color: #6D28D9;
+  color: #FFFFFF;
+  box-shadow: 0 2px 8px rgba(109, 40, 217, 0.25);
+}
+
+.right-panel-content-body {
+  display: flex;
+  flex-direction: column;
+  animation: panelFadeIn 0.2s ease-out;
+}
+
+@keyframes panelFadeIn {
+  from { opacity: 0; transform: translateY(4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@media (max-width: 1200px) {
+  .student-dashboard-grid-layout {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 768px) {
+  .student-dashboard-page {
+    padding: 16px;
+  }
+
+  .student-dashboard-main-columns {
+    grid-template-columns: 1fr;
+    gap: 16px;
+  }
+}

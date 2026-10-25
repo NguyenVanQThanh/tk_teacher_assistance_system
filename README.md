@@ -4,148 +4,102 @@
 
 | | |
 |---|---|
-| **Trạng thái** | 🚧 Đang thiết kế (Sprint 0 — Foundation & Auth) |
-| **Tài liệu nguồn** | SRS v1.0 — `docs/HỆ THỐNG QUẢN LÍ BÀI TẬP KẾT HỢP PHÂN TÍCH HÀNH VI.pdf` |
-| **Stack** | Python · FastAPI · SQLAlchemy 2.0 · Alembic · PostgreSQL · JWT |
+| **Trạng thái** | ✅ Sprint 0, Sprint 1, Sprint 2 |
+| **Kiến trúc** | Monorepo (`backend/` & `frontend/`) |
+| **Backend Stack** | Python 3.11+ · FastAPI · SQLAlchemy 2.0 · Alembic · PostgreSQL · JWT |
+| **Frontend Stack** | React 18 · Vite · JavaScript/CSS |
 
 ---
 
-## 1. Bối cảnh & Mục tiêu
+## 1. Cấu trúc Thư mục Monorepo
 
-Mô hình giao/đánh giá bài tập hiện nay gặp 3 rào cản: giáo viên **không nắm được hành vi học thực tế** của học sinh ở nhà; **thiếu công cụ trực quan hóa năng lực**; và **áp lực biên soạn bài tập cá nhân hóa** tốn nhiều công sức.
-
-SmartLMS giải quyết bằng cách:
-- **Đo lường chi tiết hành vi học tập** (thời gian, tần suất, mức tập trung).
-- **Trực quan hóa năng lực** lớp & cá nhân qua dashboard, biểu đồ.
-- **Thúc đẩy tự học**: học sinh tự đánh giá, đặt mục tiêu, nhận gợi ý lộ trình.
-- **Tối ưu biên soạn**: AI sinh bài tập từ tài liệu giáo viên cung cấp.
-
----
-
-## 2. Phạm vi chức năng (4 module cốt lõi)
-
-| # | Module | Tóm tắt | Vai trò chính |
-|---|---|---|---|
-| 1 | **Tracking — Theo dõi hành vi** | Ghi vết thời gian (bắt đầu/tạm dừng/nộp), đo mức tập trung, cảnh báo hạn nộp | Giáo viên |
-| 2 | **AI Generation — Tạo sinh bài tập** | Upload tài liệu → AI sinh câu hỏi → GV duyệt/sửa → giao bài | Giáo viên |
-| 3 | **Teacher Dashboard** | Phổ điểm lớp, phân tích hành vi, phát hiện HS sa sút / nộp sát giờ, khuyến nghị | Giáo viên |
-| 4 | **Student Dashboard** | Số liệu theo môn, đặt mục tiêu điểm, gợi ý lộ trình, biểu đồ radar | Học sinh |
-
-**Yêu cầu phi chức năng:** RBAC nghiêm ngặt · AI sinh đề ≤ 15–30s · dashboard tải < 3s (lớp ~50 HS) · responsive.
-
----
-
-## 3. Công nghệ
-
-| Lớp | Lựa chọn |
-|---|---|
-| Ngôn ngữ | Python 3.11+ |
-| Web framework | FastAPI |
-| ORM / Migration | SQLAlchemy 2.0 / Alembic |
-| Database | PostgreSQL (UUID, JSONB, GIN index) |
-| Auth | JWT (`python-jose`) + `passlib[bcrypt]` |
-| Phân quyền | RBAC permission-based (usecase code) + override theo user |
-| Test | `pytest` · `pytest-asyncio` · `httpx` · Testcontainers |
-| Chất lượng | `ruff` · `mypy` · coverage ≥ 80% |
-
----
-
-## 4. Kiến trúc & cấu trúc thư mục
-
-Monolith modular: mỗi nghiệp vụ là 1 package dưới `app/modules/`; lớp dùng chung ở `app/core/`.
-
-```
-Client → FastAPI Router → Service → Repository → PostgreSQL (SQLAlchemy)
-                              │
-                              ▼
-                     app/core (settings · session · errors · logging · security)
-```
-
-```
-.
-├── README.md                     ← (file này) tổng quan dự án
-├── docs/
-│   ├── HỆ THỐNG ... .pdf          ← SRS gốc (BA)
-│   ├── base_sql_erd.sql          ← schema PostgreSQL (ERD tham chiếu, v1.0→v1.2)
-│   ├── _template_feature_spec.md ← template spec chuẩn (PART A–E)
-│   └── v_1/
-│       ├── sprints/              ← kế hoạch theo sprint
-│       │   └── sprint_0_overview.md
-│       ├── specs/                ← feature spec
-│       │   ├── f_fnd_01_spec.md  ← Foundation & DB Baseline
-│       │   └── f_auth_01_spec.md ← Authentication & RBAC
-│       └── constraints/catalogs/ ← (TBD) error_codes / permissions / events
-└── app/                          ← (TBD) mã nguồn FastAPI
+```text
+tk_teacher_assistance_system/
+├── backend/                      # Dịch vụ Backend (FastAPI, Alembic, SQLAlchemy)
+│   ├── alembic/                  # Database migration scripts
+│   ├── alembic.ini               # Cấu hình Alembic
+│   ├── app/                      # Mã nguồn ứng dụng FastAPI
+│   │   ├── core/                 # Cấu hình, database, bảo mật, xử lý lỗi
+│   │   ├── modules/              # Các module nghiệp vụ (auth, academic, exercise,...)
+│   │   ├── scripts/              # Script khởi tạo seed data và tiện ích
+│   │   └── main.py               # Điểm khởi chạy FastAPI
+│   ├── models/                   # SQLAlchemy ORM Models
+│   ├── tests/                    # Unit, Integration & E2E tests
+│   ├── requirements.txt          # Python dependencies
+│   ├── pytest.ini                # Cấu hình pytest
+│   ├── Dockerfile                # Docker build cho Backend
+│   └── README.md                 # Hướng dẫn chi tiết cho Backend
+│
+├── frontend/                     # Ứng dụng Frontend (React + Vite)
+│   ├── public/                   # Static assets
+│   ├── src/                      # Source code giao diện (Components, Pages, Services)
+│   ├── index.html                # Entrypoint HTML
+│   ├── package.json              # Quản lý dependencies Frontend
+│   ├── vite.config.js            # Cấu hình Vite & API Proxy
+│   ├── Dockerfile                # Docker build cho Frontend
+│   └── README.md                 # Hướng dẫn chi tiết cho Frontend
+│
+├── docs/                         # Tài liệu hệ thống, SRS, Specs & Tasks
+├── docker-compose.yml            # Docker Compose chạy toàn bộ hệ thống (DB, BE, FE)
+└── README.md                     # Tài liệu tổng quan dự án
 ```
 
 ---
 
-## 5. Cơ sở dữ liệu
+## 2. Hướng dẫn Khởi chạy Dự án
 
-ERD đầy đủ ở [docs/base_sql_erd.sql](docs/base_sql_erd.sql) — **một file hợp nhất**, sắp theo nhóm domain + thứ tự phụ thuộc FK (chạy tuần tự là tạo xong toàn bộ):
+### Cách 1: Sử dụng Docker Compose (Toàn bộ hệ thống)
 
-| Nhóm | Bảng |
-|---|---|
-| **1. Phân quyền & tài khoản (RBAC)** | `roles`, `users`, `permissions`, `role_permissions`, `user_permissions` |
-| **2. Cơ cấu tổ chức** | `subjects`, `classes`, `student_class`, `teacher_subjects` |
-| **3. Học liệu & bài tập** | `documents`, `exercises`, `questions`, `answer_options` |
-| **4. Giao bài & phân tích hành vi** | `class_assignments`, `student_exercise_attempts` |
-| **5. Tương tác & cá nhân hóa** | `notifications`, `student_goals`, `learning_recommendations` |
-| **6. Index** | RBAC · hành vi (GIN) · học liệu · tương tác |
+Khởi chạy cả Database (PostgreSQL), Backend (FastAPI) và Frontend (React/Vite) chỉ với một lệnh:
 
-**Phân tích hành vi** lưu ở `student_exercise_attempts` (`behavior_logs`, `detailed_results` dạng JSONB + GIN index) — trọng tâm dữ liệu của hệ thống.
+```bash
+docker-compose up -d --build
+```
 
-> **Cố ý hoãn** (làm khi vào module cần, có ghi chú trong file): `users.last_login_at`, trigger tự đồng bộ `exercises.total_questions`, trigger tự cập nhật `updated_at` (hiện xử lý ở tầng ứng dụng).
+- **Frontend**: http://localhost:3000
+- **Backend API**: http://localhost:8000
+- **API Docs (Swagger)**: http://localhost:8000/docs
+- **PostgreSQL**: `localhost:5432`
 
 ---
 
-## 6. Mô hình phân quyền (RBAC)
+### Cách 2: Chạy độc lập từng phần (Local Development)
 
-Phân quyền **mịn theo permission (usecase)**, không chỉ theo role:
+#### 1. Khởi chạy Database (PostgreSQL)
+```bash
+docker-compose up -d postgres
+```
 
-- Mỗi endpoint khai báo `require_perm("CODE")` (vd `EXERCISE_CREATE`).
-- **Role là gói permission** (`role_permissions`) — Admin chỉnh runtime.
-- **Override theo user** (`user_permissions`, `allow`/`deny`).
-- Tập quyền hiệu lực: `role ∪ user(allow) − user(deny)` — **deny thắng**, mặc định **fail-closed**.
-- Quyền **không nhúng vào JWT** (resolve từ DB + cache theo role) → đổi quyền có hiệu lực ngay.
+#### 2. Khởi chạy Backend (`backend/`)
+```bash
+cd backend
+python -m venv .venv
+# Windows
+.venv\Scripts\activate
+# Linux/macOS
+source .venv/bin/activate
 
----
+pip install -r requirements.txt
+cp .env.example .env
 
-## 7. Lộ trình Sprint
+# Chạy migrations & khởi động server
+alembic upgrade head
+uvicorn app.main:app --reload --port 8000
+```
 
-| Sprint | Module | Mục tiêu |
-|---|---|---|
-| **S0** | Foundation & Auth | Scaffold, baseline migration, login JWT, RBAC permission-based ← *đang làm* |
-| S1 | Academic Org | Môn học, lớp, ghi danh HS, phân công GV |
-| S2 | Bài tập lõi | Câu hỏi, giao bài, làm & chấm điểm |
-| S3 | Tracking | Ghi vết hành vi, cảnh báo hạn nộp |
-| S4 | AI Generation | Upload tài liệu, AI sinh đề, GV duyệt |
-| S5 | Teacher Dashboard | Phổ điểm, phân tích hành vi, khuyến nghị |
-| S6 | Student Dashboard | Mục tiêu, gợi ý lộ trình, radar |
-
-Chi tiết Sprint 0: [docs/v_1/sprints/sprint_0_overview.md](docs/v_1/sprints/sprint_0_overview.md).
-
----
-
-## 8. Quy trình tài liệu
-
-Mỗi feature có 1 spec theo template thống nhất ([_template_feature_spec.md](docs/_template_feature_spec.md)) gồm 5 phần & gate phê duyệt:
-
-| PART | Nội dung | Gate |
-|---|---|---|
-| A | Business (user story, REQ, AC) | G3 |
-| B | Architecture (ADR, invariant, DB boundary) | G4 |
-| C | Design (API contract, BR, edge case) | G6 |
-| D | Coding context (task, file, constraint) | G6.5 |
-| E | Tracking & Sign-off | G7+ |
-
-Task chỉ bắt đầu khi PART A→D đều `approved`.
+#### 3. Khởi chạy Frontend (`frontend/`)
+```bash
+cd frontend
+npm install
+npm run dev
+```
 
 ---
 
-## 9. Bước tiếp theo
+## 3. Kiểm thử (Testing)
 
-- [ ] Tạo 3 catalog: `error_codes.md`, `permissions.md`, `events.md`
-- [ ] Bung task files cho `F-FND-01`, `F-AUTH-01`
-- [ ] Spec `F-AUTH-02` — Admin quản trị quyền (CRUD permission, mapping)
-- [ ] Scaffold mã nguồn `app/` + Alembic + CI
+Chạy test suite cho Backend:
+```bash
+cd backend
+pytest
+```

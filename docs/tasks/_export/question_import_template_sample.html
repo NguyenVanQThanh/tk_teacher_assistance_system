@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<title>Mẫu File Import Câu Hỏi</title>
+<style>
+  @page { size: A4; margin: 2cm 1.8cm; }
+  body { font-family: "Times New Roman", serif; font-size: 13pt; line-height: 1.5; color: #111; }
+  h1 { text-align: center; font-size: 16pt; margin-bottom: 4px; }
+  h2 { text-align: center; font-size: 12pt; font-weight: normal; margin-top: 0; color: #444; }
+  .rule-box { border: 1px solid #333; padding: 12px 16px; background: #f7f7f7; margin: 18px 0; font-size: 11pt; }
+  .rule-box h3 { margin-top: 0; font-size: 12pt; }
+  .rule-box ul { margin: 6px 0; padding-left: 20px; }
+  pre { background: #f4f4f4; border: 1px solid #ccc; padding: 14px; font-family: Consolas, monospace; font-size: 11.5pt; white-space: pre-wrap; margin: 16px 0; }
+  .correct { color: #0a7d2c; font-weight: bold; }
+  .tag { color: #7a2fbf; font-weight: bold; }
+  .footer-note { margin-top: 24px; font-size: 10pt; color: #555; border-top: 1px dashed #999; padding-top: 10px; }
+</style>
+</head>
+<body>
+
+<h1>MẪU FILE IMPORT CÂU HỎI (.docx / .pdf)</h1>
+<h2>Feature F-EXE-05 — Question Import</h2>
+
+<div class="rule-box">
+  <h3>Quy tắc soạn file</h3>
+  <ul>
+    <li>Mỗi câu bắt đầu bằng <b>"Câu N."</b> (N = số thứ tự bất kỳ, chỉ để phân tách).</li>
+    <li>Thẻ độ khó ngay sau số câu: <span class="tag">[NB]</span> Nhận biết · <span class="tag">[TH]</span> Thông hiểu · <span class="tag">[VD]</span> Vận dụng. Không ghi thẻ → mặc định [NB].</li>
+    <li>Thẻ <span class="tag">[TU]</span> đánh dấu câu tự luận — bắt buộc có dòng "Đáp án: ...". Không có thẻ này → mặc định trắc nghiệm.</li>
+    <li>Câu trắc nghiệm: các dòng A./B./C./D. là đáp án. Đặt dấu <span class="correct">*</span> ngay đầu dòng đáp án đúng — <b>bắt buộc đúng 1 dấu *</b>, tối thiểu 2 đáp án.</li>
+    <li>Các câu cách nhau bằng 1 dòng trống.</li>
+    <li><b>Toàn bộ file bị từ chối</b> nếu có bất kỳ câu nào sai quy tắc (không import một phần).</li>
+  </ul>
+</div>
+
+<pre>Câu 1. [NB] 2 + 2 x 3 bằng bao nhiêu?
+*A. 8
+B. 12
+C. 6
+D. 10
+
+Câu 2. [TH] Nghiệm của phương trình x + 5 = 0 là?
+*A. x = -5
+B. x = 5
+
+Câu 3. [VD] [TU] Trình bày cách giải phương trình bậc nhất một ẩn.
+Đáp án: Chuyển vế, quy đồng, rút gọn ẩn số.</pre>
+
+<div class="rule-box">
+  <h3>Ví dụ lỗi (file bị từ chối toàn bộ)</h3>
+  <pre>Câu 2. [TH] Nghiệm của phương trình x + 5 = 0 là?
+A. x = -5
+B. x = 5</pre>
+  <p>→ Thiếu dấu <span class="correct">*</span> đánh dấu đáp án đúng ở Câu 2 → lỗi <code>ERR-EXE-IMPORT_INVALID_QUESTION</code>, toàn bộ file (kể cả Câu 1, Câu 3 hợp lệ) đều không được nhập vào hệ thống.</p>
+</div>
+
+<div class="footer-note">
+  Nguồn: docs/v_1/specs/f_exe_05_question_import_spec.md (Sprint 2 — Bài tập lõi). Tải file này lên qua
+  POST /api/v1/exercises/{exercise_id}/questions/import.
+</div>
+
+</body>
+</html>

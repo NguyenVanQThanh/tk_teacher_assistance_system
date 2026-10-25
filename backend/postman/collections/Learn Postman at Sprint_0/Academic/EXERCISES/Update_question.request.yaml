@@ -1,0 +1,30 @@
+$kind: http-request
+name: Update_question
+url: "{{BASE_URL}}/questions/:question_id"
+method: PUT
+pathVariables:
+  - key: question_id
+    value: 4b6fc097-27c7-476d-b7e5-e0e45d383687
+    description: ""
+body:
+  type: json
+  content: "{\r
+
+    \  \"content\": \"Trong ngôn ngữ lập trình Python, từ khóa nào dùng để định nghĩa một hàm?\",\r
+
+    \  \"question_type\": \"ShortAnswer\",\r
+
+    \  \"difficulty\": \"NhanBiet\",\r
+
+    \  \"correct_answer\": \"def\",\r
+
+    \  \"explanation\": \"Từ khóa 'def' (viết tắt của define) được dùng để bắt đầu định nghĩa một hàm trong Python.\",\r
+
+    \  \"display_order\": 2\r
+
+    }\r\n"
+auth:
+  type: bearer
+  credentials:
+    token: "{{ACCESS_TOKEN}}"
+order: 4502817284209732

@@ -1,0 +1,604 @@
+/*
+File Name: TeacherHomeroomPage.css
+Description: Stylesheet for TeacherHomeroomPage matching exact homeroom class design specifications.
+Created At: 2026-09-01
+Created By: Tam Khang
+Updated At: 2026-09-01
+Updated By: Tam Khang
+*/
+
+.homeroom-layout {
+  height: 100vh;
+  max-height: 100vh;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  background-color: #F8F7FA;
+  font-family: 'Be Vietnam Pro', sans-serif;
+  animation: pageFadeIn 0.3s ease-out;
+}
+
+.homeroom-body {
+  display: flex;
+  flex: 1;
+  height: calc(100vh - 64px);
+  max-height: calc(100vh - 64px);
+  overflow: hidden;
+}
+
+.homeroom-main {
+  flex: 1;
+  padding: 16px 28px 24px;
+  background-color: #F8F7FA;
+  display: flex;
+  flex-direction: column;
+  box-sizing: border-box;
+  overflow-y: auto;
+  gap: 16px;
+}
+
+/* Breadcrumb Navigation */
+.homeroom-breadcrumb {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  margin-bottom: 2px;
+}
+
+.homeroom-breadcrumb .breadcrumb-link {
+  color: #6B7280;
+  text-decoration: none;
+  transition: color 0.15s ease;
+}
+
+.homeroom-breadcrumb .breadcrumb-link:hover {
+  color: #7C3AED;
+}
+
+.homeroom-breadcrumb .breadcrumb-separator {
+  color: #9CA3AF;
+}
+
+.homeroom-breadcrumb .breadcrumb-current {
+  color: #1F2937;
+  font-weight: 500;
+}
+
+/* Class Header Banner Card */
+.homeroom-header-card {
+  background-color: #FFFFFF;
+  border: 1px solid #EBE8F0;
+  border-radius: 12px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.02);
+  padding: 20px 24px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.header-card-left {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.homeroom-class-title {
+  font-size: 24px;
+  font-weight: 700;
+  color: #1D1928;
+  margin: 0;
+  line-height: 1.2;
+}
+
+.homeroom-meta-row {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+}
+
+.homeroom-meta-row .meta-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13.5px;
+  color: #494551;
+}
+
+.homeroom-meta-row .meta-icon {
+  color: #7C3AED;
+}
+
+.homeroom-meta-row strong {
+  font-weight: 600;
+  color: #1D1928;
+}
+
+.header-card-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.btn-export-list {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 9px 16px;
+  background-color: #FFFFFF;
+  border: 1px solid #D8D4E2;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 600;
+  color: #494551;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.btn-export-list:hover {
+  background-color: #F8F7FA;
+  border-color: #7C3AED;
+  color: #7C3AED;
+}
+
+.btn-add-student {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 9px 18px;
+  background-color: #7C3AED;
+  border: 1px solid #7C3AED;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 600;
+  color: #FFFFFF;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  box-shadow: 0 2px 6px rgba(124, 58, 237, 0.25);
+}
+
+.btn-add-student:hover {
+  background-color: #6D28D9;
+  border-color: #6D28D9;
+  box-shadow: 0 4px 10px rgba(124, 58, 237, 0.35);
+}
+
+/* Student Roster Card */
+.homeroom-roster-card {
+  background-color: #FFFFFF;
+  border: 1px solid #EBE8F0;
+  border-radius: 12px;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.02);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+/* Table Toolbar Header */
+.roster-toolbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 16px 24px;
+  border-bottom: 1px solid #F1F0F5;
+}
+
+.roster-toolbar-title {
+  font-size: 18px;
+  font-weight: 700;
+  color: #1D1928;
+  margin: 0;
+}
+
+.roster-toolbar-controls {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.roster-search-input-wrapper {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.roster-search-input-wrapper .search-icon {
+  position: absolute;
+  left: 12px;
+  color: #9CA3AF;
+}
+
+.roster-search-input {
+  width: 260px;
+  height: 38px;
+  padding: 0 12px 0 36px;
+  background-color: #FFFFFF;
+  border: 1px solid #E2E8F0;
+  border-radius: 8px;
+  font-size: 13px;
+  color: #1D1928;
+  outline: none;
+  font-family: inherit;
+  transition: all 0.15s ease;
+}
+
+.roster-search-input:focus {
+  border-color: #7C3AED;
+  box-shadow: 0 0 0 3px rgba(124, 58, 237, 0.1);
+}
+
+.roster-search-input::placeholder {
+  color: #9CA3AF;
+}
+
+.roster-subject-select-wrapper {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.roster-subject-select {
+  height: 38px;
+  padding: 0 32px 0 14px;
+  background-color: #FFFFFF;
+  border: 1px solid #E2E8F0;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 500;
+  color: #494551;
+  outline: none;
+  cursor: pointer;
+  appearance: none;
+  font-family: inherit;
+  transition: all 0.15s ease;
+}
+
+.roster-subject-select:focus,
+.roster-subject-select:hover {
+  border-color: #7C3AED;
+  color: #7C3AED;
+}
+
+.roster-select-arrow {
+  position: absolute;
+  right: 10px;
+  color: #9CA3AF;
+  pointer-events: none;
+}
+
+.filter-dropdown-container {
+  position: relative;
+}
+
+.btn-filter-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 38px;
+  padding: 0 14px;
+  background-color: #FFFFFF;
+  border: 1px solid #E2E8F0;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 500;
+  color: #494551;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.btn-filter-toggle:hover,
+.btn-filter-toggle.active {
+  background-color: #F5F3FF;
+  border-color: #7C3AED;
+  color: #7C3AED;
+}
+
+.filter-popover-menu {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  background-color: #FFFFFF;
+  border: 1px solid #EBE8F0;
+  border-radius: 10px;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.08);
+  padding: 8px;
+  width: 160px;
+  z-index: 50;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.filter-menu-header {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  color: #9CA3AF;
+  padding: 4px 8px;
+  letter-spacing: 0.3px;
+}
+
+.filter-menu-divider {
+  height: 1px;
+  background-color: #F1F5F9;
+  margin: 6px 4px;
+}
+
+.filter-menu-item {
+  display: block;
+  width: 100%;
+  text-align: left;
+  padding: 7px 10px;
+  border-radius: 6px;
+  border: none;
+  background: transparent;
+  font-size: 13px;
+  color: #494551;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.filter-menu-item:hover {
+  background-color: #F5F3FF;
+  color: #7C3AED;
+}
+
+.filter-menu-item.selected {
+  background-color: #EDE9FE;
+  color: #7C3AED;
+  font-weight: 600;
+}
+
+/* Students Table */
+.roster-table-responsive {
+  width: 100%;
+  overflow-x: auto;
+}
+
+.homeroom-students-table {
+  width: 100%;
+  border-collapse: collapse;
+  text-align: left;
+}
+
+.homeroom-students-table thead th {
+  background-color: #FAF9FC;
+  padding: 12px 24px;
+  font-size: 11.5px;
+  font-weight: 700;
+  color: #6B7280;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  border-bottom: 1px solid #EBE8F0;
+}
+
+.homeroom-students-table thead th.sortable-col-header {
+  cursor: pointer;
+  user-select: none;
+  transition: background-color 0.15s ease, color 0.15s ease;
+}
+
+.homeroom-students-table thead th.sortable-col-header:hover {
+  background-color: #F5F3FF;
+  color: #7C3AED;
+}
+
+.th-sort-wrapper {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.sort-badge-indicator {
+  display: inline-flex;
+  align-items: center;
+}
+
+.sort-icon-default {
+  color: #9CA3AF;
+  transition: color 0.15s ease;
+}
+
+.homeroom-students-table thead th.sortable-col-header:hover .sort-icon-default {
+  color: #7C3AED;
+}
+
+.sort-state-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  padding: 2px 8px;
+  background-color: #EDE9FE;
+  color: #7C3AED;
+  border-radius: 9999px;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: none;
+  letter-spacing: 0;
+}
+
+.homeroom-students-table thead .col-code {
+  width: 18%;
+}
+
+.homeroom-students-table thead .col-name {
+  width: 32%;
+}
+
+.homeroom-students-table thead .col-gpa {
+  width: 25%;
+}
+
+.homeroom-students-table thead .col-status {
+  width: 15%;
+}
+
+.homeroom-students-table thead .col-actions {
+  width: 10%;
+  text-align: right;
+}
+
+.student-table-row {
+  cursor: pointer;
+  transition: background-color 0.15s ease;
+  border-bottom: 1px solid #F3F1F8;
+}
+
+.student-table-row:hover {
+  background-color: #F8F7FA;
+}
+
+.student-table-row td {
+  padding: 14px 24px;
+  vertical-align: middle;
+}
+
+.col-code-cell .student-code-text {
+  font-size: 13px;
+  color: #494551;
+  font-weight: 500;
+}
+
+.col-name-cell .student-name-wrapper {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.student-avatar-badge {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #FFFFFF;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  flex-shrink: 0;
+}
+
+.student-full-name {
+  font-size: 13.5px;
+  font-weight: 600;
+  color: #1D1928;
+}
+
+.col-gpa-cell .gpa-score-text {
+  font-size: 14px;
+  font-weight: 700;
+  color: #7C3AED;
+}
+
+.status-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 3px 12px;
+  border-radius: 14px;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.status-excellent {
+  background-color: #DCFCE7;
+  color: #15803D;
+}
+
+.status-good {
+  background-color: #E0F2FE;
+  color: #0369A1;
+}
+
+.status-fair {
+  background-color: #EDE9FE;
+  color: #6D28D9;
+}
+
+.status-average {
+  background-color: #FEF3C7;
+  color: #B45309;
+}
+
+.col-actions-cell {
+  text-align: right;
+}
+
+.row-action-menu-wrapper {
+  position: relative;
+  display: inline-block;
+}
+
+.btn-action-more {
+  width: 30px;
+  height: 30px;
+  border-radius: 6px;
+  border: none;
+  background: transparent;
+  color: #9CA3AF;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.btn-action-more:hover {
+  background-color: #EDE9FE;
+  color: #7C3AED;
+}
+
+.row-action-dropdown {
+  position: absolute;
+  right: 0;
+  top: calc(100% + 4px);
+  background-color: #FFFFFF;
+  border: 1px solid #EBE8F0;
+  border-radius: 8px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.1);
+  padding: 6px;
+  width: 220px;
+  z-index: 40;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.row-action-dropdown button {
+  width: 100%;
+  text-align: left;
+  padding: 8px 12px;
+  border: none;
+  background: transparent;
+  font-size: 13px;
+  font-weight: 500;
+  color: #334155;
+  cursor: pointer;
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  transition: all 0.15s ease;
+}
+
+.row-action-dropdown button .action-icon {
+  color: #64748B;
+  flex-shrink: 0;
+}
+
+.row-action-dropdown button:hover {
+  background-color: #F5F3FF;
+  color: #7C3AED;
+}
+
+.row-action-dropdown button:hover .action-icon {
+  color: #7C3AED;
+}
+
+.empty-table-cell {
+  text-align: center;
+  padding: 36px 20px;
+  color: #6B7280;
+  font-size: 13.5px;
+}

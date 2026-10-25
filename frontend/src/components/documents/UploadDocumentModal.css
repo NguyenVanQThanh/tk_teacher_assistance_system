@@ -1,0 +1,307 @@
+/*
+File Name: UploadDocumentModal.css
+Description: Stylesheet for UploadDocumentModal with smooth spring animation and drag & drop styling.
+Created At: 2026-08-30
+Created By: Tam Khang
+Updated At: 2026-08-30
+Updated By: Tam Khang
+*/
+
+.modal-backdrop-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  background-color: rgba(15, 23, 42, 0.45);
+  backdrop-filter: blur(4px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  animation: overlayFadeIn 0.2s ease-out;
+}
+
+@keyframes overlayFadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.upload-modal-container {
+  width: 520px;
+  max-width: 92vw;
+  background-color: #FFFFFF;
+  border-radius: 16px;
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.18), 0 4px 16px rgba(0, 0, 0, 0.06);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  font-family: 'Be Vietnam Pro', sans-serif;
+  animation: modalSpring 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+@keyframes modalSpring {
+  0% {
+    opacity: 0;
+    transform: scale(0.92) translateY(-14px);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+.upload-modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 18px 24px;
+  border-bottom: 1px solid #EBE8F0;
+  background-color: #FAF9FD;
+}
+
+.header-title-box {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.upload-icon-box {
+  width: 36px;
+  height: 36px;
+  border-radius: 8px;
+  background-color: #F3EAFF;
+  color: #4D308D;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.modal-title {
+  font-size: 17px;
+  font-weight: 700;
+  color: #1D1928;
+  margin: 0;
+}
+
+.btn-modal-close {
+  background: none;
+  border: none;
+  color: #6B7280;
+  cursor: pointer;
+  padding: 6px;
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s ease;
+}
+
+.btn-modal-close:hover {
+  background-color: #F1F3F7;
+  color: #1D1928;
+}
+
+.upload-modal-body {
+  padding: 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.modal-alert-error {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 14px;
+  background-color: #FEF2F2;
+  border: 1px solid #FECACA;
+  border-radius: 8px;
+  color: #DC2626;
+  font-size: 13px;
+}
+
+/* Drop Zone */
+.file-drop-zone {
+  border: 2px dashed #CBD5E1;
+  border-radius: 12px;
+  padding: 24px 16px;
+  text-align: center;
+  background-color: #FAF9FD;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.file-drop-zone:hover,
+.file-drop-zone.is-dragging {
+  border-color: #4D308D;
+  background-color: #F4ECFD;
+}
+
+.file-drop-zone.has-file {
+  border-color: #10B981;
+  background-color: #F0FDF4;
+}
+
+.hidden-file-input {
+  display: none;
+}
+
+.drop-zone-label {
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.cloud-drop-icon {
+  color: #6549A6;
+  margin-bottom: 8px;
+}
+
+.drop-main-text {
+  font-size: 14px;
+  color: #1D1928;
+  font-weight: 500;
+  margin-bottom: 4px;
+}
+
+.browse-link {
+  color: #4D308D;
+  font-weight: 700;
+  text-decoration: underline;
+}
+
+.drop-sub-text {
+  font-size: 12px;
+  color: #6B7280;
+}
+
+.file-selected-preview {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  text-align: left;
+  width: 100%;
+  padding: 8px 12px;
+}
+
+.selected-file-icon {
+  color: #10B981;
+}
+
+.selected-file-info {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+}
+
+.file-name {
+  font-size: 14px;
+  font-weight: 600;
+  color: #1D1928;
+}
+
+.file-size {
+  font-size: 12px;
+  color: #6B7280;
+}
+
+.change-file-tag {
+  font-size: 12px;
+  color: #4D308D;
+  font-weight: 600;
+}
+
+/* Form fields */
+.modal-form-group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  flex: 1;
+}
+
+.modal-form-row {
+  display: flex;
+  gap: 12px;
+}
+
+.modal-form-label {
+  font-size: 12.5px;
+  font-weight: 600;
+  color: #494551;
+}
+
+.modal-form-input,
+.modal-form-select {
+  height: 40px;
+  padding: 0 12px;
+  border: 1px solid #EBE8F0;
+  border-radius: 8px;
+  font-size: 13.5px;
+  color: #1D1928;
+  font-family: inherit;
+  outline: none;
+  background-color: #FFFFFF;
+  transition: all 0.2s ease;
+}
+
+.modal-form-input:focus,
+.modal-form-select:focus {
+  border-color: #4D308D;
+  box-shadow: 0 0 0 3px rgba(77, 48, 141, 0.1);
+}
+
+/* Footer Actions */
+.upload-modal-footer {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 12px;
+  margin-top: 8px;
+  padding-top: 16px;
+  border-top: 1px solid #F1F3F7;
+}
+
+.btn-modal-cancel {
+  padding: 9px 18px;
+  border: 1px solid #EBE8F0;
+  background-color: #FFFFFF;
+  color: #494551;
+  font-size: 13.5px;
+  font-weight: 500;
+  font-family: inherit;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.btn-modal-cancel:hover {
+  background-color: #F8F7FA;
+}
+
+.btn-modal-submit {
+  padding: 9px 20px;
+  border: none;
+  background: linear-gradient(90deg, #6549A6 0%, #7D49A6 100%);
+  color: #FFFFFF;
+  font-size: 13.5px;
+  font-weight: 600;
+  font-family: inherit;
+  border-radius: 8px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  transition: all 0.2s ease;
+  box-shadow: 0 4px 12px rgba(101, 73, 166, 0.25);
+}
+
+.btn-modal-submit:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 6px 16px rgba(101, 73, 166, 0.35);
+}
+
+.btn-modal-submit:active {
+  transform: scale(0.98);
+}

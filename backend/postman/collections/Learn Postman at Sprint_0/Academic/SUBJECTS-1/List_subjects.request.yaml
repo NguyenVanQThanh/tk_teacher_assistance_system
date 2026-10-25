@@ -1,0 +1,9 @@
+$kind: http-request
+name: List_subjects
+url: "{{BASE_URL}}/subjects"
+method: GET
+auth:
+  type: bearer
+  credentials:
+    token: ""
+order: 512944762485577

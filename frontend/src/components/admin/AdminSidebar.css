@@ -1,0 +1,190 @@
+/*
+File Name: AdminSidebar.css
+Description: Styling for Admin sidebar navigation with modern purple accents.
+Created At: 2026-09-19
+Created By: Tam Khang
+Updated At: 2026-09-19
+Updated By: Tam Khang
+*/
+
+.admin-sidebar {
+  width: 260px;
+  min-width: 260px;
+  max-width: 260px;
+  height: 100vh;
+  background-color: #FFFFFF;
+  border-right: 1px solid #ECE7F4;
+  display: flex;
+  flex-direction: column;
+  padding: 24px 16px;
+  user-select: none;
+  z-index: 50;
+  transition: transform 0.25s ease;
+}
+
+/* Brand Header */
+.admin-brand-block {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 4px 8px 24px 8px;
+  cursor: pointer;
+  border-bottom: 1px solid #F4F1FA;
+}
+
+.admin-brand-icon-wrapper {
+  width: 44px;
+  height: 44px;
+  border-radius: 12px;
+  background: linear-gradient(135deg, #4D308D 0%, #683FB8 100%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #FFFFFF;
+  box-shadow: 0 4px 12px rgba(77, 48, 141, 0.2);
+  flex-shrink: 0;
+}
+
+.admin-brand-text {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.admin-brand-name {
+  font-size: 17px;
+  font-weight: 700;
+  color: #241A45;
+  line-height: 1.2;
+  letter-spacing: -0.2px;
+}
+
+.admin-brand-tagline {
+  font-size: 11px;
+  font-weight: 500;
+  color: #827E93;
+  margin-top: 3px;
+}
+
+/* Navigation Section */
+.admin-nav-section {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  padding-top: 24px;
+  overflow-y: auto;
+}
+
+.admin-nav-label {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  color: #9C97AA;
+  text-transform: uppercase;
+  padding: 0 12px 10px 12px;
+}
+
+.admin-nav-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.admin-nav-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 14px;
+  border-radius: 10px;
+  border: none;
+  background-color: transparent;
+  color: #555068;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  text-align: left;
+  transition: all 0.18s ease;
+  width: 100%;
+}
+
+.admin-nav-item:hover {
+  background-color: #F8F6FC;
+  color: #312656;
+}
+
+.admin-nav-item.active {
+  background-color: #F3ECFF;
+  color: #4D308D;
+  font-weight: 600;
+}
+
+.admin-nav-item.active .admin-nav-item-icon {
+  color: #4D308D;
+}
+
+.admin-nav-item-icon {
+  color: #79738E;
+  transition: color 0.18s ease;
+  flex-shrink: 0;
+}
+
+.admin-nav-item-text {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Sidebar Footer */
+.admin-sidebar-footer {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding-top: 16px;
+  border-top: 1px solid #F4F1FA;
+}
+
+.admin-footer-btn {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 14px;
+  border-radius: 10px;
+  border: none;
+  background-color: transparent;
+  color: #656077;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.18s ease;
+  width: 100%;
+  text-align: left;
+}
+
+.admin-footer-btn:hover {
+  background-color: #F8F6FC;
+  color: #2F284B;
+}
+
+.admin-footer-btn.logout-btn {
+  color: #D32F2F;
+}
+
+.admin-footer-btn.logout-btn:hover {
+  background-color: #FFF1F0;
+  color: #B71C1C;
+}
+
+/* Mobile responsiveness */
+@media (max-width: 992px) {
+  .admin-sidebar {
+    position: fixed;
+    top: 0;
+    left: 0;
+    transform: translateX(-100%);
+    box-shadow: 4px 0 20px rgba(0, 0, 0, 0.08);
+  }
+
+  .admin-sidebar.mobile-open {
+    transform: translateX(0);
+  }
+}

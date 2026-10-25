@@ -1,0 +1,13 @@
+$kind: http-request
+name: Delete_class
+url: "{{BASE_URL}}/classes/:class_id"
+method: DELETE
+pathVariables:
+  - key: class_id
+    value: 4da6d444-db22-4980-aa7d-f61235d04a41
+    description: ""
+auth:
+  type: bearer
+  credentials:
+    token: "{{ACCESS_TOKEN}}"
+order: 35087970912

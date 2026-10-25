@@ -1,0 +1,215 @@
+/*
+File Name: TeacherDashboard.css
+Description: Modern, responsive styles for Teacher Dashboard matching the exact visual mockup.
+Created At: 2026-08-30
+Created By: Tam Khang
+Updated At: 2026-09-07
+Updated By: Tam Khang
+*/
+
+.teacher-dashboard-container {
+  display: flex;
+  flex-direction: column;
+  padding: 24px 32px 40px;
+  background-color: #F8F9FA;
+  min-height: calc(100vh - 64px);
+  box-sizing: border-box;
+  font-family: 'Be Vietnam Pro', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  animation: pageFadeIn 0.3s ease-out;
+}
+
+@keyframes pageFadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Top Banner Row */
+.dashboard-top-banner-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 24px;
+  margin-bottom: 24px;
+}
+
+.dashboard-greeting-block {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.dashboard-greeting-title {
+  font-size: 26px;
+  font-weight: 800;
+  color: #1E1B4B;
+  letter-spacing: -0.5px;
+  margin: 0;
+  line-height: 1.25;
+}
+
+.greeting-wave {
+  display: inline-block;
+  transform-origin: 70% 70%;
+  animation: waveHand 2s ease-in-out infinite;
+}
+
+@keyframes waveHand {
+  0% { transform: rotate(0deg); }
+  10% { transform: rotate(14deg); }
+  20% { transform: rotate(-8deg); }
+  30% { transform: rotate(14deg); }
+  40% { transform: rotate(-4deg); }
+  50% { transform: rotate(10deg); }
+  60% { transform: rotate(0deg); }
+  100% { transform: rotate(0deg); }
+}
+
+.dashboard-greeting-subtitle {
+  font-size: 13.5px;
+  color: #64748B;
+  margin: 0;
+  line-height: 1.5;
+}
+
+/* 2 Quick Stat Cards on Right of Top Banner */
+.dashboard-quick-stats-row {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  flex-shrink: 0;
+}
+
+.quick-stat-box {
+  background-color: #FFFFFF;
+  border: 1px solid #EBE8F0;
+  border-radius: 14px;
+  padding: 12px 18px;
+  display: flex;
+  align-items: center;
+  gap: 24px;
+  min-width: 180px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.02);
+  cursor: pointer;
+  transition: transform 0.2s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.2s ease, border-color 0.2s ease;
+  box-sizing: border-box;
+}
+
+.quick-stat-box:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 16px rgba(77, 48, 141, 0.06);
+  border-color: #DDD4EC;
+}
+
+.quick-stat-box.accent-red {
+  border-left: 4px solid #EF4444;
+}
+
+.quick-stat-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.quick-stat-label {
+  font-size: 10.5px;
+  font-weight: 700;
+  color: #64748B;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+}
+
+.quick-stat-value {
+  font-size: 24px;
+  font-weight: 800;
+  color: #0F172A;
+  line-height: 1.1;
+  letter-spacing: -0.5px;
+}
+
+.quick-stat-icon-wrapper {
+  width: 40px;
+  height: 40px;
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.quick-stat-icon-wrapper.bg-red {
+  background-color: #FEE2E2;
+}
+
+.quick-stat-icon-wrapper.bg-blue {
+  background-color: #EFF6FF;
+}
+
+.stat-icon-red {
+  color: #DC2626;
+}
+
+.stat-icon-blue {
+  color: #2563EB;
+}
+
+/* Two-Column Grid Content Layout */
+.dashboard-content-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1.85fr) minmax(310px, 1.05fr);
+  gap: 24px;
+  align-items: start;
+}
+
+/* Left Column */
+.dashboard-left-column {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+/* Right Column */
+.dashboard-right-column {
+  display: flex;
+  flex-direction: column;
+}
+
+/* Responsive Breakpoints */
+@media (max-width: 1100px) {
+  .dashboard-top-banner-row {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .dashboard-quick-stats-row {
+    width: 100%;
+  }
+
+  .quick-stat-box {
+    flex: 1;
+  }
+
+  .dashboard-content-layout {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 768px) {
+  .teacher-dashboard-container {
+    padding: 16px;
+  }
+
+  .dashboard-quick-stats-row {
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  .quick-stat-box {
+    width: 100%;
+  }
+}

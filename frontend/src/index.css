@@ -1,0 +1,48 @@
+/*
+File Name: index.css
+Description: Global CSS reset and baseline typography using Be Vietnam Pro font.
+Created At: 2026-08-30
+Created By: Tam Khang
+Updated At: 2026-08-30
+Updated By: Tam Khang
+*/
+
+:root {
+  --primary-purple: #4D308D;
+  --primary-purple-hover: #3d2373;
+  --primary-purple-light: #F8F1FF;
+  --primary-purple-active: #E9DDFF;
+  --text-dark: #1D1928;
+  --text-muted: #494551;
+  --border-light: #EBE8F0;
+  --bg-main: #F8F7FA;
+  --bg-card: #FFFFFF;
+}
+
+*, *::before, *::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html, body {
+  width: 100%;
+  min-height: 100%;
+  font-family: 'Be Vietnam Pro', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  background-color: var(--bg-main);
+  color: var(--text-dark);
+}
+
+#root {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+.app-root {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}

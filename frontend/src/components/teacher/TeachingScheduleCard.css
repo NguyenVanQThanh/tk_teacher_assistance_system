@@ -1,0 +1,180 @@
+/*
+File Name: TeachingScheduleCard.css
+Description: Stylesheet for TeachingScheduleCard fitted to single-screen 100vh layout.
+Created At: 2026-08-30
+Created By: Tam Khang
+Updated At: 2026-08-30
+Updated By: Tam Khang
+*/
+
+.teaching-schedule-card {
+  background-color: #FFFFFF;
+  border-radius: 12px;
+  border: 1px solid #EBE8F0;
+  padding: 18px 20px;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  font-family: 'Be Vietnam Pro', sans-serif;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.02);
+  transition: transform 0.25s ease, box-shadow 0.25s ease;
+}
+
+.teaching-schedule-card:hover {
+  box-shadow: 0 6px 16px rgba(77, 48, 141, 0.06);
+}
+
+.schedule-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12px;
+  height: 28px;
+  flex-shrink: 0;
+}
+
+.schedule-title {
+  font-size: 16px;
+  font-weight: 700;
+  color: #1D1928;
+  line-height: 20px;
+}
+
+.schedule-nav-btns {
+  display: flex;
+  gap: 2px;
+}
+
+.icon-nav-btn {
+  width: 22px;
+  height: 22px;
+  border-radius: 4px;
+  border: none;
+  background: transparent;
+  color: #494551;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.icon-nav-btn:hover {
+  background-color: #F8F1FF;
+  color: #4D308D;
+}
+
+.schedule-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-bottom: 12px;
+  flex: 1;
+  min-height: 0;
+}
+
+.schedule-row {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+}
+
+.day-badge-col {
+  width: 40px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding-top: 2px;
+  flex-shrink: 0;
+}
+
+.day-name {
+  font-size: 12.5px;
+  font-weight: 500;
+  color: #494551;
+  line-height: 16px;
+  text-transform: uppercase;
+}
+
+.day-number {
+  font-size: 13px;
+  font-weight: 600;
+  color: #1D1928;
+  line-height: 18px;
+}
+
+.event-box {
+  flex: 1;
+  padding: 8px 12px;
+  border-radius: 0px 8px 8px 0px;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  transition: transform 0.2s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.2s ease;
+}
+
+.event-box:hover {
+  transform: translateX(4px);
+  box-shadow: 0 4px 12px rgba(77, 48, 141, 0.08);
+}
+
+.event-box.purple {
+  border-left: 4px solid #4D308D;
+  background-color: #F8F1FF;
+}
+
+.event-box.blue {
+  border-left: 4px solid #4486F4;
+  background-color: #EFF6FF;
+}
+
+.event-title {
+  font-size: 13.5px;
+  font-weight: 600;
+  color: #1D1928;
+  line-height: 18px;
+}
+
+.event-meta {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font-size: 12px;
+  line-height: 16px;
+  color: #494551;
+}
+
+.meta-item {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.meta-icon {
+  flex-shrink: 0;
+  color: #494551;
+  width: 12px;
+  height: 12px;
+}
+
+.btn-view-full-schedule {
+  width: 100%;
+  height: 34px;
+  border: 1px solid #EBE8F0;
+  background-color: #FFFFFF;
+  color: #1D1928;
+  font-size: 13px;
+  font-weight: 500;
+  font-family: inherit;
+  border-radius: 8px;
+  cursor: pointer;
+  margin-top: auto;
+  flex-shrink: 0;
+  transition: all 0.2s ease;
+}
+
+.btn-view-full-schedule:hover {
+  background-color: #F8F7FA;
+  border-color: #CBD5E1;
+}

@@ -1,0 +1,16 @@
+$kind: http-request
+name: unenroll_student
+url: "{{BASE_URL}}/classes/:class_id/students/:student_id"
+method: DELETE
+pathVariables:
+  - key: class_id
+    value: b96c850b-563d-4624-912e-abccdbf9cdee
+    description: ""
+  - key: student_id
+    value: 4f64cb51-9d51-4c12-aab4-1aa757cea9ba
+    description: ""
+auth:
+  type: bearer
+  credentials:
+    token: "{{json_web_token_10q6}}"
+order: 3832898614088879

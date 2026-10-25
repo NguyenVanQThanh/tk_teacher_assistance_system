@@ -1,0 +1,238 @@
+/*
+File Name: DocumentCard.css
+Description: Stylesheet for educational document cards with smooth hover animations.
+Created At: 2026-08-30
+Created By: Tam Khang
+Updated At: 2026-08-31
+Updated By: Tam Khang
+*/
+
+.document-card {
+  background-color: #FFFFFF;
+  border: 1px solid #EBE8F0;
+  border-radius: 12px;
+  padding: 10px 14px;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.02);
+  transition: transform 0.25s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.25s cubic-bezier(0.16, 1, 0.3, 1), border-color 0.25s ease;
+  font-family: 'Be Vietnam Pro', sans-serif;
+  position: relative;
+  height: 100%;
+  min-height: 0;
+}
+
+.document-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 20px rgba(77, 48, 141, 0.08);
+  border-color: #DDD4EC;
+}
+
+/* Card Top: Icon & More button */
+.doc-card-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 4px;
+}
+
+.doc-icon-badge {
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  transition: transform 0.2s ease;
+}
+
+.document-card:hover .doc-icon-badge {
+  transform: scale(1.05);
+}
+
+.doc-icon-badge.pdf-badge {
+  background-color: #FFECEB;
+  border: 1.5px solid #FFCDD2;
+}
+
+.pdf-tag {
+  color: #D32F2F;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: -0.3px;
+}
+
+.doc-icon-badge.video-badge {
+  background-color: #F3EAFF;
+  color: #7C3AED;
+}
+
+.doc-icon-badge.word-badge {
+  background-color: #EFF6FF;
+  color: #2563EB;
+}
+
+.doc-icon-badge.exercise-badge {
+  background-color: #F3EAFF;
+  color: #7C3AED;
+}
+
+.doc-icon-badge.code-badge {
+  background-color: #ECFDF5;
+  color: #059669;
+}
+
+.doc-more-btn {
+  background: none;
+  border: none;
+  color: #8C8894;
+  cursor: pointer;
+  padding: 4px;
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.doc-more-btn:hover {
+  background-color: #F8F1FF;
+  color: #4D308D;
+}
+
+.doc-close-btn {
+  color: #9CA3AF;
+  width: 26px;
+  height: 26px;
+}
+
+.doc-close-btn:hover {
+  background-color: #FEE2E2;
+  color: #EF4444;
+  transform: scale(1.08);
+}
+
+/* Document Title */
+.doc-title {
+  font-size: 13.5px;
+  font-weight: 700;
+  color: #1D1928;
+  line-height: 18px;
+  margin: 0 0 4px 0;
+  min-height: 36px;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Meta info */
+.doc-meta-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11.5px;
+  color: #6B7280;
+  margin-bottom: 4px;
+}
+
+.meta-icon {
+  color: #6B7280;
+}
+
+.meta-dot {
+  color: #9CA3AF;
+}
+
+/* Author row */
+.doc-author-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 4px;
+}
+
+.author-avatar-mini {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background-color: #F3EAFF;
+  color: #4D308D;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 8.5px;
+  font-weight: 700;
+  flex-shrink: 0;
+}
+
+.author-name {
+  font-size: 11.5px;
+  color: #494551;
+  font-weight: 400;
+}
+
+/* Footer & Actions */
+.doc-card-footer {
+  border-top: 1px solid #F1F3F7;
+  padding-top: 6px;
+  margin-top: auto;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.btn-action-preview {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  background: none;
+  border: none;
+  color: #2563EB;
+  font-size: 12px;
+  font-weight: 600;
+  font-family: inherit;
+  cursor: pointer;
+  padding: 2px 4px;
+  border-radius: 4px;
+  transition: all 0.2s ease;
+}
+
+.btn-action-preview:hover {
+  background-color: #EFF6FF;
+  color: #1D4ED8;
+}
+
+.doc-action-icons {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.icon-action-btn {
+  background: none;
+  border: none;
+  color: #6B7280;
+  cursor: pointer;
+  padding: 4px;
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s ease;
+}
+
+.icon-action-btn:hover {
+  background-color: #F8F1FF;
+  color: #4D308D;
+  transform: translateY(-1px);
+}
+
+.icon-action-btn:active {
+  transform: scale(0.95);
+}
+

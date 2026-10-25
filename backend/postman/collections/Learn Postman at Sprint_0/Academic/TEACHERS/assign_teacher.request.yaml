@@ -1,0 +1,22 @@
+$kind: http-request
+name: assign_teacher
+url: "{{BASE_URL}}/classes/:class_id/teacher-subjects"
+method: POST
+pathVariables:
+  - key: class_id
+    value: 4da6d444-db22-4980-aa7d-f61235d04a41
+    description: ""
+body:
+  type: json
+  content: "{\r
+
+    \  \"teacher_id\": \"808c8232-f550-4a89-abfe-5372ed77a36e\",\r
+
+    \  \"subject_id\": \"2632d783-0070-4d4d-be6f-fa5804316659\"   \r
+
+    }\r\n"
+auth:
+  type: bearer
+  credentials:
+    token: "{{json_web_token_10q6}}"
+order: 1785478038021

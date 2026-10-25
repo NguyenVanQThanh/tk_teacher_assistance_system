@@ -1,0 +1,24 @@
+$kind: http-request
+name: Create_class_assignment
+url: "{{BASE_URL}}/classes/:class_id/assignments"
+method: POST
+pathVariables:
+  - key: class_id
+    value: b96c850b-563d-4624-912e-abccdbf9cdee
+    description: ""
+body:
+  type: json
+  content: "{\r
+
+    \    \"exercise_id\": \"3ad4c004-9616-4ee1-9b88-e281596bfa7b\",\r
+
+    \    \"due_at\": \"2026-08-10T23:59:59\"\r
+
+    \r
+
+    }"
+auth:
+  type: bearer
+  credentials:
+    token: "{{ACCESS_TOKEN}}"
+order: 1785484418954
