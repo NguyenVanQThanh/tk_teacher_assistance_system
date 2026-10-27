@@ -1,0 +1,47 @@
+# AI reviewer for a target repo. Bot code lives in the private repo below (read via the App token); the target repo is read through the API only.
+# Safety: trigger is pull_request (not _target); PR code is never checked out or executed; fork PRs and drafts skipped.
+# Pin BOT_REF to a commit SHA once the bot is stable (a moving branch means bot changes apply without review here).
+name: agent-review
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+permissions:
+  contents: read
+concurrency:
+  group: agent-review-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+env:
+  BOT_REPO: NguyenVanQThanh/coding-agent-customize
+  BOT_REF: main
+jobs:
+  review:
+    if: github.event.pull_request.head.repo.full_name == github.repository && !github.event.pull_request.draft
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      # Reviews are posted as a dedicated GitHub App so they count toward required approvals.
+      # The same token also reads the private bot repo, so the App must be installed on both repos (Contents: read).
+      - id: app
+        uses: actions/create-github-app-token@v1
+        with:
+          app-id: ${{ secrets.REVIEW_APP_ID }}
+          private-key: ${{ secrets.REVIEW_APP_KEY }}
+          repositories: ${{ github.event.repository.name }},coding-agent-customize
+      - uses: actions/checkout@v4
+        with:
+          repository: ${{ env.BOT_REPO }}
+          ref: ${{ env.BOT_REF }}
+          token: ${{ steps.app.outputs.token }}
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Review
+        env:
+          GITHUB_TOKEN: ${{ steps.app.outputs.token }}
+          NINEROUTER_API_KEY: ${{ secrets.NINEROUTER_API_KEY }}
+          NINEROUTER_BASE_URL: ${{ secrets.NINEROUTER_BASE_URL }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: node scripts/review-pr.mjs "$GITHUB_REPOSITORY" "$PR_NUMBER" --profile remote --model 9router/cc/claude-sonnet-5-5 --max-usd 0.2
