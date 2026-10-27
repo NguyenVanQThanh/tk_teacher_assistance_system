@@ -496,6 +496,7 @@ class GradingClassSummary(BaseModel):
 class GradingDashboardOut(BaseModel):
     total_submissions: int = 0
     pending_grading_count: int = 0
+    pending_review_count: int = 0
     graded_count: int = 0
     need_feedback_count: int = 0
     avg_score: float = 0.0

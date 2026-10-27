@@ -25,9 +25,10 @@ import { teacherApi } from '../../services/api';
 import './TeacherSchedulePage.css';
 
 export default function TeacherSchedulePage() {
-  const [currentYear, setCurrentYear] = useState(2023);
-  const [currentMonth, setCurrentMonth] = useState(9); // October (0-indexed)
-  const [selectedDay, setSelectedDay] = useState(15);
+  const today = useMemo(() => new Date(), []);
+  const [currentYear, setCurrentYear] = useState(today.getFullYear());
+  const [currentMonth, setCurrentMonth] = useState(today.getMonth()); // 0-indexed month
+  const [selectedDay, setSelectedDay] = useState(today.getDate());
   const [selectedGrade, setSelectedGrade] = useState('all'); // 'all' | '10' | '11' | '12'
   const [notes, setNotes] = useState([
     { id: 1, text: 'Chuẩn bị đề kiểm tra 15 phút Giải tích 12' },
@@ -45,7 +46,7 @@ export default function TeacherSchedulePage() {
     startTime: '07:30',
     endTime: '09:00',
     urgency: 'teaching', // 'critical' | 'high' | 'teaching'
-    date: 15
+    date: today.getDate()
   });
 
   // Urgency configuration dictionary (3 standardized levels)
@@ -55,15 +56,75 @@ export default function TeacherSchedulePage() {
     teaching: { label: 'Lịch giảng dạy', color: '#3B82F6', badgeBg: '#EFF6FF', badgeText: '#2563EB' }
   };
 
-  // Mock schedule database - focused on examination and assessment
+  // Synced teaching schedule items (Monday to Saturday, no classes on Sunday)
   const [scheduleList, setScheduleList] = useState([
-    // October 15
+
     {
-      id: 1,
-      year: 2023,
+      id: 4,
+      year: 2026,
       month: 9,
-      day: 15,
-      title: 'Kiểm tra 15p - Giải tích 12',
+      day: 26,
+      title: 'Toán Cao Cấp - Lớp 12A1 (P.302, Tòa A)',
+      className: '12A1',
+      grade: '12',
+      startTime: '07:30',
+      endTime: '09:00',
+      urgency: 'teaching',
+      accentColor: '#3B82F6',
+      badgeColor: '#EFF6FF',
+      badgeTextColor: '#2563EB'
+    },
+    {
+      id: 5,
+      year: 2026,
+      month: 9,
+      day: 26,
+      title: 'Họp Tổ Bộ Môn (Phòng Hội đồng)',
+      className: 'Tổ Toán',
+      grade: 'all',
+      startTime: '14:00',
+      endTime: '15:30',
+      urgency: 'high',
+      accentColor: '#F59E0B',
+      badgeColor: '#FEF3C7',
+      badgeTextColor: '#D97706'
+    },
+    {
+      id: 6,
+      year: 2026,
+      month: 9,
+      day: 27,
+      title: 'Đại số - Lớp 11B2 (P.204, Tòa B)',
+      className: '11B2',
+      grade: '11',
+      startTime: '09:15',
+      endTime: '10:45',
+      urgency: 'teaching',
+      accentColor: '#3B82F6',
+      badgeColor: '#EFF6FF',
+      badgeTextColor: '#2563EB'
+    },
+    {
+      id: 7,
+      year: 2026,
+      month: 9,
+      day: 27,
+      title: 'Luyện thi TN THPT Toán (P.304, Tòa A)',
+      className: '12A2',
+      grade: '12',
+      startTime: '14:00',
+      endTime: '15:30',
+      urgency: 'critical',
+      accentColor: '#EF4444',
+      badgeColor: '#FEE2E2',
+      badgeTextColor: '#DC2626'
+    },
+    {
+      id: 8,
+      year: 2026,
+      month: 9,
+      day: 28,
+      title: 'Hình học Không gian - Lớp 12A1 (P.302, Tòa A)',
       className: '12A1',
       grade: '12',
       startTime: '07:30',
@@ -74,43 +135,27 @@ export default function TeacherSchedulePage() {
       badgeTextColor: '#DC2626'
     },
     {
-      id: 2,
-      year: 2023,
+      id: 9,
+      year: 2026,
       month: 9,
-      day: 15,
-      title: 'Ôn tập kiểm tra Toán 10',
+      day: 28,
+      title: 'Giải tích nâng cao - Lớp 10A3 (P.105, Tòa C)',
       className: '10A3',
       grade: '10',
-      startTime: '09:15',
-      endTime: '10:45',
-      urgency: 'high',
-      accentColor: '#F59E0B',
-      badgeColor: '#FEF3C7',
-      badgeTextColor: '#D97706'
+      startTime: '10:00',
+      endTime: '11:30',
+      urgency: 'teaching',
+      accentColor: '#3B82F6',
+      badgeColor: '#EFF6FF',
+      badgeTextColor: '#2563EB'
     },
     {
-      id: 3,
-      year: 2023,
+      id: 10,
+      year: 2026,
       month: 9,
-      day: 15,
-      title: 'Khảo sát chất lượng Hình học 11',
+      day: 29,
+      title: 'Kiểm tra 45p Đại số 11 (P.204, Tòa B)',
       className: '11B2',
-      grade: '11',
-      startTime: '14:00',
-      endTime: '15:30',
-      urgency: 'high',
-      accentColor: '#F59E0B',
-      badgeColor: '#FEF3C7',
-      badgeTextColor: '#D97706'
-    },
-    // October 3
-    {
-      id: 4,
-      year: 2023,
-      month: 9,
-      day: 3,
-      title: 'Kiểm tra giữa kì Hình học không gian',
-      className: '11A1',
       grade: '11',
       startTime: '08:00',
       endTime: '09:30',
@@ -119,33 +164,61 @@ export default function TeacherSchedulePage() {
       badgeColor: '#FEE2E2',
       badgeTextColor: '#DC2626'
     },
-    // October 5
     {
-      id: 5,
-      year: 2023,
+      id: 11,
+      year: 2026,
       month: 9,
-      day: 5,
-      title: 'Luyện đề thi thử Toán 12',
+      day: 29,
+      title: 'Chuyên đề Đạo hàm & Cực trị (P.302, Tòa A)',
       className: '12A1',
       grade: '12',
-      startTime: '14:00',
-      endTime: '16:00',
+      startTime: '10:00',
+      endTime: '11:30',
       urgency: 'teaching',
       accentColor: '#3B82F6',
       badgeColor: '#EFF6FF',
       badgeTextColor: '#2563EB'
     },
-    // October 19
     {
-      id: 6,
-      year: 2023,
+      id: 12,
+      year: 2026,
       month: 9,
-      day: 19,
-      title: 'Kiểm tra 1 tiết Đại số',
-      className: '10A1',
-      grade: '10',
+      day: 30,
+      title: 'Sinh hoạt Lớp Chủ nhiệm - 12A1 (P.302, Tòa A)',
+      className: '12A1',
+      grade: '12',
       startTime: '07:30',
       endTime: '08:15',
+      urgency: 'teaching',
+      accentColor: '#3B82F6',
+      badgeColor: '#EFF6FF',
+      badgeTextColor: '#2563EB'
+    },
+    {
+      id: 13,
+      year: 2026,
+      month: 9,
+      day: 30,
+      title: 'Ôn tập cuối tuần Toán 12 (P.302, Tòa A)',
+      className: '12A1',
+      grade: '12',
+      startTime: '09:15',
+      endTime: '10:45',
+      urgency: 'high',
+      accentColor: '#F59E0B',
+      badgeColor: '#FEF3C7',
+      badgeTextColor: '#D97706'
+    },
+    {
+      id: 14,
+      year: 2026,
+      month: 9,
+      day: 31,
+      title: 'Thi thử ĐGNL Khối 12 (Hội trường lớn)',
+      className: 'Khối 12',
+      grade: '12',
+      startTime: '08:00',
+      endTime: '11:00',
       urgency: 'critical',
       accentColor: '#EF4444',
       badgeColor: '#FEE2E2',
@@ -159,23 +232,32 @@ export default function TeacherSchedulePage() {
       try {
         const data = await teacherApi.getSchedule();
         if (isMounted && data?.items?.length) {
-          // Merge or set items
-          const mapped = data.items.map((item, idx) => ({
-            id: item.id || 100 + idx,
-            year: 2023,
-            month: 9,
-            day: item.day_of_week === 2 ? 15 : item.day_of_week === 4 ? 17 : 19,
-            title: `${item.subject_name} (${item.room})`,
-            className: item.class_name,
-            grade: item.class_name.startsWith('12') ? '12' : item.class_name.startsWith('11') ? '11' : '10',
-            startTime: item.start_time,
-            endTime: item.end_time,
-            urgency: item.urgency || 'teaching',
-            accentColor: item.urgency === 'critical' ? '#EF4444' : item.urgency === 'high' ? '#F59E0B' : '#3B82F6',
-            badgeColor: item.urgency === 'critical' ? '#FEE2E2' : item.urgency === 'high' ? '#FEF3C7' : '#EFF6FF',
-            badgeTextColor: item.urgency === 'critical' ? '#DC2626' : item.urgency === 'high' ? '#D97706' : '#2563EB',
-          }));
-          setScheduleList(prev => [...prev, ...mapped.filter(m => !prev.some(p => p.id === m.id))]);
+          const mapped = data.items.map((item, idx) => {
+            const urgency = item.urgency || 'teaching';
+            const urgencyData = urgencyConfig[urgency] || urgencyConfig.teaching;
+            const cls = item.class_name || '';
+            const grade = cls.startsWith('12') ? '12' : cls.startsWith('11') ? '11' : cls.startsWith('10') ? '10' : 'all';
+            const parsedDay = item.day_number || (item.date_str ? parseInt(item.date_str.split('-')[2], 10) : (item.day_of_week === 8 ? 25 : item.day_of_week + 24));
+            const parsedMonth = item.month !== undefined ? item.month : (item.date_str ? parseInt(item.date_str.split('-')[1], 10) - 1 : 9);
+            const parsedYear = item.year || (item.date_str ? parseInt(item.date_str.split('-')[0], 10) : 2026);
+
+            return {
+              id: item.id || 100 + idx,
+              year: parsedYear,
+              month: parsedMonth,
+              day: parsedDay,
+              title: item.room ? `${item.subject_name} (${item.room})` : item.subject_name,
+              className: cls,
+              grade,
+              startTime: item.start_time,
+              endTime: item.end_time,
+              urgency,
+              accentColor: urgencyData.color,
+              badgeColor: urgencyData.badgeBg,
+              badgeTextColor: urgencyData.badgeText,
+            };
+          });
+          setScheduleList(mapped);
         }
       } catch (err) {
         console.warn('Teacher schedule fetched fallback to defaults:', err);
@@ -246,17 +328,55 @@ export default function TeacherSchedulePage() {
   const handleNextMonth = () => {
     if (currentMonth === 11) {
       setCurrentMonth(0);
-      setCurrentYear(prev => prev - 1);
+      setCurrentYear(prev => prev + 1);
     } else {
       setCurrentMonth(prev => prev + 1);
     }
   };
 
   const handleGoToday = () => {
-    setCurrentYear(2023);
-    setCurrentMonth(9);
-    setSelectedDay(15);
+    const now = new Date();
+    setCurrentYear(now.getFullYear());
+    setCurrentMonth(now.getMonth());
+    setSelectedDay(now.getDate());
   };
+
+  const handlePrevDay = () => {
+    if (selectedDay > 1) {
+      setSelectedDay(prev => prev - 1);
+    } else {
+      if (currentMonth === 0) {
+        setCurrentMonth(11);
+        setCurrentYear(prev => prev - 1);
+        setSelectedDay(31);
+      } else {
+        const prevMonthDays = new Date(currentYear, currentMonth, 0).getDate();
+        setCurrentMonth(prev => prev - 1);
+        setSelectedDay(prevMonthDays);
+      }
+    }
+  };
+
+  const handleNextDay = () => {
+    const daysInCurrentMonth = new Date(currentYear, currentMonth + 1, 0).getDate();
+    if (selectedDay < daysInCurrentMonth) {
+      setSelectedDay(prev => prev + 1);
+    } else {
+      if (currentMonth === 11) {
+        setCurrentMonth(0);
+        setCurrentYear(prev => prev + 1);
+        setSelectedDay(1);
+      } else {
+        setCurrentMonth(prev => prev + 1);
+        setSelectedDay(1);
+      }
+    }
+  };
+
+  const isTodaySelected = useMemo(() => {
+    const now = new Date();
+    return selectedDay === now.getDate() && currentMonth === now.getMonth() && currentYear === now.getFullYear();
+  }, [selectedDay, currentMonth, currentYear]);
 
   // Filtered daily schedules for selected day
   const dailySchedules = useMemo(() => {
@@ -336,9 +456,9 @@ export default function TeacherSchedulePage() {
           <div className="schedule-breadcrumb">
             <span className="crumb-root">Trang chủ</span>
             <span className="crumb-sep">›</span>
-            <span className="crumb-current">Lịch kiểm tra</span>
+            <span className="crumb-current">Lịch giảng dạy</span>
           </div>
-          <h1 className="schedule-main-title">Lịch kiểm tra & Khảo thí</h1>
+          <h1 className="schedule-main-title">Lịch giảng dạy</h1>
         </div>
 
         {/* Horizontal Urgency Level Legend Bar */}
@@ -443,6 +563,7 @@ export default function TeacherSchedulePage() {
               {calendarCells.map((cell, idx) => {
                 const isWeekend = (idx % 7 === 5) || (idx % 7 === 6);
                 const isSelected = cell.isCurrentMonth && cell.day === selectedDay;
+                const isTodayCell = cell.isCurrentMonth && cell.day === today.getDate() && cell.month === today.getMonth() && cell.year === today.getFullYear();
 
                 // Find events for this cell
                 const cellEvents = scheduleList.filter(
@@ -452,7 +573,7 @@ export default function TeacherSchedulePage() {
                 return (
                   <div 
                     key={idx}
-                    className={`calendar-day-cell ${!cell.isCurrentMonth ? 'other-month' : ''} ${isWeekend ? 'weekend-cell' : ''} ${isSelected ? 'selected-day-cell' : ''}`}
+                    className={`calendar-day-cell ${!cell.isCurrentMonth ? 'other-month' : ''} ${isWeekend ? 'weekend-cell' : ''} ${isSelected ? 'selected-day-cell' : ''} ${isTodayCell ? 'today-cell' : ''}`}
                     onClick={() => {
                       if (cell.isCurrentMonth) {
                         setSelectedDay(cell.day);
@@ -493,11 +614,29 @@ export default function TeacherSchedulePage() {
             <div className="daily-schedule-card">
               <div className="daily-schedule-header">
                 <h3 className="daily-title">
-                  {selectedDay === 15 ? 'Lịch dạy hôm nay' : `Lịch dạy ngày ${selectedDay}`}
+                  {isTodaySelected ? 'Lịch dạy hôm nay' : `Lịch dạy ngày ${selectedDay}`}
                 </h3>
-                <span className="date-badge-pill">
-                  {selectedDay} Thg {currentMonth + 1}
-                </span>
+                <div className="daily-date-controls">
+                  <button
+                    type="button"
+                    className="day-nav-arrow-btn"
+                    onClick={handlePrevDay}
+                    title="Ngày trước"
+                  >
+                    <ChevronLeft size={14} />
+                  </button>
+                  <span className="date-badge-pill">
+                    {selectedDay} Thg {currentMonth + 1}
+                  </span>
+                  <button
+                    type="button"
+                    className="day-nav-arrow-btn"
+                    onClick={handleNextDay}
+                    title="Ngày sau"
+                  >
+                    <ChevronRight size={14} />
+                  </button>
+                </div>
               </div>
 
               <div className="daily-schedule-items-list">

@@ -288,9 +288,21 @@ class AttemptService:
         attempts = self.list_attempts(current_user=current_user)
 
         total_submissions = len(attempts)
-        pending_count = sum(1 for a in attempts if a.score is None)
-        graded_count = sum(1 for a in attempts if a.score is not None)
-        need_feedback = pending_count
+        known_statuses = ("pending_grading", "pending_review", "approved")
+
+        def resolve_status(a) -> str:
+            # Same rule as the Grading page: trust lifecycle status, otherwise infer from score
+            st = getattr(a, 'status', None)
+            if st in known_statuses:
+                return st
+            return 'approved' if a.score is not None else 'pending_grading'
+
+        resolved = [resolve_status(a) for a in attempts]
+        pending_grading_count = resolved.count('pending_grading')
+        pending_review_count = resolved.count('pending_review')
+        graded_count = resolved.count('approved')
+
+        need_feedback = pending_grading_count
 
         scores = [a.score for a in attempts if a.score is not None]
         avg_score = round(sum(scores) / len(scores), 2) if scores else 0.0
@@ -344,7 +356,8 @@ class AttemptService:
 
         return GradingDashboardOut(
             total_submissions=total_submissions,
-            pending_grading_count=pending_count,
+            pending_grading_count=pending_grading_count,
+            pending_review_count=pending_review_count,
             graded_count=graded_count,
             need_feedback_count=need_feedback,
             avg_score=avg_score,

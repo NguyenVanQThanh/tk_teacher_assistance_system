@@ -2,17 +2,17 @@
 // Description: Component listing recent student exercise submissions matching the visual dashboard mockup.
 // Created At: 2026-08-30
 // Created By: Tam Khang
-// Updated At: 2026-09-07
+// Updated At: 2026-10-25
 // Updated By: Tam Khang
 
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import './RecentSubmissionsTable.css';
 
-export default function RecentSubmissionsTable({ onGradeSubmission }) {
+export default function RecentSubmissionsTable({ submissions: incomingSubmissions, onGradeSubmission }) {
   const navigate = useNavigate();
 
-  const submissions = [
+  const defaultSubmissions = [
     {
       id: 1,
       studentName: 'Trần Thị B',
@@ -47,6 +47,20 @@ export default function RecentSubmissionsTable({ onGradeSubmission }) {
       statusLabel: 'Đã nộp',
     },
   ];
+
+  const submissions = (incomingSubmissions && incomingSubmissions.length > 0)
+    ? incomingSubmissions.map(item => ({
+        id: item.id,
+        studentName: item.student_name || item.studentName,
+        avatarInitial: item.avatar_initial || item.avatarInitial,
+        avatarBg: item.avatar_bg || item.avatarBg || '#E0E7FF',
+        avatarColor: item.avatar_color || item.avatarColor || '#4338CA',
+        exerciseTitle: item.exercise_title || item.exerciseTitle,
+        submittedTime: item.submitted_time || item.submittedTime,
+        status: item.status,
+        statusLabel: item.status_label || item.statusLabel,
+      }))
+    : defaultSubmissions;
 
   return (
     <div className="recent-submissions-card">

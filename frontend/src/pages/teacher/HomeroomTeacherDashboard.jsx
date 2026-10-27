@@ -2,16 +2,17 @@
 // Description: Specialized Dashboard for Homeroom Teachers (GVCN) featuring top quick stats, learning quality radar chart with qualitative notes, recent submissions table, and weekly teaching schedule.
 // Created At: 2026-08-30
 // Created By: Tam Khang
-// Updated At: 2026-09-07
+// Updated At: 2026-10-25
 // Updated By: Tam Khang
 
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   ClipboardCheck,
   BookOpen
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
+import { teacherApi } from '../../services/api';
 import LearningQualityCard from '../../components/teacher/LearningQualityCard';
 import RecentSubmissionsTable from '../../components/teacher/RecentSubmissionsTable';
 import TeachingScheduleCard from '../../components/teacher/TeachingScheduleCard';
@@ -20,6 +21,25 @@ import './TeacherDashboard.css';
 export default function HomeroomTeacherDashboard() {
   const { user } = useAuth();
   const navigate = useNavigate();
+  const [dashboardData, setDashboardData] = useState(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    let isMounted = true;
+    async function loadDashboardData() {
+      try {
+        setLoading(true);
+        const data = await teacherApi.getDashboard();
+        if (isMounted) setDashboardData(data);
+      } catch (err) {
+        console.error('Failed to load teacher dashboard:', err);
+      } finally {
+        if (isMounted) setLoading(false);
+      }
+    }
+    loadDashboardData();
+    return () => { isMounted = false; };
+  }, []);
 
   // Derive dynamic greeting title (e.g. "Thầy Nguyễn" or "Cô Mai")
   const getGreetingData = (fullName) => {
@@ -60,7 +80,9 @@ export default function HomeroomTeacherDashboard() {
           >
             <div className="quick-stat-info">
               <span className="quick-stat-label">BÀI TẬP CHỜ CHẤM</span>
-              <span className="quick-stat-value">45</span>
+              <span className="quick-stat-value">
+                {dashboardData?.metrics?.pending_grading_count ?? '—'}
+              </span>
             </div>
             <div className="quick-stat-icon-wrapper bg-red">
               <ClipboardCheck size={20} className="stat-icon-red" />
@@ -75,7 +97,9 @@ export default function HomeroomTeacherDashboard() {
           >
             <div className="quick-stat-info">
               <span className="quick-stat-label">LỚP HỌC HÔM NAY</span>
-              <span className="quick-stat-value">3</span>
+              <span className="quick-stat-value">
+                {dashboardData?.metrics?.today_classes_count ?? '—'}
+              </span>
             </div>
             <div className="quick-stat-icon-wrapper bg-blue">
               <BookOpen size={20} className="stat-icon-blue" />
@@ -88,13 +112,13 @@ export default function HomeroomTeacherDashboard() {
       <div className="dashboard-content-layout">
         {/* Left Column: Chất lượng học tập trung bình (Radar + Nhận xét) + Bài nộp gần đây */}
         <div className="dashboard-left-column">
-          <LearningQualityCard />
-          <RecentSubmissionsTable />
+          <LearningQualityCard learningQuality={dashboardData?.learning_quality} />
+          <RecentSubmissionsTable submissions={dashboardData?.recent_submissions} />
         </div>
 
         {/* Right Column: Lịch giảng dạy tuần này */}
         <div className="dashboard-right-column">
-          <TeachingScheduleCard />
+          <TeachingScheduleCard scheduleItems={dashboardData?.weekly_schedule} />
         </div>
       </div>
     </div>

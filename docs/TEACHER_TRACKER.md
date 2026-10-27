@@ -3,14 +3,14 @@ File Name: TEACHER_TRACKER.md
 Description: Comprehensive tracker for Teacher and Homeroom Teacher role use cases across Backend, Frontend, and Testing.
 Created At: 2026-09-30
 Created By: Tam Khang
-Updated At: 2026-10-07
+Updated At: 2026-10-25
 Updated By: Tam Khang
 -->
 
 # Teacher Role Use Cases Tracker
 
 > Path: `docs/TEACHER_TRACKER.md` · Role: **Teacher (Giáo viên Bộ môn & Giáo viên Chủ nhiệm)**  
-> Created By: `Tam Khang` · Updated By: `Tam Khang` · Updated At: `2026-10-07`  
+> Created By: `Tam Khang` · Updated By: `Tam Khang` · Updated At: `2026-10-25`  
 > Scope: Teaching materials, exercise bank, AI exam extraction, grading, schedules, student assessment, and dedicated homeroom class management.
 
 | Use Case | BE | FE | Test |

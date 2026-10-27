@@ -35,6 +35,7 @@ from app.modules.admin.routers.users import router as admin_users_router
 from app.modules.admin.routers.dashboard import router as admin_dashboard_router
 from app.modules.exercise.routers.student_dashboard import router as student_dashboard_router
 from app.modules.exercise.routers.teacher_schedule import router as teacher_schedule_router
+from app.modules.exercise.routers.teacher_dashboard import router as teacher_dashboard_router
 
 app = FastAPI(title="SmartLMS API", version="1.0.0")
 
@@ -62,6 +63,7 @@ app.include_router(admin_users_router)
 app.include_router(admin_dashboard_router)
 app.include_router(student_dashboard_router)
 app.include_router(teacher_schedule_router)
+app.include_router(teacher_dashboard_router)
 
 @app.get("/health")
 def health():

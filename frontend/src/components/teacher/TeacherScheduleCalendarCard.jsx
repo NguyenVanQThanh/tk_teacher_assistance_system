@@ -2,16 +2,17 @@
 // Description: Interactive weekly and monthly teaching schedule calendar selector for Teacher Dashboard.
 // Created At: 2026-09-07
 // Created By: Tam Khang
-// Updated At: 2026-09-07
+// Updated At: 2026-10-25
 // Updated By: Tam Khang
 
 import React, { useState } from 'react';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import './TeacherScheduleCalendarCard.css';
 
-export default function TeacherScheduleCalendarCard({ selectedDay = 5, onSelectDay }) {
-  const [currentMonthIndex, setCurrentMonthIndex] = useState(9); // 9 for October (0-indexed)
-  const [currentYear, setCurrentYear] = useState(2023);
+export default function TeacherScheduleCalendarCard({ selectedDay, onSelectDay, scheduleItems }) {
+  const now = React.useMemo(() => new Date(), []);
+  const [currentMonthIndex, setCurrentMonthIndex] = useState(now.getMonth());
+  const [currentYear, setCurrentYear] = useState(now.getFullYear());
 
   const monthNames = [
     'Tháng 1', 'Tháng 2', 'Tháng 3', 'Tháng 4', 'Tháng 5', 'Tháng 6',
@@ -36,27 +37,53 @@ export default function TeacherScheduleCalendarCard({ selectedDay = 5, onSelectD
     }
   };
 
-  // Calendar dates matrix matching the exact mockup
+  // Calendar dates matrix matching current month
   const weekDays = ['T2', 'T3', 'T4', 'T5', 'T6', 'T7', 'CN'];
 
-  const calendarDays = [
-    // Row 1
-    { id: 'd-25', day: 25, isMuted: true, hasEvent: false },
-    { id: 'd-26', day: 26, isMuted: true, hasEvent: false },
-    { id: 'd-27', day: 27, isMuted: true, hasEvent: false },
-    { id: 'd-28', day: 28, isMuted: true, hasEvent: false },
-    { id: 'd-29', day: 29, isMuted: true, hasEvent: false },
-    { id: 'd-30', day: 30, isMuted: true, hasEvent: false },
-    { id: 'd-1', day: 1, isMuted: false, hasEvent: false },
-    // Row 2
-    { id: 'd-2', day: 2, isMuted: false, hasEvent: true },
-    { id: 'd-3', day: 3, isMuted: false, hasEvent: false },
-    { id: 'd-4', day: 4, isMuted: false, hasEvent: true },
-    { id: 'd-5', day: 5, isMuted: false, hasEvent: true },
-    { id: 'd-6', day: 6, isMuted: false, hasEvent: true },
-    { id: 'd-7', day: 7, isMuted: false, hasEvent: false },
-    { id: 'd-8', day: 8, isMuted: false, hasEvent: false },
-  ];
+  const calendarDays = React.useMemo(() => {
+    const firstDayIndex = new Date(currentYear, currentMonthIndex, 1).getDay();
+    const leadingOffset = firstDayIndex === 0 ? 6 : firstDayIndex - 1;
+    const daysInCurrentMonth = new Date(currentYear, currentMonthIndex + 1, 0).getDate();
+    const prevMonthDaysCount = new Date(currentYear, currentMonthIndex, 0).getDate();
+
+    const days = [];
+    for (let i = leadingOffset - 1; i >= 0; i--) {
+      days.push({
+        id: `prev-${prevMonthDaysCount - i}`,
+        day: prevMonthDaysCount - i,
+        isMuted: true,
+        hasEvent: false,
+      });
+    }
+
+    const eventDays = new Set(
+      (scheduleItems || [])
+        .map(s => s.day || (s.date_str ? parseInt(s.date_str.split('-')[2], 10) : (s.date_number ? parseInt(s.date_number, 10) : null)))
+        .filter(Boolean)
+    );
+
+    for (let d = 1; d <= daysInCurrentMonth; d++) {
+      days.push({
+        id: `cur-${d}`,
+        day: d,
+        isMuted: false,
+        hasEvent: eventDays.has(d),
+      });
+    }
+
+    const totalCells = Math.ceil(days.length / 7) * 7;
+    const remaining = totalCells - days.length;
+    for (let nextDay = 1; nextDay <= remaining; nextDay++) {
+      days.push({
+        id: `next-${nextDay}`,
+        day: nextDay,
+        isMuted: true,
+        hasEvent: false,
+      });
+    }
+
+    return days;
+  }, [currentYear, currentMonthIndex, scheduleItems]);
 
   return (
     <div className="teacher-schedule-calendar-card">

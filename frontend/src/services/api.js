@@ -368,6 +368,10 @@ export const studentApi = {
 };
 
 export const teacherApi = {
+  getDashboard: async () => {
+    const response = await api.get('/api/v1/teacher/dashboard');
+    return response.data;
+  },
   getSchedule: async () => {
     const response = await api.get('/api/v1/teacher/schedule');
     return response.data;

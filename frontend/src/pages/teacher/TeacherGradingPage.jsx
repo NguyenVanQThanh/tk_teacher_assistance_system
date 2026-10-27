@@ -455,6 +455,13 @@ export default function TeacherGradingPage() {
             ? new Date(att.end_time).toLocaleDateString('vi-VN', { hour: '2-digit', minute: '2-digit', day: '2-digit', month: '2-digit' })
             : (att.start_time ? new Date(att.start_time).toLocaleDateString('vi-VN', { hour: '2-digit', minute: '2-digit', day: '2-digit', month: '2-digit' }) : 'Vừa xong');
 
+          const itemStatus = (att.status === 'pending_grading' || att.status === 'pending_review' || att.status === 'approved')
+            ? att.status
+            : (hasScore ? 'approved' : 'pending_grading');
+          const itemStatusLabel = itemStatus === 'pending_grading'
+            ? 'Chờ chấm'
+            : (itemStatus === 'pending_review' ? 'Chờ duyệt' : 'Đã duyệt');
+
           return {
             id: att.attempt_id,
             attempt_id: att.attempt_id,
@@ -474,8 +481,8 @@ export default function TeacherGradingPage() {
             exerciseTypeCode: 'classroom',
             submittedTime: submittedFormatted,
             timeType: 'normal',
-            status: hasScore ? 'approved' : 'pending_grading',
-            statusLabel: hasScore ? 'Đã duyệt' : 'Chờ chấm',
+            status: itemStatus,
+            statusLabel: itemStatusLabel,
             score: hasScore ? Number(rawScore) : null,
             feedback: '',
             raw: att
@@ -600,17 +607,17 @@ export default function TeacherGradingPage() {
 
   // Dynamic counts: exact real-time counts from submissions
   const pendingGradingCount = useMemo(() => {
-    if (dashboardStats?.pending_grading_count !== undefined && dashboardStats.pending_grading_count > 0) {
-      return dashboardStats.pending_grading_count;
+    if (submissions && submissions.length > 0) {
+      return submissions.filter((s) => s.status === 'pending_grading').length;
     }
-    return submissions.filter((s) => s.status === 'pending_grading').length;
+    return dashboardStats?.pending_grading_count ?? 0;
   }, [dashboardStats, submissions]);
 
   const pendingReviewCount = useMemo(() => {
-    if (dashboardStats?.pending_review_count !== undefined && dashboardStats.pending_review_count > 0) {
-      return dashboardStats.pending_review_count;
+    if (submissions && submissions.length > 0) {
+      return submissions.filter((s) => s.status === 'pending_review').length;
     }
-    return submissions.filter((s) => s.status === 'pending_review').length;
+    return dashboardStats?.pending_review_count ?? 0;
   }, [dashboardStats, submissions]);
 
   // Filter logic

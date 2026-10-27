@@ -2,7 +2,7 @@
 // Description: Card component displaying exercises waiting for teacher grading with direct action triggers.
 // Created At: 2026-09-07
 // Created By: Tam Khang
-// Updated At: 2026-09-07
+// Updated At: 2026-10-25
 // Updated By: Tam Khang
 
 import React from 'react';
@@ -12,15 +12,15 @@ import { useAuth } from '../../context/AuthContext';
 import { getTeacherSubjectInfo } from '../../utils/teacherSubjectHelper';
 import './PendingGradingCard.css';
 
-export default function PendingGradingCard() {
+export default function PendingGradingCard({ pendingCount, pendingItems: incomingPendingItems }) {
   const navigate = useNavigate();
   const { user } = useAuth();
   const { shortName } = getTeacherSubjectInfo(user);
 
-  const pendingItems = [
+  const defaultItems = [
     {
       id: 'pg-1',
-      count: 12,
+      count: pendingCount ? Math.ceil(pendingCount / 3) : 12,
       variant: 'danger',
       title: `Đề kiểm tra 15p - ${shortName} 10A1`,
       deadline: 'Hạn chót: Hôm qua',
@@ -28,13 +28,17 @@ export default function PendingGradingCard() {
     },
     {
       id: 'pg-2',
-      count: 35,
+      count: pendingCount ? Math.floor(pendingCount * 2 / 3) : 35,
       variant: 'neutral',
       title: `Bài tập về nhà tuần 4 - ${shortName} 11B2`,
       deadline: 'Hạn chót: Hôm nay, 23:59',
       link: '/teacher/grading',
     },
   ];
+
+  const pendingItems = (incomingPendingItems && incomingPendingItems.length > 0)
+    ? incomingPendingItems
+    : defaultItems;
 
   return (
     <div className="pending-grading-card">

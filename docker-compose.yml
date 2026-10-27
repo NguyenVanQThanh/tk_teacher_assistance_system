@@ -7,7 +7,7 @@ services:
     restart: always
     environment:
       POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: dummy_password
+      POSTGRES_PASSWORD: 123456
       POSTGRES_DB: teacher_assistance
     ports:
       - "5432:5432"
@@ -24,10 +24,11 @@ services:
       DB_HOST: postgres
       DB_PORT: 5432
       DB_USER: postgres
-      DB_PASSWORD: dummy_password
+      DB_PASSWORD: 123456
       DB_NAME: teacher_assistance
       SECRET_KEY: dev_secret_key_jwt_token_change_in_production
       ACCESS_TOKEN_EXPIRE_MINUTES: 60
+      TZ: Asia/Ho_Chi_Minh
     ports:
       - "8000:8000"
     depends_on:
