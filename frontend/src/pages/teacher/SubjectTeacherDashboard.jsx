@@ -2,13 +2,14 @@
 // Description: Specialized Dashboard for Subject Teachers featuring calendar schedule selector, pending grading, and daily schedule details.
 // Created At: 2026-09-07
 // Created By: Tam Khang
-// Updated At: 2026-09-07
+// Updated At: 2026-10-25
 // Updated By: Tam Khang
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { getTeacherSubjectInfo } from '../../utils/teacherSubjectHelper';
+import { teacherApi } from '../../services/api';
 import TeacherScheduleCalendarCard from '../../components/teacher/TeacherScheduleCalendarCard';
 import PendingGradingCard from '../../components/teacher/PendingGradingCard';
 import RecentSubmissionsSummaryCard from '../../components/teacher/RecentSubmissionsSummaryCard';
@@ -17,7 +18,26 @@ import './SubjectTeacherDashboard.css';
 
 export default function SubjectTeacherDashboard() {
   const { user } = useAuth();
-  const [selectedDay, setSelectedDay] = useState(5); // Default to Thursday 5th
+  const [selectedDay, setSelectedDay] = useState(new Date().getDate()); // Default to today
+  const [dashboardData, setDashboardData] = useState(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    let isMounted = true;
+    async function loadDashboard() {
+      try {
+        setLoading(true);
+        const data = await teacherApi.getDashboard();
+        if (isMounted) setDashboardData(data);
+      } catch (err) {
+        console.error('Failed to load subject teacher dashboard:', err);
+      } finally {
+        if (isMounted) setLoading(false);
+      }
+    }
+    loadDashboard();
+    return () => { isMounted = false; };
+  }, []);
 
   const teacherSubject = getTeacherSubjectInfo(user);
 
@@ -61,18 +81,22 @@ export default function SubjectTeacherDashboard() {
         <div className="subject-dashboard-left-column">
           <TeacherScheduleCalendarCard 
             selectedDay={selectedDay} 
-            onSelectDay={(day) => setSelectedDay(day)} 
+            onSelectDay={(day) => setSelectedDay(day)}
+            scheduleItems={dashboardData?.weekly_schedule}
           />
 
           <div className="subject-dashboard-bottom-row">
-            <PendingGradingCard />
-            <RecentSubmissionsSummaryCard />
+            <PendingGradingCard pendingCount={dashboardData?.metrics?.pending_grading_count} />
+            <RecentSubmissionsSummaryCard recentSubmissions={dashboardData?.recent_submissions} />
           </div>
         </div>
 
         {/* Right Column: Daily Schedule Details */}
         <div className="subject-dashboard-right-column">
-          <DailyScheduleDetailCard selectedDay={selectedDay} />
+          <DailyScheduleDetailCard 
+            selectedDay={selectedDay} 
+            scheduleItems={dashboardData?.weekly_schedule}
+          />
         </div>
       </div>
     </div>

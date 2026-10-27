@@ -43,6 +43,7 @@ export default function TeacherGradingPage() {
   const [loading, setLoading] = useState(true);
   const [classesList, setClassesList] = useState([]);
   const [subjectsList, setSubjectsList] = useState([]);
+  const [dashboardStats, setDashboardStats] = useState(null);
 
   // Submissions dataset with 3 official statuses: pending_grading (Chờ chấm), pending_review (Chờ duyệt), approved (Đã duyệt)
   const [submissions, setSubmissions] = useState([
@@ -411,11 +412,16 @@ export default function TeacherGradingPage() {
   const loadData = useCallback(async () => {
     try {
       setLoading(true);
-      const [attemptsRes, classesRes, subjectsRes] = await Promise.allSettled([
+      const [attemptsRes, classesRes, subjectsRes, dashboardRes] = await Promise.allSettled([
         attemptsApi.getAttempts(),
         classesApi.getClasses(),
         subjectsApi.getSubjects(),
+        attemptsApi.getGradingDashboard(),
       ]);
+
+      if (dashboardRes.status === 'fulfilled' && dashboardRes.value) {
+        setDashboardStats(dashboardRes.value);
+      }
 
       if (classesRes.status === 'fulfilled') {
         setClassesList(Array.isArray(classesRes.value) ? classesRes.value : classesRes.value.items || []);
@@ -449,6 +455,13 @@ export default function TeacherGradingPage() {
             ? new Date(att.end_time).toLocaleDateString('vi-VN', { hour: '2-digit', minute: '2-digit', day: '2-digit', month: '2-digit' })
             : (att.start_time ? new Date(att.start_time).toLocaleDateString('vi-VN', { hour: '2-digit', minute: '2-digit', day: '2-digit', month: '2-digit' }) : 'Vừa xong');
 
+          const itemStatus = (att.status === 'pending_grading' || att.status === 'pending_review' || att.status === 'approved')
+            ? att.status
+            : (hasScore ? 'approved' : 'pending_grading');
+          const itemStatusLabel = itemStatus === 'pending_grading'
+            ? 'Chờ chấm'
+            : (itemStatus === 'pending_review' ? 'Chờ duyệt' : 'Đã duyệt');
+
           return {
             id: att.attempt_id,
             attempt_id: att.attempt_id,
@@ -468,8 +481,8 @@ export default function TeacherGradingPage() {
             exerciseTypeCode: 'classroom',
             submittedTime: submittedFormatted,
             timeType: 'normal',
-            status: hasScore ? 'approved' : 'pending_grading',
-            statusLabel: hasScore ? 'Đã duyệt' : 'Chờ chấm',
+            status: itemStatus,
+            statusLabel: itemStatusLabel,
             score: hasScore ? Number(rawScore) : null,
             feedback: '',
             raw: att
@@ -594,12 +607,18 @@ export default function TeacherGradingPage() {
 
   // Dynamic counts: exact real-time counts from submissions
   const pendingGradingCount = useMemo(() => {
-    return submissions.filter((s) => s.status === 'pending_grading').length;
-  }, [submissions]);
+    if (submissions && submissions.length > 0) {
+      return submissions.filter((s) => s.status === 'pending_grading').length;
+    }
+    return dashboardStats?.pending_grading_count ?? 0;
+  }, [dashboardStats, submissions]);
 
   const pendingReviewCount = useMemo(() => {
-    return submissions.filter((s) => s.status === 'pending_review').length;
-  }, [submissions]);
+    if (submissions && submissions.length > 0) {
+      return submissions.filter((s) => s.status === 'pending_review').length;
+    }
+    return dashboardStats?.pending_review_count ?? 0;
+  }, [dashboardStats, submissions]);
 
   // Filter logic
   const filteredSubmissions = useMemo(() => {
@@ -648,11 +667,37 @@ export default function TeacherGradingPage() {
   }, [filteredSubmissions, currentPage, itemsPerPage]);
 
   const handleExportReport = () => {
-    setToastMessage('Đang xuất file báo cáo chấm điểm (Excel/PDF)...');
-    setTimeout(() => {
-      setToastMessage('Xuất báo cáo thành công!');
-      setTimeout(() => setToastMessage(null), 3000);
-    }, 1000);
+    try {
+      const headers = ['Mã bài làm', 'Họ và tên học sinh', 'Lớp', 'Môn học', 'Đề bài', 'Điểm số', 'Trạng thái', 'Nhận xét', 'Thời gian nộp'];
+      const rows = filteredSubmissions.map((s) => [
+        `"${s.id || s.attempt_id || ''}"`,
+        `"${(s.studentName || '').replace(/"/g, '""')}"`,
+        `"${(s.className || '').replace(/"/g, '""')}"`,
+        `"${(s.subjectName || s.subject || '').replace(/"/g, '""')}"`,
+        `"${(s.exerciseTitle || '').replace(/"/g, '""')}"`,
+        `"${s.score !== null && s.score !== undefined ? s.score : ''}"`,
+        `"${(s.statusLabel || s.status || '').replace(/"/g, '""')}"`,
+        `"${(s.feedback || '').replace(/"/g, '""')}"`,
+        `"${(s.submittedTime || '').replace(/"/g, '""')}"`
+      ]);
+
+      const csvContent = '\uFEFF' + [headers.join(','), ...rows.map(r => r.join(','))].join('\r\n');
+      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.setAttribute('href', url);
+      link.setAttribute('download', `Bang_Diem_Hoc_Sinh_${new Date().toISOString().slice(0, 10)}.csv`);
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+
+      setToastMessage('Đã xuất file bảng điểm (Excel/CSV) thành công!');
+    } catch (err) {
+      console.error('Export error:', err);
+      setToastMessage('Lỗi khi xuất bảng điểm.');
+    }
+    setTimeout(() => setToastMessage(null), 3500);
   };
 
   return (

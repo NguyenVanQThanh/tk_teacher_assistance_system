@@ -22,6 +22,7 @@ import {
 } from 'lucide-react';
 import StudentTranscriptPrintModal from './StudentTranscriptPrintModal';
 import { getSubjectIdByName } from '../../utils/teacherSubjectHelper';
+import { attemptsApi } from '../../services/api';
 import './StudentDetailModal.css';
 
 // Dynamic N-axis SVG Radar Chart Component (supports 3-criteria or 8-subject radar)
@@ -310,8 +311,49 @@ export default function StudentDetailModal({
     application: (baseScore * 0.88).toFixed(1),
   };
 
+  const [realAttempts, setRealAttempts] = useState([]);
+
+  useEffect(() => {
+    let isMounted = true;
+    async function loadStudentAttempts() {
+      if (!student?.id) return;
+      try {
+        const res = await attemptsApi.getAttempts({ student_id: student.id });
+        const items = Array.isArray(res) ? res : res?.items;
+        if (isMounted && Array.isArray(items) && items.length > 0) {
+          setRealAttempts(items);
+        }
+      } catch (err) {
+        // Fallback to sample data
+      }
+    }
+    loadStudentAttempts();
+    return () => { isMounted = false; };
+  }, [student?.id]);
+
   // Comprehensive Classroom Assignments list across all subjects
-  const allMasterClassroomAssignments = [
+  const mappedRealAssignments = useMemo(() => {
+    if (!realAttempts.length) return [];
+    return realAttempts.map((att, idx) => ({
+      id: att.attempt_id || `real-${idx}`,
+      subjectId: 'math',
+      subjectName: att.assignment_title?.includes('Vật lý') ? 'Vật lý' : 'Toán',
+      badgeColor: '#7C3AED',
+      title: att.assignment_title || `Bài tập #${att.assignment_id || idx + 1}`,
+      attemptsCount: 1,
+      attemptsDetails: [
+        { 
+          attempt: 1, 
+          score: att.score !== null && att.score !== undefined ? Number(att.score) : 8.5, 
+          submittedAt: att.submitted_at ? new Date(att.submitted_at).toLocaleDateString('vi-VN') : 'Mới nộp' 
+        }
+      ],
+      bestScore: att.score !== null && att.score !== undefined ? Number(att.score) : 8.5,
+      status: att.status === 'GRADED' ? 'Đã chấm điểm' : att.status === 'SUBMITTED' ? 'Đã nộp bài' : 'Đang làm'
+    }));
+  }, [realAttempts]);
+
+  const defaultMasterClassroomAssignments = [
     {
       id: 1,
       subjectId: 'math',
@@ -460,6 +502,10 @@ export default function StudentDetailModal({
       status: 'Đã hoàn thành',
     },
   ];
+
+  const allMasterClassroomAssignments = useMemo(() => {
+    return [...mappedRealAssignments, ...defaultMasterClassroomAssignments];
+  }, [mappedRealAssignments]);
 
   // Comprehensive AI-Generated Assignments list across all subjects
   const allMasterAiAssignments = [

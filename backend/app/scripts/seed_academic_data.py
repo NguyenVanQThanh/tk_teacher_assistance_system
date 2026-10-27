@@ -31,7 +31,7 @@ load_dotenv()
 from models.models import User, Role, Subject, Class, StudentClass, TeacherSubject
 from app.core.security import get_password_hash
 
-DB_USERNAME = os.environ.get("DB_USERNAME")
+DB_USERNAME = os.environ.get("DB_USERNAME") or os.environ.get("DB_USER")
 DB_PASSWORD = os.environ.get("DB_PASSWORD")
 DB_HOST = os.environ.get("DB_HOST", "localhost")
 DB_PORT = os.environ.get("DB_PORT", "5432")
@@ -40,7 +40,7 @@ DB_NAME = os.environ.get("DB_NAME")
 if not all([DB_USERNAME, DB_PASSWORD, DB_NAME]):
     raise ValueError("Missing database configuration in environment variables")
 
-DATABASE_URL = f"postgresql://{DB_USERNAME}:{DB_PASSWORD}@{DB_HOST}:{DB_PORT}/{DB_NAME}"
+DATABASE_URL = f"postgresql+psycopg2://{DB_USERNAME}:{DB_PASSWORD}@{DB_HOST}:{DB_PORT}/{DB_NAME}"
 engine = create_engine(DATABASE_URL)
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
@@ -75,6 +75,8 @@ def seed_academic_sample_data():
             {"name": "Toán học", "desc": "Môn Toán học phổ thông nâng cao và cơ bản"},
             {"name": "Vật lý", "desc": "Môn Vật lý phổ thông và thí nghiệm"},
             {"name": "Hóa học", "desc": "Môn Hóa học vô cơ và hữu cơ"},
+            {"name": "Sinh học", "desc": "Môn Sinh học tế bào, di truyền và tiến hóa"},
+            {"name": "Lịch sử", "desc": "Môn Lịch sử Việt Nam và thế giới"},
             {"name": "Tiếng Anh", "desc": "Môn Tiếng Anh học thuật và giao tiếp"},
             {"name": "Ngữ văn", "desc": "Môn Ngữ văn và đọc hiểu tác phẩm"}
         ]
@@ -95,7 +97,7 @@ def seed_academic_sample_data():
 
         session.commit()
 
-        print("--- [3] Seeding Teachers (5 Teachers) ---")
+        print("--- [3] Seeding Teachers (7 Teachers) ---")
         teachers_data = [
             {
                 "phone": "0999000002",
@@ -125,6 +127,18 @@ def seed_academic_sample_data():
                 "phone": "0999000007",
                 "email": "teacher_trang@school.com",
                 "full_name": "Cô Phạm Thu Trang",
+                "password": "Teacher@1234"
+            },
+            {
+                "phone": "0999000008",
+                "email": "teacher_ha@school.com",
+                "full_name": "Cô Đặng Thu Hà (Tổ Sinh học)",
+                "password": "Teacher@1234"
+            },
+            {
+                "phone": "0999000009",
+                "email": "teacher_hung@school.com",
+                "full_name": "Thầy Nguyễn Quốc Hùng (Tổ Lịch sử)",
                 "password": "Teacher@1234"
             }
         ]
@@ -209,14 +223,40 @@ def seed_academic_sample_data():
 
         print("--- [5] Seeding Teacher-Subject Assignments ---")
         assignments_plan = [
+            ("0999000002", "12A1", "Toán học"),
+            ("0999000002", "11B2", "Toán học"),
+            ("0999000002", "10A3", "Toán học"),
+            ("0999000002", "12A1", "Hóa học"),
+            ("0999000002", "11B2", "Hóa học"),
+            ("0999000002", "10A3", "Hóa học"),
+            ("0999000002", "12A1", "Sinh học"),
+            ("0999000002", "11B2", "Sinh học"),
+            ("0999000002", "10A3", "Sinh học"),
+            ("0999000002", "12A1", "Lịch sử"),
+            ("0999000002", "11B2", "Lịch sử"),
+            ("0999000002", "10A3", "Lịch sử"),
+            ("0999000002", "12A1", "Vật lý"),
+            ("0999000002", "11B2", "Vật lý"),
+            ("0999000002", "10A3", "Vật lý"),
+            ("0999000002", "12A1", "Ngữ văn"),
+            ("0999000002", "10A3", "Ngữ văn"),
+            ("0999000002", "12A1", "Tiếng Anh"),
+            ("0999000002", "11B2", "Tiếng Anh"),
             ("0999000004", "11B2", "Vật lý"),
             ("0999000004", "12A1", "Vật lý"),
             ("0999000005", "10A3", "Hóa học"),
             ("0999000005", "11B2", "Hóa học"),
+            ("0999000005", "12A1", "Hóa học"),
             ("0999000006", "12A1", "Tiếng Anh"),
             ("0999000006", "11B2", "Tiếng Anh"),
             ("0999000007", "12A1", "Ngữ văn"),
             ("0999000007", "10A3", "Ngữ văn"),
+            ("0999000008", "10A3", "Sinh học"),
+            ("0999000008", "11B2", "Sinh học"),
+            ("0999000008", "12A1", "Sinh học"),
+            ("0999000009", "10A3", "Lịch sử"),
+            ("0999000009", "11B2", "Lịch sử"),
+            ("0999000009", "12A1", "Lịch sử"),
         ]
         for t_phone, c_name, s_name in assignments_plan:
             teacher = teachers_dict[t_phone]

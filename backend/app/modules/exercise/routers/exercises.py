@@ -2,7 +2,7 @@
 # Description: API Router for Exercise endpoints (F-EXE-01).
 # Created At: 2026-07-31
 # Created By: Tam Khang
-# Updated At: 2026-08-04
+# Updated At: 2026-10-03
 # Updated By: Tam Khang
 
 from uuid import UUID
@@ -16,7 +16,8 @@ from app.modules.auth.dependencies import require_perm, get_current_user
 from app.modules.exercise.schemas import (
     ExerciseCreate, ExerciseUpdate, ExerciseOut,
     PaginatedExerciseOut, CursorPaginatedExerciseOut,
-    QuestionCreate, QuestionOut, AnswerOptionCreate
+    QuestionCreate, QuestionOut, AnswerOptionCreate,
+    AiExerciseGenerateRequest, AiExerciseGenerateOut
 )
 from app.modules.exercise.services.exercise_service import ExerciseService
 from app.modules.exercise.services.question_service import QuestionService
@@ -52,6 +53,41 @@ def create_exercise(
     Create a new exercise. Requires EXE_EXERCISE_MANAGE permission.
     """
     return service.create_exercise(current_user, payload)
+
+
+from app.modules.auth.services.permission_service import PermissionService
+
+
+def require_any_perm(*permission_codes: str):
+    def dependency(user: User = Depends(get_current_user), db: Session = Depends(get_db)) -> None:
+        effective_perms = PermissionService.get_effective_permissions(db, user.user_id, user.role_id)
+        if not any(code in effective_perms for code in permission_codes):
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail={
+                    "code": "ERR-AUTH-FORBIDDEN",
+                    "message": "You do not have permission to access this resource."
+                }
+            )
+    return dependency
+
+
+@router.post(
+    "/ai-generate",
+    response_model=AiExerciseGenerateOut,
+    status_code=status.HTTP_201_CREATED,
+    dependencies=[Depends(require_any_perm("EXE_ATTEMPT_SUBMIT", "EXE_EXERCISE_VIEW", "EXE_EXERCISE_MANAGE"))]
+)
+def generate_ai_exercise(
+    payload: AiExerciseGenerateRequest,
+    service: ExerciseService = Depends(get_exercise_service),
+    current_user: User = Depends(get_current_user)
+):
+    """
+    Generate an AI exercise with realistic Part 1, 2, 3 questions, assign it to the student's class,
+    and persist Exercise, Question, AnswerOption, and ClassAssignment records into PostgreSQL.
+    """
+    return service.generate_ai_exercise(current_user, payload)
 
 
 @router.get(

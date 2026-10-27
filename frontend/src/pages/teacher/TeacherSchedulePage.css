@@ -350,6 +350,16 @@
   box-shadow: 0 0 0 3px rgba(124, 58, 237, 0.12);
 }
 
+.calendar-day-cell.today-cell:not(.selected-day-cell) {
+  border: 1.5px dashed #7C3AED;
+  background-color: #FAF5FF;
+}
+
+.calendar-day-cell.today-cell:not(.selected-day-cell) .day-number-text {
+  color: #7C3AED;
+  font-weight: 800;
+}
+
 .day-header-number {
   display: flex;
   align-items: center;
@@ -426,6 +436,32 @@
   font-weight: 800;
   color: #0F172A;
   margin: 0;
+}
+
+.daily-date-controls {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.day-nav-arrow-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border: 1px solid #E2E8F0;
+  border-radius: 6px;
+  background-color: #FFFFFF;
+  color: #64748B;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.day-nav-arrow-btn:hover {
+  background-color: #F8FAFC;
+  color: #0F172A;
+  border-color: #CBD5E1;
 }
 
 .date-badge-pill {

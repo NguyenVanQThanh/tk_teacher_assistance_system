@@ -2,7 +2,7 @@
 // Description: Interactive Modal for Teacher Profile Information and Security / Password Management.
 // Created At: 2026-09-01
 // Created By: Tam Khang
-// Updated At: 2026-09-01
+// Updated At: 2026-09-30
 // Updated By: Tam Khang
 
 import React, { useState, useEffect } from 'react';
@@ -29,6 +29,7 @@ import {
   AlertCircle
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
+import { authApi } from '../../services/api';
 import { getTeacherProfileDefaults } from '../../utils/teacherSubjectHelper';
 import './TeacherProfileModal.css';
 
@@ -95,6 +96,8 @@ export default function TeacherProfileModal({
   const [showNewPass, setShowNewPass] = useState(false);
   const [showConfirmPass, setShowConfirmPass] = useState(false);
   const [twoFactorEnabled, setTwoFactorEnabled] = useState(true);
+  const [isChangingPass, setIsChangingPass] = useState(false);
+  const [errorMessage, setErrorMessage] = useState(null);
 
   // Save profile changes
   const handleSaveProfile = (e) => {
@@ -104,29 +107,44 @@ export default function TeacherProfileModal({
     setTimeout(() => setToastMessage(null), 3000);
   };
 
-  // Change password handler
-  const handleChangePassword = (e) => {
+  // Change password handler calling backend API
+  const handleChangePassword = async (e) => {
     e.preventDefault();
+    setErrorMessage(null);
     if (!passwordForm.currentPassword || !passwordForm.newPassword || !passwordForm.confirmPassword) {
-      alert('Vui lòng điền đầy đủ các trường mật khẩu.');
+      setErrorMessage('Vui lòng điền đầy đủ các trường mật khẩu.');
       return;
     }
     if (passwordForm.newPassword !== passwordForm.confirmPassword) {
-      alert('Mật khẩu mới và xác nhận mật khẩu không trùng khớp!');
+      setErrorMessage('Mật khẩu mới và xác nhận mật khẩu không trùng khớp!');
       return;
     }
     if (passwordForm.newPassword.length < 8) {
-      alert('Mật khẩu mới phải có tối thiểu 8 ký tự!');
+      setErrorMessage('Mật khẩu mới phải có tối thiểu 8 ký tự!');
       return;
     }
 
-    setPasswordForm({
-      currentPassword: '',
-      newPassword: '',
-      confirmPassword: ''
-    });
-    setToastMessage('Đã đổi mật khẩu thành công! Vui lòng sử dụng mật khẩu mới cho lần đăng nhập sau.');
-    setTimeout(() => setToastMessage(null), 3500);
+    try {
+      setIsChangingPass(true);
+      await authApi.changePassword({
+        old_password: passwordForm.currentPassword,
+        new_password: passwordForm.newPassword
+      });
+
+      setPasswordForm({
+        currentPassword: '',
+        newPassword: '',
+        confirmPassword: ''
+      });
+      setToastMessage('Đã đổi mật khẩu thành công! Vui lòng sử dụng mật khẩu mới cho lần đăng nhập sau.');
+      setTimeout(() => setToastMessage(null), 3500);
+    } catch (err) {
+      const detail = err.response?.data?.detail;
+      const msg = typeof detail === 'string' ? detail : detail?.message || 'Không thể đổi mật khẩu. Vui lòng kiểm tra lại mật khẩu hiện tại.';
+      setErrorMessage(msg);
+    } finally {
+      setIsChangingPass(false);
+    }
   };
 
   // Password strength checker
@@ -453,6 +471,24 @@ export default function TeacherProfileModal({
                 </div>
 
                 <form onSubmit={handleChangePassword} className="change-pass-modal-form">
+                  {errorMessage && (
+                    <div style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '8px',
+                      padding: '10px 14px',
+                      borderRadius: '8px',
+                      backgroundColor: '#FEF2F2',
+                      border: '1px solid #FCA5A5',
+                      color: '#B91C1C',
+                      fontSize: '13px',
+                      marginBottom: '16px'
+                    }}>
+                      <AlertCircle size={16} />
+                      <span>{errorMessage}</span>
+                    </div>
+                  )}
+
                   <div className="pass-fields-col">
                     {/* Current Password */}
                     <div className="form-item-field">
@@ -549,9 +585,9 @@ export default function TeacherProfileModal({
                   </div>
 
                   <div className="pass-actions-row">
-                    <button type="submit" className="btn-submit-new-pass">
+                    <button type="submit" className="btn-submit-new-pass" disabled={isChangingPass}>
                       <Lock size={15} />
-                      <span>Cập nhật mật khẩu mới</span>
+                      <span>{isChangingPass ? 'Đang cập nhật...' : 'Cập nhật mật khẩu mới'}</span>
                     </button>
                   </div>
                 </form>

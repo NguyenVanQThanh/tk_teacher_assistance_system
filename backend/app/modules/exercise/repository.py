@@ -430,10 +430,16 @@ class AttemptRepository:
         attempt: StudentExerciseAttempt,
         score: float,
         feedback: Optional[str] = None,
-        detailed_results: Optional[Any] = None
+        detailed_results: Optional[Any] = None,
+        status: Optional[str] = None
     ) -> StudentExerciseAttempt:
-        """Update score, feedback and detailed_results on an attempt."""
+        """Update score, feedback, status and detailed_results on an attempt."""
         attempt.score = score
+        if status:
+            attempt.status = status
+        else:
+            attempt.status = 'approved'
+
         if detailed_results is not None:
             attempt.detailed_results = detailed_results
         elif feedback is not None:

@@ -2,7 +2,7 @@
 # Description: Main entry point of the FastAPI application.
 # Created At: 2026-07-17
 # Created By: Tam Khang
-# Updated At: 2026-08-30
+# Updated At: 2026-10-04 17:27:00
 # Updated By: Tam Khang
 
 import sys
@@ -30,6 +30,12 @@ from app.modules.exercise.routers.exercises import router as exercises_router
 from app.modules.exercise.routers.questions import router as questions_router
 from app.modules.exercise.routers.assignments import router as assignments_router
 from app.modules.exercise.routers.attempts import router as attempts_router
+from app.modules.document.routers.documents import router as documents_router
+from app.modules.admin.routers.users import router as admin_users_router
+from app.modules.admin.routers.dashboard import router as admin_dashboard_router
+from app.modules.exercise.routers.student_dashboard import router as student_dashboard_router
+from app.modules.exercise.routers.teacher_schedule import router as teacher_schedule_router
+from app.modules.exercise.routers.teacher_dashboard import router as teacher_dashboard_router
 
 app = FastAPI(title="SmartLMS API", version="1.0.0")
 
@@ -52,10 +58,16 @@ app.include_router(exercises_router)
 app.include_router(questions_router)
 app.include_router(assignments_router)
 app.include_router(attempts_router)
+app.include_router(documents_router)
+app.include_router(admin_users_router)
+app.include_router(admin_dashboard_router)
+app.include_router(student_dashboard_router)
+app.include_router(teacher_schedule_router)
+app.include_router(teacher_dashboard_router)
 
 @app.get("/health")
 def health():
-    return {"status": "ok", "version": "1.0.0"}
+    return {"status": "ok", "version": "1.0.1"}
 
 if __name__ == "__main__":
     import uvicorn

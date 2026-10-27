@@ -3,7 +3,7 @@ File Name: models.py
 Description: Database models definition for Sprint 0 & Sprint 2 tables (User, Role, Permission, Exercise, Question, AnswerOption, etc.).
 Created At: 2026-07-04
 Created By: Tam Khang
-Updated At: 2026-08-09
+Updated At: 2026-09-30
 Updated By: Tam Khang
 """
 import uuid
@@ -256,4 +256,72 @@ class StudentExerciseAttempt(Base):
     assignment = relationship("ClassAssignment", backref="attempts")
 
 
+# =====================================================================
+# AGE VALIDATION TRIGGERS FOR USERS
+# =====================================================================
+from datetime import date
+from sqlalchemy import event, select
+from sqlalchemy.orm import Session
 
+@event.listens_for(User, 'before_insert')
+@event.listens_for(User, 'before_update')
+def check_user_age_by_role(mapper, connection, target):
+    """
+    Validation trigger:
+    - Student users must be at least 16 years old.
+    - Teacher users must be at least 22 years old.
+    """
+    if target.birthday and target.role_id:
+        role = None
+        session = Session.object_session(target)
+        if session:
+            role = session.query(Role).filter(Role.role_id == target.role_id).first()
+        if not role:
+            res = connection.execute(
+                select(Role.name).where(Role.role_id == target.role_id)
+            ).fetchone()
+            role_name = res[0] if res else None
+        else:
+            role_name = role.name
+
+        if role_name:
+            today = date.today()
+            b_date = target.birthday if isinstance(target.birthday, date) else date.fromisoformat(str(target.birthday))
+            age = today.year - b_date.year - ((today.month, today.day) < (b_date.month, b_date.day))
+            if role_name.lower() == "student" and age < 16:
+                raise ValueError(f"Student must be at least 16 years old. (Given birthday: {b_date}, age: {age})")
+            elif role_name.lower() == "teacher" and age < 22:
+                raise ValueError(f"Teacher must be at least 22 years old. (Given birthday: {b_date}, age: {age})")
+
+
+class ApprovalRequest(Base):
+    __tablename__ = 'approval_requests'
+
+    request_id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    requester_name = Column(String(100), nullable=False)
+    requester_sub = Column(String(150), nullable=True)
+    avatar_text = Column(String(10), nullable=True)
+    avatar_bg = Column(String(30), nullable=True)
+    is_system = Column(Boolean, default=False, nullable=False)
+    type = Column(String(255), nullable=False)
+    status = Column(String(20), default='pending', nullable=False)  # pending | approved | rejected | processed | DELETED
+    reviewed_by = Column(UUID(as_uuid=True), ForeignKey('users.user_id', ondelete='SET NULL'), nullable=True)
+    reviewed_at = Column(DateTime(timezone=True), nullable=True)
+    review_note = Column(Text, nullable=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+
+    reviewer = relationship("User", foreign_keys=[reviewed_by], backref="reviewed_requests")
+
+
+class AuditLog(Base):
+    __tablename__ = 'audit_logs'
+
+    log_id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    title = Column(String(255), nullable=False)
+    description = Column(Text, nullable=True)
+    actor_name = Column(String(100), nullable=True)
+    ip_address = Column(String(45), nullable=True)
+    severity = Column(String(20), default='info', nullable=False)  # info | warning | danger
+    status = Column(String(20), default='ACTIVE', nullable=False)  # ACTIVE | DELETED
+    created_at = Column(DateTime(timezone=True), server_default=func.now())

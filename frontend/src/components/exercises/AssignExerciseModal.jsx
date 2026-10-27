@@ -1,8 +1,8 @@
 // File Name: AssignExerciseModal.jsx
-// Description: Modal component for assigning an exercise from the repository to a target class.
+// Description: Modal component for assigning an exercise from the repository to multiple target classes simultaneously.
 // Created At: 2026-09-12
 // Created By: Tam Khang
-// Updated At: 2026-09-12
+// Updated At: 2026-09-27
 // Updated By: Tam Khang
 
 import React, { useState, useEffect } from 'react';
@@ -23,7 +23,7 @@ import './AssignExerciseModal.css';
 export default function AssignExerciseModal({ isOpen, onClose, exercise, onAssignedSuccess }) {
   const [classes, setClasses] = useState([]);
   const [loadingClasses, setLoadingClasses] = useState(false);
-  const [selectedClassId, setSelectedClassId] = useState('');
+  const [selectedClassIds, setSelectedClassIds] = useState([]);
   
   // Default due date: 7 days from now at 23:59
   const getDefaultDueDate = (daysAhead = 7) => {
@@ -35,6 +35,8 @@ export default function AssignExerciseModal({ isOpen, onClose, exercise, onAssig
   };
 
   const [dueAt, setDueAt] = useState(getDefaultDueDate(7));
+  const [durationMinutes, setDurationMinutes] = useState(45);
+  const [maxAttempts, setMaxAttempts] = useState(1);
   const [submitting, setSubmitting] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
   const [successMessage, setSuccessMessage] = useState('');
@@ -54,7 +56,8 @@ export default function AssignExerciseModal({ isOpen, onClose, exercise, onAssig
         const classList = Array.isArray(res) ? res : res.items || [];
         setClasses(classList);
         if (classList.length > 0) {
-          setSelectedClassId(classList[0].class_id);
+          // Default select all classes for convenience
+          setSelectedClassIds(classList.map(c => c.class_id));
         }
       } catch (err) {
         setErrorMessage(err.response?.data?.detail?.message || 'Không thể tải danh sách lớp học.');
@@ -72,10 +75,26 @@ export default function AssignExerciseModal({ isOpen, onClose, exercise, onAssig
     setDueAt(getDefaultDueDate(days));
   };
 
+  const handleToggleClass = (classId) => {
+    setSelectedClassIds(prev =>
+      prev.includes(classId)
+        ? prev.filter(id => id !== classId)
+        : [...prev, classId]
+    );
+  };
+
+  const handleToggleAll = () => {
+    if (selectedClassIds.length === classes.length) {
+      setSelectedClassIds([]);
+    } else {
+      setSelectedClassIds(classes.map(c => c.class_id));
+    }
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!selectedClassId) {
-      setErrorMessage('Vui lòng chọn lớp học cần giao bài.');
+    if (selectedClassIds.length === 0) {
+      setErrorMessage('Vui lòng chọn ít nhất 1 lớp học cần giao bài.');
       return;
     }
 
@@ -89,18 +108,35 @@ export default function AssignExerciseModal({ isOpen, onClose, exercise, onAssig
       setSubmitting(true);
       setErrorMessage('');
 
-      await assignmentsApi.createAssignment(selectedClassId, {
+      const results = await assignmentsApi.assignToMultipleClasses(selectedClassIds, {
         exercise_id: exercise.id || exercise.raw?.exercise_id,
         due_at: dueDateObj.toISOString(),
+        duration_minutes: Number(durationMinutes) || 45,
+        max_attempts: Number(maxAttempts) || 1,
       });
 
-      setSuccessMessage('Giao bài tập thành công!');
-      setTimeout(() => {
-        if (onAssignedSuccess) {
-          onAssignedSuccess();
+      const successes = results.filter(r => r.success);
+      const duplicates = results.filter(r => !r.success && r.code === 'ERR-EXE-DUPLICATE_ASSIGNMENT');
+      const failures = results.filter(r => !r.success && r.code !== 'ERR-EXE-DUPLICATE_ASSIGNMENT');
+
+      if (successes.length > 0) {
+        let msg = `Giao bài tập thành công cho ${successes.length} lớp!`;
+        if (duplicates.length > 0) {
+          msg += ` (${duplicates.length} lớp đã được giao trước đó)`;
         }
-        onClose();
-      }, 1200);
+        setSuccessMessage(msg);
+        setTimeout(() => {
+          if (onAssignedSuccess) {
+            onAssignedSuccess();
+          }
+          onClose();
+        }, 1400);
+      } else if (duplicates.length > 0 && failures.length === 0) {
+        setErrorMessage(`Bài tập này đã được giao cho tất cả ${duplicates.length} lớp đã chọn trước đó.`);
+      } else {
+        const firstErr = failures[0]?.error || 'Không thể giao bài tập cho các lớp đã chọn.';
+        setErrorMessage(firstErr);
+      }
     } catch (err) {
       const detail = err.response?.data?.detail;
       const msg = typeof detail === 'string' ? detail : detail?.message || 'Không thể giao bài tập. Vui lòng thử lại.';
@@ -111,22 +147,29 @@ export default function AssignExerciseModal({ isOpen, onClose, exercise, onAssig
   };
 
   return (
-    <div className="assign-modal-backdrop" onClick={onClose}>
-      <div className="assign-modal-container" onClick={(e) => e.stopPropagation()}>
-        {/* Modal Header */}
+    <div className="assign-modal-overlay" onClick={onClose}>
+      <div 
+        className="assign-modal-container"
+        onClick={(e) => e.stopPropagation()}
+        role="dialog"
+        aria-modal="true"
+      >
+        {/* Header */}
         <div className="assign-modal-header">
           <div className="assign-modal-title-wrap">
             <div className="assign-modal-icon">
               <Send size={20} />
             </div>
             <div>
-              <h2 className="assign-modal-heading">Giao bài tập cho lớp</h2>
-              <p className="assign-modal-subheading">Học sinh trong lớp sẽ nhận được bài tập để làm trực tuyến.</p>
+              <h3 className="assign-modal-heading">Giao bài tập cho học sinh</h3>
+              <p className="assign-modal-subheading">
+                Chọn một hoặc nhiều lớp học và thiết lập thời hạn nộp bài.
+              </p>
             </div>
           </div>
-          <button 
-            type="button" 
-            className="assign-modal-close-btn" 
+          <button
+            type="button"
+            className="assign-modal-close-btn"
             onClick={onClose}
             aria-label="Đóng"
           >
@@ -174,36 +217,58 @@ export default function AssignExerciseModal({ isOpen, onClose, exercise, onAssig
 
         {/* Assignment Form */}
         <form onSubmit={handleSubmit} className="assign-form">
-          {/* Class Select Field */}
+          {/* Class Multi-Select Field */}
           <div className="assign-form-group">
-            <label className="assign-label" htmlFor="select-class">
-              <GraduationCap size={16} />
-              <span>Chọn lớp học nhận bài:</span>
-            </label>
+            <div className="assign-classes-header">
+              <label className="assign-label">
+                <GraduationCap size={16} />
+                <span>Chọn các lớp nhận bài tập:</span>
+              </label>
+              {classes.length > 0 && (
+                <button
+                  type="button"
+                  className="btn-select-all-classes"
+                  onClick={handleToggleAll}
+                >
+                  {selectedClassIds.length === classes.length ? 'Bỏ chọn tất cả' : `Chọn tất cả (${classes.length} lớp)`}
+                </button>
+              )}
+            </div>
+
             {loadingClasses ? (
               <div className="assign-loading-classes">
                 <Loader2 size={18} className="animate-spin" />
                 <span>Đang tải danh sách lớp...</span>
               </div>
+            ) : classes.length === 0 ? (
+              <div className="assign-no-classes">Không có lớp học nào khả dụng</div>
             ) : (
-              <select
-                id="select-class"
-                className="assign-select"
-                value={selectedClassId}
-                onChange={(e) => setSelectedClassId(e.target.value)}
-                required
-              >
-                {classes.length === 0 ? (
-                  <option value="">Không có lớp học nào khả dụng</option>
-                ) : (
-                  classes.map((cls) => (
-                    <option key={cls.class_id} value={cls.class_id}>
-                      {cls.class_name} {cls.school_year ? `(${cls.school_year})` : ''}
-                    </option>
-                  ))
-                )}
-              </select>
+              <div className="assign-classes-grid">
+                {classes.map((cls) => {
+                  const isSelected = selectedClassIds.includes(cls.class_id);
+                  return (
+                    <div
+                      key={cls.class_id}
+                      className={`class-card-item ${isSelected ? 'selected' : ''}`}
+                      onClick={() => handleToggleClass(cls.class_id)}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={isSelected}
+                        onChange={() => handleToggleClass(cls.class_id)}
+                        className="class-card-checkbox"
+                      />
+                      <div className="class-card-info">
+                        <span className="class-card-name">{(cls.class_name || '').replace(/[^a-zA-Z0-9\sÀ-ỹ]/g, '').trim()}</span>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
             )}
+            <div className="selected-classes-summary">
+              Đã chọn: <strong>{selectedClassIds.length}</strong> / {classes.length} lớp
+            </div>
           </div>
 
           {/* Due Date & Time Field */}
@@ -255,6 +320,42 @@ export default function AssignExerciseModal({ isOpen, onClose, exercise, onAssig
             </div>
           </div>
 
+          {/* Time Limit & Max Attempts Configuration Row */}
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '20px' }}>
+            <div className="assign-form-group" style={{ marginBottom: 0 }}>
+              <label className="assign-label" htmlFor="duration-input">
+                <Clock size={16} />
+                <span>Thời gian làm bài (phút):</span>
+              </label>
+              <input
+                id="duration-input"
+                type="number"
+                min="5"
+                max="180"
+                className="assign-datetime-input"
+                value={durationMinutes}
+                onChange={(e) => setDurationMinutes(e.target.value)}
+                required
+              />
+            </div>
+            <div className="assign-form-group" style={{ marginBottom: 0 }}>
+              <label className="assign-label" htmlFor="max-attempts-input">
+                <Sparkles size={16} />
+                <span>Số lần làm bài tối đa:</span>
+              </label>
+              <input
+                id="max-attempts-input"
+                type="number"
+                min="1"
+                max="10"
+                className="assign-datetime-input"
+                value={maxAttempts}
+                onChange={(e) => setMaxAttempts(e.target.value)}
+                required
+              />
+            </div>
+          </div>
+
           {/* Modal Actions */}
           <div className="assign-modal-actions">
             <button
@@ -268,7 +369,7 @@ export default function AssignExerciseModal({ isOpen, onClose, exercise, onAssig
             <button
               type="submit"
               className="btn-assign-submit"
-              disabled={submitting || classes.length === 0}
+              disabled={submitting || classes.length === 0 || selectedClassIds.length === 0}
             >
               {submitting ? (
                 <>
@@ -278,7 +379,7 @@ export default function AssignExerciseModal({ isOpen, onClose, exercise, onAssig
               ) : (
                 <>
                   <Send size={16} />
-                  <span>Xác nhận giao bài</span>
+                  <span>Xác nhận giao cho {selectedClassIds.length} lớp</span>
                 </>
               )}
             </button>

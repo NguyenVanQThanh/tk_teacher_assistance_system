@@ -1,46 +1,77 @@
 /*
 File Name: StudentScheduleCard.css
-Description: Styling for Student calendar schedule widget matching visual mockup.
+Description: Styling for Student calendar schedule widget matching visual mockup with active highlight and interaction styles.
 Created At: 2026-09-07
 Created By: Tam Khang
-Updated At: 2026-09-07
+Updated At: 2026-09-27
 Updated By: Tam Khang
 */
 
 .student-schedule-card {
   background-color: #FFFFFF;
   border-radius: 16px;
-  border: 1px solid #EBE8F0;
-  padding: 20px 24px;
+  border: 1.5px solid #EBE8F0;
+  padding: 18px 20px;
   box-sizing: border-box;
   display: flex;
   flex-direction: column;
   box-shadow: 0 2px 10px rgba(0, 0, 0, 0.02);
-  transition: box-shadow 0.2s ease;
-  height: 100%;
+  transition: all 0.22s cubic-bezier(0.16, 1, 0.3, 1);
+  height: 335px;
+  min-height: 335px;
+  max-height: 335px;
+  cursor: pointer;
+  position: relative;
+  width: 100%;
+  min-width: 0;
+  overflow: hidden;
 }
 
 .student-schedule-card:hover {
-  box-shadow: 0 6px 18px rgba(77, 48, 141, 0.05);
+  border-color: #C4B5FD;
+  box-shadow: 0 8px 24px rgba(109, 40, 217, 0.09);
+  transform: translateY(-2px);
+}
+
+.student-schedule-card.is-active-card {
+  border-color: #7C3AED;
+  box-shadow: 0 0 0 3px rgba(124, 58, 237, 0.12), 0 8px 24px rgba(109, 40, 217, 0.08);
+}
+
+.schedule-card-header-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
 }
 
 .schedule-card-title {
-  font-size: 17px;
+  font-size: 16px;
   font-weight: 800;
   color: #1E1B4B;
-  margin: 0 0 14px 0;
+  margin: 0;
   letter-spacing: -0.2px;
+}
+
+.schedule-indicator-chip {
+  background-color: #EDE9FE;
+  color: #6D28D9;
+  font-size: 11px;
+  font-weight: 700;
+  padding: 2.5px 8px;
+  border-radius: 9999px;
+  white-space: nowrap;
 }
 
 .schedule-month-nav-row {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  margin-bottom: 12px;
+  margin-bottom: 8px;
 }
 
 .schedule-month-heading {
-  font-size: 14.5px;
+  font-size: 13.5px;
   font-weight: 700;
   color: #1E293B;
 }
@@ -55,7 +86,7 @@ Updated By: Tam Khang
   background: transparent;
   color: #64748B;
   cursor: pointer;
-  padding: 4px;
+  padding: 3px;
   border-radius: 6px;
   display: flex;
   align-items: center;
@@ -72,11 +103,11 @@ Updated By: Tam Khang
   display: grid;
   grid-template-columns: repeat(7, 1fr);
   text-align: center;
-  margin-bottom: 8px;
+  margin-bottom: 6px;
 }
 
 .schedule-weekday-label {
-  font-size: 11.5px;
+  font-size: 11px;
   font-weight: 600;
   color: #64748B;
 }
@@ -84,21 +115,24 @@ Updated By: Tam Khang
 .schedule-days-grid {
   display: grid;
   grid-template-columns: repeat(7, 1fr);
-  gap: 4px;
+  gap: 2px 4px;
   text-align: center;
+  margin-bottom: 0;
+  width: 100%;
 }
 
 .schedule-day-cell {
-  height: 28px;
+  height: 25px;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 12px;
+  font-size: 11.5px;
   font-weight: 500;
   color: #334155;
-  border-radius: 8px;
+  border-radius: 6px;
   cursor: pointer;
   transition: all 0.15s ease;
+  position: relative;
 }
 
 .schedule-day-cell:hover {
@@ -114,4 +148,41 @@ Updated By: Tam Khang
   background-color: #4D308D;
   color: #FFFFFF;
   font-weight: 700;
+}
+
+.schedule-day-cell.is-today {
+  border: 1.5px solid #7C3AED;
+  color: #7C3AED;
+  font-weight: 700;
+  background-color: #F5F3FF;
+}
+
+.cal-assignment-dot {
+  position: absolute;
+  bottom: 2px;
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background-color: #F59E0B;
+}
+
+/* Footer Prompt */
+.schedule-card-footer-prompt {
+  margin-top: auto;
+  padding-top: 10px;
+  border-top: 1px dashed #E2E8F0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  color: #7C3AED;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.schedule-card-footer-prompt .prompt-arrow-icon {
+  transition: transform 0.2s ease;
+}
+
+.student-schedule-card:hover .prompt-arrow-icon {
+  transform: translate(2px, -2px);
 }

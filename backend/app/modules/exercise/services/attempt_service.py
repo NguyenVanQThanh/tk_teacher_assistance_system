@@ -2,7 +2,7 @@
 # Description: Service layer for StudentExerciseAttempt operations (start, submit, grade, view).
 # Created At: 2026-08-05
 # Created By: Tam Khang
-# Updated At: 2026-08-05
+# Updated At: 2026-10-04
 # Updated By: Tam Khang
 
 from datetime import datetime, timezone
@@ -62,7 +62,8 @@ class AttemptService:
                 status_code=status.HTTP_409_CONFLICT,
                 detail={
                     "code": "ERR-EXE-ATTEMPT_ALREADY_OPEN",
-                    "message": "You already have an open attempt for this assignment."
+                    "message": "An in-progress attempt already exists for this assignment.",
+                    "attempt_id": str(open_attempt.attempt_id)
                 }
             )
 
@@ -274,5 +275,94 @@ class AttemptService:
             attempt=attempt,
             score=payload.score,
             feedback=payload.feedback,
-            detailed_results=payload.detailed_results
+            detailed_results=payload.detailed_results,
+            status=payload.status
         )
+
+    def get_grading_dashboard(self, current_user: User) -> "GradingDashboardOut":
+        """Compute aggregate metrics and breakdown statistics for grading dashboard."""
+        from app.modules.exercise.schemas import (
+            GradingDashboardOut, GradingScoreDistribution, GradingClassSummary
+        )
+
+        attempts = self.list_attempts(current_user=current_user)
+
+        total_submissions = len(attempts)
+        known_statuses = ("pending_grading", "pending_review", "approved")
+
+        def resolve_status(a) -> str:
+            # Same rule as the Grading page: trust lifecycle status, otherwise infer from score
+            st = getattr(a, 'status', None)
+            if st in known_statuses:
+                return st
+            return 'approved' if a.score is not None else 'pending_grading'
+
+        resolved = [resolve_status(a) for a in attempts]
+        pending_grading_count = resolved.count('pending_grading')
+        pending_review_count = resolved.count('pending_review')
+        graded_count = resolved.count('approved')
+
+        need_feedback = pending_grading_count
+
+        scores = [a.score for a in attempts if a.score is not None]
+        avg_score = round(sum(scores) / len(scores), 2) if scores else 0.0
+
+        under_5 = sum(1 for s in scores if s < 5.0)
+        from_5_to_6_5 = sum(1 for s in scores if 5.0 <= s < 6.5)
+        from_6_5_to_8 = sum(1 for s in scores if 6.5 <= s < 8.0)
+        from_8_to_10 = sum(1 for s in scores if s >= 8.0)
+
+        distribution = GradingScoreDistribution(
+            under_5=under_5,
+            from_5_to_6_5=from_5_to_6_5,
+            from_6_5_to_8=from_6_5_to_8,
+            from_8_to_10=from_8_to_10
+        )
+
+        # Class breakdown
+        class_map = {}
+        for a in attempts:
+            cid = a.class_id
+            if cid not in class_map:
+                class_map[cid] = {
+                    "class_id": cid,
+                    "class_name": a.class_name,
+                    "total": 0,
+                    "graded": 0,
+                    "pending": 0,
+                    "scores": []
+                }
+            class_map[cid]["total"] += 1
+            if a.score is not None:
+                class_map[cid]["graded"] += 1
+                class_map[cid]["scores"].append(a.score)
+            else:
+                class_map[cid]["pending"] += 1
+
+        by_class = []
+        for cdata in class_map.values():
+            c_scores = cdata["scores"]
+            c_avg = round(sum(c_scores) / len(c_scores), 2) if c_scores else 0.0
+            by_class.append(
+                GradingClassSummary(
+                    class_id=cdata["class_id"],
+                    class_name=cdata["class_name"],
+                    total_submissions=cdata["total"],
+                    graded_count=cdata["graded"],
+                    pending_count=cdata["pending"],
+                    avg_score=c_avg
+                )
+            )
+
+        return GradingDashboardOut(
+            total_submissions=total_submissions,
+            pending_grading_count=pending_grading_count,
+            pending_review_count=pending_review_count,
+            graded_count=graded_count,
+            need_feedback_count=need_feedback,
+            avg_score=avg_score,
+            score_distribution=distribution,
+            by_class=by_class,
+            recent_submissions=attempts[:10]
+        )
+

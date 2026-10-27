@@ -1,48 +1,155 @@
 // File Name: PendingStudentAssignmentsCard.jsx
-// Description: Card widget showing pending homework assignments for students with checkboxes and due dates.
+// Description: Card widget showing categorized pending homework assignments (Classroom vs AI Generated) with counts, badges, and interactive selection.
 // Created At: 2026-09-07
 // Created By: Tam Khang
-// Updated At: 2026-09-07
+// Updated At: 2026-10-11
 // Updated By: Tam Khang
 
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
+import { BookOpen, Sparkles, ChevronRight, AlertCircle } from 'lucide-react';
 import './PendingStudentAssignmentsCard.css';
 
-export default function PendingStudentAssignmentsCard() {
-  const navigate = useNavigate();
+export default function PendingStudentAssignmentsCard({ 
+  isActive = false, 
+  onClickCard,
+  assignments = null
+}) {
+  const dynamicTasks = Array.isArray(assignments) && assignments.length > 0
+    ? assignments.slice(0, 3).map((a, idx) => ({
+        id: a.assignment_id || idx,
+        title: a.title,
+        type: 'classroom',
+        typeLabel: a.subject_name || 'Trên lớp',
+        dueLabel: a.is_overdue ? 'Đã quá hạn' : (a.due_at ? `Hạn: ${new Date(a.due_at).toLocaleDateString('vi-VN')}` : 'Đến hạn'),
+        isOverdue: Boolean(a.is_overdue)
+      }))
+    : null;
 
-  const tasks = [
+  const classroomCount = dynamicTasks ? assignments.length : 3;
+  const aiGeneratedCount = 2;
+  const totalCount = classroomCount + aiGeneratedCount;
+
+  const tasks = dynamicTasks || [
     {
       id: 1,
-      title: 'Hoàn thành báo cáo tuần',
+      title: 'Toán 12: Đạo hàm & Khảo sát hàm số',
+      type: 'classroom',
+      typeLabel: 'Trên lớp',
       dueLabel: 'Trễ 2 ngày',
-      isOverdue: true,
-      link: '/student/exercises'
+      isOverdue: true
     },
     {
       id: 2,
-      title: 'Cập nhật thông tin phụ huynh',
-      dueLabel: 'Đến hạn: Ngày mai',
-      isOverdue: false,
-      link: '/student/exercises'
+      title: 'Hóa học: Chuyên đề Este – Lipit',
+      type: 'classroom',
+      typeLabel: 'Trên lớp',
+      dueLabel: 'Đến hạn: 22:00',
+      isOverdue: false
     }
   ];
 
+  const navigate = useNavigate();
+
+  const handleCardClick = (e) => {
+    if (onClickCard) {
+      onClickCard();
+    }
+  };
+
+  const handleOpenTask = (e, task) => {
+    e.stopPropagation();
+    navigate('/student/exercises', {
+      state: {
+        searchTitle: task.title,
+        autoOpenTitle: task.title,
+        autoOpenId: task.id || task.assignment_id,
+        fallbackExercise: {
+          id: task.id || task.assignment_id,
+          assignment_id: task.assignment_id || task.id,
+          exercise_id: task.exercise_id || task.id,
+          title: task.title,
+          teacher: 'Giáo viên bộ môn',
+          subject: task.subject || 'Toán học',
+          questionsCount: '20 câu hỏi',
+          total_questions: 20,
+          duration: '45 phút',
+          deadline: task.dueLabel || '16:59 11/10/2026',
+          status: 'active',
+          statusLabel: 'Đang mở',
+          isRealBackend: Boolean(task.assignment_id),
+          category: 'class_exercise',
+          categoryLabel: 'Bài tập trên lớp'
+        }
+      }
+    });
+  };
+
   return (
-    <div className="pending-assignments-card">
-      <h2 className="pending-card-title">Bài tập chưa làm</h2>
+    <div 
+      className={`pending-assignments-card ${isActive ? 'is-active-card' : ''}`}
+      onClick={handleCardClick}
+      title="Nhấn để xem chi tiết danh sách bài tập chưa làm"
+    >
+      {/* Header */}
+      <div className="pending-card-header-row">
+        <h2 className="pending-card-title">Bài tập chưa làm</h2>
+        <div className="pending-count-chip">
+          <span>{totalCount} bài</span>
+        </div>
+      </div>
+
+      {/* Categorization Stat Grid: Trên lớp vs Tạo sinh AI */}
+      <div className="pending-category-stats-grid">
+        {/* Category 1: Bài tập trên lớp */}
+        <div className="category-stat-card classroom-theme">
+          <div className="stat-card-icon-wrap classroom-icon">
+            <BookOpen size={16} />
+          </div>
+          <div className="stat-card-info">
+            <span className="stat-type-label">Bài tập trên lớp</span>
+            <div className="stat-count-row">
+              <span className="stat-number">{classroomCount}</span>
+              <span className="stat-subtext">chưa làm</span>
+            </div>
+          </div>
+        </div>
+
+        {/* Category 2: Bài tập tạo sinh AI */}
+        <div className="category-stat-card ai-theme">
+          <div className="stat-card-icon-wrap ai-icon">
+            <Sparkles size={16} />
+          </div>
+          <div className="stat-card-info">
+            <span className="stat-type-label">Tạo sinh AI</span>
+            <div className="stat-count-row">
+              <span className="stat-number">{aiGeneratedCount}</span>
+              <span className="stat-subtext">chưa làm</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Assignment Quick Preview List */}
       <div className="assignments-list">
         {tasks.map(task => (
           <div 
             key={task.id} 
             className="assignment-item-row"
-            onClick={() => navigate(task.link)}
+            onClick={(e) => handleOpenTask(e, task)}
+            title="Bấm để lọc bài tập này trong Kho bài tập"
+            style={{ cursor: 'pointer' }}
           >
             <div className="assignment-checkbox-custom" />
             <div className="assignment-info">
-              <span className="assignment-name">{task.title}</span>
+              <div className="assignment-name-row">
+                <span className="assignment-name">{task.title}</span>
+                <span className={`assignment-tag-type ${task.type}`}>
+                  {task.typeLabel}
+                </span>
+              </div>
               <span className={`assignment-due-tag ${task.isOverdue ? 'overdue' : 'normal'}`}>
+                {task.isOverdue && <AlertCircle size={11} />}
                 {task.dueLabel}
               </span>
             </div>

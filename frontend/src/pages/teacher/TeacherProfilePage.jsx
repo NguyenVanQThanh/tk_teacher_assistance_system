@@ -142,10 +142,19 @@ export default function TeacherProfilePage() {
   const [twoFactorEnabled, setTwoFactorEnabled] = useState(true);
 
   // Save profile changes
-  const handleSaveProfile = (e) => {
+  const handleSaveProfile = async (e) => {
     e.preventDefault();
-    setIsEditingProfile(false);
-    setToastMessage('Đã cập nhật thông tin hồ sơ cá nhân thành công!');
+    try {
+      await authApi.updateProfile({
+        full_name: profileForm.fullName,
+        email: profileForm.email,
+        phone: profileForm.phone
+      });
+      setIsEditingProfile(false);
+      setToastMessage('Đã cập nhật thông tin hồ sơ cá nhân thành công!');
+    } catch (err) {
+      setToastMessage('Lỗi khi cập nhật hồ sơ cá nhân.');
+    }
     setTimeout(() => setToastMessage(null), 3500);
   };
 

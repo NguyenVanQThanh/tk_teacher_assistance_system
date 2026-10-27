@@ -52,9 +52,10 @@ export default function ExerciseFilterBar({
             <option value="math">Toán học</option>
             <option value="physics">Vật lý</option>
             <option value="chemistry">Hóa học</option>
+            <option value="biology">Sinh học</option>
+            <option value="history">Lịch sử</option>
             <option value="english">Tiếng Anh</option>
             <option value="it">Tin học</option>
-            <option value="history">Lịch sử</option>
           </select>
           <ChevronDown size={16} className="select-arrow-icon" />
         </div>

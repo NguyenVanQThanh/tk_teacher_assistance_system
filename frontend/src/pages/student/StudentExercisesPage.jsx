@@ -1,12 +1,12 @@
 // File Name: StudentExercisesPage.jsx
-// Description: Student exercise repository page with filter bar, exercise cards, exam/exercise categorization, status tracking, and interactive AI-powered exercise generator modal.
+// Description: Student exercise repository page connected to backend assignments feed, with session caching, tabs filtering, subject and title search filtering, briefing cards, and AI exercise generator modal.
 // Created At: 2026-09-07
 // Created By: Tam Khang
-// Updated At: 2026-09-13
+// Updated At: 2026-10-11
 // Updated By: Tam Khang
 
-import React, { useState, useEffect, useMemo } from 'react';
-import { useNavigate } from 'react-router-dom';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { 
   HelpCircle, 
   Mic, 
@@ -37,72 +37,301 @@ import {
   Zap, 
   ArrowRight, 
   RotateCcw,
-  Loader2
+  Loader2,
+  Search
 } from 'lucide-react';
-import { classesApi, assignmentsApi, attemptsApi, subjectsApi } from '../../services/api';
+import { classesApi, assignmentsApi, attemptsApi, subjectsApi, exercisesApi } from '../../services/api';
 import './StudentExercisesPage.css';
+
+// Helper to format deadline preserving exact date & time without unwanted UTC shifts
+export const formatDeadline = (dueAtStr) => {
+  if (!dueAtStr) return 'Không có';
+  try {
+    if (typeof dueAtStr === 'string' && dueAtStr.includes('T')) {
+      const [datePart, rawTime] = dueAtStr.split('T');
+      const [y, m, d] = datePart.split('-');
+      const timePart = (rawTime || '').replace('Z', '').split('.')[0];
+      const [hh, mm] = timePart.split(':');
+      if (d && m && y && hh && mm) {
+        return `${hh}:${mm} ${d}/${m}/${y}`;
+      }
+    }
+    const d = new Date(dueAtStr);
+    return isNaN(d.getTime()) ? 'Không có' : d.toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+  } catch (e) {
+    return 'Không có';
+  }
+};
+
+// Session cache helpers: stores raw assignments, attempts and subjects for the current browser session
+const getCurrentUserId = () => {
+  try {
+    const raw = localStorage.getItem('user_info');
+    if (raw) {
+      const u = JSON.parse(raw);
+      return u.user_id || u.id || 'default';
+    }
+  } catch (e) {}
+  return 'default';
+};
+
+const getSessionCacheKeys = () => {
+  const uid = getCurrentUserId();
+  return {
+    assignmentsKey: `tk_student_assignments_session_${uid}`,
+    attemptsKey: `tk_student_attempts_session_${uid}`,
+    subjectsKey: `tk_student_subjects_session_${uid}`,
+  };
+};
+
+const readSessionCache = () => {
+  try {
+    const { assignmentsKey, attemptsKey, subjectsKey } = getSessionCacheKeys();
+    const rawAssignments = sessionStorage.getItem(assignmentsKey);
+    const rawAttempts = sessionStorage.getItem(attemptsKey);
+    const rawSubjects = sessionStorage.getItem(subjectsKey);
+
+    if (rawAssignments && rawAttempts) {
+      const parsedAssignments = JSON.parse(rawAssignments);
+      const parsedAttempts = JSON.parse(rawAttempts);
+      const parsedSubjects = rawSubjects ? JSON.parse(rawSubjects) : [];
+      if (Array.isArray(parsedAssignments) && Array.isArray(parsedAttempts)) {
+        return {
+          assignments: parsedAssignments,
+          attempts: parsedAttempts,
+          subjects: Array.isArray(parsedSubjects) ? parsedSubjects : [],
+        };
+      }
+    }
+  } catch (err) {
+    console.warn('Failed to read exercises session cache:', err);
+  }
+  return null;
+};
+
+const writeSessionCache = (assignments, attempts, subjects) => {
+  try {
+    const { assignmentsKey, attemptsKey, subjectsKey } = getSessionCacheKeys();
+    sessionStorage.setItem(assignmentsKey, JSON.stringify(assignments));
+    sessionStorage.setItem(attemptsKey, JSON.stringify(attempts));
+    if (Array.isArray(subjects) && subjects.length > 0) {
+      sessionStorage.setItem(subjectsKey, JSON.stringify(subjects));
+    }
+  } catch (err) {
+    console.warn('Failed to write exercises session cache:', err);
+  }
+};
+
+const clearSessionCache = () => {
+  try {
+    const { assignmentsKey, attemptsKey } = getSessionCacheKeys();
+    sessionStorage.removeItem(assignmentsKey);
+    sessionStorage.removeItem(attemptsKey);
+  } catch (err) {}
+};
 
 export default function StudentExercisesPage() {
   const navigate = useNavigate();
+  const location = useLocation();
+  const [selectedTab, setSelectedTab] = useState('all'); // 'all', 'active', 'overdue', 'completed'
+  const [searchTitle, setSearchTitle] = useState('');
   const [selectedSubject, setSelectedSubject] = useState('all');
   const [selectedType, setSelectedType] = useState('all');
+  const [availableSubjects, setAvailableSubjects] = useState([]);
   const [selectedExerciseDetail, setSelectedExerciseDetail] = useState(null);
-  const [selectedAttemptId, setSelectedAttemptId] = useState(2); // Default to attempt 2 (highest result)
+  const [selectedAttemptId, setSelectedAttemptId] = useState(null);
   const [currentPage, setCurrentPage] = useState(1);
   const [backendAssignments, setBackendAssignments] = useState([]);
   const [backendAttempts, setBackendAttempts] = useState([]);
   const [loading, setLoading] = useState(false);
   const [localAiExercisesTrigger, setLocalAiExercisesTrigger] = useState(0);
 
-  // Dynamic Attempts dataset reflecting each completion with detailed analytics
-  const attemptsData = useMemo(() => [
-    {
-      id: 1,
-      attemptNum: 1,
-      badgeLabel: 'Lần 1',
-      dateText: '14/10/2023 – 19:30',
-      statusTag: 'Đã hoàn thành',
-      statusTagClass: 'attempt-status-tag',
-      score: '7.2',
-      scoreLabel: 'KẾT QUẢ (LẦN 1)',
-      grade: 'Khá',
-      correctCount: 29,
-      totalCount: 40,
-      correctPct: '72.5%',
-      timeSpent: '42 phút',
-      cognitive: {
-        recognition: { correct: 9, total: 10, pct: '90%' },
-        understanding: { correct: 13, total: 16, pct: '81.3%' },
-        application: { correct: 7, total: 14, pct: '50%' }
+  // Real backend detail & attempt history state
+  const [detailSummary, setDetailSummary] = useState(null);
+  const [isLoadingDetail, setIsLoadingDetail] = useState(false);
+
+  // Fetch real assignment result summary & attempts when modal opens
+  useEffect(() => {
+    let isMounted = true;
+    async function fetchDetailSummary() {
+      if (!selectedExerciseDetail) {
+        setDetailSummary(null);
+        return;
       }
-    },
-    {
-      id: 2,
-      attemptNum: 2,
-      badgeLabel: 'Lần 2 (Mới nhất)',
-      isLatest: true,
-      isBest: true,
-      dateText: '15/10/2023 – 14:20',
-      statusTag: 'Đã chấm điểm',
-      statusTagClass: 'attempt-status-tag-outline-green',
-      score: '8.5',
-      scoreLabel: 'KẾT QUẢ CAO NHẤT (LẦN 2)',
-      grade: 'Giỏi',
-      correctCount: 34,
-      totalCount: 40,
-      correctPct: '85%',
-      timeSpent: '38 phút 15 giây',
-      cognitive: {
-        recognition: { correct: 10, total: 10, pct: '100%' },
-        understanding: { correct: 15, total: 16, pct: '93.8%' },
-        application: { correct: 9, total: 14, pct: '64.3%' }
+      const isUuid = (id) => typeof id === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id);
+      const targetAssignmentId = selectedExerciseDetail.assignment_id || selectedExerciseDetail.exercise_id || selectedExerciseDetail.id;
+
+      if (isUuid(targetAssignmentId)) {
+        try {
+          setIsLoadingDetail(true);
+          const data = await assignmentsApi.getAssignmentResult(targetAssignmentId);
+          if (isMounted && data) {
+            setDetailSummary(data);
+            if (data.best_attempt?.id || data.best_attempt?.attempt_id) {
+              setSelectedAttemptId(data.best_attempt.id || data.best_attempt.attempt_id);
+            } else if (data.latest_attempt?.id || data.latest_attempt?.attempt_id) {
+              setSelectedAttemptId(data.latest_attempt.id || data.latest_attempt.attempt_id);
+            } else if (data.attempts?.length > 0) {
+              setSelectedAttemptId(data.attempts[data.attempts.length - 1].id || data.attempts[data.attempts.length - 1].attempt_id);
+            }
+          }
+        } catch (err) {
+          console.warn('Could not fetch assignment result from BE:', err);
+          if (isMounted) {
+            setDetailSummary(null);
+          }
+        } finally {
+          if (isMounted) {
+            setIsLoadingDetail(false);
+          }
+        }
+      } else {
+        setDetailSummary(null);
       }
     }
-  ], []);
+
+    fetchDetailSummary();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [selectedExerciseDetail]);
+
+  // Dynamic Attempts dataset reflecting real completions
+  const activeAttempts = useMemo(() => {
+    if (detailSummary && Array.isArray(detailSummary.attempts)) {
+      return detailSummary.attempts.filter(att => 
+        att.is_finished !== false && (att.score != null || att.score_val != null)
+      );
+    }
+    // Fallback to attempts from backendAssignments/backendAttempts for this assignment
+    if (selectedExerciseDetail) {
+      const targetAssignmentId = String(selectedExerciseDetail.assignment_id || selectedExerciseDetail.id || '').toLowerCase();
+      const matched = backendAttempts.filter(att => 
+        String(att.assignment_id || '').toLowerCase() === targetAssignmentId &&
+        att.is_finished && att.score != null
+      );
+      if (matched.length > 0) {
+        return matched.map((att, idx) => {
+          const scoreVal = Number(att.score);
+          const totalQ = selectedExerciseDetail.total_questions || parseInt(selectedExerciseDetail.questionsCount) || 2;
+          const correctCount = Math.round((scoreVal / 10) * totalQ);
+          return {
+            id: att.attempt_id || att.id || idx + 1,
+            attempt_id: att.attempt_id || att.id,
+            attempt_num: idx + 1,
+            badge_label: `Lần ${idx + 1}${idx === matched.length - 1 ? ' (Mới nhất)' : ''}`,
+            date_text: att.end_time ? formatDeadline(att.end_time) : (att.created_at ? formatDeadline(att.created_at) : 'Vừa xong'),
+            status_tag: 'Đã chấm điểm',
+            status_tag_class: 'attempt-status-tag-outline-green',
+            score: scoreVal,
+            score_label: `KẾT QUẢ (LẦN ${idx + 1})`,
+            grade: scoreVal >= 8 ? 'Giỏi' : scoreVal >= 6.5 ? 'Khá' : scoreVal >= 5 ? 'Trung bình' : 'Yếu',
+            correct_count: correctCount,
+            total_count: totalQ,
+            correct_pct: `${Math.round((correctCount / totalQ) * 100)}%`,
+            time_spent: (() => {
+              let sec = att.total_time_seconds;
+              const limitMin = selectedExerciseDetail.duration_minutes || parseInt(selectedExerciseDetail.duration) || 45;
+              if (sec && limitMin && sec > limitMin * 60) {
+                sec = limitMin * 60;
+              }
+              return sec ? `${Math.floor(sec / 60)} phút${sec % 60 > 0 ? ' ' + (sec % 60) + ' giây' : ''}` : (selectedExerciseDetail.duration || '45 phút');
+            })(),
+            cognitive: {
+              recognition: { correct: correctCount, total: totalQ, pct: `${Math.round((correctCount / totalQ) * 100)}%` },
+              understanding: { correct: 0, total: 0, pct: '0%' },
+              application: { correct: 0, total: 0, pct: '0%' }
+            }
+          };
+        });
+      }
+      // Check localStorage submission (strictly for local AI practice exercises that are not in DB)
+      if (selectedExerciseDetail.isAiGenerated && !selectedExerciseDetail.isRealBackend) {
+        const localKeyId = selectedExerciseDetail.id || selectedExerciseDetail.assignment_id || selectedExerciseDetail.exercise_id;
+        const rawSaved = localStorage.getItem(`tk_exam_submitted_${localKeyId}`) ||
+                         (selectedExerciseDetail.exercise_id && localStorage.getItem(`tk_exam_submitted_${selectedExerciseDetail.exercise_id}`)) ||
+                         (selectedExerciseDetail.assignment_id && localStorage.getItem(`tk_exam_submitted_${selectedExerciseDetail.assignment_id}`));
+        if (rawSaved) {
+          try {
+            const parsed = JSON.parse(rawSaved);
+            const scoreVal = parsed.score != null ? Number(parsed.score) : 10.0;
+            const totalQ = parsed.totalQuestions || selectedExerciseDetail.totalQuestions || selectedExerciseDetail.total_questions || 4;
+            const correctCount = parsed.answeredCount != null ? Number(parsed.answeredCount) : Math.round((scoreVal / 10) * totalQ);
+            const recTot = Math.max(1, Math.round(totalQ * 0.5));
+            const compTot = Math.max(1, Math.round(totalQ * 0.3));
+            const appTot = Math.max(0, totalQ - recTot - compTot);
+            const recCor = Math.min(recTot, correctCount);
+            const compCor = Math.min(compTot, Math.max(0, correctCount - recCor));
+            const appCor = Math.min(appTot, Math.max(0, correctCount - recCor - compCor));
+
+            return [{
+              id: parsed.attemptId || 'local_1',
+              attempt_id: parsed.attemptId || 'local_1',
+              attempt_num: 1,
+              badge_label: 'Lần 1 (Mới nhất)',
+              is_latest: true,
+              is_best: true,
+              date_text: parsed.formattedTime || 'Vừa xong',
+              status_tag: 'Đã chấm điểm',
+              status_tag_class: 'attempt-status-tag-outline-green',
+              score: scoreVal,
+              score_label: 'KẾT QUẢ CAO NHẤT (LẦN 1)',
+              grade: scoreVal >= 8 ? 'Giỏi' : scoreVal >= 6.5 ? 'Khá' : scoreVal >= 5 ? 'Trung bình' : 'Yếu',
+              correct_count: correctCount,
+              total_count: totalQ,
+              correct_pct: `${Math.round((correctCount / totalQ) * 100)}%`,
+              time_spent: parsed.totalTimeSeconds ? `${Math.floor(parsed.totalTimeSeconds / 60)} phút ${parsed.totalTimeSeconds % 60} giây` : (selectedExerciseDetail.duration || '45 phút'),
+              cognitive: {
+                recognition: { correct: recCor, total: recTot, pct: `${Math.round((recCor / recTot) * 100)}%` },
+                understanding: { correct: compCor, total: compTot, pct: `${Math.round((compCor / compTot) * 100)}%` },
+                application: { correct: appCor, total: appTot, pct: `${appTot > 0 ? Math.round((appCor / appTot) * 100) : 0}%` }
+              }
+            }];
+          } catch (e) {
+            console.error('Error parsing local attempt in modal:', e);
+          }
+        }
+      }
+    }
+    return [];
+  }, [detailSummary, selectedExerciseDetail, backendAttempts]);
 
   const currentAttempt = useMemo(() => {
-    return attemptsData.find(a => a.id === selectedAttemptId) || attemptsData[1];
-  }, [attemptsData, selectedAttemptId]);
+    if (activeAttempts.length > 0) {
+      const found = activeAttempts.find(a => 
+        String(a.id || a.attempt_id) === String(selectedAttemptId)
+      );
+      return found || detailSummary?.best_attempt || detailSummary?.latest_attempt || activeAttempts[activeAttempts.length - 1];
+    }
+    return null;
+  }, [activeAttempts, selectedAttemptId, detailSummary]);
+
+  // Check if current exercise detail represents an examination
+  const isModalExam = useMemo(() => {
+    if (!selectedExerciseDetail) return false;
+    return Boolean(
+      selectedExerciseDetail.category === 'exam' ||
+      detailSummary?.category === 'exam' ||
+      (selectedExerciseDetail.categoryLabel || '').toLowerCase().includes('bài thi') ||
+      (selectedExerciseDetail.title || '').toLowerCase().includes('đề thi') ||
+      (detailSummary?.title || '').toLowerCase().includes('đề thi')
+    );
+  }, [selectedExerciseDetail, detailSummary]);
+
+  // Check if current exam has already been submitted and completed (1 attempt limit)
+  const isModalExamSubmitted = useMemo(() => {
+    if (!selectedExerciseDetail || !isModalExam) return false;
+    return Boolean(
+      detailSummary?.status === 'completed' ||
+      selectedExerciseDetail.status === 'completed' ||
+      (selectedExerciseDetail.isRealBackend ? selectedExerciseDetail.score != null : false) ||
+      activeAttempts.some(a => a.is_finished || a.score != null) ||
+      (selectedExerciseDetail.id && localStorage.getItem(`tk_exam_submitted_${selectedExerciseDetail.id}`)) ||
+      (selectedExerciseDetail.assignment_id && localStorage.getItem(`tk_exam_submitted_${selectedExerciseDetail.assignment_id}`)) ||
+      (selectedExerciseDetail.exercise_id && localStorage.getItem(`tk_exam_submitted_${selectedExerciseDetail.exercise_id}`))
+    );
+  }, [selectedExerciseDetail, isModalExam, detailSummary, activeAttempts]);
 
   const defaultSeeds = useMemo(() => [
     {
@@ -171,71 +400,106 @@ export default function StudentExercisesPage() {
     }
   ], []);
 
-  // Fetch real backend assignments and attempts for student
+  // Manual refresh handler to force fetch fresh data from backend into cache
+  const handleRefreshData = () => {
+    clearSessionCache();
+    setLocalAiExercisesTrigger(prev => prev + 1);
+  };
+
+  // Fetch student assignments and attempts: uses session cache when available, otherwise queries BE/DB and saves to session cache
   useEffect(() => {
     let isMounted = true;
     async function loadData() {
+      // 1. Check if session cache already has data for this session
+      const cached = readSessionCache();
+      if (cached) {
+        if (isMounted) {
+          setBackendAssignments(cached.assignments);
+          setBackendAttempts(cached.attempts);
+          if (cached.subjects && cached.subjects.length > 0) {
+            setAvailableSubjects(cached.subjects);
+          }
+        }
+        return; // Early return: no backend call needed within the same session
+      }
+
+      // 2. When FE does not have session cache, call BE and DB once to populate cache
       try {
         setLoading(true);
-        const [classesRes, attemptsRes] = await Promise.allSettled([
-          classesApi.getClasses().catch(() => []),
+
+        const [assignmentsRes, attemptsRes, subjectsRes] = await Promise.allSettled([
+          assignmentsApi.getAssignments(),
           attemptsApi.getAttempts().catch(() => []),
+          availableSubjects.length === 0 ? subjectsApi.getSubjects().catch(() => []) : Promise.resolve(availableSubjects),
         ]);
 
+        const rawAssignments = assignmentsRes.status === 'fulfilled' && Array.isArray(assignmentsRes.value) ? assignmentsRes.value : [];
         const studentAttempts = attemptsRes.status === 'fulfilled' && Array.isArray(attemptsRes.value) ? attemptsRes.value : [];
-        if (isMounted) {
-          setBackendAttempts(studentAttempts);
+        const subjectsList = subjectsRes.status === 'fulfilled' && Array.isArray(subjectsRes.value) ? subjectsRes.value : availableSubjects;
+
+        if (isMounted && subjectsList.length > 0) {
+          setAvailableSubjects(subjectsList);
         }
 
-        const enrolledClasses = classesRes.status === 'fulfilled' && Array.isArray(classesRes.value) ? classesRes.value : [];
+        const allAssigned = rawAssignments.map(a => {
+          const myAttempts = studentAttempts.filter(att => 
+            String(att.assignment_id || '').toLowerCase() === String(a.assignment_id || '').toLowerCase()
+          );
+          const finishedAttempt = myAttempts.find(att => att.is_finished);
+          const hasFinishedBackend = Boolean(finishedAttempt || a.is_finished || (a.completed_attempts_count > 0));
+          const isFinished = hasFinishedBackend;
 
-        const assignmentsPromises = enrolledClasses.map(cls =>
-          assignmentsApi.getClassAssignments(cls.class_id).catch(() => [])
-        );
-        const assignmentsResponses = await Promise.allSettled(assignmentsPromises);
+          const due = a.due_at ? new Date(a.due_at) : null;
+          const now = new Date();
+          const isOverdue = due ? (due < now && !isFinished) : false;
+          const formattedDue = formatDeadline(a.due_at);
+          const isToday = due ? now.toDateString() === due.toDateString() : false;
 
-        const allAssigned = [];
-        assignmentsResponses.forEach((res, idx) => {
-          if (res.status === 'fulfilled' && Array.isArray(res.value)) {
-            const cls = enrolledClasses[idx];
-            res.value.forEach(a => {
-              const myAttempt = studentAttempts.find(att => att.assignment_id === a.assignment_id);
-              const isFinished = Boolean(myAttempt && myAttempt.is_finished);
+          const feedStatus = isFinished ? 'completed' : isOverdue ? 'overdue' : 'active';
+          const statusLabel = isFinished ? 'Đã nộp bài' : isOverdue ? 'Quá hạn' : 'Đang mở';
+          const completedAttempts = myAttempts.filter(att => att.is_finished);
+          const completedCount = a.completed_attempts_count != null ? a.completed_attempts_count : completedAttempts.length;
+          const finalCompletedCount = isFinished ? Math.max(1, completedCount) : completedCount;
+          const isAi = Boolean(a.is_ai_generated || a.category === 'ai_generated');
 
-              const due = a.due_at ? new Date(a.due_at) : null;
-              const formattedDue = due ? due.toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric' }) : 'Không có';
-              const isToday = due ? new Date().toDateString() === due.toDateString() : false;
-
-              allAssigned.push({
-                id: a.assignment_id,
-                assignment_id: a.assignment_id,
-                exercise_id: a.exercise_id,
-                class_id: a.class_id,
-                className: cls?.class_name || 'Lớp học',
-                type: 'quiz',
-                category: 'exam',
-                categoryLabel: 'Bài tập trên lớp',
-                title: a.exercise_title || 'Bài tập được giao',
-                teacher: 'Giáo viên bộ môn',
-                subject: cls?.class_name?.includes('Lý') ? 'Vật lý' : cls?.class_name?.includes('Hóa') ? 'Hóa học' : 'Toán học',
-                questionsCount: a.total_questions ? `${a.total_questions} câu hỏi` : 'Đề thi trắc nghiệm',
-                duration: '45 phút',
-                deadline: formattedDue,
-                isToday,
-                status: isFinished ? 'completed' : 'uncompleted',
-                statusLabel: isFinished ? 'Đã nộp bài' : 'Chưa làm',
-                attempt: myAttempt,
-                isRealBackend: true,
-              });
-            });
-          }
+          return {
+            id: a.assignment_id,
+            assignment_id: a.assignment_id,
+            exercise_id: a.exercise_id,
+            class_id: a.class_id,
+            className: a.class_name || 'Lớp học',
+            type: 'quiz',
+            category: a.category || (isAi ? 'ai_generated' : ((a.exercise_title || '').toLowerCase().includes('đề thi') ? 'exam' : 'class_exercise')),
+            categoryLabel: a.categoryLabel || (isAi ? 'Bài tập tạo sinh AI' : ((a.exercise_title || '').toLowerCase().includes('đề thi') ? 'Bài thi' : 'Bài tập trên lớp')),
+            title: a.exercise_title || 'Bài tập được giao',
+            teacher: a.teacher_name || (isAi ? 'Trợ lý AI Tam Khang' : 'Giáo viên bộ môn'),
+            subject: a.subject_name || (a.class_name?.includes('Lý') ? 'Vật lý' : a.class_name?.includes('Hóa') ? 'Hóa học' : 'Toán học'),
+            questionsCount: a.total_questions ? `${a.total_questions} câu hỏi` : 'Đề thi trắc nghiệm',
+            total_questions: a.total_questions || 0,
+            duration: `${a.duration_minutes || 45} phút`,
+            deadline: formattedDue,
+            due_at: a.due_at,
+            isToday,
+            status: feedStatus,
+            statusLabel,
+            maxAttempts: (((a.category || '').toLowerCase() === 'exam' || (a.exercise_title || '').toLowerCase().includes('đề thi')) ? 1 : null),
+            completedAttemptsCount: finalCompletedCount,
+            attempt: finishedAttempt || myAttempts[0],
+            score: a.latest_score ?? (finishedAttempt?.score ?? null),
+            isRealBackend: true,
+            isAiGenerated: isAi
+          };
         });
 
+        // Save into session cache
+        writeSessionCache(allAssigned, studentAttempts, subjectsList);
+
         if (isMounted) {
+          setBackendAttempts(studentAttempts);
           setBackendAssignments(allAssigned);
         }
       } catch (err) {
-        console.error('Failed to load student assignments:', err);
+        console.error('Failed to load student assignments from backend:', err);
       } finally {
         if (isMounted) {
           setLoading(false);
@@ -247,7 +511,7 @@ export default function StudentExercisesPage() {
     return () => {
       isMounted = false;
     };
-  }, []);
+  }, [localAiExercisesTrigger]);
 
   // Safe icon helper that always returns a valid Lucide component even after JSON parsing
   const getAssignmentIcon = (item) => {
@@ -259,7 +523,7 @@ export default function StudentExercisesPage() {
     return FileText;
   };
 
-  // Combine backend assignments, saved AI exercises from localStorage, and default seeds
+  // Combine backend assignments and saved AI exercises with strict deduplication
   const assignmentsList = useMemo(() => {
     let localAiList = [];
     try {
@@ -273,17 +537,120 @@ export default function StudentExercisesPage() {
     } catch (e) {
       console.error(e);
     }
-    if (backendAssignments.length > 0 || localAiList.length > 0) {
-      return [...backendAssignments, ...localAiList];
+
+    // 1. Deduplicate backend assignments by assignment_id and exercise_id
+    const seenAssignmentIds = new Set();
+    const seenExerciseIds = new Set();
+    const dedupedBackend = [];
+
+    backendAssignments.forEach(item => {
+      const aId = item.assignment_id || item.id;
+      const eId = item.exercise_id;
+      if (aId && seenAssignmentIds.has(String(aId).toLowerCase())) return;
+      if (eId && seenExerciseIds.has(String(eId).toLowerCase())) return;
+      if (aId) seenAssignmentIds.add(String(aId).toLowerCase());
+      if (eId) seenExerciseIds.add(String(eId).toLowerCase());
+      dedupedBackend.push(item);
+    });
+
+    // 2. Filter local AI items:
+    // Only exclude a local AI item if:
+    // a) Its exact ID is already present in backend assignments
+    // b) Or an AI-generated backend assignment already has the exact same title
+    const seenIds = new Set([
+      ...Array.from(seenAssignmentIds),
+      ...Array.from(seenExerciseIds)
+    ]);
+
+    const filteredLocal = localAiList.filter(localItem => {
+      const localId = String(localItem.id || localItem.assignment_id || localItem.exercise_id || '').toLowerCase();
+      if (localId && seenIds.has(localId)) return false;
+
+      const localTitle = (localItem.title || '').trim().toLowerCase().replace(/\s+/g, ' ');
+      if (!localTitle) return false;
+
+      // Only check collision against backend items that are ALSO AI-generated exercises
+      const duplicateAiInBackend = dedupedBackend.some(b => 
+        b.isAiGenerated && (b.title || '').trim().toLowerCase().replace(/\s+/g, ' ') === localTitle
+      );
+      if (duplicateAiInBackend) return false;
+
+      return true;
+    });
+
+    const mappedLocal = filteredLocal.map(item => {
+      const isAi = Boolean(item.isAiGenerated || item.type === 'ai_generated' || item.category === 'ai_generated');
+      let cat = item.category;
+      if (!cat || cat === 'exercise') {
+        cat = isAi ? 'ai_generated' : 'class_exercise';
+      }
+      return {
+        ...item,
+        category: cat,
+        categoryLabel: item.categoryLabel || (cat === 'ai_generated' ? 'Bài tập tạo sinh AI' : 'Bài tập trên lớp'),
+        isAiGenerated: isAi,
+        status: item.status || 'active',
+        statusLabel: item.statusLabel || 'Đang mở'
+      };
+    });
+
+    if (dedupedBackend.length > 0 || mappedLocal.length > 0) {
+      return [...dedupedBackend, ...mappedLocal];
     }
-    return defaultSeeds;
-  }, [backendAssignments, defaultSeeds, localAiExercisesTrigger]);
+    return [];
+  }, [backendAssignments, localAiExercisesTrigger]);
+
+  // Handle auto-filter and auto-open exercise modal when navigating from Dashboard
+  useEffect(() => {
+    if (location.state?.searchTitle) {
+      setSearchTitle(location.state.searchTitle);
+      setCurrentPage(1);
+    }
+  }, [location.state?.searchTitle]);
+
+  const hasAutoOpenedRef = useRef(false);
+
+  // Close modal and clear navigation state so it does not re-open automatically
+  const handleCloseDetailModal = () => {
+    setSelectedExerciseDetail(null);
+    hasAutoOpenedRef.current = true;
+    if (location.state?.autoOpenTitle || location.state?.autoOpenId || location.state?.searchTitle) {
+      navigate(location.pathname, { replace: true, state: {} });
+    }
+  };
+
+  useEffect(() => {
+    const targetTitle = location.state?.autoOpenTitle || location.state?.searchTitle;
+    const targetId = location.state?.autoOpenId;
+    if (!hasAutoOpenedRef.current && (targetTitle || targetId) && assignmentsList.length > 0) {
+      const matched = assignmentsList.find(item => {
+        if (targetId && (String(item.id) === String(targetId) || String(item.assignment_id) === String(targetId) || String(item.exercise_id) === String(targetId))) {
+          return true;
+        }
+        if (targetTitle) {
+          const itemTitle = (item.title || '').trim().toLowerCase();
+          const qTitle = targetTitle.trim().toLowerCase();
+          return itemTitle.includes(qTitle) || qTitle.includes(itemTitle);
+        }
+        return false;
+      });
+
+      if (matched) {
+        hasAutoOpenedRef.current = true;
+        setSelectedExerciseDetail(matched);
+      } else if (location.state?.fallbackExercise) {
+        hasAutoOpenedRef.current = true;
+        setSelectedExerciseDetail(location.state.fallbackExercise);
+      }
+    }
+  }, [assignmentsList, location.state]);
 
   // AI Generator Modal States
   const [isAiModalOpen, setIsAiModalOpen] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
   const [generationStep, setGenerationStep] = useState(0);
   const [generatedExerciseId, setGeneratedExerciseId] = useState(null);
+  const [generatedAiResult, setGeneratedAiResult] = useState(null);
 
   // Form Configuration for AI Exercise
   const [aiSubject, setAiSubject] = useState('Hóa học');
@@ -323,8 +690,8 @@ export default function StudentExercisesPage() {
     }));
   };
 
-  // Submit AI Generation Handler
-  const handleGenerateAiExercise = () => {
+  // Submit AI Generation Handler (Persisted to Database)
+  const handleGenerateAiExercise = async () => {
     if (totalAiQuestions === 0) {
       alert('Vui lòng chọn số lượng câu hỏi lớn hơn 0.');
       return;
@@ -333,63 +700,75 @@ export default function StudentExercisesPage() {
     setIsGenerating(true);
     setGenerationStep(1);
 
-    setTimeout(() => {
+    const step2Timer = setTimeout(() => {
       setGenerationStep(2);
-    }, 850);
+    }, 800);
 
-    setTimeout(() => {
+    const step3Timer = setTimeout(() => {
       setGenerationStep(3);
-    }, 1750);
+    }, 1600);
 
-    setTimeout(() => {
-      const newId = Date.now();
-      const newExercise = {
-        id: newId,
-        type: 'ai_generated',
-        category: 'exercise',
-        categoryLabel: 'Bài tập tạo sinh AI',
-        icon: Sparkles,
-        title: `${aiSubject} ${aiGrade.replace('Lớp ', '')} – ${aiTopicPrompt.slice(0, 48)}${aiTopicPrompt.length > 48 ? '...' : ''}`,
-        teacher: 'Trợ lý AI Tam Khang',
-        subject: aiSubject,
-        grade: aiGrade,
-        topicPrompt: aiTopicPrompt,
-        questionsCount: `${totalAiQuestions} câu hỏi`,
-        totalQuestions: totalAiQuestions,
-        part1Count: part1Total,
-        part2Count: part2Total,
-        part3Count: part3Total,
-        durationMinutes: aiDuration,
-        duration: `${aiDuration} phút`,
-        deadline: 'Tự do rèn luyện',
-        isToday: true,
-        status: 'uncompleted',
-        statusLabel: 'Chưa làm',
-        isAiGenerated: true,
-        createdAt: new Date().toISOString(),
-        matrix: {
-          part1: part1Total,
-          part2: part2Total,
-          part3: part3Total,
-          know: totalKnow,
-          comp: totalComp,
-          app: totalApp
-        }
+    try {
+      const payload = {
+        subject_name: aiSubject,
+        grade_name: aiGrade,
+        topic_prompt: aiTopicPrompt,
+        part1_count: part1Total,
+        part2_count: part2Total,
+        part3_count: part3Total,
+        duration_minutes: aiDuration
       };
 
-      // Persist permanently in localStorage
+      const result = await exercisesApi.generateAiExercise(payload);
+
+      clearTimeout(step2Timer);
+      clearTimeout(step3Timer);
+
+      // Keep local backup as well so it's always available across reloads
       try {
-        const currentSaved = JSON.parse(localStorage.getItem('tk_student_ai_exercises') || '[]');
-        localStorage.setItem('tk_student_ai_exercises', JSON.stringify([newExercise, ...currentSaved]));
-      } catch (e) {
-        console.error('Error saving AI exercise to localStorage:', e);
+        const existingLocal = JSON.parse(localStorage.getItem('tk_student_ai_exercises') || '[]');
+        const newLocalItem = {
+          id: result.exercise_id,
+          exercise_id: result.exercise_id,
+          assignment_id: result.assignment_id,
+          class_id: result.class_id,
+          className: result.class_name || '12A1',
+          type: 'quiz',
+          category: 'ai_generated',
+          categoryLabel: 'Bài tập tạo sinh AI',
+          title: result.title,
+          teacher: 'Trợ lý AI Tam Khang',
+          subject: result.subject_name,
+          questionsCount: `${result.total_questions} câu hỏi`,
+          total_questions: result.total_questions,
+          duration: `${result.duration_minutes} phút`,
+          status: 'active',
+          statusLabel: 'Đang mở',
+          isAiGenerated: true,
+          isRealBackend: true,
+          topicPrompt: aiTopicPrompt
+        };
+        const updated = [newLocalItem, ...existingLocal.filter(x => x.id !== result.exercise_id && x.title !== result.title)];
+        localStorage.setItem('tk_student_ai_exercises', JSON.stringify(updated));
+      } catch (err) {
+        console.warn('Could not save local copy of AI exercise', err);
       }
 
-      setLocalAiExercisesTrigger(prev => prev + 1);
-      setGeneratedExerciseId(newId);
+      clearSessionCache();
+      setGeneratedAiResult(result);
+      setGeneratedExerciseId(result.exercise_id);
       setIsGenerating(false);
-      setGenerationStep(4); // Completed stage
-    }, 2500);
+      setGenerationStep(4);
+      setLocalAiExercisesTrigger(prev => prev + 1);
+    } catch (err) {
+      clearTimeout(step2Timer);
+      clearTimeout(step3Timer);
+      console.error('Failed to generate AI exercise in DB:', err);
+      const errMsg = err.response?.data?.detail?.message || err.message || 'Có lỗi khi tạo bài tập trên máy chủ. Vui lòng thử lại.';
+      alert(errMsg);
+      setIsGenerating(false);
+      setGenerationStep(0);
+    }
   };
 
   const handleCloseAiModal = () => {
@@ -397,32 +776,127 @@ export default function StudentExercisesPage() {
     setIsGenerating(false);
     setGenerationStep(0);
     setGeneratedExerciseId(null);
+    setGeneratedAiResult(null);
+    clearSessionCache();
+    setLocalAiExercisesTrigger(prev => prev + 1);
   };
 
-  const filteredAssignments = assignmentsList.filter(item => {
-    if (selectedSubject !== 'all' && item.subject !== selectedSubject) return false;
-    if (selectedType !== 'all' && item.category !== selectedType) return false;
-    return true;
-  });
+  // Compute tab counts directly from full in-memory assignments list (cached backend + local AI)
+  const tabCounts = useMemo(() => {
+    let active = 0;
+    let overdue = 0;
+    let completed = 0;
+
+    assignmentsList.forEach(item => {
+      const savedData = !item.isRealBackend ? (
+        localStorage.getItem(`tk_exam_submitted_${item.id}`) ||
+        (item.assignment_id && localStorage.getItem(`tk_exam_submitted_${item.assignment_id}`)) ||
+        (item.exercise_id && localStorage.getItem(`tk_exam_submitted_${item.exercise_id}`))
+      ) : null;
+      const isFinished = item.status === 'completed' || Boolean(savedData);
+      const status = isFinished ? 'completed' : (item.status || 'active');
+
+      if (status === 'completed') {
+        completed++;
+      } else if (status === 'overdue') {
+        overdue++;
+      } else {
+        active++;
+      }
+    });
+
+    return {
+      all: active + overdue + completed,
+      active,
+      overdue,
+      completed,
+    };
+  }, [assignmentsList]);
+
+  const subjectOptions = useMemo(() => {
+    const list = new Set(['Toán học', 'Hóa học', 'Vật lý', 'Tiếng Anh', 'Sinh học', 'Ngữ văn', 'Lịch sử']);
+    if (Array.isArray(availableSubjects)) {
+      availableSubjects.forEach(s => {
+        if (s.subject_name) list.add(s.subject_name);
+      });
+    }
+    assignmentsList.forEach(a => {
+      if (a.subject) list.add(a.subject);
+    });
+    return Array.from(list);
+  }, [availableSubjects, assignmentsList]);
+
+  // Client-side query and filter on cached data in the current session
+  const filteredAssignments = useMemo(() => {
+    return assignmentsList.filter(item => {
+      // 1. Category / Type filter
+      if (selectedType !== 'all') {
+        const itemCat = item.category || (item.isAiGenerated ? 'ai_generated' : 'class_exercise');
+        if (selectedType === 'class_exercise') {
+          // "Bài tập trên lớp" includes class_exercise and AI practice exercises
+          if (itemCat === 'exam') return false;
+        } else if (selectedType === 'ai_generated') {
+          if (itemCat !== 'ai_generated' && !item.isAiGenerated) return false;
+        } else if (selectedType === 'exam') {
+          if (itemCat !== 'exam') return false;
+        }
+      }
+
+      // Check submission state
+      const savedData = !item.isRealBackend ? (
+        localStorage.getItem(`tk_exam_submitted_${item.id}`) ||
+        (item.assignment_id && localStorage.getItem(`tk_exam_submitted_${item.assignment_id}`)) ||
+        (item.exercise_id && localStorage.getItem(`tk_exam_submitted_${item.exercise_id}`))
+      ) : null;
+      const isFinished = item.status === 'completed' || Boolean(savedData);
+      const currentItemStatus = isFinished ? 'completed' : (item.status || 'active');
+
+      // 2. Tab status filter ('all', 'active', 'overdue', 'completed')
+      if (selectedTab !== 'all') {
+        if (selectedTab === 'active' && currentItemStatus !== 'active') return false;
+        if (selectedTab === 'overdue' && currentItemStatus !== 'overdue') return false;
+        if (selectedTab === 'completed' && currentItemStatus !== 'completed') return false;
+      }
+
+      // 3. Subject filter
+      if (selectedSubject !== 'all') {
+        const itemSub = (item.subject || '').trim().toLowerCase();
+        const selSub = selectedSubject.trim().toLowerCase();
+        if (itemSub !== selSub) return false;
+      }
+
+      // 4. Keyword search filter (title, subject, teacher name, class name)
+      if (searchTitle.trim()) {
+        const query = searchTitle.toLowerCase().trim();
+        const matchesTitle = (item.title || '').toLowerCase().includes(query);
+        const matchesSubject = (item.subject || '').toLowerCase().includes(query);
+        const matchesTeacher = (item.teacher || '').toLowerCase().includes(query);
+        const matchesClass = (item.className || '').toLowerCase().includes(query);
+        if (!matchesTitle && !matchesSubject && !matchesTeacher && !matchesClass) {
+          return false;
+        }
+      }
+
+      return true;
+    });
+  }, [assignmentsList, selectedType, selectedSubject, searchTitle, selectedTab]);
 
   const handleStartExercise = (item) => {
-    if (item.isRealBackend) {
-      navigate(`/student/exercises/${item.exercise_id}/taking`, {
-        state: {
-          assignmentId: item.assignment_id,
-          exerciseId: item.exercise_id,
-          classId: item.class_id,
-          title: item.title
-        }
-      });
-    } else {
-      navigate(`/student/exercises/${item.id}/taking`);
-    }
+    const targetExerciseId = item.exercise_id || item.exerciseId || item.id;
+    const targetAssignmentId = item.assignment_id || item.id;
+    navigate(`/student/exercises/${targetExerciseId}/taking`, {
+      state: {
+        assignmentId: targetAssignmentId,
+        exerciseId: targetExerciseId,
+        classId: item.class_id,
+        title: item.title
+      }
+    });
   };
 
   const handleCardClick = (item) => {
     setSelectedExerciseDetail(item);
-    setSelectedAttemptId(2);
+    setSelectedAttemptId(null);
   };
 
   return (
@@ -448,22 +922,79 @@ export default function StudentExercisesPage() {
         </button>
       </div>
 
+      {/* Exercise Tabs Row */}
+      <div className="exercises-tabs-bar">
+        <button 
+          type="button" 
+          className={`exercises-tab-pill ${selectedTab === 'all' ? 'active' : ''}`}
+          onClick={() => { setSelectedTab('all'); setCurrentPage(1); }}
+        >
+          <span>Tất cả</span>
+          <span className="tab-pill-count">{tabCounts.all}</span>
+        </button>
+        <button 
+          type="button" 
+          className={`exercises-tab-pill ${selectedTab === 'active' ? 'active' : ''}`}
+          onClick={() => { setSelectedTab('active'); setCurrentPage(1); }}
+        >
+          <span>Đang diễn ra</span>
+          <span className="tab-pill-count count-active">{tabCounts.active}</span>
+        </button>
+        <button 
+          type="button" 
+          className={`exercises-tab-pill ${selectedTab === 'overdue' ? 'active' : ''}`}
+          onClick={() => { setSelectedTab('overdue'); setCurrentPage(1); }}
+        >
+          <span>Quá hạn</span>
+          <span className="tab-pill-count count-overdue">{tabCounts.overdue}</span>
+        </button>
+        <button 
+          type="button" 
+          className={`exercises-tab-pill ${selectedTab === 'completed' ? 'active' : ''}`}
+          onClick={() => { setSelectedTab('completed'); setCurrentPage(1); }}
+        >
+          <span>Đã hoàn thành</span>
+          <span className="tab-pill-count count-completed">{tabCounts.completed}</span>
+        </button>
+      </div>
+
       {/* Filter Card */}
       <div className="exercises-filter-card">
+        <div className="filter-field-group search-field-group">
+          <label className="filter-field-label">Tìm kiếm bài tập</label>
+          <div className="filter-search-input-wrap">
+            <Search size={16} className="filter-search-icon" />
+            <input 
+              type="text"
+              className="filter-search-input"
+              placeholder="Nhập tên bài tập, đề thi, môn học..."
+              value={searchTitle}
+              onChange={(e) => { setSearchTitle(e.target.value); setCurrentPage(1); }}
+            />
+            {searchTitle && (
+              <button 
+                type="button" 
+                className="filter-search-clear" 
+                onClick={() => { setSearchTitle(''); setCurrentPage(1); }}
+                aria-label="Xóa tìm kiếm"
+              >
+                <X size={14} />
+              </button>
+            )}
+          </div>
+        </div>
+
         <div className="filter-field-group">
           <label className="filter-field-label">Môn học</label>
           <select 
             className="filter-select-input"
             value={selectedSubject}
-            onChange={(e) => setSelectedSubject(e.target.value)}
+            onChange={(e) => { setSelectedSubject(e.target.value); setCurrentPage(1); }}
           >
             <option value="all">Tất cả môn học</option>
-            <option value="Toán học">Toán học</option>
-            <option value="Hóa học">Hóa học</option>
-            <option value="Vật lý">Vật lý</option>
-            <option value="Tiếng Anh">Tiếng Anh</option>
-            <option value="Sinh học">Sinh học</option>
-            <option value="Ngữ văn">Ngữ văn</option>
+            {subjectOptions.map(sub => (
+              <option key={sub} value={sub}>{sub}</option>
+            ))}
           </select>
         </div>
 
@@ -472,7 +1003,7 @@ export default function StudentExercisesPage() {
           <select 
             className="filter-select-input"
             value={selectedType}
-            onChange={(e) => setSelectedType(e.target.value)}
+            onChange={(e) => { setSelectedType(e.target.value); setCurrentPage(1); }}
           >
             <option value="all">Tất cả thể loại</option>
             <option value="exam">Bài thi</option>
@@ -481,105 +1012,142 @@ export default function StudentExercisesPage() {
           </select>
         </div>
 
-        <button type="button" className="btn-filter-submit">
-          <ListFilter size={16} />
-          <span>Lọc kết quả</span>
-        </button>
+        <div className="filter-refresh-group">
+          <button
+            type="button"
+            className="btn-filter-refresh"
+            onClick={handleRefreshData}
+            title="Làm mới dữ liệu từ máy chủ"
+            disabled={loading}
+          >
+            <RotateCcw size={15} className={loading ? 'icon-spin' : ''} />
+            <span>{loading ? 'Đang tải...' : 'Làm mới'}</span>
+          </button>
+        </div>
       </div>
 
       {/* Exercises Cards Grid */}
       <div className="exercises-cards-grid">
-        {filteredAssignments.map(item => {
-          const Icon = getAssignmentIcon(item);
-          const savedData = localStorage.getItem(`tk_exam_submitted_${item.id}`);
-          const isSubmitted = Boolean(savedData);
-          const isExam = item.category === 'exam';
-          const displayCategoryLabel = item.category === 'exam' 
-            ? 'Bài thi' 
-            : item.category === 'ai_generated' 
-              ? 'Bài tập tạo sinh AI' 
-              : 'Bài tập trên lớp';
+        {filteredAssignments.length === 0 ? (
+          <div className="exercises-empty-state" style={{ gridColumn: '1 / -1', textAlign: 'center', padding: '48px 24px', backgroundColor: '#FFFFFF', borderRadius: '14px', border: '1px solid #EBE8F0' }}>
+            <HelpCircle size={44} color="#94A3B8" style={{ margin: '0 auto 12px' }} />
+            <h3 style={{ fontSize: '16px', fontWeight: 700, color: '#1E293B', margin: '0 0 6px' }}>Không tìm thấy bài tập phù hợp</h3>
+            <p style={{ fontSize: '13.5px', color: '#64748B', margin: 0 }}>Thử chuyển tab trạng thái, chọn môn học khác hoặc xóa từ khóa tìm kiếm.</p>
+          </div>
+        ) : (
+          filteredAssignments.map(item => {
+            const Icon = getAssignmentIcon(item);
+            const savedData = !item.isRealBackend ? (
+              localStorage.getItem(`tk_exam_submitted_${item.id}`) ||
+              (item.assignment_id && localStorage.getItem(`tk_exam_submitted_${item.assignment_id}`)) ||
+              (item.exercise_id && localStorage.getItem(`tk_exam_submitted_${item.exercise_id}`))
+            ) : null;
+            const isSubmitted = item.status === 'completed' || Boolean(savedData);
+            const isExam = item.category === 'exam';
+            const displayCategoryLabel = item.category === 'exam' 
+              ? 'Bài thi' 
+              : item.category === 'ai_generated' 
+                ? 'Bài tập tạo sinh AI' 
+                : 'Bài tập trên lớp';
 
-          const currentStatus = isSubmitted ? 'completed' : item.status;
-          const currentStatusLabel = isSubmitted ? 'Đã nộp bài' : item.statusLabel;
+            const currentStatus = isSubmitted ? 'completed' : item.status;
+            const currentStatusLabel = isSubmitted ? 'Đã nộp bài' : item.statusLabel;
 
-          return (
-            <div 
-              key={item.id} 
-              className={`student-assignment-card clickable-card ${isExam ? 'is-exam-card' : ''} ${item.isAiGenerated ? 'is-ai-card' : ''}`}
-              onClick={() => handleCardClick(item)}
-            >
-              <div className="card-top-row">
-                <div className="card-type-left">
-                  <div className={`card-type-icon-box ${isExam ? 'exam-icon-accent' : ''} ${item.isAiGenerated ? 'ai-icon-accent' : ''}`}>
-                    <Icon size={18} strokeWidth={2.2} />
+            return (
+              <div 
+                key={item.id} 
+                className={`student-assignment-card clickable-card ${isExam ? 'is-exam-card' : ''} ${item.isAiGenerated ? 'is-ai-card' : ''}`}
+                onClick={() => handleCardClick(item)}
+              >
+                <div className="card-top-row">
+                  <div className="card-type-left">
+                    <div className={`card-type-icon-box ${isExam ? 'exam-icon-accent' : ''} ${item.isAiGenerated ? 'ai-icon-accent' : ''}`}>
+                      <Icon size={18} strokeWidth={2.2} />
+                    </div>
+                    <span className={`card-category-tag ${item.category === 'exam' ? 'tag-exam' : item.category === 'ai_generated' ? 'tag-ai' : 'tag-class'}`}>
+                      {displayCategoryLabel}
+                    </span>
                   </div>
-                  <span className={`card-category-tag ${item.category === 'exam' ? 'tag-exam' : item.category === 'ai_generated' ? 'tag-ai' : 'tag-class'}`}>
-                    {displayCategoryLabel}
+                  <span className={`card-status-pill ${currentStatus}`}>
+                    {currentStatusLabel}
                   </span>
                 </div>
-                <span className={`card-status-pill ${currentStatus}`}>
-                  {currentStatusLabel}
-                </span>
-              </div>
 
-              <div className="card-body-content">
-                <h3 className="card-assignment-title">{item.title}</h3>
-                <p className="card-teacher-name">Giáo viên: {item.teacher}</p>
+                <div className="card-body-content">
+                  <h3 className="card-assignment-title">{item.title}</h3>
+                  <p className="card-teacher-name">Giáo viên: {item.teacher}</p>
 
-                <div className="card-meta-chips-row">
-                  <span className="meta-chip-item">
-                    <ListChecks size={13} />
-                    {item.questionsCount}
-                  </span>
-                  <span className="meta-chip-item">
-                    <Clock size={13} />
-                    {item.duration}
-                  </span>
+                  <div className="card-meta-chips-row">
+                    <span className="meta-chip-item">
+                      <ListChecks size={13} />
+                      {item.questionsCount}
+                    </span>
+                    <span className="meta-chip-item">
+                      <Clock size={13} />
+                      {item.duration}
+                    </span>
+                    <span className="meta-chip-item" title="Số lượt làm bài">
+                      <RotateCcw size={13} />
+                      {isExam ? `Lượt làm: ${item.completedAttemptsCount || (isSubmitted ? 1 : 0)}/1` : (item.completedAttemptsCount > 0 ? `Lượt làm: ${item.completedAttemptsCount} (Không giới hạn)` : 'Không giới hạn lượt làm')}
+                    </span>
+                    {item.className && (
+                      <span className="meta-chip-item class-badge">
+                        {item.className}
+                      </span>
+                    )}
+                  </div>
                 </div>
-              </div>
 
-              <div className="card-bottom-footer" onClick={(e) => e.stopPropagation()}>
-                <span className={`card-due-text ${item.isToday ? 'is-today' : ''}`}>
-                  <Calendar size={13} />
-                  Hạn chót: {item.deadline}
-                </span>
+                <div className="card-bottom-footer" onClick={(e) => e.stopPropagation()}>
+                  <span className={`card-due-text ${item.isToday ? 'is-today' : ''}`}>
+                    <Calendar size={13} />
+                    Hạn chót: {item.deadline}
+                  </span>
 
-                {isExam && isSubmitted ? (
-                  <div className="card-exam-locked-action">
+                  {isExam && isSubmitted ? (
+                    <div className="card-exam-locked-action">
+                      <button 
+                        type="button" 
+                        className="btn-card-action"
+                        onClick={() => setSelectedExerciseDetail(item)}
+                      >
+                        Xem kết quả
+                      </button>
+                      <span className="exam-no-retake-badge">
+                        <Lock size={11} />
+                        <span>Không thể làm lại</span>
+                      </span>
+                    </div>
+                  ) : isSubmitted ? (
                     <button 
                       type="button" 
                       className="btn-card-action"
                       onClick={() => setSelectedExerciseDetail(item)}
                     >
-                      Xem kết quả
+                      Luyện tập lại
                     </button>
-                    <span className="exam-no-retake-badge">
-                      <Lock size={11} />
-                      <span>Không thể làm lại</span>
-                    </span>
-                  </div>
-                ) : isSubmitted ? (
-                  <button 
-                    type="button" 
-                    className="btn-card-action"
-                    onClick={() => setSelectedExerciseDetail(item)}
-                  >
-                    Luyện tập lại
-                  </button>
-                ) : (
-                  <button 
-                    type="button" 
-                    className="btn-card-action"
-                    onClick={() => handleStartExercise(item)}
-                  >
-                    {isExam ? 'Làm bài thi' : 'Bắt đầu'}
-                  </button>
-                )}
+                  ) : item.status === 'overdue' ? (
+                    <button 
+                      type="button" 
+                      className="btn-card-action btn-overdue"
+                      onClick={() => handleStartExercise(item)}
+                    >
+                      Quá hạn
+                    </button>
+                  ) : (
+                    <button 
+                      type="button" 
+                      className="btn-card-action"
+                      onClick={() => handleStartExercise(item)}
+                    >
+                      {isExam ? 'Làm bài thi' : 'Bắt đầu'}
+                    </button>
+                  )}
+                </div>
               </div>
-            </div>
-          );
-        })}
+            );
+          })
+        )}
       </div>
 
       {/* Pagination Footer */}
@@ -686,9 +1254,19 @@ export default function StudentExercisesPage() {
                     type="button" 
                     className="btn-modal-start-generated"
                     onClick={() => {
-                      const targetId = generatedExerciseId || '4';
+                      const targetExerciseId = generatedAiResult?.exercise_id || generatedExerciseId;
+                      const targetAssignmentId = generatedAiResult?.assignment_id;
+                      const targetClassId = generatedAiResult?.class_id;
+                      const targetTitle = generatedAiResult?.title;
                       handleCloseAiModal();
-                      navigate(`/student/exercises/${targetId}/taking`);
+                      navigate(`/student/exercises/${targetExerciseId}/taking`, {
+                        state: {
+                          assignmentId: targetAssignmentId,
+                          exerciseId: targetExerciseId,
+                          classId: targetClassId,
+                          title: targetTitle
+                        }
+                      });
                     }}
                   >
                     <span>Làm bài ngay</span>
@@ -1170,31 +1748,33 @@ export default function StudentExercisesPage() {
       )}
 
       {/* ============================================================ */}
-      {/* EXERCISE DETAIL & ATTEMPT HISTORY MODAL (EXACTLY LIKE IMAGE 1) */}
+      {/* EXERCISE DETAIL & ATTEMPT HISTORY MODAL */}
       {/* ============================================================ */}
       {selectedExerciseDetail && (
-        <div className="detail-modal-backdrop" onClick={() => setSelectedExerciseDetail(null)}>
+        <div className="detail-modal-backdrop" onClick={handleCloseDetailModal}>
           <div className="exercise-detail-modal-card" onClick={(e) => e.stopPropagation()}>
             {/* Modal Header */}
             <div className="detail-modal-header">
               <div className="detail-modal-header-left">
                 <div className="detail-modal-top-tags">
-                  <span className="modal-status-pill-green">Đã hoàn thành</span>
+                  <span className={detailSummary?.status === 'completed' || (detailSummary?.attempts?.some(a => a.is_finished || a.score != null)) || (selectedExerciseDetail.isRealBackend ? selectedExerciseDetail.score != null : selectedExerciseDetail.status === 'completed') ? "modal-status-pill-green" : "modal-status-pill-blue"}>
+                    {detailSummary?.status === 'completed' || (detailSummary?.attempts?.some(a => a.is_finished || a.score != null)) || (selectedExerciseDetail.isRealBackend ? selectedExerciseDetail.score != null : selectedExerciseDetail.status === 'completed') ? 'Đã hoàn thành' : 'Đang mở'}
+                  </span>
                   <span className="modal-subject-grade-text">
-                    {selectedExerciseDetail.subject || 'Toán học'} • {selectedExerciseDetail.grade || 'Lớp 12'}
+                    {detailSummary?.subject_name || selectedExerciseDetail.subject || 'Toán học'} • {detailSummary?.grade_name || selectedExerciseDetail.grade || 'Lớp 12'}
                   </span>
                 </div>
                 <h2 className="detail-modal-main-title">
-                  Chi tiết kết quả & Lịch sử làm bài - {selectedExerciseDetail.title}
+                  Chi tiết kết quả & Lịch sử làm bài - {detailSummary?.title || selectedExerciseDetail.title}
                 </h2>
                 <p className="detail-modal-meta-line">
-                  Giáo viên: <strong>Thầy {selectedExerciseDetail.teacher}</strong> • Thời lượng: <strong>{selectedExerciseDetail.duration}</strong> • Số lượng: <strong>{selectedExerciseDetail.questionsCount}</strong> • Hạn nộp: <strong className="due-highlight">{selectedExerciseDetail.deadline}</strong>
+                  Giáo viên: <strong>Thầy {detailSummary?.teacher_name || selectedExerciseDetail.teacher}</strong> • Thời lượng: <strong>{detailSummary?.duration_minutes ? `${detailSummary.duration_minutes} phút` : selectedExerciseDetail.duration}</strong> • Số lượng: <strong>{detailSummary?.total_questions ? `${detailSummary.total_questions} câu hỏi` : selectedExerciseDetail.questionsCount}</strong> • Hạn nộp: <strong className="due-highlight">{detailSummary?.deadline_text || selectedExerciseDetail.deadline}</strong>
                 </p>
               </div>
               <button 
                 type="button" 
                 className="detail-modal-close-btn"
-                onClick={() => setSelectedExerciseDetail(null)}
+                onClick={handleCloseDetailModal}
                 title="Đóng"
               >
                 <X size={20} />
@@ -1203,137 +1783,183 @@ export default function StudentExercisesPage() {
 
             {/* Modal Body */}
             <div className="detail-modal-scrollable-body">
-              {/* 1. Dynamic Result Summary Card reflecting clicked attempt */}
-              <div className="best-result-summary-box">
-                <div className="best-result-top-row">
-                  <div className="best-score-left-col">
-                    <span className="best-score-label">{currentAttempt.scoreLabel}</span>
-                    <div className="best-score-digits-row">
-                      <span className="score-number-big">{currentAttempt.score}</span>
-                      <span className="score-scale-denom">/ 10</span>
-                      <span className="score-grade-pill">{currentAttempt.grade}</span>
-                    </div>
-                  </div>
-
-                  <div className="best-stat-cell">
-                    <span className="stat-cell-title">Đúng</span>
-                    <span className="stat-cell-val val-green">
-                      {currentAttempt.correctCount} / {currentAttempt.totalCount} câu <span className="stat-cell-pct">({currentAttempt.correctPct})</span>
-                    </span>
-                  </div>
-
-                  <div className="best-stat-cell">
-                    <span className="stat-cell-title">Thời gian làm</span>
-                    <span className="stat-cell-val val-dark">{currentAttempt.timeSpent}</span>
-                  </div>
+              {isLoadingDetail ? (
+                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', minHeight: '260px', gap: '12px' }}>
+                  <Loader2 size={32} className="animate-spin text-purple-600" />
+                  <span style={{ fontSize: '14px', color: '#6b7280' }}>Đang tải chi tiết kết quả từ hệ thống...</span>
                 </div>
+              ) : currentAttempt ? (
+                <>
+                  {/* 1. Dynamic Result Summary Card reflecting clicked attempt */}
+                  <div className="best-result-summary-box">
+                    <div className="best-result-top-row">
+                      <div className="best-score-left-col">
+                        <span className="best-score-label">{currentAttempt.score_label || currentAttempt.scoreLabel}</span>
+                        <div className="best-score-digits-row">
+                          <span className="score-number-big">{currentAttempt.score != null ? currentAttempt.score : '--'}</span>
+                          <span className="score-scale-denom">/ 10</span>
+                          <span className="score-grade-pill">{currentAttempt.grade}</span>
+                        </div>
+                      </div>
 
-                {/* Cognitive Level Analysis */}
-                <div className="cognitive-analysis-section">
-                  <h4 className="cognitive-section-heading">Phân tích mức độ nhận thức</h4>
-                  
-                  <div className="cognitive-progress-list">
-                    <div className="cognitive-progress-item">
-                      <div className="cognitive-item-info">
-                        <span className="cognitive-level-name">Nhận biết</span>
-                        <span className="cognitive-level-score green-text">
-                          {currentAttempt.cognitive.recognition.correct}/{currentAttempt.cognitive.recognition.total} ({currentAttempt.cognitive.recognition.pct})
+                      <div className="best-stat-cell">
+                        <span className="stat-cell-title">Đúng</span>
+                        <span className="stat-cell-val val-green">
+                          {currentAttempt.correct_count ?? currentAttempt.correctCount} / {currentAttempt.total_count ?? currentAttempt.totalCount} câu <span className="stat-cell-pct">({currentAttempt.correct_pct || currentAttempt.correctPct})</span>
                         </span>
                       </div>
-                      <div className="cognitive-track">
-                        <div 
-                          className="cognitive-bar bar-green" 
-                          style={{ width: currentAttempt.cognitive.recognition.pct }} 
-                        />
+
+                      <div className="best-stat-cell">
+                        <span className="stat-cell-title">Thời gian làm</span>
+                        <span className="stat-cell-val val-dark">{currentAttempt.time_spent || currentAttempt.timeSpent}</span>
                       </div>
                     </div>
 
-                    <div className="cognitive-progress-item">
-                      <div className="cognitive-item-info">
-                        <span className="cognitive-level-name">Thông hiểu</span>
-                        <span className="cognitive-level-score blue-text">
-                          {currentAttempt.cognitive.understanding.correct}/{currentAttempt.cognitive.understanding.total} ({currentAttempt.cognitive.understanding.pct})
-                        </span>
-                      </div>
-                      <div className="cognitive-track">
-                        <div 
-                          className="cognitive-bar bar-blue" 
-                          style={{ width: currentAttempt.cognitive.understanding.pct }} 
-                        />
-                      </div>
-                    </div>
-
-                    <div className="cognitive-progress-item">
-                      <div className="cognitive-item-info">
-                        <span className="cognitive-level-name">Vận dụng</span>
-                        <span className="cognitive-level-score purple-text">
-                          {currentAttempt.cognitive.application.correct}/{currentAttempt.cognitive.application.total} ({currentAttempt.cognitive.application.pct})
-                        </span>
-                      </div>
-                      <div className="cognitive-track">
-                        <div 
-                          className="cognitive-bar bar-purple" 
-                          style={{ width: currentAttempt.cognitive.application.pct }} 
-                        />
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              {/* 2. Attempt History List */}
-              <div className="attempts-history-wrapper">
-                <div className="attempts-history-header">
-                  <Clock size={16} className="history-clock-icon" />
-                  <h3 className="attempts-history-title">Lịch sử các lần làm bài</h3>
-                  <span className="attempts-unlimited-pill">Không giới hạn số lượt</span>
-                </div>
-
-                <div className="attempts-cards-list">
-                  {attemptsData.map((attempt) => {
-                    const isSelected = selectedAttemptId === attempt.id;
-                    return (
-                      <div
-                        key={attempt.id}
-                        className={`attempt-record-card ${isSelected ? 'is-selected-attempt' : ''} ${attempt.isLatest ? 'is-latest-attempt' : ''}`}
-                        onClick={() => setSelectedAttemptId(attempt.id)}
-                        title="Bấm để xem chi tiết kết quả lần làm bài này"
-                      >
-                        <div className="attempt-record-left">
-                          <div className="attempt-badge-row">
-                            <span className={`attempt-num-badge ${attempt.isLatest ? 'badge-latest-purple' : ''}`}>
-                              {attempt.badgeLabel}
-                            </span>
-                            <span className="attempt-date-text">{attempt.dateText}</span>
-                            <span className={attempt.statusTagClass}>{attempt.statusTag}</span>
-                            {isSelected && (
-                              <span className="attempt-viewing-tag">Đang hiển thị</span>
-                            )}
+                    {/* Cognitive Level Analysis */}
+                    {currentAttempt.cognitive && (
+                      <div className="cognitive-analysis-section">
+                        <h4 className="cognitive-section-heading">Phân tích mức độ nhận thức</h4>
+                        
+                        <div className="cognitive-progress-list">
+                          <div className="cognitive-progress-item">
+                            <div className="cognitive-item-info">
+                              <span className="cognitive-level-name">Nhận biết</span>
+                              <span className="cognitive-level-score green-text">
+                                {currentAttempt.cognitive.recognition.correct}/{currentAttempt.cognitive.recognition.total} ({currentAttempt.cognitive.recognition.pct})
+                              </span>
+                            </div>
+                            <div className="cognitive-track">
+                              <div 
+                                className="cognitive-bar bar-green" 
+                                style={{ width: currentAttempt.cognitive.recognition.pct }} 
+                              />
+                            </div>
                           </div>
-                          <div className="attempt-stats-row">
-                            <span>Điểm: <strong>{attempt.score} / 10</strong></span>
-                            <span className="attempt-stat-divider">•</span>
-                            <span>Thời gian: <strong>{attempt.timeSpent}</strong></span>
+
+                          <div className="cognitive-progress-item">
+                            <div className="cognitive-item-info">
+                              <span className="cognitive-level-name">Thông hiểu</span>
+                              <span className="cognitive-level-score blue-text">
+                                {currentAttempt.cognitive.understanding.correct}/{currentAttempt.cognitive.understanding.total} ({currentAttempt.cognitive.understanding.pct})
+                              </span>
+                            </div>
+                            <div className="cognitive-track">
+                              <div 
+                                className="cognitive-bar bar-blue" 
+                                style={{ width: currentAttempt.cognitive.understanding.pct }} 
+                              />
+                            </div>
+                          </div>
+
+                          <div className="cognitive-progress-item">
+                            <div className="cognitive-item-info">
+                              <span className="cognitive-level-name">Vận dụng</span>
+                              <span className="cognitive-level-score purple-text">
+                                {currentAttempt.cognitive.application.correct}/{currentAttempt.cognitive.application.total} ({currentAttempt.cognitive.application.pct})
+                              </span>
+                            </div>
+                            <div className="cognitive-track">
+                              <div 
+                                className="cognitive-bar bar-purple" 
+                                style={{ width: currentAttempt.cognitive.application.pct }} 
+                              />
+                            </div>
                           </div>
                         </div>
-
-                        <button 
-                          type="button" 
-                          className="btn-view-attempt-detail"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            const targetId = selectedExerciseDetail.id;
-                            setSelectedExerciseDetail(null);
-                            navigate(`/student/exercises/${targetId}/taking`);
-                          }}
-                        >
-                          Xem chi tiết bài làm
-                        </button>
                       </div>
-                    );
-                  })}
+                    )}
+                  </div>
+
+                  {/* 2. Attempt History List */}
+                  <div className="attempts-history-wrapper">
+                    <div className="attempts-history-header">
+                      <Clock size={16} className="history-clock-icon" />
+                      <h3 className="attempts-history-title">Lịch sử các lần làm bài</h3>
+                      {isModalExam ? (
+                        <span className="attempts-unlimited-pill attempts-exam-limit-pill">
+                          <Lock size={12} />
+                          <span>{isModalExamSubmitted ? `Đã hết số lượt (${activeAttempts.length || 1}/1)` : 'Giới hạn: 1 lượt làm'}</span>
+                        </span>
+                      ) : (
+                        <span className="attempts-unlimited-pill">Không giới hạn số lượt</span>
+                      )}
+                    </div>
+
+                    <div className="attempts-cards-list">
+                      {activeAttempts.map((attempt) => {
+                        const attId = attempt.id || attempt.attempt_id;
+                        const isSelected = String(selectedAttemptId) === String(attId);
+                        return (
+                          <div
+                            key={attId}
+                            className={`attempt-record-card ${isSelected ? 'is-selected-attempt' : ''} ${attempt.is_latest || attempt.isLatest ? 'is-latest-attempt' : ''}`}
+                            onClick={() => setSelectedAttemptId(attId)}
+                            title="Bấm để xem chi tiết kết quả lần làm bài này"
+                          >
+                            <div className="attempt-record-left">
+                              <div className="attempt-badge-row">
+                                <span className={`attempt-num-badge ${attempt.is_latest || attempt.isLatest ? 'badge-latest-purple' : ''}`}>
+                                  {attempt.badge_label || attempt.badgeLabel}
+                                </span>
+                                <span className="attempt-date-text">{attempt.date_text || attempt.dateText}</span>
+                                <span className={attempt.status_tag_class || attempt.statusTagClass}>{attempt.status_tag || attempt.statusTag}</span>
+                                {isSelected && (
+                                  <span className="attempt-viewing-tag">Đang hiển thị</span>
+                                )}
+                              </div>
+                              <div className="attempt-stats-row">
+                                <span>Điểm: <strong>{attempt.score != null ? attempt.score : '--'} / 10</strong></span>
+                                <span className="attempt-stat-divider">•</span>
+                                <span>Thời gian: <strong>{attempt.time_spent || attempt.timeSpent}</strong></span>
+                              </div>
+                            </div>
+
+                            <button 
+                              type="button" 
+                              className="btn-view-attempt-detail"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                const targetExerciseId = detailSummary?.exercise_id || selectedExerciseDetail.exercise_id || selectedExerciseDetail.exerciseId || selectedExerciseDetail.id;
+                                const targetAssignmentId = detailSummary?.assignment_id || selectedExerciseDetail.assignment_id || selectedExerciseDetail.id;
+                                const targetAttemptId = attempt.id || attempt.attempt_id;
+                                handleCloseDetailModal();
+                                navigate(`/student/exercises/${targetExerciseId}/taking`, {
+                                  state: {
+                                    assignmentId: targetAssignmentId,
+                                    exerciseId: targetExerciseId,
+                                    attemptId: targetAttemptId,
+                                    classId: detailSummary?.class_id || selectedExerciseDetail.class_id,
+                                    title: detailSummary?.title || selectedExerciseDetail.title
+                                  }
+                                });
+                              }}
+                            >
+                              {attempt.is_finished || attempt.score != null ? 'Xem chi tiết bài làm' : 'Tiếp tục làm bài'}
+                            </button>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                </>
+              ) : (
+                <div style={{ textAlign: 'center', padding: '48px 24px' }}>
+                  <p style={{ color: '#4b5563', fontSize: '15px', marginBottom: '20px' }}>
+                    Chưa có lượt làm bài nào cho bài tập này.
+                  </p>
+                  <button
+                    type="button"
+                    className="btn-modal-retake-purple"
+                    onClick={() => {
+                      const targetItem = selectedExerciseDetail;
+                      setSelectedExerciseDetail(null);
+                      handleStartExercise(targetItem);
+                    }}
+                  >
+                    Bắt đầu làm bài ngay
+                  </button>
                 </div>
-              </div>
+              )}
             </div>
 
             {/* Modal Bottom Actions */}
@@ -1341,39 +1967,69 @@ export default function StudentExercisesPage() {
               <button 
                 type="button" 
                 className="btn-modal-close-flat"
-                onClick={() => setSelectedExerciseDetail(null)}
+                onClick={handleCloseDetailModal}
               >
                 Đóng
               </button>
 
               <div className="modal-footer-right-group">
-                <button 
-                  type="button" 
-                  className="btn-modal-view-answers-outline"
-                  onClick={() => {
-                    const id = selectedExerciseDetail.id;
-                    setSelectedExerciseDetail(null);
-                    navigate(`/student/exercises/${id}/taking`);
-                  }}
-                >
-                  Xem đáp án & giải thích chi tiết
-                </button>
+                {(currentAttempt?.is_finished || currentAttempt?.score != null || selectedExerciseDetail.score != null || isModalExamSubmitted) && (
+                  <button 
+                    type="button" 
+                    className="btn-modal-view-answers-outline"
+                    onClick={() => {
+                      const targetExerciseId = detailSummary?.exercise_id || selectedExerciseDetail.exercise_id || selectedExerciseDetail.exerciseId || selectedExerciseDetail.id;
+                      const targetAssignmentId = detailSummary?.assignment_id || selectedExerciseDetail.assignment_id || selectedExerciseDetail.id;
+                      const targetAttemptId = currentAttempt ? (currentAttempt.id || currentAttempt.attempt_id) : null;
+                      handleCloseDetailModal();
+                      navigate(`/student/exercises/${targetExerciseId}/taking`, {
+                        state: {
+                          assignmentId: targetAssignmentId,
+                          exerciseId: targetExerciseId,
+                          attemptId: targetAttemptId,
+                          classId: detailSummary?.class_id || selectedExerciseDetail.class_id,
+                          title: detailSummary?.title || selectedExerciseDetail.title
+                        }
+                      });
+                    }}
+                  >
+                    Xem đáp án & giải thích chi tiết
+                  </button>
+                )}
 
-                <button 
-                  type="button" 
-                  className="btn-modal-retake-purple"
-                  onClick={() => {
-                    const id = selectedExerciseDetail.id;
-                    setSelectedExerciseDetail(null);
-                    navigate(`/student/exercises/${id}/taking`);
-                  }}
-                  title="Làm lại bài (Không giới hạn số lượt)"
-                >
-                  <RotateCcw size={15} />
-                  <span>
-                    {selectedExerciseDetail.category === 'exam' ? 'Làm lại bài thi' : 'Làm lại bài'}
-                  </span>
-                </button>
+                {isModalExam && isModalExamSubmitted ? (
+                  <div className="modal-exam-locked-badge">
+                    <Lock size={15} />
+                    <span>Không thể làm lại</span>
+                  </div>
+                ) : (
+                  <button 
+                    type="button" 
+                    className="btn-modal-retake-purple"
+                    onClick={() => {
+                      const targetExerciseId = detailSummary?.exercise_id || selectedExerciseDetail.exercise_id || selectedExerciseDetail.exerciseId || selectedExerciseDetail.id;
+                      const targetAssignmentId = detailSummary?.assignment_id || selectedExerciseDetail.assignment_id || selectedExerciseDetail.id;
+                      handleCloseDetailModal();
+                      navigate(`/student/exercises/${targetExerciseId}/taking`, {
+                        state: {
+                          assignmentId: targetAssignmentId,
+                          exerciseId: targetExerciseId,
+                          classId: detailSummary?.class_id || selectedExerciseDetail.class_id,
+                          title: detailSummary?.title || selectedExerciseDetail.title,
+                          isRetake: true
+                        }
+                      });
+                    }}
+                    title={isModalExam ? "Làm bài thi" : "Luyện tập lại"}
+                  >
+                    <RotateCcw size={15} />
+                    <span>
+                      {(currentAttempt?.is_finished || selectedExerciseDetail.score != null)
+                        ? 'Luyện tập lại'
+                        : (activeAttempts.length > 0 ? 'Tiếp tục làm bài' : (isModalExam ? 'Bắt đầu làm bài thi' : 'Bắt đầu làm bài'))}
+                    </span>
+                  </button>
+                )}
               </div>
             </div>
           </div>

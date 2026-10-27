@@ -41,6 +41,10 @@ nosetests.xml
 coverage.xml
 *.cover
 *.log
+playwright-report/
+test-results/
+frontend/playwright-report/
+frontend/test-results/
 
 # Node / Frontend
 node_modules/

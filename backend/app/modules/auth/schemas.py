@@ -7,7 +7,7 @@
 
 
 from uuid import UUID
-from typing import Optional
+from typing import Optional, List
 from pydantic import BaseModel, Field, ConfigDict
 
 class LoginRequest(BaseModel):
@@ -61,6 +61,18 @@ class UserProfileOut(BaseModel):
     email: Optional[str] = Field(None, description="User email address")
     phone: Optional[str] = Field(None, description="User phone number")
     status: str = Field(..., description="User account status")
+    student_code: Optional[str] = Field(None, description="Student enrollment code if applicable")
+    class_id: Optional[UUID] = Field(None, description="Enrolled or primary class ID")
+    class_name: Optional[str] = Field(None, description="Enrolled or primary class name")
+    teaching_subjects: Optional[List[str]] = Field(None, description="Assigned teaching subjects for teachers")
+
+class UserProfileUpdateRequest(BaseModel):
+    """
+    Schema for updating current user profile details.
+    """
+    full_name: Optional[str] = Field(None, min_length=1, max_length=128)
+    email: Optional[str] = Field(None, max_length=128)
+    phone: Optional[str] = Field(None, min_length=10, max_length=15)
 
 class ChangePasswordRequest(BaseModel):
     """

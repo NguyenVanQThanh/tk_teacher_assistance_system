@@ -1,8 +1,8 @@
 # File Name: test_assignments.py
-# Description: Unit & Integration tests for F-EXE-02 Class Assignments module (creation, scoping, soft-delete, restore, validation).
+# Description: Unit & Integration tests for F-EXE-02 Class Assignments module (creation, scoping, feed, soft-delete, restore, validation).
 # Created At: 2026-07-31
 # Created By: Tam Khang
-# Updated At: 2026-07-31
+# Updated At: 2026-10-03
 # Updated By: Tam Khang
 
 import uuid
@@ -31,7 +31,7 @@ def get_teacher_token(client: TestClient) -> str:
 def get_student_token(client: TestClient) -> str:
     resp = client.post(
         "/api/v1/auth/login",
-        json={"phone": "0911223344", "password": "password123"}
+        json={"phone": "0934567890", "password": "password123"}
     )
     return resp.json()["access_token"]
 
@@ -163,3 +163,69 @@ class TestClassAssignmentModule:
         list_resp_restored = client.get(f"/api/v1/classes/{c1}/assignments", headers=teacher_headers)
         assert list_resp_restored.status_code == status.HTTP_200_OK
         assert len(list_resp_restored.json()) == 1
+
+        # 13. Test student feed (GET /api/v1/assignments)
+        student_token = get_student_token(client)
+        student_headers = {"Authorization": f"Bearer {student_token}"}
+        student_me = client.get("/api/v1/auth/me", headers=student_headers).json()
+        student_id = student_me["user_id"]
+
+        # Enroll student in class c1
+        client.post(
+            f"/api/v1/classes/{c1}/students",
+            json={"student_id": student_id, "student_code": f"STU{uuid.uuid4().hex[:6]}"},
+            headers=admin_headers
+        )
+
+        # Student calls GET /api/v1/assignments
+        feed_resp = client.get("/api/v1/assignments", headers=student_headers)
+        assert feed_resp.status_code == status.HTTP_200_OK
+        feed_data = feed_resp.json()
+        assert len(feed_data) >= 1
+        item = next((a for a in feed_data if a["assignment_id"] == assignment_id), None)
+        assert item is not None
+        assert item["exercise_title"] == "Bai tap Vat Ly 1"
+        assert item["feed_status"] == "active"
+        assert item["completed_attempts_count"] == 0
+
+        # Test search filter
+        search_resp = client.get("/api/v1/assignments?search=Vat+Ly", headers=student_headers)
+        assert search_resp.status_code == status.HTTP_200_OK
+        assert any(a["assignment_id"] == assignment_id for a in search_resp.json())
+
+        no_match_resp = client.get("/api/v1/assignments?search=NonExistent12345", headers=student_headers)
+        assert no_match_resp.status_code == status.HTTP_200_OK
+        assert len(no_match_resp.json()) == 0
+
+        # 14. Test assignment result & attempt history API (GET /api/v1/assignments/{id}/result)
+        result_before = client.get(f"/api/v1/assignments/{assignment_id}/result", headers=student_headers)
+        assert result_before.status_code == status.HTTP_200_OK
+        res_data = result_before.json()
+        assert res_data["assignment_id"] == assignment_id
+        assert res_data["title"] == "Bai tap Vat Ly 1"
+        assert res_data["attempts"] == []
+        assert res_data["best_attempt"] is None
+
+        # Start and submit an attempt
+        start_att = client.post(f"/api/v1/assignments/{assignment_id}/attempts", headers=student_headers)
+        assert start_att.status_code == status.HTTP_201_CREATED
+        att_id = start_att.json()["attempt_id"]
+
+        submit_resp = client.put(f"/api/v1/attempts/{att_id}/submit", json={"answers": []}, headers=student_headers)
+        assert submit_resp.status_code == status.HTTP_200_OK
+
+        # Call /result again
+        result_after = client.get(f"/api/v1/assignments/{assignment_id}/result", headers=student_headers)
+        assert result_after.status_code == status.HTTP_200_OK
+        res_after_data = result_after.json()
+        assert len(res_after_data["attempts"]) == 1
+        assert res_after_data["best_attempt"] is not None
+        assert res_after_data["attempts"][0]["badge_label"] == "Lần 1 (Mới nhất)"
+        assert "cognitive" in res_after_data["attempts"][0]
+        assert "recognition" in res_after_data["attempts"][0]["cognitive"]
+
+        # Call /attempts route
+        attempts_history = client.get(f"/api/v1/assignments/{assignment_id}/attempts", headers=student_headers)
+        assert attempts_history.status_code == status.HTTP_200_OK
+        assert attempts_history.json()["assignment_id"] == assignment_id
+

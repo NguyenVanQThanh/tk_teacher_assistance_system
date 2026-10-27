@@ -2,7 +2,7 @@
 # Description: Security utilities including password hashing and JWT token management.
 # Created At: 2026-07-16
 # Created By: Tam Khang
-# Updated At: 2026-07-18
+# Updated At: 2026-10-04
 # Updated By: Tam Khang
 
 import os

@@ -1,11 +1,11 @@
 // File Name: AdminDashboard.jsx
-// Description: Master Admin Dashboard with system operations metrics, server status, LMS traffic chart, approval queue, and audit logs.
+// Description: Master Admin Dashboard with system operations metrics, server status, LMS traffic chart, approval queue, and audit logs connected to Backend API.
 // Created At: 2026-09-19
 // Created By: Tam Khang
-// Updated At: 2026-09-20
+// Updated At: 2026-09-30
 // Updated By: Tam Khang
 
-import React, { useState } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { 
   GraduationCap, 
   Users, 
@@ -24,6 +24,7 @@ import {
   Sparkles,
   X
 } from 'lucide-react';
+import { adminDashboardApi } from '../../services/api';
 import './AdminDashboard.css';
 
 export default function AdminDashboard() {
@@ -34,47 +35,36 @@ export default function AdminDashboard() {
   const [showAuditModal, setShowAuditModal] = useState(false);
   const [toastMessage, setToastMessage] = useState(null);
 
-  // Approval requests state
-  const [requests, setRequests] = useState([
-    {
-      id: 1,
-      requesterName: 'ThS. Lê Nguyên',
-      requesterSub: 'lenguyen@edu.vn',
-      avatarText: 'LN',
-      avatarBg: '#5B35A8',
-      type: 'Cấp tài khoản Giảng viên mới',
-      time: '15 phút trước',
-      status: 'pending', // pending | approved | rejected
-    },
-    {
-      id: 2,
-      requesterName: 'Trần Minh Phong',
-      requesterSub: 'Toán - Tin học',
-      avatarText: 'TP',
-      avatarBg: '#8B2C9A',
-      type: 'Mở thêm lớp Chuyên Toán 10-T1',
-      time: '1 giờ trước',
-      status: 'pending',
-    },
-    {
-      id: 3,
-      requesterName: 'Hệ thống Bảo mật',
-      requesterSub: 'SSL / DNS Automation',
-      isSystem: true,
-      type: 'Gia hạn chứng chỉ SSL / Domain',
-      time: 'Hôm qua',
-      status: 'processed',
-    }
-  ]);
-
-  // Form state for Create User modal
-  const [newUser, setNewUser] = useState({
-    fullName: '',
-    email: '',
-    phone: '',
-    role: 'Teacher',
-    department: 'Toán học'
+  // Core stats state
+  const [stats, setStats] = useState({
+    total_students: 2450,
+    total_teachers: 128,
+    total_classes: 64,
+    attendance_rate: 96.8,
+    lecture_views: 14200,
+    assignments_submitted: 3489
   });
+
+  // Chart data state
+  const [chartData, setChartData] = useState({
+    points: [
+      { day: 'T2', visits: 850, x: 50, y: 190 },
+      { day: 'T3', visits: 1450, x: 140, y: 155 },
+      { day: 'T4', visits: 2250, x: 230, y: 105 },
+      { day: 'T5', visits: 2350, x: 320, y: 100 },
+      { day: 'T6 (Đỉnh)', visits: 2840, x: 410, y: 70, isPeak: true },
+      { day: 'T7', visits: 2200, x: 500, y: 110 },
+      { day: 'CN', visits: 1250, x: 590, y: 165 },
+    ],
+    lectureViews: 14200,
+    assignmentsSubmitted: 3489,
+    lastUpdated: '10 phút trước'
+  });
+
+  // Approval requests state
+  const [requests, setRequests] = useState([]);
+  const [auditLogs, setAuditLogs] = useState([]);
+  const [loading, setLoading] = useState(false);
 
   const showToast = (msg) => {
     setToastMessage(msg);
@@ -83,24 +73,100 @@ export default function AdminDashboard() {
     }, 3500);
   };
 
-  const handleApprove = (id) => {
-    setRequests(prev => prev.map(req => {
-      if (req.id === id) {
-        return { ...req, status: 'approved' };
+  // Fetch all dashboard data from backend
+  const fetchDashboardData = useCallback(async () => {
+    try {
+      const [statsRes, reqsRes, logsRes] = await Promise.all([
+        adminDashboardApi.getStats().catch(() => null),
+        adminDashboardApi.getApprovalRequests().catch(() => null),
+        adminDashboardApi.getAuditLogs().catch(() => null)
+      ]);
+
+      if (statsRes) {
+        setStats(statsRes);
       }
-      return req;
-    }));
-    showToast('Đã phê duyệt yêu cầu thành công!');
+      if (reqsRes && Array.isArray(reqsRes)) {
+        setRequests(reqsRes.map(req => ({
+          id: req.id,
+          requesterName: req.requester_name,
+          requesterSub: req.requester_sub,
+          avatarText: req.avatar_text || (req.requester_name ? req.requester_name.slice(0, 2).toUpperCase() : 'US'),
+          avatarBg: req.avatar_bg || '#5B35A8',
+          isSystem: req.is_system,
+          type: req.type,
+          time: req.time,
+          status: req.status,
+        })));
+      }
+      if (logsRes && Array.isArray(logsRes)) {
+        setAuditLogs(logsRes);
+      }
+    } catch (err) {
+      console.error('Error fetching dashboard data:', err);
+    }
+  }, []);
+
+  // Fetch chart data when timeframe changes
+  const fetchChartData = useCallback(async (tf) => {
+    try {
+      const res = await adminDashboardApi.getActivityChart(tf);
+      if (res && res.points) {
+        setChartData({
+          points: res.points,
+          lectureViews: res.lecture_views,
+          assignmentsSubmitted: res.assignments_submitted,
+          lastUpdated: res.last_updated_relative === '10 minutes ago' ? '10 phút trước' : res.last_updated_relative
+        });
+      }
+    } catch (err) {
+      console.error('Error fetching chart data:', err);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchDashboardData();
+  }, [fetchDashboardData]);
+
+  useEffect(() => {
+    fetchChartData(timeframe);
+  }, [timeframe, fetchChartData]);
+
+  const handleApprove = async (id) => {
+    try {
+      const res = await adminDashboardApi.approveRequest(id);
+      setRequests(prev => prev.map(req => {
+        if (req.id === id) {
+          return { ...req, status: 'approved' };
+        }
+        return req;
+      }));
+      showToast('Đã phê duyệt yêu cầu thành công!');
+      // Refresh audit logs to show approval action
+      const logsRes = await adminDashboardApi.getAuditLogs().catch(() => null);
+      if (logsRes && Array.isArray(logsRes)) setAuditLogs(logsRes);
+    } catch (err) {
+      console.error('Failed to approve request:', err);
+      showToast('Có lỗi xảy ra khi phê duyệt yêu cầu.');
+    }
   };
 
-  const handleReject = (id) => {
-    setRequests(prev => prev.map(req => {
-      if (req.id === id) {
-        return { ...req, status: 'rejected' };
-      }
-      return req;
-    }));
-    showToast('Đã từ chối yêu cầu.');
+  const handleReject = async (id) => {
+    try {
+      const res = await adminDashboardApi.rejectRequest(id);
+      setRequests(prev => prev.map(req => {
+        if (req.id === id) {
+          return { ...req, status: 'rejected' };
+        }
+        return req;
+      }));
+      showToast('Đã từ chối yêu cầu.');
+      // Refresh audit logs to show rejection action
+      const logsRes = await adminDashboardApi.getAuditLogs().catch(() => null);
+      if (logsRes && Array.isArray(logsRes)) setAuditLogs(logsRes);
+    } catch (err) {
+      console.error('Failed to reject request:', err);
+      showToast('Có lỗi xảy ra khi từ chối yêu cầu.');
+    }
   };
 
   const handleCreateUserSubmit = (e) => {
@@ -120,25 +186,7 @@ export default function AdminDashboard() {
     });
   };
 
-  // Weekly data points for area chart
-  const weeklyData = [
-    { day: 'T2', visits: 850, x: 50, y: 190 },
-    { day: 'T3', visits: 1450, x: 140, y: 155 },
-    { day: 'T4', visits: 2250, x: 230, y: 105 },
-    { day: 'T5', visits: 2350, x: 320, y: 100 },
-    { day: 'T6 (Đỉnh)', visits: 2840, x: 410, y: 70, isPeak: true },
-    { day: 'T7', visits: 2200, x: 500, y: 110 },
-    { day: 'CN', visits: 1250, x: 590, y: 165 },
-  ];
-
-  const monthlyData = [
-    { day: 'Tuần 1', visits: 12400, x: 70, y: 170 },
-    { day: 'Tuần 2', visits: 15800, x: 210, y: 125 },
-    { day: 'Tuần 3 (Đỉnh)', visits: 19400, x: 380, y: 65, isPeak: true },
-    { day: 'Tuần 4', visits: 14600, x: 550, y: 140 },
-  ];
-
-  const currentChartData = timeframe === 'week' ? weeklyData : monthlyData;
+  const currentChartData = chartData.points;
 
   // Path generator for SVG smooth spline curve
   const generateSvgPath = (points) => {
@@ -307,15 +355,15 @@ export default function AdminDashboard() {
             <div className="chart-legend-items">
               <div className="legend-item">
                 <span className="legend-dot purple"></span>
-                <span>Lượt xem bài giảng: <strong>14,200</strong></span>
+                <span>Lượt xem bài giảng: <strong>{chartData.lectureViews ? chartData.lectureViews.toLocaleString() : '14,200'}</strong></span>
               </div>
               <div className="legend-item">
                 <span className="legend-dot blue"></span>
-                <span>Bài tập đã nộp: <strong>3,489</strong></span>
+                <span>Bài tập đã nộp: <strong>{chartData.assignmentsSubmitted ? chartData.assignmentsSubmitted.toLocaleString() : '3,489'}</strong></span>
               </div>
             </div>
             <div className="chart-update-time">
-              Cập nhật lúc: 10 phút trước
+              Cập nhật lúc: {chartData.lastUpdated}
             </div>
           </div>
         </div>
@@ -329,7 +377,7 @@ export default function AdminDashboard() {
             <div>
               <h2 className="admin-panel-title">Yêu cầu phê duyệt & Hoạt động gần đây</h2>
               <p className="admin-panel-subtitle">
-                Có 3 yêu cầu khẩn cấp cần quản trị viên xử lý
+                Có {requests.filter(r => r.status === 'pending').length} yêu cầu khẩn cấp cần quản trị viên xử lý
               </p>
             </div>
             <button 
@@ -453,47 +501,28 @@ export default function AdminDashboard() {
           </div>
 
           <div className="audit-timeline-list">
-            {/* Audit Item 1 */}
-            <div className="audit-item">
-              <div className="audit-icon-circle red">
-                <AlertTriangle size={16} />
+            {auditLogs.length > 0 ? (
+              auditLogs.map((log) => {
+                const isWarning = log.severity === 'warning' || log.severity === 'danger';
+                const circleClass = isWarning ? 'red' : (log.actor_name === 'Admin' ? 'purple' : 'green');
+                return (
+                  <div className="audit-item" key={log.id}>
+                    <div className={`audit-icon-circle ${circleClass}`}>
+                      {isWarning ? <AlertTriangle size={16} /> : (log.actor_name === 'Admin' ? <Users size={16} /> : <Cloud size={16} />)}
+                    </div>
+                    <div className="audit-details">
+                      <h4 className="audit-item-title">{log.title}</h4>
+                      <p className="audit-item-desc">{log.description}</p>
+                      <span className={`audit-item-time ${isWarning ? 'red' : ''}`}>{log.time}</span>
+                    </div>
+                  </div>
+                );
+              })
+            ) : (
+              <div className="audit-empty-state" style={{ padding: '16px', color: '#6B7280', fontSize: '13px' }}>
+                Không có nhật ký kiểm toán mới.
               </div>
-              <div className="audit-details">
-                <h4 className="audit-item-title">5 lần đăng nhập thất bại liên tiếp</h4>
-                <p className="audit-item-desc">
-                  IP: 118.70.12.91 đã bị tạm khóa bảo mật 30 phút
-                </p>
-                <span className="audit-item-time red">10 phút trước</span>
-              </div>
-            </div>
-
-            {/* Audit Item 2 */}
-            <div className="audit-item">
-              <div className="audit-icon-circle purple">
-                <Users size={16} />
-              </div>
-              <div className="audit-details">
-                <h4 className="audit-item-title">Cập nhật phân quyền Ban Giám Hiệu</h4>
-                <p className="audit-item-desc">
-                  Thực hiện bởi: Thầy Hiệu Trưởng (UID: #AD01)
-                </p>
-                <span className="audit-item-time">45 phút trước</span>
-              </div>
-            </div>
-
-            {/* Audit Item 3 */}
-            <div className="audit-item">
-              <div className="audit-icon-circle green">
-                <Cloud size={16} />
-              </div>
-              <div className="audit-details">
-                <h4 className="audit-item-title">Backup dữ liệu tự động hoàn tất</h4>
-                <p className="audit-item-desc">
-                  Bản snapshot lưu trữ dung lượng 8.2 GB
-                </p>
-                <span className="audit-item-time">02:00 Sáng hôm nay</span>
-              </div>
-            </div>
+            )}
           </div>
 
           <button 
@@ -582,7 +611,9 @@ export default function AdminDashboard() {
                     <option value="Toán học">Tổ Toán học</option>
                     <option value="Vật lý">Tổ Vật lý</option>
                     <option value="Hóa học">Tổ Hóa học</option>
+                    <option value="Sinh học">Tổ Sinh học</option>
                     <option value="Ngữ văn">Tổ Ngữ văn</option>
+                    <option value="Lịch sử">Tổ Lịch sử</option>
                     <option value="Tin học">Tổ Tin học</option>
                     <option value="Tiếng Anh">Tổ Tiếng Anh</option>
                   </select>

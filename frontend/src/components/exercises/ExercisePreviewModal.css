@@ -3,7 +3,7 @@ File Name: ExercisePreviewModal.css
 Description: Stylesheet for ExercisePreviewModal component with interactive questions and assign actions.
 Created At: 2026-08-30
 Created By: Tam Khang
-Updated At: 2026-08-30
+Updated At: 2026-10-04
 Updated By: Tam Khang
 */
 
@@ -93,11 +93,13 @@ Updated By: Tam Khang
 }
 
 .q-text {
-  font-size: 14px;
-  font-weight: 600;
+  font-family: 'Times New Roman', 'KaTeX_Main', 'Cambria', Times, serif;
+  font-size: 15.5px;
+  font-weight: 500;
   color: #1D1928;
-  line-height: 22px;
+  line-height: 24px;
   margin: 0;
+  -webkit-font-smoothing: antialiased;
 }
 
 .options-grid {
@@ -114,9 +116,11 @@ Updated By: Tam Khang
   background-color: #F8F7FA;
   border: 1px solid #EBE8F0;
   border-radius: 8px;
-  font-size: 13.5px;
+  font-family: 'Times New Roman', 'KaTeX_Main', 'Cambria', Times, serif;
+  font-size: 15px;
   color: #1D1928;
   position: relative;
+  -webkit-font-smoothing: antialiased;
 }
 
 .option-item.is-correct {
@@ -182,6 +186,163 @@ Updated By: Tam Khang
   cursor: pointer;
 }
 
+/* Multi-Class Dropdown in Preview Modal */
+.multi-class-dropdown-container {
+  position: relative;
+}
+
+.multi-class-trigger {
+  height: 38px;
+  min-width: 210px;
+  max-width: 340px;
+  padding: 0 12px;
+  background-color: #FAF9FD;
+  border: 1px solid #EBE8F0;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  font-family: inherit;
+  font-size: 13.5px;
+  color: #1D1928;
+  transition: all 0.2s ease;
+  text-align: left;
+}
+
+.multi-class-trigger:hover:not(:disabled) {
+  border-color: #6549A6;
+  background-color: #FFFFFF;
+}
+
+.multi-class-trigger .trigger-icon {
+  color: #6549A6;
+  flex-shrink: 0;
+}
+
+.multi-class-trigger .trigger-text {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.multi-class-trigger .trigger-count-badge {
+  background-color: #ECE6F8;
+  color: #4D308D;
+  font-size: 11px;
+  font-weight: 700;
+  padding: 2px 7px;
+  border-radius: 10px;
+  flex-shrink: 0;
+}
+
+.multi-class-trigger .trigger-chevron {
+  color: #8C849E;
+  transition: transform 0.2s ease;
+  flex-shrink: 0;
+}
+
+.multi-class-trigger .trigger-chevron.open {
+  transform: rotate(180deg);
+}
+
+.multi-class-menu {
+  position: absolute;
+  bottom: calc(100% + 8px);
+  left: 0;
+  min-width: 260px;
+  max-width: 360px;
+  background: #FFFFFF;
+  border: 1px solid #E5E1EC;
+  border-radius: 10px;
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.12);
+  z-index: 50;
+  overflow: hidden;
+  animation: fadeInDropdown 0.15s ease-out;
+}
+
+@keyframes fadeInDropdown {
+  from { opacity: 0; transform: translateY(4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.multi-class-menu-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 14px;
+  background: #F8F7FA;
+  cursor: pointer;
+  user-select: none;
+}
+
+.multi-class-menu-header:hover {
+  background: #F0EDF6;
+}
+
+.multi-class-menu-divider {
+  height: 1px;
+  background: #EBE8F0;
+}
+
+.multi-class-menu-list {
+  max-height: 180px;
+  overflow-y: auto;
+  padding: 4px 0;
+}
+
+.multi-class-menu-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 14px;
+  cursor: pointer;
+  transition: background 0.15s;
+  user-select: none;
+}
+
+.multi-class-menu-item:hover {
+  background: #F8F7FA;
+}
+
+.multi-class-menu-item.selected {
+  background: #F3EFF9;
+}
+
+.class-checkbox {
+  width: 16px;
+  height: 16px;
+  accent-color: #6549A6;
+  cursor: pointer;
+  margin: 0;
+}
+
+.checkbox-label {
+  font-size: 13px;
+  font-weight: 600;
+  color: #1D1928;
+  cursor: pointer;
+  user-select: none;
+}
+
+.class-item-details {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+}
+
+.class-item-name {
+  font-weight: 600;
+  color: #1D1928;
+}
+
+.class-item-year {
+  color: #716982;
+  font-size: 12px;
+}
+
 .btn-assign-action {
   display: flex;
   align-items: center;
@@ -207,3 +368,4 @@ Updated By: Tam Khang
 .btn-assign-action:active:not(:disabled) {
   transform: scale(0.98);
 }
+

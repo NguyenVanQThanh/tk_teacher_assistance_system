@@ -213,7 +213,43 @@ export default function TeacherHomeroomPage() {
     setShowAddStudentModal(true);
   };
 
-  const handleCreateStudent = (newStudent) => {
+  const handleCreateStudent = async (newStudent) => {
+    try {
+      if (selectedClassId) {
+        await classesApi.enrollStudent(selectedClassId, {
+          student_name: newStudent.name,
+          birthday: newStudent.dateOfBirth,
+          gender: newStudent.gender === 'Nữ' ? 'FEMALE' : newStudent.gender === 'Nam' ? 'MALE' : 'OTHER',
+          phone: newStudent.phone || ''
+        });
+        const res = await classesApi.getStudentsInClass(selectedClassId);
+        if (Array.isArray(res) && res.length > 0) {
+          const avatarColors = ['#7C3AED', '#8B5CF6', '#A78BFA', '#6366F1', '#EC4899', '#3B82F6', '#10B981', '#F59E0B'];
+          const mapped = res.map((s, idx) => {
+            const name = s.student_name || `Học sinh ${idx + 1}`;
+            const nameParts = name.trim().split(' ');
+            const initials = nameParts.length >= 2
+              ? (nameParts[nameParts.length - 2][0] + nameParts[nameParts.length - 1][0]).toUpperCase()
+              : name.substring(0, 2).toUpperCase();
+            return {
+              id: s.student_id,
+              code: s.student_code || `HS${String(idx + 1).padStart(3, '0')}`,
+              name: name,
+              initials: initials,
+              avatarColor: avatarColors[idx % avatarColors.length],
+              avgScore: 8.2,
+              status: s.status === 'ACTIVE' ? 'good' : 'fair',
+              statusLabel: s.status === 'ACTIVE' ? 'Đang học' : 'Nghỉ học',
+              subjectScores: { math: 8.5, physics: 8.0, chemistry: 8.2, literature: 8.0, english: 8.5, biology: 8.0, history: 8.0, informatics: 8.5 }
+            };
+          });
+          setStudentsList(mapped);
+          return;
+        }
+      }
+    } catch (err) {
+      console.error('Error adding student to class:', err);
+    }
     setStudentsList(prev => [newStudent, ...prev]);
   };
 

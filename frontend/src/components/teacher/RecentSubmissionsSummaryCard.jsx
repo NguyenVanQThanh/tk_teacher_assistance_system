@@ -2,17 +2,17 @@
 // Description: Compact widget displaying the latest student submissions and status pills.
 // Created At: 2026-09-07
 // Created By: Tam Khang
-// Updated At: 2026-09-07
+// Updated At: 2026-10-25
 // Updated By: Tam Khang
 
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import './RecentSubmissionsSummaryCard.css';
 
-export default function RecentSubmissionsSummaryCard() {
+export default function RecentSubmissionsSummaryCard({ recentSubmissions }) {
   const navigate = useNavigate();
 
-  const recentList = [
+  const defaultList = [
     {
       id: 'sub-1',
       studentName: 'Trần Thị Bích Ngọc',
@@ -34,6 +34,19 @@ export default function RecentSubmissionsSummaryCard() {
       avatarColor: '#D97706',
     },
   ];
+
+  const recentList = (recentSubmissions && recentSubmissions.length > 0)
+    ? recentSubmissions.map(item => ({
+        id: item.id,
+        studentName: item.student_name || item.studentName,
+        className: item.class_name ? `Lớp ${item.class_name}` : item.className,
+        initials: item.avatar_initial || item.initials,
+        status: item.status,
+        statusLabel: item.status_label || item.statusLabel,
+        avatarBg: item.avatar_bg || item.avatarBg || '#E0E7FF',
+        avatarColor: item.avatar_color || item.avatarColor || '#4338CA',
+      }))
+    : defaultList;
 
   return (
     <div className="recent-submissions-summary-card">
