@@ -2,7 +2,7 @@
 # Description: Router providing the teaching timetable and schedule notes/reminders for teachers.
 # Created At: 2026-10-07
 # Created By: Tam Khang
-# Updated At: 2026-10-28
+# Updated At: 2026-10-29
 # Updated By: Tam Khang
 
 from typing import List, Optional
@@ -11,12 +11,10 @@ from uuid import UUID
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
-from jose import jwt
 
 from app.core.database import get_db
-from app.core.security import SECRET_KEY, ALGORITHM
-from app.modules.auth.dependencies import oauth2_scheme
-from models.models import User, Role, ScheduleNote
+from app.modules.auth.dependencies import get_current_user
+from models.models import User, ScheduleNote
 
 router = APIRouter(prefix="/api/v1/teacher/schedule", tags=["Teacher Schedule"])
 
@@ -112,41 +110,6 @@ class ScheduleNotesResponse(BaseModel):
     total: int
 
 
-def get_current_user_or_default(
-    token: Optional[str] = Depends(oauth2_scheme),
-    db: Session = Depends(get_db)
-) -> User:
-    """
-    Authenticate user via JWT token if provided; otherwise fallback to the primary active teacher
-    to ensure seamless user experience during testing.
-    """
-    if token:
-        try:
-            payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
-            user_id = payload.get("sub")
-            if user_id:
-                user = db.query(User).filter(User.user_id == UUID(user_id)).first()
-                if user and user.status != "Blocked":
-                    return user
-        except Exception:
-            pass
-
-    teacher_role = db.query(Role).filter(Role.name == "Teacher").first()
-    if teacher_role:
-        default_teacher = db.query(User).filter(User.role_id == teacher_role.role_id, User.status == "ACTIVE").first()
-        if default_teacher:
-            return default_teacher
-
-    fallback_user = db.query(User).filter(User.status == "ACTIVE").first()
-    if fallback_user:
-        return fallback_user
-
-    raise HTTPException(
-        status_code=status.HTTP_401_UNAUTHORIZED,
-        detail={"code": "ERR-AUTH-MISSING_TOKEN", "message": "Authentication token required."}
-    )
-
-
 def get_synced_schedule_items(start_date: Optional[date] = None) -> List[TeacherScheduleItemOut]:
     """Generate timetable sessions for the next SCHEDULE_WINDOW_DAYS days starting from start_date (default today)."""
     start = start_date or date.today()
@@ -173,7 +136,7 @@ def get_synced_schedule_items(start_date: Optional[date] = None) -> List[Teacher
 @router.get("", response_model=TeacherScheduleResponse)
 def get_teacher_schedule(
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user_or_default),
+    current_user: User = Depends(get_current_user),
 ):
     """
     Retrieve synchronized teaching timetable for the authenticated teacher.
@@ -188,7 +151,7 @@ def get_teacher_schedule(
 @router.get("/notes", response_model=ScheduleNotesResponse)
 def get_schedule_notes(
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user_or_default),
+    current_user: User = Depends(get_current_user),
 ):
     """
     Retrieve active schedule notes and reminders for the current teacher.
@@ -239,7 +202,7 @@ def get_schedule_notes(
 def create_schedule_note(
     payload: ScheduleNoteCreate,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user_or_default),
+    current_user: User = Depends(get_current_user),
 ):
     """
     Create a new schedule note for the current teacher.
@@ -285,11 +248,12 @@ def create_schedule_note(
 def delete_schedule_note(
     note_id: str,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user_or_default),
+    current_user: User = Depends(get_current_user),
 ):
     """
     Soft-delete a schedule note by updating its status to 'DELETED'.
     Hard delete is strictly prohibited per architecture rules.
+    Restricted to the note owner only to prevent IDOR.
     """
     try:
         uuid_val = UUID(note_id)
@@ -301,13 +265,14 @@ def delete_schedule_note(
 
     note = db.query(ScheduleNote).filter(
         ScheduleNote.note_id == uuid_val,
+        ScheduleNote.user_id == current_user.user_id,
         ScheduleNote.status != "DELETED"
     ).first()
 
     if not note:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="Schedule note not found or already deleted."
+            detail="Schedule note not found or access denied."
         )
 
     # Soft delete

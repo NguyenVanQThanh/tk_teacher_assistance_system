@@ -8,6 +8,8 @@ build/
 develop-eggs/
 dist/
 downloads/
+uploads/
+backend/uploads/
 eggs/
 .eggs/
 lib/

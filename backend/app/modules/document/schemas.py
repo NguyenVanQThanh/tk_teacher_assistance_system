@@ -2,13 +2,13 @@
 # Description: Pydantic schemas for Document Repository and Document Dashboard.
 # Created At: 2026-09-27
 # Created By: Tam Khang
-# Updated At: 2026-10-28
+# Updated At: 2026-10-29
 # Updated By: Tam Khang
 
 from datetime import datetime
 from typing import List, Optional, Dict, Any
 from uuid import UUID
-from pydantic import BaseModel, Field, ConfigDict
+from pydantic import BaseModel, Field, ConfigDict, field_validator
 
 
 class DocumentCreate(BaseModel):
@@ -27,6 +27,18 @@ class DocumentUpdate(BaseModel):
     document_type: Optional[str] = Field(None, description="Document type: lecture, exam, reference")
     description: Optional[str] = Field(None, description="Optional document summary")
     status: Optional[str] = Field(None, description="Document status")
+
+    @field_validator("status")
+    @classmethod
+    def validate_status(cls, v: Optional[str]) -> Optional[str]:
+        if v is None:
+            return v
+        allowed = {"Uploaded", "Draft", "Archived", "ACTIVE"}
+        if v.upper() == "DELETED":
+            raise ValueError("Cannot set status to DELETED via update. Use DELETE endpoint instead.")
+        if v not in allowed:
+            raise ValueError(f"Invalid status '{v}'. Allowed statuses: {', '.join(sorted(allowed))}")
+        return v
 
 
 class DocumentOut(BaseModel):

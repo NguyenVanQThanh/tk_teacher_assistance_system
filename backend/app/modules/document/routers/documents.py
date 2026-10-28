@@ -2,7 +2,7 @@
 # Description: API Router for Teacher Document Repository & Document Dashboard.
 # Created At: 2026-09-27
 # Created By: Tam Khang
-# Updated At: 2026-10-28
+# Updated At: 2026-10-29
 # Updated By: Tam Khang
 
 from typing import Optional
@@ -95,9 +95,9 @@ def get_document_detail(
     current_user: User = Depends(get_current_user)
 ):
     """
-    Retrieve single document detail by document_id.
+    Retrieve single document detail by document_id with access control.
     """
-    return DocumentService.get_document_detail(db, document_id)
+    return DocumentService.get_document_detail(db, document_id, current_user)
 
 
 @router.put("/{document_id}", response_model=DocumentOut)
@@ -120,9 +120,9 @@ def download_document(
     current_user: User = Depends(get_current_user)
 ):
     """
-    Download a document file stream and increment real download counter.
+    Download a document file stream and increment real download counter after access check.
     """
-    doc = DocumentService.record_download(db, document_id)
+    doc = DocumentService.record_download(db, document_id, current_user)
     if not doc.file_url:
         raise HTTPException(status_code=404, detail="File attachment not found.")
 

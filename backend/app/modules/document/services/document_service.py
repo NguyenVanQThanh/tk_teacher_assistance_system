@@ -2,7 +2,7 @@
 # Description: Service layer for Document Repository and Document Dashboard management.
 # Created At: 2026-09-27
 # Created By: Tam Khang
-# Updated At: 2026-10-28
+# Updated At: 2026-10-29
 # Updated By: Tam Khang
 
 import math
@@ -13,7 +13,7 @@ from uuid import UUID
 from fastapi import UploadFile, HTTPException, status
 from sqlalchemy.orm import Session
 
-from models.models import Document, Subject, User
+from models.models import Document, Subject, User, Role
 from app.modules.document.schemas import (
     DocumentOut, DocumentListOut, DocumentDashboardOut,
     DocumentSubjectStat, DocumentTypeStat, DocumentUpdate
@@ -38,21 +38,45 @@ def format_storage_size(bytes_val: int) -> str:
 
 class DocumentService:
     @staticmethod
-    def to_document_out(doc: Document, db: Session) -> DocumentOut:
-        """Convert Document ORM model to DocumentOut Pydantic schema."""
-        subj = db.query(Subject).filter(Subject.subject_id == doc.subject_id).first() if doc.subject_id else None
-        author = db.query(User).filter(User.user_id == doc.uploaded_by).first() if doc.uploaded_by else None
+    def check_document_access(db: Session, doc: Document, current_user: User, requires_ownership: bool = False) -> None:
+        """Verify user permissions and document access rights."""
+        is_owner = doc.uploaded_by == current_user.user_id
+        admin_role = db.query(Role).filter(Role.name == "Admin").first()
+        is_admin = bool(admin_role and current_user.role_id == admin_role.role_id)
+
+        if requires_ownership and not (is_owner or is_admin):
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail={"code": "ERR-DOC-PERMISSION_DENIED", "message": "You do not have permission to modify this document."}
+            )
+
+        if doc.status == "DELETED" and not (is_owner or is_admin):
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail={"code": "ERR-DOC-NOT_FOUND", "message": "Document not found."}
+            )
+
+    @staticmethod
+    def to_document_out(
+        doc: Document,
+        db: Session,
+        subject_name: Optional[str] = None,
+        author_name: Optional[str] = None
+    ) -> DocumentOut:
+        """Convert Document ORM model to DocumentOut Pydantic schema without DB writes on read."""
+        if subject_name is None:
+            subj = db.query(Subject).filter(Subject.subject_id == doc.subject_id).first() if doc.subject_id else None
+            subject_name = subj.subject_name if subj else "Chung"
+
+        if author_name is None:
+            author = db.query(User).filter(User.user_id == doc.uploaded_by).first() if doc.uploaded_by else None
+            author_name = author.full_name if author else "Giáo viên"
 
         size = doc.file_size or 0
         if size == 0 and doc.file_url:
             disk_path = UPLOAD_DIR / Path(doc.file_url).name
             if disk_path.exists():
                 size = disk_path.stat().st_size
-                doc.file_size = size
-                try:
-                    db.commit()
-                except Exception:
-                    db.rollback()
 
         return DocumentOut(
             document_id=doc.document_id,
@@ -61,12 +85,12 @@ class DocumentService:
             file_type=doc.file_type or "pdf",
             file_size=size,
             subject_id=doc.subject_id,
-            subject_name=subj.subject_name if subj else "Chung",
+            subject_name=subject_name,
             grade=doc.grade or "12",
             document_type=doc.document_type or "reference",
             description=doc.raw_content,
             uploaded_by=doc.uploaded_by,
-            author_name=author.full_name if author else "Giáo viên",
+            author_name=author_name,
             download_count=doc.download_count or 0,
             status=doc.status,
             created_at=doc.created_at,
@@ -174,7 +198,23 @@ class DocumentService:
         offset = (page - 1) * page_size
 
         docs = query.order_by(Document.created_at.desc()).offset(offset).limit(page_size).all()
-        items = [DocumentService.to_document_out(d, db) for d in docs]
+
+        # Batch load subjects and authors to eliminate N+1 queries
+        subject_ids = {d.subject_id for d in docs if d.subject_id}
+        author_ids = {d.uploaded_by for d in docs if d.uploaded_by}
+
+        subjects = {s.subject_id: s.subject_name for s in db.query(Subject).filter(Subject.subject_id.in_(subject_ids)).all()} if subject_ids else {}
+        authors = {u.user_id: u.full_name for u in db.query(User).filter(User.user_id.in_(author_ids)).all()} if author_ids else {}
+
+        items = [
+            DocumentService.to_document_out(
+                d,
+                db,
+                subject_name=subjects.get(d.subject_id, "Chung"),
+                author_name=authors.get(d.uploaded_by, "Giáo viên")
+            )
+            for d in docs
+        ]
 
         return DocumentListOut(
             items=items,
@@ -196,9 +236,10 @@ class DocumentService:
         return doc
 
     @staticmethod
-    def get_document_detail(db: Session, document_id: UUID) -> DocumentOut:
-        """Retrieve single document detail DTO."""
+    def get_document_detail(db: Session, document_id: UUID, current_user: User) -> DocumentOut:
+        """Retrieve single document detail DTO with access validation."""
         doc = DocumentService.get_document_by_id(db, document_id)
+        DocumentService.check_document_access(db, doc, current_user, requires_ownership=False)
         return DocumentService.to_document_out(doc, db)
 
     @staticmethod
@@ -208,8 +249,9 @@ class DocumentService:
         payload: DocumentUpdate,
         current_user: User
     ) -> DocumentOut:
-        """Update document metadata and status (Soft Delete policy enforced)."""
+        """Update document metadata and status (ownership verified)."""
         doc = DocumentService.get_document_by_id(db, document_id)
+        DocumentService.check_document_access(db, doc, current_user, requires_ownership=True)
 
         if payload.title is not None:
             if len(payload.title.strip()) < 3:
@@ -239,9 +281,10 @@ class DocumentService:
         return DocumentService.to_document_out(doc, db)
 
     @staticmethod
-    def record_download(db: Session, document_id: UUID) -> Document:
-        """Increment document download counter and return entity."""
+    def record_download(db: Session, document_id: UUID, current_user: User) -> Document:
+        """Increment document download counter and return entity after access check."""
         doc = DocumentService.get_document_by_id(db, document_id)
+        DocumentService.check_document_access(db, doc, current_user, requires_ownership=False)
         doc.download_count = (doc.download_count or 0) + 1
         db.commit()
         db.refresh(doc)
@@ -249,15 +292,17 @@ class DocumentService:
 
     @staticmethod
     def delete_document(db: Session, document_id: UUID, current_user: User) -> None:
-        """Soft delete document (set status = DELETED)."""
+        """Soft delete document (set status = DELETED, ownership verified)."""
         doc = DocumentService.get_document_by_id(db, document_id)
+        DocumentService.check_document_access(db, doc, current_user, requires_ownership=True)
         doc.status = "DELETED"
         db.commit()
 
     @staticmethod
     def restore_document(db: Session, document_id: UUID, current_user: User) -> DocumentOut:
-        """Restore soft-deleted document to Uploaded status."""
+        """Restore soft-deleted document to Uploaded status (ownership verified)."""
         doc = DocumentService.get_document_by_id(db, document_id)
+        DocumentService.check_document_access(db, doc, current_user, requires_ownership=True)
         doc.status = "Uploaded"
         db.commit()
         db.refresh(doc)
@@ -265,12 +310,12 @@ class DocumentService:
 
     @staticmethod
     def get_document_dashboard(db: Session, current_user: Optional[User] = None) -> DocumentDashboardOut:
-        """Aggregate real metrics and statistics for Document Repository Dashboard."""
+        """Aggregate real metrics and statistics for Document Repository Dashboard without writes on read."""
         active_docs = db.query(Document).filter(Document.status != "DELETED").all()
         total_documents = len(active_docs)
         total_downloads = sum(d.download_count or 0 for d in active_docs)
 
-        # Calculate actual storage from active documents
+        # Calculate actual storage from active documents in-memory
         total_storage_bytes = 0
         for d in active_docs:
             if d.file_size:
@@ -278,13 +323,7 @@ class DocumentService:
             elif d.file_url:
                 disk_path = UPLOAD_DIR / Path(d.file_url).name
                 if disk_path.exists():
-                    s = disk_path.stat().st_size
-                    d.file_size = s
-                    total_storage_bytes += s
-        try:
-            db.commit()
-        except Exception:
-            db.rollback()
+                    total_storage_bytes += disk_path.stat().st_size
 
         storage_formatted = format_storage_size(total_storage_bytes)
 
@@ -323,7 +362,18 @@ class DocumentService:
             Document.status != "DELETED"
         ).order_by(Document.created_at.desc()).limit(5).all()
 
-        recent_items = [DocumentService.to_document_out(d, db) for d in recent_docs]
+        author_ids = {d.uploaded_by for d in recent_docs if d.uploaded_by}
+        authors = {u.user_id: u.full_name for u in db.query(User).filter(User.user_id.in_(author_ids)).all()} if author_ids else {}
+
+        recent_items = [
+            DocumentService.to_document_out(
+                d,
+                db,
+                subject_name=subject_map.get(d.subject_id, "Chung"),
+                author_name=authors.get(d.uploaded_by, "Giáo viên")
+            )
+            for d in recent_docs
+        ]
 
         return DocumentDashboardOut(
             total_documents=total_documents,

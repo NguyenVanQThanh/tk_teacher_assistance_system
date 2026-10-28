@@ -2,12 +2,13 @@
 # Description: Seed script ensuring all classes in the database have enrolled students and assigned homeroom teachers.
 # Created At: 2026-10-28
 # Created By: Tam Khang
-# Updated At: 2026-10-28
+# Updated At: 2026-10-29
 # Updated By: Tam Khang
 
 import os
 import sys
 import uuid
+import hashlib
 from pathlib import Path
 from datetime import date
 
@@ -18,6 +19,8 @@ if backend_root not in sys.path:
 from app.core.database import SessionLocal
 from models.models import User, Role, Class, StudentClass
 from app.core.security import get_password_hash
+
+DEFAULT_STUDENT_PASSWORD = os.environ.get("SEED_STUDENT_PASSWORD", "Student@1234")
 
 SAMPLE_NAMES_11 = [
     "Nguyễn Thị Hương", "Lê Quốc Trung", "Trần Văn Minh", "Phạm Thị Thu",
@@ -78,7 +81,8 @@ def seed_remaining_students():
                 for i in range(needed):
                     code_num = student_count + i + 1
                     student_code = f"HS{cls.class_name}_{code_num:03d}"
-                    phone = f"09992{abs(hash(cls.class_name + str(code_num))) % 1000000:06d}"
+                    phone_suffix = int(hashlib.sha256(f"{cls.class_name}_{code_num}".encode("utf-8")).hexdigest()[:8], 16) % 1000000
+                    phone = f"09992{phone_suffix:06d}"
                     email = f"student_{cls.class_name.lower()}_{code_num:02d}@school.com"
                     full_name = name_list[i % len(name_list)]
 
@@ -88,7 +92,7 @@ def seed_remaining_students():
                             user_id=uuid.uuid4(),
                             phone=phone,
                             email=email,
-                            password_hash=get_password_hash("Student@1234"),
+                            password_hash=get_password_hash(DEFAULT_STUDENT_PASSWORD),
                             full_name=full_name,
                             birthday=date(2008, (code_num % 12) + 1, (code_num % 28) + 1),
                             role_id=role_student.role_id,
