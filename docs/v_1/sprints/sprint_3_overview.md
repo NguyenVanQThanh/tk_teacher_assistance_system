@@ -1,21 +1,21 @@
 # Sprint 3 — Quản trị Người dùng & Cổng Bài tập Học sinh (Admin User Management & Student Assignment Feed)
 
-> Path: `docs/v_1/sprints/sprint_3_overview.md` · Module(s): `admin`, `auth`, `exercise`  
+> Path: `docs/v_1/sprints/sprint_3_overview.md` · Module(s): `admin`, `auth`, `exercise`, `academic`  
 > Created At: `2026-09-23`  
 > Created By: `Tam Khang`  
-> Updated At: `2026-09-23`  
+> Updated At: `2026-10-27`  
 > Updated By: `Tam Khang`  
 
 ---
 
 ## 1. Mục tiêu Sprint (Sprint Objectives)
 
-Triển khai nhóm tính năng **Ưu tiên 1 (Priority 1)** nhằm hoàn thiện hạ tầng dữ liệu quản trị cốt lõi và tối ưu hóa luồng tải dữ liệu bài tập cho học sinh, giải quyết dứt điểm tình trạng Frontend phải sử dụng Mock Data ở cổng Admin và gọi API vòng qua nhiều lớp ở cổng Học sinh:
+Triển khai nhóm tính năng **Ưu tiên 1 (Priority 1)** nhằm hoàn thiện hạ tầng dữ liệu quản trị cốt lõi, đồng bộ toàn bộ các API đã có từ Sprint 0–2 vào `api.js`, và tối ưu hóa luồng tải dữ liệu bài tập cho học sinh, giải quyết dứt điểm tình trạng Frontend phải sử dụng Mock Data ở cổng Admin và gọi API vòng qua nhiều lớp ở cổng Học sinh:
 
-1. **Phân hệ Quản trị Người dùng (Admin User Management)**: Xây dựng toàn bộ các API CRUD, lọc đa tiêu chí, phân trang, khóa/mở khóa tài khoản, reset mật khẩu, import/export Excel, xóa mềm (Soft Delete) và khôi phục (Restore) người dùng cho toàn hệ thống.
-2. **Phân hệ Phân quyền Quản trị (Admin Role & Permission Management)**: Cung cấp API quản lý ma trận quyền hạn (Permission Matrix) theo vai trò (`Admin`, `Teacher`, `Student`) và cơ chế ghi đè quyền hạn riêng biệt theo từng tài khoản (`user_permissions`).
-3. **Cổng Bài tập Tập trung cho Học sinh (Student Unified Assignment Feed)**: Cung cấp endpoint tối ưu hóa một chạm (`GET /api/v1/student/assignments`) giúp học sinh tải toàn bộ danh sách bài tập đã được giao từ tất cả các lớp đang theo học, tổng hợp sẵn trạng thái nộp bài, thời hạn, số lần làm và điểm số cao nhất.
-4. **Tích hợp Frontend**: Kết nối trực tiếp [frontend/src/services/api.js](file:///e:/tk_teacher_assistance_system/frontend/src/services/api.js) với các màn hình [AdminUsersPage.jsx](file:///e:/tk_teacher_assistance_system/frontend/src/pages/admin/AdminUsersPage.jsx), [AdminRolesPage.jsx](file:///e:/tk_teacher_assistance_system/frontend/src/pages/admin/AdminRolesPage.jsx), và [StudentExercisesPage.jsx](file:///e:/tk_teacher_assistance_system/frontend/src/pages/student/StudentExercisesPage.jsx).
+1. **Phân hệ Quản trị Người dùng (Admin User Management - `F-ADMIN-01`)**: Xây dựng toàn bộ các API CRUD, lọc đa tiêu chí, phân trang, khóa/mở khóa tài khoản, reset mật khẩu, import/export Excel, xóa mềm (Soft Delete) và khôi phục (Restore) người dùng cho toàn hệ thống.
+2. **Phân hệ Phân quyền Quản trị (Admin Role & Permission Management - `F-ADMIN-02`)**: Cung cấp API quản lý ma trận quyền hạn (Permission Matrix) theo vai trò (`Admin`, `Teacher`, `Student`) và cơ chế ghi đè quyền hạn riêng biệt theo từng tài khoản (`user_permissions`).
+3. **Cổng Bài tập Tập trung cho Học sinh (Student Unified Assignment Feed - `F-STUDENT-01`)**: Cung cấp endpoint tối ưu hóa một chạm (`GET /api/v1/student/assignments`) giúp học sinh tải toàn bộ danh sách bài tập đã được giao từ tất cả các lớp đang theo học, tổng hợp sẵn trạng thái nộp bài, thời hạn, số lần làm và điểm số cao nhất.
+4. **Đồng bộ API Sprint 0–2 & Tích hợp Frontend**: Bổ sung 11 endpoints đã có sẵn ở Backend (`subjects`, `classes`, `enrollments`, `teacher_assignments`, `exercises/restore`, `auth/register`) vào [frontend/src/services/api.js](file:///e:/tk_teacher_assistance_system/frontend/src/services/api.js) và kết nối trực tiếp với [AdminUsersPage.jsx](file:///e:/tk_teacher_assistance_system/frontend/src/pages/admin/AdminUsersPage.jsx), [AdminRolesPage.jsx](file:///e:/tk_teacher_assistance_system/frontend/src/pages/admin/AdminRolesPage.jsx), [AdminClassesPage.jsx](file:///e:/tk_teacher_assistance_system/frontend/src/pages/admin/AdminClassesPage.jsx), [TeacherHomeroomPage.jsx](file:///e:/tk_teacher_assistance_system/frontend/src/pages/teacher/TeacherHomeroomPage.jsx), và [StudentExercisesPage.jsx](file:///e:/tk_teacher_assistance_system/frontend/src/pages/student/StudentExercisesPage.jsx).
 
 ---
 
@@ -39,24 +39,24 @@ Triển khai nhóm tính năng **Ưu tiên 1 (Priority 1)** nhằm hoàn thiện
 | **AS-01** | **Chính sách Xóa mềm 100% (Soft Delete Policy)**: Tuyệt đối không xóa vật lý bản ghi `User`. Khi xóa, chuyển `status` sang `DELETED`, lưu vết `deleted_at`. Admin có thể tra cứu và khôi phục (Restore) người dùng bất kỳ lúc nào. | Tuân thủ tuyệt đối Quy tắc 6 (`Soft Delete Policy`) và bảo toàn toàn vẹn dữ liệu cho các bảng liên kết (`attempts`, `enrollments`). |
 | **AS-02** | **Quản lý Trạng thái Tài khoản**: Thống nhất 4 trạng thái người dùng trong hệ thống: `ACTIVE` (Đang hoạt động), `INACTIVE` (Tạm ngưng), `SUSPENDED` (Khóa bảo mật), `DELETED` (Đã xóa mềm). | Đảm bảo tính linh hoạt trong công tác quản trị trường học. |
 | **AS-03** | **Batch Import Excel (Tất cả hoặc không - All-or-Nothing)**: Hỗ trợ import danh sách học sinh / giáo viên từ file `.xlsx`/`.csv`. Validate từng dòng (định dạng email, số điện thoại, trùng mã định danh). Nếu phát hiện lỗi, trả về danh sách chi tiết số dòng và lý do lỗi để Admin sửa. | Tránh tình trạng nạp dữ liệu rác hoặc tạo tài khoản nửa chừng gây sai lệch cơ sở dữ liệu. |
-| **AS-04** | **Phân quyền Phủ quyết (Deny Overrides Allow)**: Khi kiểm tra quyền hạn của một người dùng, quyền cá nhân cấu hình trong `user_permissions` với giá trị `is_granted = false` sẽ ghi đè quyền của Role (`role_permissions`). | Đảm bảo an toàn bảo mật, cho phép thu hồi nhanh quyền của một cá nhân cụ thể. |
+| **AS-04** | **Phân quyền Phủ quyết (Deny Overrides Allow)**: Khi kiểm tra quyền hạn của một người dùng, quyền cá nhân cấu hình trong `user_permissions` với giá trị `effect = 'deny'` sẽ ghi đè quyền của Role (`role_permissions`). | Đảm bảo an toàn bảo mật, cho phép thu hồi nhanh quyền của một cá nhân cụ thể. |
 | **AS-05** | **Tối ưu hóa Student Assignment Feed**: Thay vì Frontend phải gọi `GET /api/v1/classes`, sau đó lặp qua từng `class_id` để gọi `/assignments` và `/attempts`, Backend cung cấp endpoint `GET /api/v1/student/assignments` sử dụng SQL `JOIN` tối ưu với bảng `student_class`, `class_assignments` và `student_exercise_attempts`. | Giảm thiểu N+1 network requests, tăng tốc độ render từ 2-3 giây xuống dưới 100ms. |
 
 ---
 
 ## 4. Danh mục Features trong Sprint (Features List)
 
-| Feature ID | Tên tính năng | Module | Tài liệu Spec / File nguồn | Trạng thái |
+| Feature ID | Tên tính năng | Module | Tài liệu Spec / File Task | Trạng thái |
 |:---|:---|:---|:---|:---:|
-| `F-ADMIN-01` | **Admin User Management** (Quản lý Tài khoản & Phân loại) | `admin` / `auth` | `docs/v_1/specs/f_admin_01_user_management_spec.md` | `planning` |
-| `F-ADMIN-02` | **Admin Role & Permissions** (Quản lý Phân quyền & Ghi đè quyền) | `admin` / `auth` | `docs/v_1/specs/f_admin_02_role_permissions_spec.md` | `planning` |
-| `F-STUDENT-01` | **Student Unified Assignment Feed** (Cổng tra cứu bài tập của học sinh) | `exercise` | `docs/v_1/specs/f_student_01_assignment_feed_spec.md` | `planning` |
+| `F-ADMIN-01` | **Admin User Management** (Quản lý Tài khoản & Phân loại) | `admin` / `auth` | [f_admin_01_user_management_spec.md](../specs/f_admin_01_user_management_spec.md) · [f_admin_01_user_management.md](../../tasks/f_admin_01/f_admin_01_user_management.md) | `planning` |
+| `F-ADMIN-02` | **Admin Role & Permissions** (Quản lý Phân quyền & Ghi đè quyền) | `admin` / `auth` | [f_admin_02_role_permissions_spec.md](../specs/f_admin_02_role_permissions_spec.md) · [f_admin_02_role_permissions.md](../../tasks/f_admin_02/f_admin_02_role_permissions.md) | `planning` |
+| `F-STUDENT-01` | **Student Unified Assignment Feed** (Cổng tra cứu bài tập của học sinh) | `exercise` | [f_student_01_assignment_feed_spec.md](../specs/f_student_01_assignment_feed_spec.md) · [f_student_01_assignment_feed.md](../../tasks/f_student_01/f_student_01_assignment_feed.md) | `planning` |
 
 ---
 
-## 5. Chi tiết API Endpoints cần xây dựng
+## 5. Chi tiết API Endpoints cần xây dựng & đồng bộ trong Sprint 3
 
-### 5.1. Phân hệ Quản lý Người dùng (`/api/v1/admin/users`)
+### 5.1. Phân hệ Quản lý Người dùng (`/api/v1/admin/users` — Cần xây dựng mới ở BE & FE)
 
 ```text
 POST   /api/v1/admin/users                     Tạo mới một tài khoản người dùng
@@ -71,7 +71,7 @@ POST   /api/v1/admin/users/import-excel        Import hàng loạt học sinh/gi
 GET    /api/v1/admin/users/export-excel        Xuất danh sách người dùng ra file Excel (.xlsx)
 ```
 
-### 5.2. Phân hệ Quản lý Vai trò & Quyền hạn (`/api/v1/admin/roles`)
+### 5.2. Phân hệ Quản lý Vai trò & Quyền hạn (`/api/v1/admin/roles` — Cần xây dựng mới ở BE & FE)
 
 ```text
 GET    /api/v1/admin/roles                     Lấy danh sách tất cả các Role kèm số lượng user
@@ -81,12 +81,23 @@ GET    /api/v1/admin/users/{id}/perms          Lấy bảng quyền thực tế 
 PUT    /api/v1/admin/users/{id}/perms          Cấu hình ghi đè quyền cá nhân (Grant / Revoke riêng biệt)
 ```
 
-### 5.3. Phân hệ Cổng Bài tập Học sinh (`/api/v1/student/assignments`)
+### 5.3. Phân hệ Cổng Bài tập Học sinh (`/api/v1/student/assignments` — Cần xây dựng mới ở BE & FE)
 
 ```text
 GET    /api/v1/student/assignments             Lấy toàn bộ bài tập được giao cho học sinh theo các lớp đang học
-                                               Params: status (all | pending | completed | overdue), subject_id, limit, cursor
+                                               Params: status (all | pending | completed | overdue), subject_id, page, page_size
 ```
+
+### 5.4. Bảng Theo dõi Đồng bộ 11 API Đã có ở Backend (Sprint 0–2) vào `api.js` & UI
+
+| Nhóm | Method & Endpoint (Đã có ở BE) | Cần bổ sung vào `api.js` | Màn hình Frontend cần nối | Trạng thái |
+|:---|:---|:---|:---|:---:|
+| **Auth** | `POST /api/v1/auth/register` | `authApi.register` | Form đăng ký / khởi tạo nhanh | `pending` |
+| **Subjects** | `POST /api/v1/subjects`<br>`PUT /api/v1/subjects/{id}`<br>`DELETE /api/v1/subjects/{id}`<br>`POST /api/v1/subjects/{id}/restore` | `subjectsApi.createSubject`<br>`subjectsApi.updateSubject`<br>`subjectsApi.deleteSubject`<br>`subjectsApi.restoreSubject` | Quản lý danh mục môn học (Admin) | `pending` |
+| **Classes** | `POST /api/v1/classes`<br>`PUT /api/v1/classes/{id}`<br>`DELETE /api/v1/classes/{id}`<br>`POST /api/v1/classes/{id}/restore` | `classesApi.createClass`<br>`classesApi.updateClass`<br>`classesApi.deleteClass`<br>`classesApi.restoreClass` | `AdminClassesPage.jsx` (Tạo/Sửa/Xóa mềm/Khôi phục lớp học) | `pending` |
+| **Enrollments** | `POST /api/v1/classes/{id}/students`<br>`DELETE /api/v1/classes/{id}/students/{sid}`<br>`POST /api/v1/classes/{id}/students/{sid}/restore` | `classesApi.enrollStudent`<br>`classesApi.unenrollStudent`<br>`classesApi.restoreEnrollment` | `AdminClassesPage.jsx`, `TeacherHomeroomPage.jsx`, `AddStudentModal.jsx` | `pending` |
+| **Teacher Assign** | `POST /api/v1/classes/{id}/teacher-subjects`<br>`DELETE .../teacher-subjects/{tid}/{sid}`<br>`POST .../restore` | `classesApi.assignTeacher`<br>`classesApi.unassignTeacher`<br>`classesApi.restoreTeacherAssignment` | `AdminClassesPage.jsx` (Modal phân công giáo viên bộ môn) | `pending` |
+| **Exercises** | `POST /api/v1/exercises/{id}/restore` | `exercisesApi.restoreExercise` | `ExerciseRepositoryPage.jsx` | `pending` |
 
 ---
 
@@ -106,14 +117,15 @@ graph TD
         C1[StudentAssignmentQueryService với SQL JOIN tối ưu] --> C2[FastAPI Student Router: /api/v1/student/assignments]
     end
 
-    subgraph "Phase 3: Frontend Integration"
-        D1[Cập nhật frontend/src/services/api.js]
+    subgraph "Phase 3: Frontend Integration & Sync"
+        D1[Cập nhật frontend/src/services/api.js: adminApi, studentApi & 11 APIs S0-S2]
         A5 --> D1
         B2 --> D1
         C2 --> D1
         D1 --> E1[Tích hợp AdminUsersPage.jsx]
         D1 --> E2[Tích hợp AdminRolesPage.jsx]
-        D1 --> E3[Tích hợp StudentExercisesPage.jsx]
+        D1 --> E3[Tích hợp AdminClassesPage.jsx & TeacherHomeroomPage.jsx]
+        D1 --> E4[Tích hợp StudentExercisesPage.jsx]
     end
 ```
 
@@ -126,9 +138,10 @@ graph TD
 | ☐ | **CRUD User API**: `POST/GET/PUT/DELETE/RESTORE /api/v1/admin/users` hoạt động chuẩn xác, phân trang, lọc đa tiêu chí, bảo vệ bởi quyền `ADMIN_USER_MANAGE`. | `pending` |
 | ☐ | **Excel Import/Export**: Import danh sách HS/GV từ Excel có bắt lỗi định dạng từng dòng (`All-or-Nothing`), xuất file `.xlsx` định dạng chuẩn. | `pending` |
 | ☐ | **Quản lý Trạng thái & Password**: Khóa/mở khóa tài khoản ngay lập tức vô hiệu hóa JWT token; reset mật khẩu thành công. | `pending` |
-| ☐ | **Phân quyền Role & Custom Override**: API cập nhật ma trận phân quyền hoạt động; cơ chế `is_granted = false` ghi đè thành công quyền của Role. | `pending` |
+| ☐ | **Phân quyền Role & Custom Override**: API cập nhật ma trận phân quyền hoạt động; cơ chế `effect = 'deny'` ghi đè thành công quyền của Role. | `pending` |
 | ☐ | **Student Assignment Feed**: `GET /api/v1/student/assignments` trả về đầy đủ bài tập của tất cả lớp học sinh tham gia kèm trạng thái `NOT_STARTED`, `IN_PROGRESS`, `SUBMITTED`, `GRADED`, `OVERDUE`. | `pending` |
-| ☐ | **Tích hợp Giao diện Frontend**: Loại bỏ toàn bộ mock data trong `AdminUsersPage.jsx`, `AdminRolesPage.jsx`, `StudentExercisesPage.jsx` và kết nối thông suốt với Backend qua `api.js`. | `pending` |
+| ☐ | **Đồng bộ 11 API Sprint 0–2**: Khai báo đầy đủ các API `subjects`, `classes`, `enrollments`, `teacher_assignments`, `exercises/restore` vào `api.js` và nối vào `AdminClassesPage.jsx` / `TeacherHomeroomPage.jsx`. | `pending` |
+| ☐ | **Tích hợp Giao diện Frontend**: Loại bỏ toàn bộ mock data trong `AdminUsersPage.jsx`, `AdminRolesPage.jsx`, `AdminClassesPage.jsx`, `StudentExercisesPage.jsx` và kết nối thông suốt với Backend qua `api.js`. | `pending` |
 | ☐ | **Kiểm thử Tự động (Testing)**: Toàn bộ Unit Tests và Integration Tests cho các module mới đạt 100% pass rate (`pytest`). | `pending` |
 | ☐ | **Quy chuẩn Mã nguồn**: 100% comments, docstrings viết bằng Standard English, header ghi rõ `Created By: Tam Khang` / `Updated By: Tam Khang`. | `pending` |
 

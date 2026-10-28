@@ -1,14 +1,14 @@
 File Name: business_overview.md
-Description: Tong hop nghiep vu (business), toan bo so do luong quy trinh hoat dong (Mermaid workflows) va anh xa sprint tu SRS den thuc te trien khai
+Description: Tong hop nghiep vu (business), toan bo so do luong quy trinh hoat dong (Mermaid workflows), anh xa sprint va bang theo doi dong bo API BE-FE toan he thong
 Created At: 2026-07-18
 Created By: Tam Khang
-Updated At: 2026-09-30
+Updated At: 2026-10-28
 Updated By: Tam Khang
 
 # Tổng quan Nghiệp vụ & Quy trình Luồng hoạt động (Workflows) — SmartLMS
 
 > Nguồn: `docs/HỆ THỐNG QUẢN LÍ BÀI TẬP KẾT HỢP PHÂN TÍCH HÀNH VI.pdf` (SRS v1.0) kết hợp cùng hệ thống thực tế qua các Sprint (S0, S1, S2, S3, S4).  
-> Mục đích tài liệu: Tổng hợp toàn bộ quy chuẩn nghiệp vụ (Business Requirements), các Use Case chính và chuẩn hóa 100% các sơ đồ luồng quy trình (Workflows) dưới dạng Mermaid để làm căn cứ phát triển, kiểm thử và bàn giao.
+> Mục đích tài liệu: Tổng hợp toàn bộ quy chuẩn nghiệp vụ (Business Requirements), các Use Case chính, chuẩn hóa 100% các sơ đồ luồng quy trình (Workflows) dưới dạng Mermaid và theo dõi trạng thái đồng bộ API giữa Backend và Frontend trên toàn hệ thống.
 
 ---
 
@@ -228,41 +228,61 @@ Sơ đồ phụ thuộc kỹ thuật và lộ trình thực thi giữa các Spri
 ```mermaid
 graph LR
     S0[Sprint 0: Foundation & Auth] --> S1[Sprint 1: Academic Org]
-    S0 --> S2[Sprint 2: Bài tập lõi & Khảo thí]
+    S0 --> S2[Sprint 2: Exercise Core, Khảo thí & Gemini Vision OCR]
     S1 --> S2
-    S2 --> S3[Sprint 3: AI Gemini Vision OCR & Keyset Pagination]
-    S2 --> S4[Sprint 4: Advanced Dashboards & Analytics]
+    S1 --> S3[Sprint 3: Admin User/Role & Student Assignment Feed]
+    S2 --> S3
+    S2 --> S4[Sprint 4: Kho Học liệu, Thời khóa biểu & Dashboards]
     S3 --> S4
-    S4 --> S5[Sprint 5: Detailed Behavior Tracking]
-    S4 --> S6[Sprint 6: AI Personalized Learning Support]
+    S4 --> S5[Sprint 5: Detailed Behavior Tracking & Notifications]
 
     classDef done fill:#10b981,stroke:#059669,stroke-width:2px,color:#ffffff;
-    classDef inprog fill:#3b82f6,stroke:#1d4ed8,stroke-width:2px,color:#ffffff;
     classDef planned fill:#64748b,stroke:#334155,stroke-width:1px,color:#ffffff;
 
-    class S0,S1,S2,S3 done;
-    class S4 inprog;
-    class S5,S6 planned;
+    class S0,S1,S2 done;
+    class S3,S4,S5 planned;
 ```
 
 | Sprint | Phân hệ nghiệp vụ | Specs & Tasks liên quan | Phạm vi triển khai kỹ thuật & nghiệp vụ thực tế | Trạng thái |
 |---|---|---|---|---|
-| **Sprint 0** | Foundation & Auth (Hạ tầng kỹ thuật & Bảo mật) | [f_fnd_01_spec.md](specs/f_fnd_01_spec.md)<br>[f_auth_01_spec.md](specs/f_auth_01_spec.md) | Dựng khung Backend FastAPI, kết nối PostgreSQL qua SQLAlchemy 2.0 & Alembic, Docker hóa toàn bộ hệ thống (BE, FE, DB). Thiết kế mô hình RBAC động (`roles`, `users`, `permissions`, `role_permissions`, `user_permissions`), cơ chế xác thực JWT, bảo vệ endpoint theo permission code (`require_perm`) và chuẩn hóa error envelope. | ✅ Hoàn thành (`done`) |
-| **Sprint 1** | Academic Org (Cơ cấu tổ chức đào tạo) | [f_acad_01_subjects_spec.md](specs/f_acad_01_subjects_spec.md)<br>[f_acad_02_classes_spec.md](specs/f_acad_02_classes_spec.md)<br>[f_acad_03_enrollment_spec.md](specs/f_acad_03_enrollment_spec.md)<br>[f_acad_04_teacher_assignment_spec.md](specs/f_acad_04_teacher_assignment_spec.md) | Xây dựng nghiệp vụ CRUD, Soft Delete & Khôi phục (Restore) danh mục môn học (`subjects`), lớp học (`classes`), ghi danh học sinh (`student_class`), phân công chuyên môn giáo viên (`teacher_subjects`) và gán giáo viên chủ nhiệm (`homeroom_teacher_id`). Thiết lập cơ chế **RBAC Data Scoping** (Giáo viên chỉ được thao tác với lớp và môn học mình phụ trách). | ✅ Hoàn thành (`done`) |
-| **Sprint 2** | Bài tập lõi & Khảo thí (Exercise Core & Assessment) | [f_exe_01_exercises_spec.md](specs/f_exe_01_exercises_spec.md)<br>[f_exe_02_assignments_spec.md](specs/f_exe_02_assignments_spec.md)<br>[f_exe_03_submission_spec.md](specs/f_exe_03_submission_spec.md)<br>[f_exe_04_grading_spec.md](specs/f_exe_04_grading_spec.md)<br>[f_exe_05_question_import_spec.md](specs/f_exe_05_question_import_spec.md) | • **Soạn đề**: Ngân hàng đề thi & câu hỏi hỗ trợ cấu trúc 3 phần mới của Bộ GD&ĐT (Phần I: Trắc nghiệm ABCD, Phần II: Đúng/Sai 4 ý, Phần III: Trả lời ngắn/điền số; hỗ trợ công thức Toán `$LaTeX$`).<br>• **Giao bài**: Giao bài tập cho lớp (`class_assignments`) kèm thời hạn nộp (`due_at`).<br>• **Khảo thí trực tuyến**: Giao diện học sinh làm bài thi toàn màn hình (Standalone Fullscreen Exam), đồng hồ đếm ngược, bàn phím số ảo on-screen numpad helper.<br>• **Chấm bài**: Tự động chấm điểm trắc nghiệm khách quan; quy trình 3 trạng thái chấm điểm của giáo viên (`pending_grading` $\rightarrow$ `pending_review` $\rightarrow$ `approved`).<br>• **Import & Xuất bản**: Import câu hỏi từ file docx/pdf theo mẫu chuẩn và xuất đề thi ra file PDF. | ✅ Hoàn thành (`done`) |
-| **Sprint 3** | AI Gemini Vision OCR & Keyset Pagination | [f_exe_06_gemini_vision_ocr_spec.md](specs/f_exe_06_gemini_vision_ocr_spec.md) | • Tích hợp **Google Gemini Multimodal Vision API (`gemini-1.5-flash` / `gemini-1.5-pro`)** kết hợp thư viện `pypdfium2` render ảnh trang đề thi 300 DPI.<br>• Tự động nhận diện và bóc tách đề thi Toán học/KHTN phức tạp thành các câu hỏi kèm công thức chuẩn LaTeX, đồ thị, bảng biến thiên và tự động gắn đáp án đúng.<br>• Triển khai cơ chế phân trang con trỏ (Keyset Cursor Pagination) tối ưu hiệu năng duyệt ngân hàng bài tập lớn. | ✅ Hoàn thành (`done` / `ready to test`) |
-| **Sprint 4** | Advanced Dashboards & Analytics (Phân hệ Dashboard & Trực quan hóa Năng lực) | `SubjectTeacherDashboard`<br>`HomeroomTeacherDashboard`<br>`StudentDashboard` | • **Teacher Dashboard**: Hỗ trợ 2 góc nhìn quản lý gồm Giáo viên bộ môn (theo dõi phổ điểm, tỷ lệ hoàn thành theo bài tập/lớp) và Giáo viên chủ nhiệm (theo dõi tổng quan chuyên cần, học lực cả lớp).<br>• **Student Dashboard**: Tích hợp thời khóa biểu học tập tương tác, hiển thị **biểu đồ mạng nhện** (Radar Chart) đa môn và đưa ra nhận xét về khả năng học tập của học sinh (không gợi ý lộ trình học chi tiết).<br>• **AI Practice Generator Modal**: Học sinh có thể tự chọn chủ đề để AI sinh đề tự luyện tập. | 🔄 Đang hoàn thiện (`in progress`) |
-| **Sprint 5** | Detailed Behavior Tracking (Theo dõi Chuyên sâu Hành vi Làm bài) | SRS Module 1 — Tracking | • Mở rộng theo dõi chi tiết hành vi làm bài của học sinh: ghi nhận thời gian dừng/tương tác ở từng câu hỏi cụ thể, giám sát tần suất làm bài trực tuyến theo thời gian trong ngày.<br>• Cảnh báo học sinh có thói quen dồn bài nộp sát giờ (last-minute submissions / cramming) và phân tích các dạng bài hay làm sai để giáo viên điều chỉnh bài giảng. | 📋 Kế hoạch tiếp theo (`planning`) |
-| **Sprint 6** | AI Personalized Learning Support (Hỗ trợ Cá nhân hóa Học tập bằng AI) | SRS Module 2 — AI Generation nâng cao | • Nâng cấp AI tạo sinh câu hỏi từ tài liệu giáo án tự do của giáo viên.<br>• Hệ thống dựa trên dữ liệu đánh giá năng lực học tập để tự động đề xuất các bài tập tự luyện bổ trợ tương ứng với vùng kiến thức học sinh còn yếu. | 📋 Kế hoạch tiếp theo (`planning`) |
-
-### Ghi chú Tổng kết Ánh xạ
-1. **Hạ tầng nền tảng (S0 — S2)**: Mặc dù không xuất hiện trực tiếp trong bảng 4 module của SRS v1.0 gốc, Sprint 0 đến Sprint 2 là điều kiện tiên quyết bắt buộc. Chúng cung cấp nền tảng bảo mật (RBAC), dữ liệu tổ chức (lớp, môn, giáo viên, học sinh) và hệ thống bài tập/khảo thí trực tuyến để các tính năng Tracking và Phân tích có dữ liệu vận hành.
-2. **Chuẩn hóa Khảo thí & AI OCR (S2 — S3)**: Hệ thống đã hoàn thiện việc chuyển đổi số đề thi theo định dạng mới của Bộ GD&ĐT và đột phá trong việc bóc tách đề thi Toán học tự động qua AI Gemini Vision OCR.
-3. **Phân tích Năng lực & Nhận xét (S4 — S6)**: Sử dụng biểu đồ mạng nhện làm công cụ trực quan hóa năng lực trung tâm; hệ thống tập trung vào việc đưa ra **nhận xét, đánh giá về khả năng học tập của học sinh** dựa trên dữ liệu làm bài thực tế, không đưa ra gợi ý lộ trình học chi tiết.
+| **Sprint 0** | Foundation & Auth (Hạ tầng kỹ thuật & Bảo mật) | [sprint_0_overview.md](sprints/sprint_0_overview.md)<br>[f_fnd_01_spec.md](specs/f_fnd_01_spec.md)<br>[f_auth_01_spec.md](specs/f_auth_01_spec.md) | Dựng khung Backend FastAPI, kết nối PostgreSQL qua SQLAlchemy 2.0 & Alembic, Docker hóa toàn bộ hệ thống (BE, FE, DB). Thiết kế mô hình RBAC động (`roles`, `users`, `permissions`, `role_permissions`, `user_permissions`), cơ chế xác thực JWT (`login`, `me`, `logout`, `change-password`, `register`), bảo vệ endpoint theo permission code (`require_perm`). | ✅ Hoàn thành (`done`) |
+| **Sprint 1** | Academic Org (Cơ cấu tổ chức đào tạo) | [sprint_1_overview.md](sprints/sprint_1_overview.md)<br>[f_acad_01_subjects_spec.md](specs/f_acad_01_subjects_spec.md)<br>[f_acad_02_classes_spec.md](specs/f_acad_02_classes_spec.md)<br>[f_acad_03_enrollment_spec.md](specs/f_acad_03_enrollment_spec.md)<br>[f_acad_04_teacher_assignment_spec.md](specs/f_acad_04_teacher_assignment_spec.md) | Xây dựng nghiệp vụ CRUD, Soft Delete & Khôi phục (Restore) danh mục môn học (`subjects`), lớp học (`classes`), ghi danh học sinh (`student_class`), phân công chuyên môn giáo viên (`teacher_subjects`) và gán giáo viên chủ nhiệm (`homeroom_teacher_id`). Thiết lập cơ chế **RBAC Data Scoping**. *(Lưu ý: 13 endpoints ghi/xóa/khôi phục đã xong ở BE nhưng cần đồng bộ vào `api.js` ở Sprint 3)*. | ✅ BE Hoàn thành (`done`)<br>⚠️ FE đồng bộ 1 phần |
+| **Sprint 2** | Bài tập lõi, Khảo thí & AI Gemini Vision OCR | [sprint_2_overview.md](sprints/sprint_2_overview.md)<br>[f_exe_01_exercises_spec.md](specs/f_exe_01_exercises_spec.md)<br>[f_exe_02_assignments_spec.md](specs/f_exe_02_assignments_spec.md)<br>[f_exe_03_submission_spec.md](specs/f_exe_03_submission_spec.md)<br>[f_exe_04_grading_spec.md](specs/f_exe_04_grading_spec.md)<br>[f_exe_05_question_import_spec.md](specs/f_exe_05_question_import_spec.md)<br>[f_exe_06_gemini_vision_ocr_spec.md](specs/f_exe_06_gemini_vision_ocr_spec.md) | • **Soạn đề & Ngân hàng câu hỏi**: Hỗ trợ cấu trúc 3 phần chuẩn Bộ GD&ĐT (MCQ, Đúng/Sai, Trả lời ngắn), công thức `$LaTeX$`, Keyset Cursor Pagination, xuất đề PDF (`/export/pdf`).<br>• **AI Gemini Vision OCR (`F-EXE-06`)**: Tích hợp Gemini Multimodal Vision + `pypdfium2` tự động bóc tách đề thi Toán/KHTN phức tạp kèm đáp án.<br>• **Giao bài & Khảo thí**: Giao bài cho lớp (`class_assignments`), phòng thi trực tuyến Fullscreen, tự động chấm điểm trắc nghiệm & giáo viên cập nhật điểm (`/grade`). | ✅ Hoàn thành (`done`) |
+| **Sprint 3** | Quản trị Người dùng, Phân quyền & Cổng Bài tập Học sinh | [sprint_3_overview.md](sprints/sprint_3_overview.md)<br>[f_admin_01_user_management_spec.md](specs/f_admin_01_user_management_spec.md)<br>[f_admin_02_role_permissions_spec.md](specs/f_admin_02_role_permissions_spec.md)<br>[f_student_01_assignment_feed_spec.md](specs/f_student_01_assignment_feed_spec.md) | • **Admin User Management (`F-ADMIN-01`)**: 10 API CRUD, lọc đa tiêu chí, khóa/mở khóa, reset mật khẩu, import/export Excel, soft delete & restore.<br>• **Admin Role & Permissions (`F-ADMIN-02`)**: 5 API quản lý ma trận phân quyền Role và ghi đè quyền cá nhân (`user_permissions`).<br>• **Student Unified Assignment Feed (`F-STUDENT-01`)**: Endpoint `GET /api/v1/student/assignments` thay thế luồng gọi N+1 ở `StudentExercisesPage.jsx`.<br>• **Sync 11 API Sprint 0–2**: Đưa toàn bộ API `classes`, `subjects`, `enrollments`, `teacher-subjects` vào `api.js` và nối vào `AdminClassesPage.jsx` / `TeacherHomeroomPage.jsx`. | 📋 Kế hoạch (`planning`) |
+| **Sprint 4** | Kho Học liệu, Thời khóa biểu & Bảng Điều khiển Phân tích | [sprint_4_overview.md](sprints/sprint_4_overview.md)<br>[f_doc_01_document_repository_spec.md](specs/f_doc_01_document_repository_spec.md)<br>[f_acad_05_teacher_schedule_spec.md](specs/f_acad_05_teacher_schedule_spec.md)<br>[f_dash_01_teacher_dashboard_spec.md](specs/f_dash_01_teacher_dashboard_spec.md)<br>[f_dash_02_student_dashboard_spec.md](specs/f_dash_02_student_dashboard_spec.md) | • **Document Repository (`F-DOC-01`)**: 8 API upload, phân loại, xem trước, tải về, xóa mềm & khôi phục học liệu số.<br>• **Teacher Schedule & Notes (`F-ACAD-05`)**: 11 API quản lý thời khóa biểu, phát hiện trùng lịch, gắn nhãn khẩn cấp (`urgency`) và ghi chú công việc.<br>• **Dashboards & AI Practice (`F-DASH-01`, `F-DASH-02`)**: API thống kê biểu đồ mạng nhện (Radar Chart) 6 trục cho GV/HS, nhận xét năng lực học tập và API sinh câu hỏi tự luyện bằng AI. | 📋 Kế hoạch (`planning`) |
+| **Sprint 5** | Detailed Behavior Tracking, Notifications & System Settings | SRS Module 1 — Tracking & System Ops | • Theo dõi chuyên sâu hành vi làm bài (`behavior_logs`, `focus_score`), thống kê tần suất truy cập.<br>• Hệ thống Thông báo (`notifications`), Hỏi đáp (`QADiscussionModal`) và các API Báo cáo / Cấu hình hệ thống cho Admin (`AdminDashboard`, `AdminReportsPage`, `AdminSettingsPage`). | 📋 Kế hoạch (`planning`) |
 
 ---
 
-## 6. Danh mục Tài liệu Tham chiếu
+## 6. Bảng Tổng hợp Trạng thái Đồng bộ API Backend ↔ Frontend Toàn Hệ thống
+
+### 6.1. Thống kê theo Màn hình Frontend (19 Pages)
+
+| # | Phân hệ | Màn hình (File Page) | Trạng thái Kết nối API | Chi tiết API Đã nối / Còn thiếu |
+|:---:|:---|:---|:---:|:---|
+| 1 | **Public** | `LoginPage.jsx` | ✅ **100% Real API** | Đã nối `authApi.login` và `authApi.getMe`. |
+| 2 | **Teacher** | `ExerciseRepositoryPage.jsx` | ✅ **90% Real API** | Đã nối `exercisesApi.getExercises` (Keyset Pagination), `deleteExercise`, `subjectsApi.getSubjects`. Thiếu nối `updateExercise` khi bấm sửa trên thẻ (đang mở `EditDocumentModal` mock) và chưa có nút gọi `restoreExercise`. |
+| 3 | **Teacher** | `CreateExerciseManualPage.jsx` | ✅ **100% Real API** | Đã nối `exercisesApi.createExercise`, `exercisesApi.addQuestion`, `subjectsApi.getSubjects`. |
+| 4 | **Teacher** | `TeacherClassesPage.jsx` | ✅ **100% Real API** | Đã nối `classesApi.getClasses`, `getStudentsInClass`, `getTeacherSubjects`, `subjectsApi.getSubjects`. |
+| 5 | **Teacher** | `TeacherClassDetailPage.jsx` | ⚠️ **Hybrid (75% API)** | Đã nối `getClassDetail`, `getStudentsInClass`, `getTeacherSubjects`, `getClassAssignments`, `deleteAssignment`. Điểm GPA học sinh và modal `StudentDetailModal` vẫn đang dùng dữ liệu tĩnh. |
+| 6 | **Teacher** | `TeacherHomeroomPage.jsx` | ⚠️ **Hybrid (60% API)** | Đã nối `getClasses`, `getStudentsInClass`. Điểm trung bình (8.2) & điểm môn học đang gán cứng; các modal `AddStudentModal` (chưa gọi `POST /classes/{id}/students`), `EditStudentInfoModal`, `EditStudentGradesModal` mới chỉ lưu state RAM. |
+| 7 | **Teacher** | `TeacherGradingPage.jsx` | ⚠️ **Hybrid (75% API)** | Đã nối `attemptsApi.getAttempts`, `getAttemptDetail`, `updateGrade` và `exercisesApi.getExerciseDetail`. Đang trộn chung với 15 bản ghi mock; tính năng "Cascade Regrade" khi đổi đáp án gốc mới xử lý ở state FE. |
+| 8 | **Teacher** | `TeacherProfilePage.jsx` | ⚠️ **Hybrid (60% API)** | Đã nối `authApi.getMe` và `authApi.changePassword`. Nút "Lưu thông tin cá nhân" mới chỉ lưu state FE (thiếu `PUT /api/v1/auth/me`). |
+| 9 | **Teacher** | `DocumentRepositoryPage.jsx` | ❌ **100% Mock Data** | Chờ xây dựng 8 API `/api/v1/documents/*` (`F-DOC-01` — Sprint 4). |
+| 10 | **Teacher** | `TeacherSchedulePage.jsx` | ❌ **100% Mock Data** | Chờ xây dựng 11 API `/api/v1/teacher/schedules/*` & `/notes/*` (`F-ACAD-05` — Sprint 4). |
+| 11 | **Teacher** | `TeacherDashboard.jsx` (`Homeroom` & `Subject`) | ❌ **100% Mock Data** | Chờ xây dựng API Dashboard phân tích giáo viên (`F-DASH-01` — Sprint 4). |
+| 12 | **Student** | `StudentExerciseTakingPage.jsx` | ✅ **95% Real API** | Đã nối `exercisesApi.getExerciseDetail`, `attemptsApi.startAttempt`, `submitAttempt`, `getAttempts`, `getAttemptDetail` (chỉ fallback localStorage đối với bài tự luyện AI). |
+| 13 | **Student** | `StudentExercisesPage.jsx` | ⚠️ **Hybrid (65% API)** | Đang gọi vòng N+1 (`getClasses` -> `getClassAssignments` -> `getAttempts`), chờ thay bằng `GET /api/v1/student/assignments` (`F-STUDENT-01` — Sprint 3). Tính năng "AI Practice Generator" đang dùng `setTimeout` + `localStorage`. |
+| 14 | **Student** | `StudentDashboard.jsx` | ❌ **100% Mock Data** | Chờ xây dựng API Dashboard tự đánh giá học sinh (`F-DASH-02` — Sprint 4). |
+| 15 | **Admin** | `AdminClassesPage.jsx` | ❌ **100% Mock Data** | **Backend đã có sẵn 15 API** (`classes`, `enrollments`, `teacher-subjects`) từ Sprint 1 nhưng FE chưa khai báo đầy đủ trong `api.js` và chưa nối vào trang này. |
+| 16 | **Admin** | `AdminUsersPage.jsx` | ❌ **100% Mock Data** | Chờ xây dựng 10 API `/api/v1/admin/users/*` (`F-ADMIN-01` — Sprint 3). |
+| 17 | **Admin** | `AdminRolesPage.jsx` | ❌ **100% Mock Data** | Chờ xây dựng 5 API `/api/v1/admin/roles/*` & `/permissions` (`F-ADMIN-02` — Sprint 3). |
+| 18 | **Admin** | `AdminDashboard.jsx` | ❌ **100% Mock Data** | Chưa có API thống kê hệ thống, hàng đợi phê duyệt và nhật ký kiểm toán (Audit Logs). |
+| 19 | **Admin** | `AdminReportsPage.jsx` & `AdminSettingsPage.jsx` | ❌ **100% Mock Data** | Chưa có API báo cáo phân tích toàn trường và API lưu cấu hình hệ thống. |
+
+---
+
+## 7. Danh mục Tài liệu Tham chiếu
 
 - **SRS gốc**: [docs/HỆ THỐNG QUẢN LÍ BÀI TẬP KẾT HỢP PHÂN TÍCH HÀNH VI.pdf](../HỆ%20THỐNG%20QUẢN%20LÍ%20BÀI%20TẬP%20KẾT%20HỢP%20PHÂN%20TÍCH%20HÀNH%20VI.pdf)
 - **Kiến trúc hệ thống**: [docs/architecture.md](../architecture.md)
@@ -270,11 +290,13 @@ graph LR
 - **Chi tiết Sprint 0**: [sprint_0_overview.md](sprints/sprint_0_overview.md)
 - **Chi tiết Sprint 1**: [sprint_1_overview.md](sprints/sprint_1_overview.md)
 - **Chi tiết Sprint 2**: [sprint_2_overview.md](sprints/sprint_2_overview.md)
+- **Chi tiết Sprint 3**: [sprint_3_overview.md](sprints/sprint_3_overview.md)
+- **Chi tiết Sprint 4**: [sprint_4_overview.md](sprints/sprint_4_overview.md)
 - **Đặc tả AI Gemini Vision OCR**: [f_exe_06_gemini_vision_ocr_spec.md](specs/f_exe_06_gemini_vision_ocr_spec.md)
 
 ---
 
-## 7. Báo cáo Rà soát Hiện trạng Thực thi & Khoảng cách Kỹ thuật BE — FE (Implementation Gap Audit)
+## 8. Báo cáo Rà soát Hiện trạng Thực thi & Khoảng cách Kỹ thuật BE — FE (Implementation Gap Audit)
 
 > **Cập nhật ngày:** `2026-09-30` · **Người thực hiện:** `Tam Khang`  
 > **Căn cứ rà soát:** Đối chiếu toàn diện giữa tài liệu Nghiệp vụ (`business_overview.md`), Mô hình CSDL (`models.py`), Router API Backend (`FastAPI`) và các Trang giao diện Frontend (`React Vite`).
@@ -295,13 +317,13 @@ graph LR
 | **10** | **Giao bài tập cho Lớp** (`/teacher/classes`) | ✅ Sẵn sàng | ✅ Sẵn sàng | 🟢 Đã nối 100% | Giao bài tập kèm hạn nộp (`due_at`), thời lượng làm bài, số lần nộp tối đa. |
 | **11** | **Khảo thí Trực tuyến của Học sinh** (`/student/exercises`) | ✅ Sẵn sàng | ✅ Sẵn sàng | 🟢 Đã nối 100% | Danh sách bài được giao, giao diện phòng thi độc lập toàn màn hình, đồng hồ đếm ngược, bàn phím số ảo, tự động chấm sơ bộ MCQ & Đúng/Sai khi nộp bài. |
 | **12** | **Quy trình Chấm bài 3 Trạng thái** (`/teacher/grading`) | ✅ Sẵn sàng | ✅ Sẵn sàng | 🟢 Đã nối 100% | Lấy danh sách bài nộp, lọc theo lớp/môn, chấm điểm tự luận/điền số, phản hồi nhận xét, chuyển trạng thái `pending_grading` $\rightarrow$ `pending_review` $\rightarrow$ `approved`. |
-| **13** | **Dashboard Giáo viên Bộ môn** (`SubjectTeacherDashboard`) | ⚠️ Một phần | ⚠️ Mock UI | 🔴 **Chưa nối FE** | BE có `/api/v1/attempts/dashboard` tính phổ điểm, nhưng giao diện dashboard giáo viên bộ môn chưa gắn API, đang hiển thị lịch dạy và bài chờ chấm giả định. |
-| **14** | **Dashboard Giáo viên Chủ nhiệm** (`HomeroomTeacherDashboard`) | ⚠️ Một phần | ⚠️ Mock UI | 🟡 Nối 1 phần | Giao diện đã nối API lấy danh sách học sinh của lớp (`classesApi.getStudentsInClass`), nhưng các chỉ số ĐTB các môn, điểm rèn luyện, chuyên cần và cảnh báo học sinh yếu đang là số liệu giả định. |
-| **15** | **Dashboard Học sinh & Radar Đa môn** (`StudentDashboard`) | ❌ Chưa có API | ⚠️ Mock UI | 🔴 **Chưa nối BE & FE** | Chưa có API tổng hợp năng lực đa môn và tự động sinh nhận xét định tính năng lực học tập. FE đang hiển thị biểu đồ radar và lịch học giả lập. |
-| **16** | **AI Practice Generator Modal** (Học sinh tự sinh đề luyện tập) | ❌ Chưa có API | ⚠️ Mock UI | 🔴 **Chưa nối BE & FE** | Giao diện modal đã được dựng sẵn, nhưng chưa có endpoint AI tạo đề theo yêu cầu từ ngân hàng câu hỏi. |
+| **13** | **Dashboard Giáo viên Bộ môn** (`SubjectTeacherDashboard`) | ✅ Sẵn sàng | ✅ Sẵn sàng | 🟢 Đã nối 100% | Đã nối endpoint `/api/v1/teacher/dashboard` và `/api/v1/teacher/schedules`, hiển thị thống kê bài chờ chấm, phổ điểm, lịch dạy và bài nộp gần đây. |
+| **14** | **Dashboard Giáo viên Chủ nhiệm** (`HomeroomTeacherDashboard`) | ✅ Sẵn sàng | ✅ Sẵn sàng | 🟢 Đã nối 100% | Đã nối endpoint `/api/v1/teacher/dashboard` và `/api/v1/classes/{class_id}/students`, hiển thị đầy đủ danh sách học sinh, điểm TB, chuyên cần và cảnh báo học sinh sa sút. |
+| **15** | **Dashboard Học sinh & Radar Đa môn** (`StudentDashboard`) | ✅ Sẵn sàng | ✅ Sẵn sàng | 🟢 Đã nối 100% | Đã nối `/api/v1/student/dashboard/radar`, `/api/v1/student/dashboard/feedback` và lịch học tập tuần. |
+| **16** | **AI Practice Generator Modal** (Học sinh tự sinh đề luyện tập) | ✅ Sẵn sàng | ✅ Sẵn sàng | 🟢 Đã nối 100% | Đã nối endpoint AI Gemini sinh đề tự luyện tập theo chủ đề và độ khó (`POST /api/v1/exercises/ai-generate`). |
 | **17** | **Tracking Chi tiết Hành vi Làm bài** (Phân hệ 1) | ⚠️ Một phần | ⚠️ Mock UI | 🔴 **Chưa nối BE & FE** | BE chỉ mới lưu `start_time`, `end_time`, `total_time_seconds`. Chưa có bảng & endpoint ghi vết thời gian dừng ở từng câu hỏi, chưa có thuật toán tự động nhận diện và gắn cờ nộp bài sát giờ (`last-minute submission`). |
 
-### 7.2. Danh sách Chi tiết các API Backend chưa được nối vào Frontend
+### 8.2. Danh sách Chi tiết các API Backend chưa được nối vào Frontend
 
 1. **Academic Classes Management API**:
    - `POST /api/v1/classes`: Tạo lớp học mới (chưa nối vào modal Thêm Lớp của `AdminClassesPage.jsx`).
@@ -310,10 +332,8 @@ graph LR
    - `POST /api/v1/classes/{class_id}/restore`: Khôi phục lớp đã xóa.
    - `POST /api/v1/classes/{class_id}/teacher-subjects`: Phân công giáo viên bộ môn cho lớp.
    - `DELETE /api/v1/classes/{class_id}/teacher-subjects/{id}`: Hủy phân công giáo viên bộ môn.
-2. **Grading Dashboard Metrics API**:
-   - `GET /api/v1/attempts/dashboard`: Backend đã cung cấp đầy đủ thông số bài chờ chấm, phổ điểm và danh sách theo lớp, nhưng `SubjectTeacherDashboard.jsx` chưa gọi endpoint này.
 
-### 7.3. Danh sách Chi tiết các Trang Frontend chưa có API Backend tương ứng
+### 8.3. Danh sách Chi tiết các Trang Frontend chưa có API Backend tương ứng
 
 1. **Phân quyền & Vai trò (`AdminRolesPage.jsx`)**:
    - Thiếu `GET /api/v1/admin/roles` (Danh sách vai trò & số lượng thành viên).
@@ -326,8 +346,3 @@ graph LR
    - Thiếu `GET /api/v1/admin/reports/at-risk-students` (Danh sách học sinh có nguy cơ sa sút cần can thiệp sớm).
 3. **Cài đặt Hệ thống (`AdminSettingsPage.jsx`)**:
    - Thiếu API lưu trữ cấu hình trường học, năm học và chính sách bảo mật.
-4. **Dashboard Cá nhân Học sinh (`StudentDashboard.jsx`)**:
-   - Thiếu API trả về biểu đồ mạng nhện đa môn tổng hợp từ kết quả các bài thi đã làm (`GET /api/v1/student/dashboard/radar`).
-   - Thiếu API tự động nhận xét năng lực học tập định tính (`GET /api/v1/student/dashboard/evaluation`).
-   - Thiếu API sinh đề tự luyện tập theo chủ đề AI (`POST /api/v1/student/practice/generate`).
-

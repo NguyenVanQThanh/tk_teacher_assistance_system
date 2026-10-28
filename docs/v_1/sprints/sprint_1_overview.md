@@ -3,7 +3,7 @@
 > Path: `docs/v_1/sprints/sprint_1_overview.md` · Module(s): `academic`
 > Created At: `2026-07-18`
 > Created By: `Tam Khang`
-> Updated At: `2026-07-26`
+> Updated At: `2026-10-27`
 > Updated By: `Tam Khang`
 
 ## Mục tiêu Sprint
@@ -61,6 +61,22 @@ F-AUTH-01 (RBAC, current-user dependency, JWT)
 | [x] | Seed 8 permission `ACAD_*` mới, map cho role Admin | `done` |
 | [x] | `pytest tests` (115/115 unit & integration tests) pass 100% | `done` |
 | [x] | Specs `F-ACAD-01`, `F-ACAD-02`, `F-ACAD-03`, `F-ACAD-04` cập nhật theo thực tế triển khai | `done` |
+
+## Trạng thái Đồng bộ API Backend ↔ Frontend (`academic`)
+
+Mặc dù toàn bộ 19 endpoints của Sprint 1 đã hoàn thành 100% ở Backend, hiện tại `frontend/src/services/api.js` mới chỉ khai báo **6 endpoints đọc (`GET`)** và còn **13 endpoints ghi/xóa mềm/khôi phục (`POST/PUT/DELETE/RESTORE`)** chưa được đưa vào `api.js` và chưa nối vào UI:
+
+| Feature | Method & Endpoint | Backend | Khai báo `api.js` | Màn hình Frontend liên quan | Trạng thái Sync |
+|---|---|---|---|---|---|
+| `F-ACAD-01` | `GET /api/v1/subjects` | ✅ Đã có | `subjectsApi.getSubjects` | `TeacherClassesPage`, `ExerciseRepositoryPage`, `CreateExerciseModal` | ✅ Đã đồng bộ |
+| `F-ACAD-01` | `GET /api/v1/subjects/{id}` | ✅ Đã có | `subjectsApi.getSubjectDetail` | Đã có trong `api.js` | ✅ Đã khai báo |
+| `F-ACAD-01` | `POST /api/v1/subjects`<br>`PUT /api/v1/subjects/{id}`<br>`DELETE /api/v1/subjects/{id}`<br>`POST /api/v1/subjects/{id}/restore` | ✅ Đã có | ❌ Chưa khai báo | Chưa nối UI quản lý môn học ở cổng Admin | ⚠️ Đã có BE, thiếu ở `api.js` & FE |
+| `F-ACAD-02` | `GET /api/v1/classes`<br>`GET /api/v1/classes/{id}` | ✅ Đã có | `classesApi.getClasses`<br>`classesApi.getClassDetail` | `TeacherClassesPage`, `TeacherClassDetailPage`, `TeacherHomeroomPage`, `AssignExerciseModal` | ⚠️ Đã nối ở cổng Teacher; chưa nối ở `AdminClassesPage.jsx` (vẫn dùng mock) |
+| `F-ACAD-02` | `POST /api/v1/classes`<br>`PUT /api/v1/classes/{id}`<br>`DELETE /api/v1/classes/{id}`<br>`POST /api/v1/classes/{id}/restore` | ✅ Đã có | ❌ Chưa khai báo | `AdminClassesPage.jsx` (Modal tạo/sửa/xóa lớp đang chạy mock state) | ⚠️ Đã có BE, thiếu ở `api.js` & `AdminClassesPage` |
+| `F-ACAD-03` | `GET /api/v1/classes/{id}/students` | ✅ Đã có | `classesApi.getStudentsInClass` | `TeacherClassesPage`, `TeacherClassDetailPage`, `TeacherHomeroomPage` | ⚠️ Đã nối ở Teacher (nhưng điểm số/GPA đang gán cứng 8.2); chưa nối ở `AdminClassesPage` |
+| `F-ACAD-03` | `POST /api/v1/classes/{id}/students`<br>`DELETE /api/v1/classes/{id}/students/{student_id}`<br>`POST .../restore` | ✅ Đã có | ❌ Chưa khai báo | `AddStudentModal.jsx`, `TeacherHomeroomPage.jsx`, `AdminClassesPage.jsx` (đang thêm học sinh vào state tạm) | ⚠️ Đã có BE, thiếu ở `api.js` & FE |
+| `F-ACAD-04` | `GET /api/v1/classes/{id}/teacher-subjects` | ✅ Đã có | `classesApi.getTeacherSubjects` | `TeacherClassesPage`, `TeacherClassDetailPage` | ✅ Đã đồng bộ ở cổng Teacher |
+| `F-ACAD-04` | `POST /api/v1/classes/{id}/teacher-subjects`<br>`DELETE .../teacher-subjects/{tid}/{sid}`<br>`POST .../restore` | ✅ Đã có | ❌ Chưa khai báo | `AdminClassesPage.jsx` (Modal phân công giáo viên đang dùng mock state) | ⚠️ Đã có BE, thiếu ở `api.js` & `AdminClassesPage` |
 
 ## Catalogs khởi tạo trong Sprint này
 
