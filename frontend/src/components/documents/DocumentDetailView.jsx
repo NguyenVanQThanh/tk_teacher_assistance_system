@@ -35,10 +35,10 @@ export default function DocumentDetailView({
     'Tài liệu tổng hợp các kiến thức trọng tâm học kì 1 môn Toán lớp 12, bao gồm các chuyên đề: Ứng dụng đạo hàm để khảo sát và vẽ đồ thị hàm số, Hàm số lũy thừa, hàm số mũ và hàm số logarit. Kèm theo hệ thống bài tập tự luyện từ cơ bản đến nâng cao có đáp án chi tiết, phù hợp cho học sinh ôn thi THPT Quốc gia.';
 
   const folderName = doc.folder || `Toán ${doc.grade || '12'}`;
-  const viewsCount = doc.viewsCount || '1,245';
-  const downloadsCount = doc.downloadsCount || '342';
-  const ratingScore = doc.ratingScore || '4.8/5';
-  const ratingsCount = doc.ratingsCount || '56';
+  const viewsCount = doc.viewsCount || '0';
+  const downloadsCount = doc.downloadsCount !== undefined && doc.downloadsCount !== null ? String(doc.downloadsCount) : '0';
+  const ratingScore = doc.ratingScore || '5.0/5';
+  const ratingsCount = doc.ratingsCount || '1';
 
   return (
     <div className="doc-detail-view-container">

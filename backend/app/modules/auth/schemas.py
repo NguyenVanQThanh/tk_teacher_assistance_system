@@ -1,8 +1,8 @@
 # File Name: schemas.py
-# Description: Pydantic schemas for auth module request and response validation.
+# Description: Pydantic schemas for auth module request and response validation with RBAC permissions list.
 # Created At: 2026-07-11
-# Created By: Thanh Nguyen
-# Updated At: 2026-07-17
+# Created By: Tam Khang
+# Updated At: 2026-10-28
 # Updated By: Tam Khang
 
 
@@ -39,6 +39,8 @@ class UserOut(BaseModel):
     role: str
     email_masked: Optional[str] = Field(None, description="Masked email address for privacy")
     phone_masked: Optional[str] = Field(None, description="Masked phone number for privacy")
+    permissions: List[str] = Field(default_factory=list, description="Effective permission codes")
+
 
 class LoginResponse(BaseModel):
     """
@@ -65,6 +67,8 @@ class UserProfileOut(BaseModel):
     class_id: Optional[UUID] = Field(None, description="Enrolled or primary class ID")
     class_name: Optional[str] = Field(None, description="Enrolled or primary class name")
     teaching_subjects: Optional[List[str]] = Field(None, description="Assigned teaching subjects for teachers")
+    permissions: List[str] = Field(default_factory=list, description="Effective permission codes")
+
 
 class UserProfileUpdateRequest(BaseModel):
     """

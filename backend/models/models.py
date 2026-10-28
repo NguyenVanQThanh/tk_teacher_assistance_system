@@ -1,9 +1,9 @@
 """
 File Name: models.py
-Description: Database models definition for Sprint 0 & Sprint 2 tables (User, Role, Permission, Exercise, Question, AnswerOption, etc.).
+Description: Database models definition for tables (User, Role, Permission, Exercise, Question, ScheduleNote, etc.).
 Created At: 2026-07-04
 Created By: Tam Khang
-Updated At: 2026-09-30
+Updated At: 2026-10-28
 Updated By: Tam Khang
 """
 import uuid
@@ -148,6 +148,10 @@ class Document(Base):
     title = Column(String(255), nullable=False)
     file_url = Column(String(500), nullable=True)
     file_type = Column(String(20), nullable=True)
+    file_size = Column(Integer, default=0, nullable=True)
+    download_count = Column(Integer, default=0, nullable=False, server_default='0')
+    grade = Column(String(20), nullable=True, default='12')
+    document_type = Column(String(50), nullable=True, default='reference')
     raw_content = Column(Text, nullable=True)
     status = Column(String(20), default='Uploaded')
     created_at = Column(DateTime(timezone=True), server_default=func.now())
@@ -325,3 +329,18 @@ class AuditLog(Base):
     severity = Column(String(20), default='info', nullable=False)  # info | warning | danger
     status = Column(String(20), default='ACTIVE', nullable=False)  # ACTIVE | DELETED
     created_at = Column(DateTime(timezone=True), server_default=func.now())
+
+
+class ScheduleNote(Base):
+    __tablename__ = 'schedule_notes'
+
+    note_id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    user_id = Column(UUID(as_uuid=True), ForeignKey('users.user_id', ondelete='CASCADE'), nullable=False)
+    content = Column(Text, nullable=False)
+    note_date = Column(Date, nullable=True)
+    status = Column(String(20), default='ACTIVE', nullable=False)  # ACTIVE | DELETED (Strict Soft Delete)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+
+    user = relationship("User", backref="schedule_notes")
+

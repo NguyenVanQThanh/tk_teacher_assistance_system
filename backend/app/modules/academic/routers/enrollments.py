@@ -1,8 +1,8 @@
 # File Name: enrollments.py
-# Description: API router for Enrollment & Restore endpoints (F-ACAD-03).
+# Description: API router for Enrollment & Restore endpoints strictly enforcing ACAD_ENROLLMENT_MANAGE permission (F-ACAD-03).
 # Created At: 2026-07-23
 # Created By: Tam Khang
-# Updated At: 2026-07-26
+# Updated At: 2026-10-28
 # Updated By: Tam Khang
 
 from uuid import UUID
@@ -46,8 +46,7 @@ def enroll_student(
 
     perms = PermissionService.get_effective_permissions(db, current_user.user_id, current_user.role_id)
     has_perm = "ACAD_ENROLLMENT_MANAGE" in perms
-    is_homeroom = cls.homeroom_teacher_id == current_user.user_id
-    if not has_perm and not is_homeroom:
+    if not has_perm:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail={"code": "ERR-AUTH-PERMISSION_DENIED", "message": "You do not have permission to enroll students into this class."}

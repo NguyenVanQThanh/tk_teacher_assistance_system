@@ -1,8 +1,8 @@
 // File Name: api.js
-// Description: Centralized Axios API client configuration with token management, academic, and assignment service APIs.
+// Description: Centralized Axios API client configuration with token management, academic, assignment, and schedule service APIs.
 // Created At: 2026-08-30
 // Created By: Tam Khang
-// Updated At: 2026-10-03
+// Updated At: 2026-10-28
 // Updated By: Tam Khang
 
 import axios from 'axios';
@@ -261,6 +261,14 @@ export const documentsApi = {
     });
     return response.data;
   },
+  getDocumentDetail: async (documentId) => {
+    const response = await api.get(`/api/v1/documents/${documentId}`);
+    return response.data;
+  },
+  updateDocument: async (documentId, data) => {
+    const response = await api.put(`/api/v1/documents/${documentId}`, data);
+    return response.data;
+  },
   deleteDocument: async (documentId) => {
     await api.delete(`/api/v1/documents/${documentId}`);
   },
@@ -374,6 +382,18 @@ export const teacherApi = {
   },
   getSchedule: async () => {
     const response = await api.get('/api/v1/teacher/schedule');
+    return response.data;
+  },
+  getScheduleNotes: async () => {
+    const response = await api.get('/api/v1/teacher/schedule/notes');
+    return response.data;
+  },
+  createScheduleNote: async (data) => {
+    const response = await api.post('/api/v1/teacher/schedule/notes', data);
+    return response.data;
+  },
+  deleteScheduleNote: async (noteId) => {
+    const response = await api.delete(`/api/v1/teacher/schedule/notes/${noteId}`);
     return response.data;
   },
 };

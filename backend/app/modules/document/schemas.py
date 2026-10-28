@@ -2,7 +2,7 @@
 # Description: Pydantic schemas for Document Repository and Document Dashboard.
 # Created At: 2026-09-27
 # Created By: Tam Khang
-# Updated At: 2026-09-27
+# Updated At: 2026-10-28
 # Updated By: Tam Khang
 
 from datetime import datetime
@@ -20,6 +20,15 @@ class DocumentCreate(BaseModel):
     is_public: Optional[bool] = Field(False, description="Public visibility")
 
 
+class DocumentUpdate(BaseModel):
+    title: Optional[str] = Field(None, min_length=3, max_length=255, description="Document title")
+    subject_id: Optional[UUID] = Field(None, description="Associated subject UUID")
+    grade: Optional[str] = Field(None, description="Grade level (10, 11, 12)")
+    document_type: Optional[str] = Field(None, description="Document type: lecture, exam, reference")
+    description: Optional[str] = Field(None, description="Optional document summary")
+    status: Optional[str] = Field(None, description="Document status")
+
+
 class DocumentOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
@@ -32,6 +41,7 @@ class DocumentOut(BaseModel):
     subject_name: Optional[str] = None
     grade: Optional[str] = "12"
     document_type: Optional[str] = "reference"
+    description: Optional[str] = None
     uploaded_by: UUID
     author_name: Optional[str] = None
     download_count: Optional[int] = 0
@@ -65,6 +75,7 @@ class DocumentDashboardOut(BaseModel):
     total_downloads: int
     total_storage_bytes: int
     storage_formatted: str
+    storage_used_formatted: Optional[str] = None
     by_subject: List[DocumentSubjectStat]
     by_type: List[DocumentTypeStat]
     recent_documents: List[DocumentOut]

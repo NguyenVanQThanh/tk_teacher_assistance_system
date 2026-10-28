@@ -2,7 +2,7 @@
 # Description: API Router for Teacher Document Repository & Document Dashboard.
 # Created At: 2026-09-27
 # Created By: Tam Khang
-# Updated At: 2026-09-27
+# Updated At: 2026-10-28
 # Updated By: Tam Khang
 
 from typing import Optional
@@ -15,7 +15,8 @@ from pathlib import Path
 from app.core.database import get_db
 from models.models import User
 from app.modules.auth.dependencies import get_current_user
-from app.modules.document.schemas import DocumentOut, DocumentListOut, DocumentDashboardOut
+from app.modules.document.schemas import DocumentOut, DocumentListOut, DocumentDashboardOut, DocumentUpdate
+from app.modules.document.services import document_service
 from app.modules.document.services.document_service import DocumentService, UPLOAD_DIR
 
 router = APIRouter(prefix="/api/v1/documents", tags=["documents"])
@@ -27,7 +28,7 @@ def get_document_dashboard(
     current_user: User = Depends(get_current_user)
 ):
     """
-    Retrieve document repository statistics and metrics for the dashboard.
+    Retrieve document repository statistics and real metrics for the dashboard.
     """
     return DocumentService.get_document_dashboard(db=db, current_user=current_user)
 
@@ -87,6 +88,31 @@ def list_documents(
     )
 
 
+@router.get("/{document_id}", response_model=DocumentOut)
+def get_document_detail(
+    document_id: UUID,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """
+    Retrieve single document detail by document_id.
+    """
+    return DocumentService.get_document_detail(db, document_id)
+
+
+@router.put("/{document_id}", response_model=DocumentOut)
+def update_document(
+    document_id: UUID,
+    payload: DocumentUpdate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """
+    Update document metadata (title, subject_id, grade, document_type, description, status).
+    """
+    return DocumentService.update_document(db, document_id, payload, current_user)
+
+
 @router.get("/{document_id}/download")
 def download_document(
     document_id: UUID,
@@ -94,9 +120,9 @@ def download_document(
     current_user: User = Depends(get_current_user)
 ):
     """
-    Download a document file stream.
+    Download a document file stream and increment real download counter.
     """
-    doc = DocumentService.get_document_by_id(db, document_id)
+    doc = DocumentService.record_download(db, document_id)
     if not doc.file_url:
         raise HTTPException(status_code=404, detail="File attachment not found.")
 
@@ -104,11 +130,11 @@ def download_document(
     file_path = UPLOAD_DIR / file_name
 
     if not file_path.exists():
-        # Fallback if file on disk was cleared
         return {
             "document_id": doc.document_id,
             "title": doc.title,
             "file_url": doc.file_url,
+            "download_count": doc.download_count,
             "message": "File download initiated."
         }
 
