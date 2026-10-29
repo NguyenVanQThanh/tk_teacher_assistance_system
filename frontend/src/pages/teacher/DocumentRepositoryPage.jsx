@@ -196,6 +196,7 @@ export default function DocumentRepositoryPage() {
       }
     } catch (err) {
       console.error('Download error:', err);
+      showToast('Không thể tải tài liệu. Tệp có thể không còn tồn tại.', 'error', 'Tải tài liệu');
     }
   };
 

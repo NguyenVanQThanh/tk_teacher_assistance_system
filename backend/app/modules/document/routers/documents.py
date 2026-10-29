@@ -126,21 +126,13 @@ def download_document(
     """
     Download a document file stream and increment real download counter after access check.
     """
-    doc = DocumentService.record_download(db, document_id, current_user)
-    if not doc.file_url:
+    doc = DocumentService.get_document_by_id(db, document_id)
+    DocumentService.check_document_access(db, doc, current_user, requires_ownership=False)
+    file_path = UPLOAD_DIR / Path(doc.file_url).name if doc.file_url else None
+    # Verify the file exists before counting so a missing file never yields a bogus download.
+    if file_path is None or not file_path.exists():
         raise HTTPException(status_code=404, detail="File attachment not found.")
-
-    file_name = Path(doc.file_url).name
-    file_path = UPLOAD_DIR / file_name
-
-    if not file_path.exists():
-        return {
-            "document_id": doc.document_id,
-            "title": doc.title,
-            "file_url": doc.file_url,
-            "download_count": doc.download_count,
-            "message": "File download initiated."
-        }
+    doc = DocumentService.record_download(db, document_id, current_user)
 
     return FileResponse(
         path=file_path,

@@ -272,10 +272,7 @@ export default function TeacherSchedulePage() {
       } catch (err) {
         console.warn('Teacher schedule notes fallback to defaults:', err);
         if (isMounted) {
-          setNotes([
-            { id: 'fallback-1', text: 'Chuẩn bị đề kiểm tra 15 phút Giải tích 12' },
-            { id: 'fallback-2', text: 'Nộp báo cáo chuyên môn cho Tổ trưởng trước thứ 6' }
-          ]);
+          setNotes([]);
         }
       } finally {
         if (isMounted) {
@@ -428,14 +425,10 @@ export default function TeacherSchedulePage() {
       setNotes(prev => [created, ...prev]);
       setToastMessage('Đã thêm ghi chú mới thành công!');
     } catch (err) {
-      console.warn('Failed to save note to API, falling back to local state:', err);
-      const fallbackNote = {
-        id: `local-${Date.now()}`,
-        date: formattedDate,
-        text: trimmed
-      };
-      setNotes(prev => [fallbackNote, ...prev]);
-      setToastMessage('Đã thêm ghi chú mới!');
+      console.warn('Failed to save note:', err);
+      setToastMessage('Không thể lưu ghi chú. Vui lòng thử lại.');
+      setTimeout(() => setToastMessage(null), 3000);
+      return;
     }
     setNewNoteInput('');
     setTimeout(() => setToastMessage(null), 3000);
@@ -444,14 +437,14 @@ export default function TeacherSchedulePage() {
   // Delete note via API (strict soft delete on server)
   const handleDeleteNote = async (id) => {
     try {
+      await teacherApi.deleteScheduleNote(id);
       setNotes(prev => prev.filter(n => n.id !== id));
-      if (!String(id).startsWith('fallback-') && !String(id).startsWith('local-')) {
-        await teacherApi.deleteScheduleNote(id);
-      }
       setToastMessage('Đã xóa ghi chú thành công!');
       setTimeout(() => setToastMessage(null), 3000);
     } catch (err) {
       console.warn('Failed to delete note via API:', err);
+      setToastMessage('Không thể xóa ghi chú. Vui lòng thử lại.');
+      setTimeout(() => setToastMessage(null), 3000);
     }
   };
 
