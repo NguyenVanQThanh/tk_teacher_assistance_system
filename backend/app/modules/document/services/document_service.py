@@ -39,11 +39,26 @@ def format_storage_size(bytes_val: int) -> str:
 
 class DocumentService:
     @staticmethod
+    def is_admin(db: Session, user: User) -> bool:
+        """Return True when the user's role is Admin (case-insensitive, matching the router role gate)."""
+        role = db.query(Role).filter(Role.role_id == user.role_id).first()
+        return bool(role and role.name.lower() == "admin")
+
+    @staticmethod
+    def visible_documents_query(db: Session, current_user: User):
+        """Base query of documents the user may see: published ones, plus their own (admins see all)."""
+        query = db.query(Document).filter(Document.status != "DELETED")
+        if not DocumentService.is_admin(db, current_user):
+            query = query.filter(
+                (Document.status == "Uploaded") | (Document.uploaded_by == current_user.user_id)
+            )
+        return query
+
+    @staticmethod
     def check_document_access(db: Session, doc: Document, current_user: User, requires_ownership: bool = False) -> None:
         """Verify user permissions and document access rights."""
         is_owner = doc.uploaded_by == current_user.user_id
-        admin_role = db.query(Role).filter(Role.name == "Admin").first()
-        is_admin = bool(admin_role and current_user.role_id == admin_role.role_id)
+        is_admin = DocumentService.is_admin(db, current_user)
 
         if requires_ownership and not (is_owner or is_admin):
             raise HTTPException(
@@ -174,21 +189,12 @@ class DocumentService:
         page_size: int = 12
     ) -> DocumentListOut:
         """List documents with filtering, search, and pagination."""
-        query = db.query(Document)
+        # Soft-deleted documents are never listed; non-published ones are limited to their owner or an admin.
+        query = DocumentService.visible_documents_query(db, current_user)
 
-        # "ALL" (or empty) means every non-deleted status; DELETED is only listed when explicitly requested.
+        # "ALL" (or empty) means every visible status.
         if status_val and status_val != "ALL":
             query = query.filter(Document.status == status_val)
-        else:
-            query = query.filter(Document.status != "DELETED")
-
-        # Non-published documents (Draft, Archived, DELETED) are visible to their owner or an admin only.
-        admin_role = db.query(Role).filter(Role.name == "Admin").first()
-        is_admin = bool(admin_role and current_user.role_id == admin_role.role_id)
-        if not is_admin:
-            query = query.filter(
-                (Document.status == "Uploaded") | (Document.uploaded_by == current_user.user_id)
-            )
 
         if subject_id:
             query = query.filter(Document.subject_id == subject_id)
@@ -323,9 +329,10 @@ class DocumentService:
         return DocumentService.to_document_out(doc, db)
 
     @staticmethod
-    def get_document_dashboard(db: Session, current_user: Optional[User] = None) -> DocumentDashboardOut:
-        """Aggregate real metrics and statistics for Document Repository Dashboard without writes on read."""
-        active_docs = db.query(Document).filter(Document.status != "DELETED").all()
+    def get_document_dashboard(db: Session, current_user: User) -> DocumentDashboardOut:
+        """Aggregate metrics for the documents the user may see (same visibility as list), without writes on read."""
+        visible_query = DocumentService.visible_documents_query(db, current_user)
+        active_docs = visible_query.all()
         total_documents = len(active_docs)
         total_downloads = sum(d.download_count or 0 for d in active_docs)
 
@@ -372,9 +379,7 @@ class DocumentService:
         ]
 
         # Recent documents
-        recent_docs = db.query(Document).filter(
-            Document.status != "DELETED"
-        ).order_by(Document.created_at.desc()).limit(5).all()
+        recent_docs = visible_query.order_by(Document.created_at.desc()).limit(5).all()
 
         author_ids = {d.uploaded_by for d in recent_docs if d.uploaded_by}
         authors = {u.user_id: u.full_name for u in db.query(User).filter(User.user_id.in_(author_ids)).all()} if author_ids else {}

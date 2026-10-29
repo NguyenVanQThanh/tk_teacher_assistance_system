@@ -39,6 +39,17 @@ const formatFileSize = (bytes) => {
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 };
 
+// Backend returns subject names; filter, preview and edit components work with these keys.
+const SUBJECT_KEY_BY_NAME = {
+  'toán học': 'math',
+  'vật lý': 'physics',
+  'hóa học': 'chemistry',
+  'sinh học': 'biology',
+  'lịch sử': 'history',
+  'tiếng anh': 'english',
+  'tin học': 'it',
+};
+
 const mapBackendDoc = (doc) => ({
   id: doc.document_id,
   title: doc.title,
@@ -46,7 +57,8 @@ const mapBackendDoc = (doc) => ({
   fileSize: formatFileSize(doc.file_size),
   uploadDate: doc.created_at ? new Date(doc.created_at).toLocaleDateString('vi-VN') : '',
   grade: doc.grade || '12',
-  subject: doc.subject_name || doc.subject || 'math',
+  subject: SUBJECT_KEY_BY_NAME[(doc.subject_name || '').trim().toLowerCase()] || 'other',
+  subjectName: doc.subject_name || 'Chung',
   authorName: doc.author_name || doc.uploader_name || 'GV. Tam Khang',
   authorInitial: (doc.author_name || 'TK').split(' ').map(n => n[0]).join('').slice(-2).toUpperCase(),
   folder: `${doc.subject_name || 'Tài liệu'} ${doc.grade || ''}`.trim(),
@@ -104,9 +116,7 @@ export default function DocumentRepositoryPage() {
   }, []);
 
   useEffect(() => {
-    let isMounted = true;
     reloadData();
-    return () => { isMounted = false; };
   }, [reloadData]);
 
   // Filter logic

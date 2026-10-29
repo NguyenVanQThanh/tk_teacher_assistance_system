@@ -768,6 +768,9 @@ export default function TeacherSchedulePage() {
 
               {/* Notes List */}
               <div className="notes-items-list">
+                {!isNotesLoading && notes.length === 0 && (
+                  <span className="note-text">Chưa có ghi chú nào.</span>
+                )}
                 {notes.map((note) => (
                   <div key={note.id} className="single-note-item">
                     <div className="note-bullet" />

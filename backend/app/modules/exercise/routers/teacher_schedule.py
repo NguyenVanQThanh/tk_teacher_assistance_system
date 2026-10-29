@@ -157,34 +157,12 @@ def get_schedule_notes(
     current_user: User = Depends(get_current_user),
 ):
     """
-    Retrieve active schedule notes and reminders for the current teacher.
-    Initializes default reminder notes if none exist yet.
+    Retrieve active schedule notes and reminders for the current teacher (read-only).
     """
     notes = db.query(ScheduleNote).filter(
         ScheduleNote.user_id == current_user.user_id,
         ScheduleNote.status != "DELETED"
     ).order_by(ScheduleNote.created_at.desc()).all()
-
-    if not notes:
-        default_notes = [
-            ScheduleNote(
-                user_id=current_user.user_id,
-                content="Chuẩn bị đề kiểm tra 15 phút Giải tích 12",
-                status="ACTIVE",
-                note_date=date.today(),
-            ),
-            ScheduleNote(
-                user_id=current_user.user_id,
-                content="Nộp báo cáo chuyên môn cho Tổ trưởng trước thứ 6",
-                status="ACTIVE",
-                note_date=date.today(),
-            )
-        ]
-        db.add_all(default_notes)
-        db.commit()
-        for n in default_notes:
-            db.refresh(n)
-        notes = default_notes
 
     items = [
         ScheduleNoteOut(

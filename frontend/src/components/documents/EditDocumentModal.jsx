@@ -110,7 +110,8 @@ export default function EditDocumentModal({ isOpen, doc, onClose, onSave }) {
   // Header Data
   const [docTitle, setDocTitle] = useState(doc.title || 'Đề cương ôn tập Toán 12 - Học kì 1 (Nâng cao)');
   const docCode = doc.code || '#TL-TOAN12-HK1';
-  const gradeSubject = doc.subject && doc.grade ? `${doc.subject} - Lớp ${doc.grade}` : 'Toán học - Lớp 12';
+  const subjectLabel = doc.subjectName || doc.subject;
+  const gradeSubject = subjectLabel && doc.grade ? `${subjectLabel} - Lớp ${doc.grade}` : 'Toán học - Lớp 12';
 
   // Topic Metadata
   const [lessonTitle, setLessonTitle] = useState(

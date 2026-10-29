@@ -63,3 +63,12 @@ Initial test runs also encountered unrelated local infrastructure: another appli
 - The repository currently fetches at most 100 documents and does not provide complete pagination beyond that limit.
 - Dashboard visibility and direct file serving were not established as secured by the TC-06 correction or the broad existing E2E suite.
 - No commit or push was performed.
+
+## Follow-up: second AI review round (2026-10-29)
+
+- Dashboard leak: `get_document_dashboard` now uses the same `visible_documents_query` as list, so totals, storage, by-subject/type and `recent_documents` exclude other users' Draft/Archived documents. Admin sees all.
+- Admin check: service uses one case-insensitive `DocumentService.is_admin`, consistent with `require_roles`.
+- Schedule notes: `GET /api/v1/teacher/schedule/notes` is read-only; default-note seeding removed (deleted notes no longer reappear). Frontend shows an empty state.
+- Subject filter: `DocumentRepositoryPage.jsx` maps backend subject names to the filter keys (`math`, `physics`, ...) and keeps `subjectName` for display; unknown subjects map to `other`.
+- Removed unused `isMounted`. `restore_document` was already correct (`get_document_by_id` does not filter DELETED).
+- Verified over HTTP: teacher B cannot see teacher A's draft in dashboard/list/detail (404), A and Admin can; delete then restore works; deleting all notes keeps the list empty. E2E 29/29.
