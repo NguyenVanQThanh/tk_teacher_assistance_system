@@ -2,8 +2,8 @@
 // Description: Playwright test configuration for teacher portal end-to-end automation.
 // Created At: 2026-10-07
 // Created By: Tam Khang
-// Updated At: 2026-10-07
-// Updated By: Tam Khang
+// Updated At: 2026-10-29
+// Updated By: AI Agent
 
 import { defineConfig, devices } from '@playwright/test';
 
@@ -21,7 +21,7 @@ export default defineConfig({
     ['html', { outputFolder: 'playwright-report', open: 'never' }]
   ],
   use: {
-    baseURL: 'http://localhost:3000',
+    baseURL: 'http://127.0.0.1:3000',
     trace: 'on-first-retry',
     screenshot: 'only-on-failure',
     video: 'off',
