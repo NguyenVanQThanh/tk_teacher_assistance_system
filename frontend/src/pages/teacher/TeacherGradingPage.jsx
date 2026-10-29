@@ -2,7 +2,7 @@
 // Description: Teacher Grading & Feedback management page with submission metrics, multi-criteria filtering, submission roster table, and interactive grading modal.
 // Created At: 2026-09-01
 // Created By: Tam Khang
-// Updated At: 2026-09-12
+// Updated At: 2026-10-29
 // Updated By: Tam Khang
 
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
@@ -23,16 +23,18 @@ import {
   Check,
   Loader2
 } from 'lucide-react';
+import { useSearchParams } from 'react-router-dom';
 import GradingFeedbackModal from '../../components/teacher/GradingFeedbackModal';
 import { attemptsApi, classesApi, subjectsApi } from '../../services/api';
 import './TeacherGradingPage.css';
 
 export default function TeacherGradingPage() {
+  const [searchParams] = useSearchParams();
   const [showSidebar, setShowSidebar] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [gradeFilter, setGradeFilter] = useState('all');
   const [subjectFilter, setSubjectFilter] = useState('all');
-  const [statusFilter, setStatusFilter] = useState('all');
+  const [statusFilter, setStatusFilter] = useState(searchParams.get('status') || 'all');
   const [typeFilter, setTypeFilter] = useState('all');
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 8;
@@ -45,369 +47,15 @@ export default function TeacherGradingPage() {
   const [subjectsList, setSubjectsList] = useState([]);
   const [dashboardStats, setDashboardStats] = useState(null);
 
-  // Submissions dataset with 3 official statuses: pending_grading (Chờ chấm), pending_review (Chờ duyệt), approved (Đã duyệt)
-  const [submissions, setSubmissions] = useState([
-    {
-      id: 1,
-      studentName: 'Trần Thị Lan',
-      avatarInitial: 'TL',
-      avatarColor: '#8B5CF6',
-      className: '10A1',
-      grade: '10',
-      subject: 'math',
-      exerciseTitle: 'Kiểm tra 15p - Đạo hàm',
-      exerciseType: 'Bài tập trên lớp',
-      exerciseTypeCode: 'classroom',
-      submittedTime: 'Hôm nay, 08:30',
-      timeType: 'normal',
-      status: 'pending_grading',
-      statusLabel: 'Chờ chấm',
-      score: null,
-      feedback: ''
-    },
-    {
-      id: 2,
-      studentName: 'Phạm Thu Thảo',
-      avatarInitial: 'TT',
-      avatarColor: '#6366F1',
-      className: '12A1',
-      grade: '12',
-      subject: 'math',
-      exerciseTitle: 'Khảo sát hàm số nâng cao',
-      exerciseType: 'Bài tập trên lớp',
-      exerciseTypeCode: 'classroom',
-      submittedTime: 'Hôm nay, 09:15',
-      timeType: 'normal',
-      status: 'pending_grading',
-      statusLabel: 'Chờ chấm',
-      score: null,
-      feedback: ''
-    },
-    {
-      id: 3,
-      studentName: 'Hoàng Yến Nhi',
-      avatarInitial: 'YN',
-      avatarColor: '#EC4899',
-      className: '11A3',
-      grade: '11',
-      subject: 'physics',
-      exerciseTitle: 'Kiểm tra 45p - Sóng ánh sáng',
-      exerciseType: 'Bài tập trên lớp',
-      exerciseTypeCode: 'classroom',
-      submittedTime: 'Hôm qua, 22:30',
-      timeType: 'late',
-      status: 'pending_grading',
-      statusLabel: 'Chờ chấm',
-      score: null,
-      feedback: ''
-    },
-    {
-      id: 4,
-      studentName: 'Bùi Quốc Anh',
-      avatarInitial: 'QA',
-      avatarColor: '#3B82F6',
-      className: '10A2',
-      grade: '10',
-      subject: 'physics',
-      exerciseTitle: 'Bài tập Thuyết electron & Điện tích',
-      exerciseType: 'Bài tập trên lớp',
-      exerciseTypeCode: 'classroom',
-      submittedTime: 'Hôm nay, 10:05',
-      timeType: 'normal',
-      status: 'pending_grading',
-      statusLabel: 'Chờ chấm',
-      score: null,
-      feedback: ''
-    },
-    {
-      id: 5,
-      studentName: 'Lê Gia Hưng',
-      avatarInitial: 'GH',
-      avatarColor: '#10B981',
-      className: '11B1',
-      grade: '11',
-      subject: 'chemistry',
-      exerciseTitle: 'Bài tập Ancol - Phenol',
-      exerciseType: 'Bài tập trên lớp',
-      exerciseTypeCode: 'classroom',
-      submittedTime: 'Hôm nay, 10:45',
-      timeType: 'normal',
-      status: 'pending_grading',
-      statusLabel: 'Chờ chấm',
-      score: null,
-      feedback: ''
-    },
-    {
-      id: 6,
-      studentName: 'Đỗ Minh Trí',
-      avatarInitial: 'MT',
-      avatarColor: '#F59E0B',
-      className: '12A2',
-      grade: '12',
-      subject: 'chemistry',
-      exerciseTitle: 'Đề kiểm tra Este Lipit nâng cao',
-      exerciseType: 'Bài tập trên lớp',
-      exerciseTypeCode: 'classroom',
-      submittedTime: 'Hôm qua, 21:10',
-      timeType: 'normal',
-      status: 'pending_grading',
-      statusLabel: 'Chờ chấm',
-      score: null,
-      feedback: ''
-    },
-    {
-      id: 7,
-      studentName: 'Võ Thùy Trang',
-      avatarInitial: 'TT',
-      avatarColor: '#8B5CF6',
-      className: '10A3',
-      grade: '10',
-      subject: 'literature',
-      exerciseTitle: 'Phân tích văn bản Tấm Cám',
-      exerciseType: 'Bài tập trên lớp',
-      exerciseTypeCode: 'classroom',
-      submittedTime: 'Hôm qua, 18:20',
-      timeType: 'normal',
-      status: 'pending_grading',
-      statusLabel: 'Chờ chấm',
-      score: null,
-      feedback: ''
-    },
-    {
-      id: 8,
-      studentName: 'Trịnh Hoàng Long',
-      avatarInitial: 'HL',
-      avatarColor: '#06B6D4',
-      className: '11A1',
-      grade: '11',
-      subject: 'literature',
-      exerciseTitle: 'Nghị luận xã hội: Tư duy tự học',
-      exerciseType: 'Bài tập trên lớp',
-      exerciseTypeCode: 'classroom',
-      submittedTime: 'Hôm nay, 07:50',
-      timeType: 'normal',
-      status: 'pending_grading',
-      statusLabel: 'Chờ chấm',
-      score: null,
-      feedback: ''
-    },
-    {
-      id: 9,
-      studentName: 'Dương Thanh Hà',
-      avatarInitial: 'TH',
-      avatarColor: '#EC4899',
-      className: '12A3',
-      grade: '12',
-      subject: 'english',
-      exerciseTitle: 'Ôn tập Unit 4: Urbanisation',
-      exerciseType: 'Bài tập trên lớp',
-      exerciseTypeCode: 'classroom',
-      submittedTime: 'Hôm qua, 23:45',
-      timeType: 'late',
-      status: 'pending_grading',
-      statusLabel: 'Chờ chấm',
-      score: null,
-      feedback: ''
-    },
-    {
-      id: 10,
-      studentName: 'Nguyễn Hải Yến',
-      avatarInitial: 'HY',
-      avatarColor: '#14B8A6',
-      className: '10A1',
-      grade: '10',
-      subject: 'english',
-      exerciseTitle: 'Progress Test: Tenses & Modals',
-      exerciseType: 'Bài tập trên lớp',
-      exerciseTypeCode: 'classroom',
-      submittedTime: 'Hôm nay, 11:00',
-      timeType: 'normal',
-      status: 'pending_grading',
-      statusLabel: 'Chờ chấm',
-      score: null,
-      feedback: ''
-    },
-    {
-      id: 11,
-      studentName: 'Phan Minh Khang',
-      avatarInitial: 'MK',
-      avatarColor: '#6366F1',
-      className: '11B2',
-      grade: '11',
-      subject: 'physics',
-      exerciseTitle: 'Bài tập Định luật Vạn vật Hấp dẫn',
-      exerciseType: 'Bài tập trên lớp',
-      exerciseTypeCode: 'classroom',
-      submittedTime: 'Hôm nay, 11:30',
-      timeType: 'normal',
-      status: 'pending_grading',
-      statusLabel: 'Chờ chấm',
-      score: null,
-      feedback: ''
-    },
-    {
-      id: 12,
-      studentName: 'Trương Bảo Ngọc',
-      avatarInitial: 'BN',
-      avatarColor: '#A855F7',
-      className: '12A1',
-      grade: '12',
-      subject: 'math',
-      exerciseTitle: 'Phương trình Logarit chứa tham số m',
-      exerciseType: 'Bài tập trên lớp',
-      exerciseTypeCode: 'classroom',
-      submittedTime: 'Hôm nay, 11:45',
-      timeType: 'normal',
-      status: 'pending_grading',
-      statusLabel: 'Chờ chấm',
-      score: null,
-      feedback: ''
-    },
-    {
-      id: 13,
-      studentName: 'Nguyễn Minh Hải',
-      avatarInitial: 'MH',
-      avatarColor: '#A855F7',
-      className: '11B2',
-      grade: '11',
-      subject: 'math',
-      exerciseTitle: 'Luyện tập AI - Tích phân',
-      exerciseType: 'Tạo sinh',
-      exerciseTypeCode: 'ai',
-      submittedTime: 'Hôm qua, 23:15',
-      timeType: 'normal',
-      status: 'pending_review',
-      statusLabel: 'Chờ duyệt',
-      score: 8.5,
-      feedback: ''
-    },
-    {
-      id: 14,
-      studentName: 'Đặng Quốc Huy',
-      avatarInitial: 'QH',
-      avatarColor: '#10B981',
-      className: '12A1',
-      grade: '12',
-      subject: 'chemistry',
-      exerciseTitle: 'Luyện tập AI - Este Lipit',
-      exerciseType: 'Tạo sinh',
-      exerciseTypeCode: 'ai',
-      submittedTime: 'Hôm nay, 11:20',
-      timeType: 'normal',
-      status: 'pending_review',
-      statusLabel: 'Chờ duyệt',
-      score: 8.0,
-      feedback: ''
-    },
-    {
-      id: 15,
-      studentName: 'Cao Tuấn Kiệt',
-      avatarInitial: 'TK',
-      avatarColor: '#3B82F6',
-      className: '10A2',
-      grade: '10',
-      subject: 'physics',
-      exerciseTitle: 'Luyện tập AI - Khúc xạ ánh sáng',
-      exerciseType: 'Tạo sinh',
-      exerciseTypeCode: 'ai',
-      submittedTime: 'Hôm nay, 08:15',
-      timeType: 'normal',
-      status: 'pending_review',
-      statusLabel: 'Chờ duyệt',
-      score: 9.0,
-      feedback: ''
-    },
-    {
-      id: 16,
-      studentName: 'Lâm Khánh Linh',
-      avatarInitial: 'KL',
-      avatarColor: '#EC4899',
-      className: '11A1',
-      grade: '11',
-      subject: 'english',
-      exerciseTitle: 'Luyện tập AI - Conditional Sentences',
-      exerciseType: 'Tạo sinh',
-      exerciseTypeCode: 'ai',
-      submittedTime: 'Hôm nay, 09:40',
-      timeType: 'normal',
-      status: 'pending_review',
-      statusLabel: 'Chờ duyệt',
-      score: 8.5,
-      feedback: ''
-    },
-    {
-      id: 17,
-      studentName: 'Hồ Văn Tuấn',
-      avatarInitial: 'VT',
-      avatarColor: '#F59E0B',
-      className: '12A2',
-      grade: '12',
-      subject: 'math',
-      exerciseTitle: 'Luyện tập AI - Tọa độ không gian Oxyz',
-      exerciseType: 'Tạo sinh',
-      exerciseTypeCode: 'ai',
-      submittedTime: 'Hôm nay, 10:10',
-      timeType: 'normal',
-      status: 'pending_review',
-      statusLabel: 'Chờ duyệt',
-      score: 7.5,
-      feedback: ''
-    },
-    {
-      id: 18,
-      studentName: 'Lê Phương Duy',
-      avatarInitial: 'PD',
-      avatarColor: '#94A3B8',
-      className: '10A1',
-      grade: '10',
-      subject: 'math',
-      exerciseTitle: 'Bài tập Hình học Không gian',
-      exerciseType: 'Bài tập trên lớp',
-      exerciseTypeCode: 'classroom',
-      submittedTime: '12/05/2023, 14:20',
-      timeType: 'graded',
-      status: 'approved',
-      statusLabel: 'Đã duyệt',
-      score: 8.5,
-      feedback: 'Làm bài tốt, hình vẽ rõ ràng và lập luận chuẩn xác.'
-    },
-    {
-      id: 19,
-      studentName: 'Vũ Đức Nam',
-      avatarInitial: 'DN',
-      avatarColor: '#3B82F6',
-      className: '10A2',
-      grade: '10',
-      subject: 'math',
-      exerciseTitle: 'Luyện tập AI - Tổ hợp xác suất',
-      exerciseType: 'Tạo sinh',
-      exerciseTypeCode: 'ai',
-      submittedTime: 'Hôm qua, 20:45',
-      timeType: 'graded',
-      status: 'approved',
-      statusLabel: 'Đã duyệt',
-      score: 9.0,
-      feedback: 'Lời giải ngắn gọn, kết quả chính xác 100%.'
-    },
-    {
-      id: 20,
-      studentName: 'Nguyễn Bích Ngọc',
-      avatarInitial: 'BN',
-      avatarColor: '#F59E0B',
-      className: '10A1',
-      grade: '10',
-      subject: 'literature',
-      exerciseTitle: 'Đọc hiểu Văn bản Thơ',
-      exerciseType: 'Bài tập trên lớp',
-      exerciseTypeCode: 'classroom',
-      submittedTime: 'Hôm qua, 16:30',
-      timeType: 'graded',
-      status: 'approved',
-      statusLabel: 'Đã duyệt',
-      score: 8.0,
-      feedback: 'Cảm thụ tốt, lời văn trau chuốt.'
+  // Submissions dataset populated from real backend API
+  const [submissions, setSubmissions] = useState([]);
+
+  useEffect(() => {
+    const s = searchParams.get('status');
+    if (s) {
+      setStatusFilter(s);
     }
-  ]);
+  }, [searchParams]);
 
   const loadData = useCallback(async () => {
     try {
@@ -431,11 +79,12 @@ export default function TeacherGradingPage() {
         setSubjectsList(Array.isArray(subjectsRes.value) ? subjectsRes.value : subjectsRes.value.items || []);
       }
 
-      if (attemptsRes.status === 'fulfilled' && Array.isArray(attemptsRes.value) && attemptsRes.value.length > 0) {
-        const mapped = attemptsRes.value.map((att, idx) => {
+      if (attemptsRes.status === 'fulfilled') {
+        const rawItems = Array.isArray(attemptsRes.value) ? attemptsRes.value : (attemptsRes.value?.items || []);
+        const mapped = rawItems.map((att, idx) => {
           const rawScore = att.score;
           const hasScore = rawScore !== null && rawScore !== undefined;
-          const gradeMatch = att.class_name ? att.class_name.match(/\b(10|11|12)\b/) : null;
+          const gradeMatch = att.class_name ? att.class_name.match(/(10|11|12)/) : null;
           const grade = gradeMatch ? gradeMatch[1] : '12';
 
           let subjKey = 'math';
@@ -476,7 +125,7 @@ export default function TeacherGradingPage() {
             grade,
             subject: subjKey,
             subjectName: att.subject_name || 'Toán học',
-            exerciseTitle: att.exercise_title || 'Bài tập trực tuyến',
+            exerciseTitle: att.exercise_title || att.assignment_title || 'Bài tập trực tuyến',
             exerciseType: 'Bài tập trực tuyến',
             exerciseTypeCode: 'classroom',
             submittedTime: submittedFormatted,
