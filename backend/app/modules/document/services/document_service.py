@@ -8,7 +8,7 @@
 import math
 import uuid
 from pathlib import Path
-from typing import Optional, List
+from typing import Optional
 from uuid import UUID
 from fastapi import UploadFile, HTTPException, status
 from sqlalchemy import func
@@ -55,10 +55,23 @@ class DocumentService:
         return query
 
     @staticmethod
-    def check_document_access(db: Session, doc: Document, current_user: User, requires_ownership: bool = False) -> None:
+    def check_document_access(
+        db: Session,
+        doc: Document,
+        current_user: User,
+        requires_ownership: bool = False,
+        allow_deleted: bool = False
+    ) -> None:
         """Verify user permissions and document access rights."""
         is_owner = doc.uploaded_by == current_user.user_id
         is_admin = DocumentService.is_admin(db, current_user)
+
+        # Soft-deleted documents are not readable or mutable by anyone; restore is the only way back.
+        if doc.status == "DELETED" and not allow_deleted:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail={"code": "ERR-DOC-NOT_FOUND", "message": "Document not found."}
+            )
 
         if requires_ownership and not (is_owner or is_admin):
             raise HTTPException(
@@ -322,7 +335,7 @@ class DocumentService:
     def restore_document(db: Session, document_id: UUID, current_user: User) -> DocumentOut:
         """Restore soft-deleted document to Uploaded status (ownership verified)."""
         doc = DocumentService.get_document_by_id(db, document_id)
-        DocumentService.check_document_access(db, doc, current_user, requires_ownership=True)
+        DocumentService.check_document_access(db, doc, current_user, requires_ownership=True, allow_deleted=True)
         doc.status = "Uploaded"
         db.commit()
         db.refresh(doc)

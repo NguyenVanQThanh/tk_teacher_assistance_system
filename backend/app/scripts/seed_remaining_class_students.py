@@ -20,9 +20,12 @@ from app.core.database import SessionLocal
 from models.models import User, Role, Class, StudentClass
 from app.core.security import get_password_hash
 
-DEFAULT_STUDENT_PASSWORD = os.environ.get("SEED_STUDENT_PASSWORD")
-if not DEFAULT_STUDENT_PASSWORD:
-    sys.exit("SEED_STUDENT_PASSWORD environment variable is required.")
+def get_student_password() -> str:
+    """Return the injected seed password; fail only when seeding actually runs, not on import."""
+    password = os.environ.get("SEED_STUDENT_PASSWORD")
+    if not password:
+        raise SystemExit("SEED_STUDENT_PASSWORD environment variable is required.")
+    return password
 
 SAMPLE_NAMES_11 = [
     "Nguyễn Thị Hương", "Lê Quốc Trung", "Trần Văn Minh", "Phạm Thị Thu",
@@ -41,6 +44,7 @@ SAMPLE_NAMES_12 = [
 ]
 
 def seed_remaining_students():
+    student_password = get_student_password()
     db = SessionLocal()
     try:
         role_student = db.query(Role).filter(Role.name == "Student").first()
@@ -94,7 +98,7 @@ def seed_remaining_students():
                             user_id=uuid.uuid4(),
                             phone=phone,
                             email=email,
-                            password_hash=get_password_hash(DEFAULT_STUDENT_PASSWORD),
+                            password_hash=get_password_hash(student_password),
                             full_name=full_name,
                             birthday=date(2008, (code_num % 12) + 1, (code_num % 28) + 1),
                             role_id=role_student.role_id,

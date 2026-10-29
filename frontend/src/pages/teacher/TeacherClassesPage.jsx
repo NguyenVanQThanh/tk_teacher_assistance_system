@@ -5,7 +5,7 @@
 // Updated At: 2026-10-28
 // Updated By: Tam Khang
 
-import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { 
   ChevronRight, 
   Search, 
@@ -35,6 +35,9 @@ function getCurrentAcademicYear() {
   return month >= 8 ? `${year}-${year + 1}` : `${year - 1}-${year}`;
 }
 
+// Minimum gap between automatic refreshes triggered by tab visibility.
+const MIN_REFRESH_GAP_MS = 30000;
+
 export default function TeacherClassesPage() {
   const currentAcademicYear = useMemo(() => getCurrentAcademicYear(), []);
 
@@ -51,11 +54,19 @@ export default function TeacherClassesPage() {
   const { user } = useAuth();
   const navigate = useNavigate();
 
+  // Refs keep the loader stable: it must not be re-created (and re-subscribed) when the user object changes.
+  const userIdRef = useRef(user?.user_id);
+  userIdRef.current = user?.user_id;
+  const isRefreshingRef = useRef(false);
+  const lastLoadedAtRef = useRef(0);
+  const userId = user?.user_id;
+
   // Color themes for card banner rotation
   const THEMES = ['purple-theme', 'lavender-theme', 'pink-theme'];
 
   // Load and enrich classes data from backend APIs
   const loadData = useCallback(async (isInitial = false) => {
+    isRefreshingRef.current = true;
     try {
       if (isInitial) {
         setLoading(true);
@@ -100,8 +111,9 @@ export default function TeacherClassesPage() {
             if (Array.isArray(teacherAssignments)) {
               // Find assignment for current teacher if authenticated
               let myAssign = null;
-              if (user?.user_id) {
-                myAssign = teacherAssignments.find(a => a.teacher_id === user.user_id && a.status !== 'DELETED');
+              const currentUserId = userIdRef.current;
+              if (currentUserId) {
+                myAssign = teacherAssignments.find(a => a.teacher_id === currentUserId && a.status !== 'DELETED');
               }
               // If not found for current user, check active assignment in class
               if (!myAssign && teacherAssignments.length > 0) {
@@ -162,38 +174,27 @@ export default function TeacherClassesPage() {
     } finally {
       if (isInitial) setLoading(false);
       setIsRefreshing(false);
+      isRefreshingRef.current = false;
+      lastLoadedAtRef.current = Date.now();
     }
-  }, [user]);
+  }, []);
 
   // Initial load and automated background synchronization
   useEffect(() => {
     loadData(true);
 
-    // Auto-refresh interval (polling every 10 seconds for real-time db updates)
-    const intervalId = setInterval(() => {
-      loadData(false);
-    }, 10000);
-
-    // Auto-refresh on window focus / tab visibility
-    const handleFocus = () => {
-      loadData(false);
-    };
-
+    // Refresh when the tab becomes visible again. Each refresh fans out two requests per class,
+    // so there is no timer and a refresh is skipped while another one is still running or was just done.
     const handleVisibility = () => {
-      if (document.visibilityState === 'visible') {
-        loadData(false);
-      }
+      if (document.visibilityState !== 'visible') return;
+      if (isRefreshingRef.current || Date.now() - lastLoadedAtRef.current < MIN_REFRESH_GAP_MS) return;
+      loadData(false);
     };
 
-    window.addEventListener('focus', handleFocus);
     document.addEventListener('visibilitychange', handleVisibility);
-
-    return () => {
-      clearInterval(intervalId);
-      window.removeEventListener('focus', handleFocus);
-      document.removeEventListener('visibilitychange', handleVisibility);
-    };
-  }, [loadData]);
+    return () => document.removeEventListener('visibilitychange', handleVisibility);
+    // userId re-triggers the initial load once the authenticated user is known.
+  }, [loadData, userId]);
 
   // Distinct academic years available from data + current academic year
   const availableYears = useMemo(() => {

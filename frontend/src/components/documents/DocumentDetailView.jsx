@@ -16,8 +16,7 @@ import {
   Calendar, 
   FileText, 
   Folder, 
-  Check, 
-  Star 
+  Check
 } from 'lucide-react';
 import './DocumentDetailView.css';
 
