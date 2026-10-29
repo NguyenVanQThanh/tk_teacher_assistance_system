@@ -2,7 +2,7 @@
 // Description: Interactive grading and feedback modal with question result overrides, warning confirmation popup on answer key changes, and automatic batch cascade regrading.
 // Created At: 2026-09-01
 // Created By: Tam Khang
-// Updated At: 2026-10-07
+// Updated At: 2026-10-30
 // Updated By: Tam Khang
 
 import React, { useState, useEffect } from 'react';
@@ -92,13 +92,24 @@ export default function GradingFeedbackModal({
     }
   ];
 
-  const [questions, setQuestions] = useState(initialQuestions);
+  const [questions, setQuestions] = useState([]);
   const [score, setScore] = useState(submission.score !== null && submission.score !== undefined ? submission.score : 8.5);
   const [feedback, setFeedback] = useState(submission.feedback || '');
   const [isGeneratingAi, setIsGeneratingAi] = useState(false);
   const [hasModifiedAnswerKey, setHasModifiedAnswerKey] = useState(false);
   const [showWarningConfirmModal, setShowWarningConfirmModal] = useState(false);
-  const [loadingDetails, setLoadingDetails] = useState(false);
+  const [loadingDetails, setLoadingDetails] = useState(true);
+
+  // Close modal on Escape key
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      if (e.key === 'Escape') {
+        onClose();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [onClose]);
 
   useEffect(() => {
     if (!submission) return;
@@ -109,115 +120,119 @@ export default function GradingFeedbackModal({
     setHasModifiedAnswerKey(false);
     setShowWarningConfirmModal(false);
 
-    if (submission.attempt_id && submission.exercise_id) {
-      let isMounted = true;
-      async function loadRealDetails() {
-        try {
-          setLoadingDetails(true);
-          const [attRes, exRes] = await Promise.allSettled([
-            attemptsApi.getAttemptDetail(submission.attempt_id),
-            exercisesApi.getExerciseDetail(submission.exercise_id)
-          ]);
+    let isMounted = true;
+    async function loadRealDetails() {
+      try {
+        setLoadingDetails(true);
+        let attData = null;
+        if (submission.attempt_id) {
+          attData = await attemptsApi.getAttemptDetail(submission.attempt_id).catch(() => null);
+        }
 
-          if (!isMounted) return;
+        if (!isMounted) return;
 
-          if (exRes.status === 'fulfilled' && exRes.value && exRes.value.questions && exRes.value.questions.length > 0) {
-            const exQuestions = exRes.value.questions;
-            const attData = attRes.status === 'fulfilled' ? attRes.value : null;
-            const attResults = (attData?.detailed_results?.questions || []);
-            const resultsMap = {};
-            attResults.forEach((r) => {
-              resultsMap[r.question_id] = r;
-            });
+        const targetExerciseId = submission.exercise_id || attData?.exercise_id;
+        let exData = null;
+        if (targetExerciseId) {
+          exData = await exercisesApi.getExerciseDetail(targetExerciseId).catch(() => null);
+        }
 
-            const pointsPerQ = 10.0 / exQuestions.length;
+        if (!isMounted) return;
 
-            const mapped = exQuestions.map((q, idx) => {
-              const res = resultsMap[q.question_id] || {};
-              const isMC = q.question_type === 'MultipleChoice';
-              const isTF = q.question_type === 'TrueFalse';
-              const isShort = q.question_type === 'ShortAnswer';
-              
-              let studentOptKey = null;
-              let correctOptKey = null;
-              const formattedOptions = (q.answer_options || []).map((opt, oIdx) => {
-                const letter = String.fromCharCode(65 + oIdx);
-                if (opt.is_correct) correctOptKey = letter;
-                if (opt.option_id === res.student_answer_option_id) studentOptKey = letter;
-                return { 
-                  key: letter, 
-                  text: opt.content, 
-                  option_id: opt.option_id,
-                  is_correct: opt.is_correct 
-                };
-              });
+        if (exData && exData.questions && exData.questions.length > 0) {
+          const exQuestions = exData.questions;
+          const attResults = (attData?.detailed_results?.questions || []);
+          const resultsMap = {};
+          attResults.forEach((r) => {
+            resultsMap[r.question_id] = r;
+          });
 
-              let isCorrect = false;
-              let currentPoints = 0;
+          const pointsPerQ = 10.0 / exQuestions.length;
 
-              if (isMC) {
-                isCorrect = res.is_correct !== undefined ? res.is_correct : (studentOptKey && studentOptKey === correctOptKey);
-                currentPoints = isCorrect ? pointsPerQ : 0;
-              } else if (isTF) {
-                isCorrect = res.is_correct !== undefined ? res.is_correct : false;
-                currentPoints = isCorrect ? pointsPerQ : 0;
-              } else if (isShort) {
-                // Short answer: check if already evaluated or matches exact string
-                if (res.is_correct !== null && res.is_correct !== undefined) {
-                  isCorrect = res.is_correct;
-                } else if (q.correct_answer && res.student_answer_text) {
-                  const normStudent = String(res.student_answer_text).trim().replace(',', '.').toLowerCase();
-                  const normCorrect = String(q.correct_answer).trim().replace(',', '.').toLowerCase();
-                  isCorrect = normStudent === normCorrect;
-                } else {
-                  isCorrect = false;
-                }
-                currentPoints = isCorrect ? pointsPerQ : 0;
-              }
-
-              const type = isMC ? 'multiple_choice' : (isTF ? 'true_false' : 'short_answer');
-              const typeName = isMC 
-                ? `CÂU ${idx + 1} (TRẮC NGHIỆM)` 
-                : (isTF ? `CÂU ${idx + 1} (ĐÚNG / SAI)` : `CÂU ${idx + 1} (TRẢ LỜI NGẮN)`);
-
-              return {
-                id: q.question_id,
-                type: type,
-                typeName: typeName,
-                maxPoints: pointsPerQ,
-                studentOption: studentOptKey,
-                correctOption: correctOptKey,
-                studentAnswer: res.student_answer_text || studentOptKey,
-                correctAnswer: q.correct_answer || correctOptKey,
-                currentPoints: currentPoints,
-                isCorrect: isCorrect,
-                needsManualGrading: isShort && (res.pending_manual_grade !== false),
-                needsReview: q.needs_review || (!correctOptKey && isMC),
-                stem: q.content,
-                options: formattedOptions,
-                subResults: res.sub_results || {}
+          const mapped = exQuestions.map((q, idx) => {
+            const res = resultsMap[q.question_id] || {};
+            const isMC = q.question_type === 'MultipleChoice';
+            const isTF = q.question_type === 'TrueFalse';
+            const isShort = q.question_type === 'ShortAnswer';
+            
+            let studentOptKey = null;
+            let correctOptKey = null;
+            const formattedOptions = (q.answer_options || []).map((opt, oIdx) => {
+              const letter = String.fromCharCode(65 + oIdx);
+              if (opt.is_correct) correctOptKey = letter;
+              if (opt.option_id === res.student_answer_option_id) studentOptKey = letter;
+              return { 
+                key: letter, 
+                text: opt.content, 
+                option_id: opt.option_id,
+                is_correct: opt.is_correct 
               };
             });
 
-            setQuestions(mapped);
-            if (attData && attData.score !== null && attData.score !== undefined) {
-              setScore(attData.score);
-            }
-          } else {
-            setQuestions(initialQuestions);
-          }
-        } catch (err) {
-          setQuestions(initialQuestions);
-        } finally {
-          if (isMounted) setLoadingDetails(false);
-        }
-      }
+            let isCorrect = false;
+            let currentPoints = 0;
 
-      loadRealDetails();
-      return () => { isMounted = false; };
-    } else {
-      setQuestions(initialQuestions);
+            if (isMC) {
+              isCorrect = res.is_correct !== undefined ? res.is_correct : (studentOptKey && studentOptKey === correctOptKey);
+              currentPoints = isCorrect ? pointsPerQ : 0;
+            } else if (isTF) {
+              isCorrect = res.is_correct !== undefined ? res.is_correct : false;
+              currentPoints = isCorrect ? pointsPerQ : 0;
+            } else if (isShort) {
+              // Short answer: check if already evaluated or matches exact string
+              if (res.is_correct !== null && res.is_correct !== undefined) {
+                isCorrect = res.is_correct;
+              } else if (q.correct_answer && res.student_answer_text) {
+                const normStudent = String(res.student_answer_text).trim().replace(',', '.').toLowerCase();
+                const normCorrect = String(q.correct_answer).trim().replace(',', '.').toLowerCase();
+                isCorrect = normStudent === normCorrect;
+              } else {
+                isCorrect = false;
+              }
+              currentPoints = isCorrect ? pointsPerQ : 0;
+            }
+
+            const type = isMC ? 'multiple_choice' : (isTF ? 'true_false' : 'short_answer');
+            const typeName = isMC 
+              ? `CÂU ${idx + 1} (TRẮC NGHIỆM)` 
+              : (isTF ? `CÂU ${idx + 1} (ĐÚNG / SAI)` : `CÂU ${idx + 1} (TRẢ LỜI NGẮN)`);
+
+            return {
+              id: q.question_id,
+              type: type,
+              typeName: typeName,
+              maxPoints: pointsPerQ,
+              studentOption: studentOptKey,
+              correctOption: correctOptKey,
+              studentAnswer: res.student_answer_text || studentOptKey,
+              correctAnswer: q.correct_answer || correctOptKey,
+              currentPoints: currentPoints,
+              isCorrect: isCorrect,
+              needsManualGrading: isShort && (res.pending_manual_grade !== false),
+              needsReview: q.needs_review || (!correctOptKey && isMC),
+              stem: q.content,
+              options: formattedOptions,
+              subResults: res.sub_results || {}
+            };
+          });
+
+          setQuestions(mapped);
+          if (attData && attData.score !== null && attData.score !== undefined) {
+            setScore(attData.score);
+          }
+        } else {
+          setQuestions([]);
+        }
+      } catch (err) {
+        console.error('Failed to load attempt questions:', err);
+        setQuestions([]);
+      } finally {
+        if (isMounted) setLoadingDetails(false);
+      }
     }
+
+    loadRealDetails();
+    return () => { isMounted = false; };
   }, [submission]);
 
   // Recalculate total score dynamically (scale to 10-point rubric)
@@ -321,8 +336,14 @@ export default function GradingFeedbackModal({
 
   return (
     <>
-      <div className="grading-modal-overlay">
-        <div className="grading-modal-window">
+      <div 
+        className="grading-modal-overlay"
+        onClick={onClose}
+      >
+        <div 
+          className="grading-modal-window"
+          onClick={(e) => e.stopPropagation()}
+        >
           {/* Modal Header */}
           <header className="grading-modal-header">
             <div className="modal-header-left">
@@ -411,7 +432,21 @@ export default function GradingFeedbackModal({
               })()}
 
               {/* Questions list */}
-              <div className="submission-questions-container">
+              {loadingDetails ? (
+                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '48px 16px', gap: '12px' }}>
+                  <Loader2 size={28} className="animate-spin" style={{ color: '#7C3AED' }} />
+                  <span style={{ color: '#64748B', fontSize: '14px', fontWeight: 500 }}>
+                    Đang tải nội dung đề bài và bài nộp của học sinh...
+                  </span>
+                </div>
+              ) : questions.length === 0 ? (
+                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '48px 16px', gap: '12px', textAlign: 'center', border: '1px dashed #CBD5E1', borderRadius: '12px' }}>
+                  <HelpCircle size={36} style={{ color: '#94A3B8' }} />
+                  <h4 style={{ margin: 0, fontSize: '15px', color: '#334155', fontWeight: 600 }}>Bài tập chưa có câu hỏi trong ngân hàng đề</h4>
+                  <p style={{ margin: 0, fontSize: '13px', color: '#64748B' }}>Vui lòng kiểm tra lại cấu hình ngân hàng đề cho bài tập này.</p>
+                </div>
+              ) : (
+                <div className="submission-questions-container">
                 {questions.map((q, idx) => {
                   const isShortAnswer = q.type === 'short_answer';
                   const isTrueFalse = q.type === 'true_false';
@@ -574,6 +609,7 @@ export default function GradingFeedbackModal({
                   );
                 })}
               </div>
+              )}
             </div>
 
           {/* Right Column: Grading Controls & Feedback */}

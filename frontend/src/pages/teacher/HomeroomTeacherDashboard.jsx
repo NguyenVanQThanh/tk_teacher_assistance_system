@@ -2,13 +2,14 @@
 // Description: Specialized Dashboard for Homeroom Teachers (GVCN) featuring top quick stats, learning quality radar chart with qualitative notes, recent submissions table, and weekly teaching schedule.
 // Created At: 2026-08-30
 // Created By: Tam Khang
-// Updated At: 2026-10-25
+// Updated At: 2026-10-29
 // Updated By: Tam Khang
 
 import React, { useState, useEffect } from 'react';
 import { 
   ClipboardCheck,
-  BookOpen
+  BookOpen,
+  Loader2
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
@@ -26,9 +27,10 @@ export default function HomeroomTeacherDashboard() {
 
   useEffect(() => {
     let isMounted = true;
-    async function loadDashboardData() {
+    async function loadData() {
       try {
         setLoading(true);
+        // Load consolidated dashboard for current academic year homeroom class
         const data = await teacherApi.getDashboard();
         if (isMounted) setDashboardData(data);
       } catch (err) {
@@ -37,9 +39,9 @@ export default function HomeroomTeacherDashboard() {
         if (isMounted) setLoading(false);
       }
     }
-    loadDashboardData();
+    loadData();
     return () => { isMounted = false; };
-  }, []);
+  }, [user]);
 
   // Derive dynamic greeting title (e.g. "Thầy Nguyễn" or "Cô Mai")
   const getGreetingData = (fullName) => {
@@ -57,6 +59,21 @@ export default function HomeroomTeacherDashboard() {
   };
 
   const { title: teacherTitle, name: greetingName } = getGreetingData(user?.full_name);
+
+  // High-UX Loading State: While BE is returning response, show loading animation instead of empty/placeholder layout
+  if (loading && !dashboardData) {
+    return (
+      <div className="teacher-dashboard-container">
+        <div className="dashboard-loading-overlay">
+          <div className="dashboard-loading-card">
+            <Loader2 className="dashboard-loading-icon" size={38} />
+            <h3 className="dashboard-loading-title">Đang đồng bộ dữ liệu giảng dạy...</h3>
+            <p className="dashboard-loading-desc">Hệ thống đang tải số liệu lớp học, chất lượng học tập và lịch giảng dạy từ máy chủ.</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="teacher-dashboard-container">
@@ -112,8 +129,14 @@ export default function HomeroomTeacherDashboard() {
       <div className="dashboard-content-layout">
         {/* Left Column: Chất lượng học tập trung bình (Radar + Nhận xét) + Bài nộp gần đây */}
         <div className="dashboard-left-column">
-          <LearningQualityCard learningQuality={dashboardData?.learning_quality} />
-          <RecentSubmissionsTable submissions={dashboardData?.recent_submissions} />
+          <LearningQualityCard 
+            learningQuality={dashboardData?.learning_quality} 
+          />
+          <RecentSubmissionsTable 
+            submissions={dashboardData?.recent_submissions} 
+            loading={loading}
+            onGradeSubmission={(attemptId) => navigate(`/teacher/grading?attempt_id=${attemptId}`)}
+          />
         </div>
 
         {/* Right Column: Lịch giảng dạy tuần này */}

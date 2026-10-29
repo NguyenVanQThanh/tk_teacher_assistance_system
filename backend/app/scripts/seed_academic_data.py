@@ -3,7 +3,7 @@
 # Created At: 2026-09-01
 # Created By: Tam Khang
 # Updated At: 2026-10-29
-# Updated By: AI Agent
+# Updated By: Tam Khang
 
 import os
 import sys
@@ -177,47 +177,56 @@ def seed_academic_sample_data():
 
         session.commit()
 
-        print("--- [4] Seeding Classes (3 Classes) ---")
-        # 12A1: Homeroom is Sample Teacher (0999000002)
-        # 11B2: Homeroom is Thầy An (0999000004)
-        # 10A3: Homeroom is Cô Mai (0999000005)
+        print("--- [4] Seeding Classes (Canonical Classes with Verified Homeroom Teachers) ---")
         today = date.today()
         start_year = today.year if today.month >= 8 else today.year - 1
         academic_year = f"{start_year}-{start_year + 1}"
+        current_year = academic_year
+        prev_year_1 = f"{start_year - 1}-{start_year}"
+        prev_year_2 = f"{start_year - 2}-{start_year - 1}"
+
         classes_data = [
             {
                 "name": "12A1",
-                "school_year": academic_year,
-                "homeroom_phone": "0999000002"
+                "school_year": current_year,
+                "homeroom_phone": "0999000002"  # Nguyen Van A (2026-2027)
             },
             {
                 "name": "11B2",
-                "school_year": academic_year,
-                "homeroom_phone": "0999000004"
+                "school_year": prev_year_1,
+                "homeroom_phone": "0999000004"  # Thầy An (2025-2026)
             },
             {
                 "name": "10A3",
-                "school_year": academic_year,
-                "homeroom_phone": "0999000005"
+                "school_year": prev_year_2,
+                "homeroom_phone": "0999000005"  # Cô Mai (2024-2025)
             }
         ]
         classes_dict = {}
         for c_info in classes_data:
             cls = session.query(Class).filter(Class.class_name == c_info["name"], Class.status != "DELETED").first()
-            homeroom_user = teachers_dict[c_info["homeroom_phone"]]
+            # Safely verify teacher existence in dictionary or DB
+            homeroom_user = teachers_dict.get(c_info["homeroom_phone"])
+            if not homeroom_user:
+                homeroom_user = session.query(User).filter(User.phone == c_info["homeroom_phone"]).first()
+            if not homeroom_user and teachers_dict:
+                homeroom_user = list(teachers_dict.values())[0]
+
+            homeroom_id = homeroom_user.user_id if homeroom_user else None
             if not cls:
                 cls = Class(
                     class_id=uuid.uuid4(),
                     class_name=c_info["name"],
                     academic_year=c_info["school_year"],
-                    homeroom_teacher_id=homeroom_user.user_id,
+                    homeroom_teacher_id=homeroom_id,
                     status="ACTIVE"
                 )
                 session.add(cls)
                 session.flush()
-                print(f"Created Class: {cls.class_name} (GVCN: {homeroom_user.full_name})")
+                print(f"Created Class: {cls.class_name} (GVCN: {homeroom_user.full_name if homeroom_user else 'None'})")
             else:
-                cls.homeroom_teacher_id = homeroom_user.user_id
+                if homeroom_id:
+                    cls.homeroom_teacher_id = homeroom_id
                 cls.academic_year = c_info["school_year"]
                 cls.status = "ACTIVE"
                 session.flush()

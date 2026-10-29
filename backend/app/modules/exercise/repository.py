@@ -2,7 +2,7 @@
 # Description: Data Access Layer (Repository) for Exercise, Question, and AnswerOption models.
 # Created At: 2026-07-31
 # Created By: Tam Khang
-# Updated At: 2026-07-31
+# Updated At: 2026-10-30
 # Updated By: Tam Khang
 
 from typing import List, Optional, Any, Tuple, Dict
@@ -10,7 +10,7 @@ from uuid import UUID
 from datetime import datetime
 import base64
 from fastapi import HTTPException, status
-from sqlalchemy import and_, or_
+from sqlalchemy import and_, or_, func
 from sqlalchemy.orm import Session, joinedload
 from models.models import User, Exercise, Question, AnswerOption, ClassAssignment, StudentExerciseAttempt
 
@@ -422,8 +422,13 @@ class AttemptRepository:
                     User.phone.ilike(term)
                 )
             )
-
-        return query.order_by(StudentExerciseAttempt.created_at.desc()).all()
+        return query.order_by(
+            func.coalesce(
+                StudentExerciseAttempt.end_time,
+                StudentExerciseAttempt.start_time,
+                StudentExerciseAttempt.created_at
+            ).desc()
+        ).all()
 
     def update_grade(
         self,

@@ -1,54 +1,33 @@
 // File Name: RecentSubmissionsTable.jsx
-// Description: Component listing recent student exercise submissions matching the visual dashboard mockup.
+// Description: Component listing recent student exercise submissions with direct click-through to grading detail modal.
 // Created At: 2026-08-30
 // Created By: Tam Khang
-// Updated At: 2026-10-25
+// Updated At: 2026-10-29
 // Updated By: Tam Khang
 
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
+import { Loader2 } from 'lucide-react';
 import './RecentSubmissionsTable.css';
 
-export default function RecentSubmissionsTable({ submissions: incomingSubmissions, onGradeSubmission }) {
+export default function RecentSubmissionsTable({ 
+  submissions: incomingSubmissions, 
+  loading = false, 
+  onGradeSubmission 
+}) {
   const navigate = useNavigate();
 
-  const defaultSubmissions = [
-    {
-      id: 1,
-      studentName: 'Trần Thị B',
-      avatarInitial: 'TB',
-      avatarBg: '#E0E7FF',
-      avatarColor: '#4338CA',
-      exerciseTitle: 'Đề thi thử Hóa học #2',
-      submittedTime: '10 phút trước',
-      status: 'submitted',
-      statusLabel: 'Đã nộp',
-    },
-    {
-      id: 2,
-      studentName: 'Lê Văn C',
-      avatarInitial: 'LC',
-      avatarBg: '#FEF3C7',
-      avatarColor: '#D97706',
-      exerciseTitle: 'Bài tập Toán Hình học',
-      submittedTime: '1 giờ trước',
-      status: 'late',
-      statusLabel: 'Trễ hạn',
-    },
-    {
-      id: 3,
-      studentName: 'Phạm Hương D',
-      avatarInitial: 'PD',
-      avatarBg: '#FCE7F3',
-      avatarColor: '#DB2777',
-      exerciseTitle: 'Tiểu luận Lịch sử',
-      submittedTime: 'Hôm qua, 15:30',
-      status: 'submitted',
-      statusLabel: 'Đã nộp',
-    },
-  ];
+  const handleRowClick = (attemptId) => {
+    if (!attemptId) return;
+    if (onGradeSubmission) {
+      onGradeSubmission(attemptId);
+    } else {
+      navigate(`/teacher/grading?attempt_id=${attemptId}`);
+    }
+  };
 
-  const submissions = (incomingSubmissions && incomingSubmissions.length > 0)
+  const hasData = Array.isArray(incomingSubmissions) && incomingSubmissions.length > 0;
+  const submissions = hasData
     ? incomingSubmissions.map(item => ({
         id: item.id,
         studentName: item.student_name || item.studentName,
@@ -60,7 +39,7 @@ export default function RecentSubmissionsTable({ submissions: incomingSubmission
         status: item.status,
         statusLabel: item.status_label || item.statusLabel,
       }))
-    : defaultSubmissions;
+    : [];
 
   return (
     <div className="recent-submissions-card">
@@ -87,37 +66,63 @@ export default function RecentSubmissionsTable({ submissions: incomingSubmission
             </tr>
           </thead>
           <tbody>
-            {submissions.map((item) => (
-              <tr key={item.id}>
-                <td>
-                  <div className="student-cell">
-                    <div 
-                      className="student-avatar-mini"
-                      style={{ backgroundColor: item.avatarBg, color: item.avatarColor }}
-                    >
-                      {item.avatarInitial}
-                    </div>
-                    <span className="student-name">{item.studentName}</span>
+            {loading ? (
+              <tr>
+                <td colSpan="5" className="submissions-state-cell">
+                  <div className="submissions-loading-spinner-wrapper">
+                    <Loader2 size={20} className="animate-spin" />
+                    <span>Đang tải bài nộp gần đây...</span>
                   </div>
                 </td>
-                <td className="exercise-title-cell">{item.exerciseTitle}</td>
-                <td className="time-cell">{item.submittedTime}</td>
-                <td>
-                  <span className={`status-pill ${item.status}`}>
-                    {item.statusLabel}
-                  </span>
-                </td>
-                <td>
-                  <button 
-                    type="button"
-                    className="btn-action-grade"
-                    onClick={() => onGradeSubmission ? onGradeSubmission(item.id) : navigate('/teacher/grading')}
-                  >
-                    Chấm bài
-                  </button>
+              </tr>
+            ) : submissions.length === 0 ? (
+              <tr>
+                <td colSpan="5" className="submissions-state-cell">
+                  Chưa có bài tập nào được nộp gần đây.
                 </td>
               </tr>
-            ))}
+            ) : (
+              submissions.map((item) => (
+                <tr 
+                  key={item.id} 
+                  className="clickable-submission-row"
+                  onClick={() => handleRowClick(item.id)}
+                  title="Bấm để xem chi tiết bài nộp và chấm điểm"
+                >
+                  <td>
+                    <div className="student-cell">
+                      <div 
+                        className="student-avatar-mini"
+                        style={{ backgroundColor: item.avatarBg, color: item.avatarColor }}
+                      >
+                        {item.avatarInitial}
+                      </div>
+                      <span className="student-name">{item.studentName}</span>
+                    </div>
+                  </td>
+                  <td className="exercise-title-cell">{item.exerciseTitle}</td>
+                  <td className="time-cell">{item.submittedTime}</td>
+                  <td>
+                    <span className={`status-pill ${item.status}`}>
+                      {item.statusLabel}
+                    </span>
+                  </td>
+                  <td>
+                    <button 
+                      type="button"
+                      className="btn-action-grade"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleRowClick(item.id);
+                      }}
+                      title="Chấm bài này"
+                    >
+                      Chấm bài
+                    </button>
+                  </td>
+                </tr>
+              ))
+            )}
           </tbody>
         </table>
       </div>
