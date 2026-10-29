@@ -75,7 +75,7 @@ export default function HomeroomTeacherDashboard() {
           {/* Stat Card 1: BÀI TẬP CHỜ CHẤM */}
           <div 
             className="quick-stat-box accent-red"
-            onClick={() => navigate('/teacher/grading')}
+            onClick={() => navigate('/teacher/grading?status=pending_grading')}
             title="Xem danh sách bài tập chờ chấm"
           >
             <div className="quick-stat-info">
