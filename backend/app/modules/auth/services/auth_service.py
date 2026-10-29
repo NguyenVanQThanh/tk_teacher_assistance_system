@@ -1,8 +1,8 @@
 # File Name: auth_service.py
-# Description: Service layer implementing login, password verification, and JWT token issuance.
+# Description: Service layer implementing login, password verification, and JWT token issuance with effective permissions.
 # Created At: 2026-07-16
 # Created By: Tam Khang
-# Updated At: 2026-07-17
+# Updated At: 2026-10-28
 # Updated By: Tam Khang
 
 import logging
@@ -16,6 +16,7 @@ from app.modules.auth.repository import UserRepository, RoleRepository
 from app.modules.auth.schemas import LoginResponse, UserOut
 from app.core.security import create_access_token, verify_password, ACCESS_TOKEN_EXPIRE_MINUTES
 from .password_service import PasswordService
+from .permission_service import PermissionService
 logger = logging.getLogger("auth_service")
 
 class AuthService:
@@ -139,13 +140,15 @@ class AuthService:
         email_masked = AuthService.mask_email(user.email)
         phone_masked = AuthService.mask_phone(user.phone)
 
-        # 4. Construct user response info
+        # 4. Construct user response info with effective permissions
+        perms = list(PermissionService.get_effective_permissions(db, user.user_id, user.role_id))
         user_out = UserOut(
             user_id=user.user_id,
             full_name=user.full_name,
             role=role_name,
             email_masked=email_masked,
-            phone_masked=phone_masked
+            phone_masked=phone_masked,
+            permissions=perms
         )
 
         # 5. Log success event

@@ -1,15 +1,14 @@
 // File Name: DocumentRepositoryPage.jsx
-// Description: Teacher Document Repository Page featuring filtering, search, pagination, centered toast notifications, and soft delete.
+// Description: Teacher Document Repository Page featuring filtering, search, pagination, centered toast notifications, real metrics, and full CRUD.
 // Created At: 2026-08-30
 // Created By: Tam Khang
-// Updated At: 2026-09-27
+// Updated At: 2026-10-28
 // Updated By: Tam Khang
 
-import React, { useState, useMemo, useRef, useEffect } from 'react';
+import React, { useState, useMemo, useRef, useEffect, useCallback } from 'react';
 import { 
   ChevronRight, 
   Upload, 
-  ChevronLeft, 
   CheckCircle2, 
   AlertCircle, 
   AlertTriangle,
@@ -31,63 +30,55 @@ import EditDocumentModal from '../../components/documents/EditDocumentModal';
 import CreateExerciseModal from '../../components/exercises/CreateExerciseModal';
 import './DocumentRepositoryPage.css';
 
+const isUuid = (str) => /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(String(str || ''));
+
+const formatFileSize = (bytes) => {
+  if (!bytes || bytes <= 0) return '0 KB';
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+};
+
+// Backend returns subject names; filter, preview and edit components work with these keys.
+const SUBJECT_KEY_BY_NAME = {
+  'toán học': 'math',
+  'vật lý': 'physics',
+  'hóa học': 'chemistry',
+  'sinh học': 'biology',
+  'lịch sử': 'history',
+  'tiếng anh': 'english',
+  'tin học': 'it',
+};
+
+const mapBackendDoc = (doc) => ({
+  id: doc.document_id,
+  title: doc.title,
+  fileType: doc.document_type || 'lecture',
+  fileSize: formatFileSize(doc.file_size),
+  uploadDate: doc.created_at ? new Date(doc.created_at).toLocaleDateString('vi-VN') : '',
+  grade: doc.grade || '12',
+  subject: SUBJECT_KEY_BY_NAME[(doc.subject_name || '').trim().toLowerCase()] || 'other',
+  subjectName: doc.subject_name || 'Chung',
+  authorName: doc.author_name || doc.uploader_name || 'GV. Tam Khang',
+  authorInitial: (doc.author_name || 'TK').split(' ').map(n => n[0]).join('').slice(-2).toUpperCase(),
+  folder: `${doc.subject_name || 'Tài liệu'} ${doc.grade || ''}`.trim(),
+  description: doc.description || 'Tài liệu học tập được chia sẻ cho học sinh và giáo viên.',
+  downloadsCount: `${doc.download_count || 0}`,
+  fileUrl: doc.file_url,
+});
+
 export default function DocumentRepositoryPage() {
-  const [showSidebar, setShowSidebar] = useState(true);
   const [selectedGrade, setSelectedGrade] = useState('all');
   const [selectedSubject, setSelectedSubject] = useState('all');
   const [selectedType, setSelectedType] = useState('all');
   const [searchQuery, setSearchQuery] = useState('');
-  const [currentPage, setCurrentPage] = useState(1);
   const [isUploadOpen, setIsUploadOpen] = useState(false);
   const [isCreateExerciseOpen, setIsCreateExerciseOpen] = useState(false);
   const [previewDoc, setPreviewDoc] = useState(null);
   const [selectedDoc, setSelectedDoc] = useState(null);
   const [editingDoc, setEditingDoc] = useState(null);
   const [dashboardStats, setDashboardStats] = useState(null);
-
-  useEffect(() => {
-    let isMounted = true;
-    async function loadData() {
-      try {
-        const [dashRes, docsRes] = await Promise.allSettled([
-          documentsApi.getDocumentDashboard(),
-          documentsApi.getDocuments()
-        ]);
-        if (!isMounted) return;
-        if (dashRes.status === 'fulfilled' && dashRes.value) {
-          setDashboardStats(dashRes.value);
-        }
-        if (docsRes.status === 'fulfilled' && docsRes.value) {
-          const items = Array.isArray(docsRes.value) ? docsRes.value : docsRes.value.items;
-          if (Array.isArray(items) && items.length > 0) {
-            const mapped = items.map((doc, idx) => ({
-              id: doc.document_id,
-              title: doc.title,
-              fileType: doc.document_type || 'lecture',
-              fileSize: doc.file_size ? `${(doc.file_size / (1024 * 1024)).toFixed(1)} MB` : '1.5 MB',
-              uploadDate: doc.created_at ? new Date(doc.created_at).toLocaleDateString('vi-VN') : '15/10/2023',
-              grade: doc.grade || '12',
-              subject: doc.subject || 'math',
-              authorName: doc.uploader_name || 'GV. Tam Khang',
-              authorInitial: 'TK',
-              folder: `${doc.subject || 'Tài liệu'} ${doc.grade || ''}`,
-              description: doc.description || 'Tài liệu học tập được chia sẻ cho học sinh và giáo viên.',
-              viewsCount: `${(doc.downloads_count || 0) * 3 + 120}`,
-              downloadsCount: `${doc.downloads_count || 0}`,
-              ratingScore: '4.9/5',
-              ratingsCount: '35',
-              fileUrl: doc.file_url,
-            }));
-            setDocuments(mapped);
-          }
-        }
-      } catch (err) {
-        console.error('Failed to load documents:', err);
-      }
-    }
-    loadData();
-    return () => { isMounted = false; };
-  }, []);
+  const [documents, setDocuments] = useState([]);
 
   // Centered Confirmation Dialog & Toast States
   const [deleteConfirmDoc, setDeleteConfirmDoc] = useState(null);
@@ -106,145 +97,27 @@ export default function DocumentRepositoryPage() {
 
   const navigate = useNavigate();
 
-  // Initial mock documents matching Figma design
-  const [documents, setDocuments] = useState([
-    {
-      id: 1,
-      title: 'Đề cương ôn tập Toán 12 - Học kì 1 (Nâng cao)',
-      fileType: 'exam',
-      fileSize: '2.4 MB',
-      uploadDate: '15/10/2023',
-      grade: '12',
-      subject: 'math',
-      authorName: 'GV. Nguyễn Văn A',
-      authorInitial: 'NA',
-      folder: 'Toán 12',
-      description: 'Tài liệu tổng hợp các kiến thức trọng tâm học kì 1 môn Toán lớp 12, bao gồm các chuyên đề: Ứng dụng đạo hàm để khảo sát và vẽ đồ thị hàm số, Hàm số lũy thừa, hàm số mũ và hàm số logarit. Kèm theo hệ thống bài tập tự luyện từ cơ bản đến nâng cao có đáp án chi tiết, phù hợp cho học sinh ôn thi THPT Quốc gia.',
-      viewsCount: '1,245',
-      downloadsCount: '342',
-      ratingScore: '4.8/5',
-      ratingsCount: '56'
-    },
-    {
-      id: 2,
-      title: 'Bài giảng: Động lượng và Định luật bảo toàn động lượng',
-      fileType: 'lecture',
-      fileSize: '15.8 MB',
-      uploadDate: '12/10/2023',
-      grade: '10',
-      subject: 'physics',
-      authorName: 'GV. Trần Thị B',
-      authorInitial: 'TB',
-      folder: 'Vật lý 10',
-      description: 'Bài giảng chi tiết về khái niệm động lượng, định luật bảo toàn động lượng và ứng dụng giải bài toán va chạm đàn hồi.',
-      viewsCount: '980',
-      downloadsCount: '215',
-      ratingScore: '4.9/5',
-      ratingsCount: '42'
-    },
-    {
-      id: 3,
-      title: 'Ma trận đề thi Giữa kì 1 - Hóa học 11',
-      fileType: 'reference',
-      fileSize: '1.2 MB',
-      uploadDate: '10/10/2023',
-      grade: '11',
-      subject: 'chemistry',
-      authorName: 'GV. Nguyễn Văn A',
-      authorInitial: 'NA',
-      folder: 'Hóa học 11',
-      description: 'Bảng đặc tả ma trận đề kiểm tra giữa kì 1 môn Hóa học 11 bám sát chương trình GDPT 2018 mới.',
-      viewsCount: '620',
-      downloadsCount: '145',
-      ratingScore: '4.7/5',
-      ratingsCount: '28'
-    },
-    {
-      id: 4,
-      title: 'Bài giảng chuyên đề Vật lý 10 - Chương 1',
-      fileType: 'lecture',
-      fileSize: '1.5 MB',
-      uploadDate: '08/10/2023',
-      grade: '10',
-      subject: 'physics',
-      authorName: 'GV. Trần Thị B',
-      authorInitial: 'TB',
-      folder: 'Vật lý 10',
-      description: 'Bộ tài liệu bài giảng và bài tập định lượng chương Chuyển động thẳng đều và chuyển động biến đổi đều.',
-      viewsCount: '850',
-      downloadsCount: '310',
-      ratingScore: '4.8/5',
-      ratingsCount: '35'
-    },
-    {
-      id: 5,
-      title: 'Đề kiểm tra Tiếng Anh - Unit 3 (Global Success)',
-      fileType: 'exam',
-      fileSize: '3.2 MB',
-      uploadDate: '05/10/2023',
-      grade: '11',
-      subject: 'english',
-      authorName: 'GV. Nguyễn Văn A',
-      authorInitial: 'NA',
-      folder: 'Tiếng Anh 11',
-      description: 'Đề kiểm tra 45 phút Unit 3 Global Success có kèm bảng đáp án và hướng dẫn chấm chi tiết.',
-      viewsCount: '1,120',
-      downloadsCount: '430',
-      ratingScore: '4.9/5',
-      ratingsCount: '60'
-    },
-    {
-      id: 6,
-      title: 'Tài liệu tham khảo Tin học - Lập trình Python cơ bản',
-      fileType: 'reference',
-      fileSize: '4.1 MB',
-      uploadDate: '01/10/2023',
-      grade: '10',
-      subject: 'it',
-      authorName: 'GV. Nguyễn Văn A',
-      authorInitial: 'NA',
-      folder: 'Tin học 10',
-      description: 'Sổ tay hướng dẫn thực hành lập trình Python từ cơ bản đến cấu trúc điều khiển và mảng 1 chiều.',
-      viewsCount: '790',
-      downloadsCount: '260',
-      ratingScore: '4.8/5',
-      ratingsCount: '31'
-    },
-    {
-      id: 7,
-      title: 'Bài giảng Sinh học 12: Cơ chế di truyền cấp phân tử',
-      fileType: 'lecture',
-      fileSize: '3.8 MB',
-      uploadDate: '16/10/2023',
-      grade: '12',
-      subject: 'biology',
-      authorName: 'Cô Đặng Thu Hà',
-      authorInitial: 'TH',
-      folder: 'Sinh học 12',
-      description: 'Chuyên đề ADN, ARN và quá trình dịch mã, phiên mã có sơ đồ minh họa trực quan bám sát GDPT 2018.',
-      viewsCount: '890',
-      downloadsCount: '340',
-      ratingScore: '4.9/5',
-      ratingsCount: '45'
-    },
-    {
-      id: 8,
-      title: 'Đề kiểm tra Lịch sử 12: Việt Nam từ 1945 đến 1954',
-      fileType: 'exam',
-      fileSize: '2.1 MB',
-      uploadDate: '18/10/2023',
-      grade: '12',
-      subject: 'history',
-      authorName: 'Thầy Nguyễn Quốc Hùng',
-      authorInitial: 'QH',
-      folder: 'Lịch sử 12',
-      description: 'Đề kiểm tra 45 phút chuyên đề lịch sử kháng chiến toàn quốc chống thực dân Pháp có ma trận đề và đáp án.',
-      viewsCount: '730',
-      downloadsCount: '280',
-      ratingScore: '4.8/5',
-      ratingsCount: '38'
-    },
-  ]);
+  const reloadData = useCallback(async () => {
+    try {
+      const [dashRes, docsRes] = await Promise.allSettled([
+        documentsApi.getDocumentDashboard(),
+        documentsApi.getDocuments({ status: 'ALL', page_size: 100 })
+      ]);
+      if (dashRes.status === 'fulfilled' && dashRes.value) {
+        setDashboardStats(dashRes.value);
+      }
+      if (docsRes.status === 'fulfilled' && docsRes.value) {
+        const items = Array.isArray(docsRes.value) ? docsRes.value : (docsRes.value.items || []);
+        setDocuments(items.map(mapBackendDoc));
+      }
+    } catch (err) {
+      console.error('Failed to reload documents:', err);
+    }
+  }, []);
+
+  useEffect(() => {
+    reloadData();
+  }, [reloadData]);
 
   // Filter logic
   const filteredDocuments = useMemo(() => {
@@ -264,25 +137,66 @@ export default function DocumentRepositoryPage() {
       // Search query
       if (searchQuery.trim()) {
         const q = searchQuery.toLowerCase().trim();
-        const matchesTitle = doc.title.toLowerCase().includes(q);
-        const matchesAuthor = doc.authorName.toLowerCase().includes(q);
+        const matchesTitle = (doc.title || '').toLowerCase().includes(q);
+        const matchesAuthor = (doc.authorName || '').toLowerCase().includes(q);
         return matchesTitle || matchesAuthor;
       }
       return true;
     });
   }, [documents, selectedGrade, selectedSubject, selectedType, searchQuery]);
 
-  const handleUploadSuccess = (newDoc) => {
-    setDocuments((prev) => [newDoc, ...prev]);
+  const handleUploadSuccess = async (newDoc) => {
+    await reloadData();
     showToast(`Đã tải lên tài liệu "${newDoc.title}" thành công!`, 'success', 'Tải lên hoàn tất');
   };
 
-  const handleSaveEditedDoc = (updatedDoc) => {
-    setDocuments((prev) => prev.map((d) => (d.id === updatedDoc.id ? updatedDoc : d)));
-    if (selectedDoc && selectedDoc.id === updatedDoc.id) {
-      setSelectedDoc(updatedDoc);
+  const handleSaveEditedDoc = async (updatedDoc) => {
+    try {
+      if (updatedDoc.id && isUuid(updatedDoc.id)) {
+        await documentsApi.updateDocument(updatedDoc.id, {
+          title: updatedDoc.title,
+          grade: updatedDoc.grade,
+          document_type: updatedDoc.fileType,
+          description: updatedDoc.description,
+        });
+      }
+      setDocuments((prev) => prev.map((d) => (d.id === updatedDoc.id ? { ...d, ...updatedDoc } : d)));
+      if (selectedDoc && selectedDoc.id === updatedDoc.id) {
+        setSelectedDoc((prev) => ({ ...prev, ...updatedDoc }));
+      }
+      showToast(`Đã cập nhật thông tin tài liệu "${updatedDoc.title}" thành công!`, 'success', 'Cập nhật thành công');
+      // Refresh dashboard in background
+      documentsApi.getDocumentDashboard().then(stats => stats && setDashboardStats(stats)).catch(() => {});
+    } catch (err) {
+      console.error('Failed to update document in backend:', err);
+      showToast('Có lỗi xảy ra khi cập nhật tài liệu.', 'error', 'Lỗi cập nhật');
     }
-    showToast(`Đã cập nhật thông tin tài liệu "${updatedDoc.title}" thành công!`, 'success', 'Cập nhật thành công');
+  };
+
+  const handleDownloadDocument = async (doc) => {
+    showToast(`Bắt đầu tải xuống: ${doc.title}`, 'info', 'Tải tài liệu');
+    try {
+      if (doc.id && isUuid(doc.id)) {
+        const blob = await documentsApi.downloadDocument(doc.id);
+        const url = window.URL.createObjectURL(new Blob([blob]));
+        const link = document.createElement('a');
+        link.href = url;
+        link.setAttribute('download', `${doc.title}.${doc.fileType || 'pdf'}`);
+        document.body.appendChild(link);
+        link.click();
+        link.remove();
+        window.URL.revokeObjectURL(url);
+
+        // Update real download counter locally and sync dashboard
+        setDocuments((prev) => prev.map((d) => d.id === doc.id ? { ...d, downloadsCount: String(Number(d.downloadsCount || 0) + 1) } : d));
+        if (selectedDoc && selectedDoc.id === doc.id) {
+          setSelectedDoc((prev) => ({ ...prev, downloadsCount: String(Number(prev.downloadsCount || 0) + 1) }));
+        }
+        documentsApi.getDocumentDashboard().then(stats => stats && setDashboardStats(stats)).catch(() => {});
+      }
+    } catch (err) {
+      console.error('Download error:', err);
+    }
   };
 
   const requestDeleteDocument = (doc) => {
@@ -294,7 +208,7 @@ export default function DocumentRepositoryPage() {
     const doc = deleteConfirmDoc;
     setDeleteConfirmDoc(null);
     try {
-      if (doc.id) {
+      if (doc.id && isUuid(doc.id)) {
         await documentsApi.deleteDocument(doc.id);
       }
     } catch (err) {
@@ -302,176 +216,130 @@ export default function DocumentRepositoryPage() {
     }
     // Soft Delete Policy: filter out from active view list and show confirmation toast
     setDocuments((prev) => prev.filter((d) => d.id !== doc.id));
-    showToast(`Đã xóa tài liệu "${doc.title}" thành công!`, 'success', 'Xóa tài liệu');
-  };
-
-  const handleNavSelect = (navId) => {
-    setSelectedDoc(null);
-    if (navId === 'dashboard') {
-      navigate('/teacher');
-    } else if (navId === 'classes') {
-      navigate('/teacher/classes');
-    } else if (navId === 'grading') {
-      navigate('/teacher/grading');
-    } else if (navId === 'documents') {
-      navigate('/teacher/documents');
-    } else if (navId === 'exercises') {
-      navigate('/teacher/exercises');
+    if (selectedDoc && selectedDoc.id === doc.id) {
+      setSelectedDoc(null);
     }
+    showToast(`Đã xóa tài liệu "${doc.title}" thành công!`, 'success', 'Xóa tài liệu');
+    // Refresh stats
+    documentsApi.getDocumentDashboard().then(stats => stats && setDashboardStats(stats)).catch(() => {});
   };
 
   return (
     <div className="doc-repository-main">
-          {selectedDoc ? (
-            /* Document Detail View (Image 1) */
-            <DocumentDetailView
-              doc={selectedDoc}
-              onBack={() => setSelectedDoc(null)}
-              onViewDocument={(d) => setPreviewDoc(d)}
-              onDownloadDocument={(d) => showToast(`Bắt đầu tải xuống: ${d.title}`, 'info', 'Tải xuống')}
-              onEditDocument={(d) => setEditingDoc(d)}
-              onMoreOptions={(d) => showToast(`Tùy chọn khác cho: ${d.title}`, 'info', 'Tùy chọn')}
-            />
-          ) : (
-            /* Document List View */
-            <>
-              {/* Breadcrumb & Action Row */}
-              <div className="doc-top-bar">
-                <div className="doc-title-group">
-                  <nav className="breadcrumb-nav" aria-label="Breadcrumb">
-                    <Link to="/teacher" className="breadcrumb-link">Trang chủ</Link>
-                    <ChevronRight size={14} className="breadcrumb-separator" />
-                    <span className="breadcrumb-current">Kho tài liệu</span>
-                  </nav>
-                  <h1 className="page-heading">Kho tài liệu</h1>
-                </div>
+      {selectedDoc ? (
+        /* Document Detail View (Image 1) */
+        <DocumentDetailView
+          doc={selectedDoc}
+          onBack={() => setSelectedDoc(null)}
+          onViewDocument={(d) => setPreviewDoc(d)}
+          onDownloadDocument={(d) => handleDownloadDocument(d)}
+          onEditDocument={(d) => setEditingDoc(d)}
+          onMoreOptions={(d) => showToast(`Tùy chọn khác cho: ${d.title}`, 'info', 'Tùy chọn')}
+        />
+      ) : (
+        /* Document List View */
+        <>
+          {/* Breadcrumb & Action Row */}
+          <div className="doc-top-bar">
+            <div className="doc-title-group">
+              <nav className="breadcrumb-nav" aria-label="Breadcrumb">
+                <Link to="/teacher" className="breadcrumb-link">Trang chủ</Link>
+                <ChevronRight size={14} className="breadcrumb-separator" />
+                <span className="breadcrumb-current">Kho tài liệu</span>
+              </nav>
+              <h1 className="page-heading">Kho tài liệu</h1>
+            </div>
 
-                <button 
-                  type="button" 
-                  className="btn-upload-new"
-                  onClick={() => setIsUploadOpen(true)}
-                >
-                  <Upload size={16} />
-                  <span>Tải lên tài liệu mới</span>
-                </button>
+            <button 
+              type="button" 
+              className="btn-upload-new"
+              onClick={() => setIsUploadOpen(true)}
+            >
+              <Upload size={16} />
+              <span>Tải lên tài liệu mới</span>
+            </button>
+          </div>
+          
+          {/* Document Repository Dashboard Real Stats */}
+          <div className="doc-dashboard-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '14px', marginBottom: '16px' }}>
+            <div style={{ background: '#FFFFFF', borderRadius: '10px', padding: '14px 18px', border: '1px solid #E2E8F0', display: 'flex', alignItems: 'center', gap: '14px', boxShadow: '0 1px 3px rgba(0,0,0,0.05)' }}>
+              <div style={{ width: '42px', height: '42px', borderRadius: '8px', background: '#F5F3FF', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#7C3AED' }}>
+                <FileText size={20} />
               </div>
-              
-              {/* Document Repository Dashboard Stats */}
-              <div className="doc-dashboard-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '14px', marginBottom: '16px' }}>
-                <div style={{ background: '#FFFFFF', borderRadius: '10px', padding: '14px 18px', border: '1px solid #E2E8F0', display: 'flex', alignItems: 'center', gap: '14px', boxShadow: '0 1px 3px rgba(0,0,0,0.05)' }}>
-                  <div style={{ width: '42px', height: '42px', borderRadius: '8px', background: '#F5F3FF', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#7C3AED' }}>
-                    <FileText size={20} />
-                  </div>
-                  <div>
-                    <span style={{ fontSize: '12px', color: '#64748B', fontWeight: 500, display: 'block' }}>Tổng số tài liệu</span>
-                    <strong style={{ fontSize: '20px', color: '#1E293B', fontWeight: 700 }}>
-                      {dashboardStats?.total_documents !== undefined ? dashboardStats.total_documents : documents.length}
-                    </strong>
-                  </div>
-                </div>
-
-                <div style={{ background: '#FFFFFF', borderRadius: '10px', padding: '14px 18px', border: '1px solid #E2E8F0', display: 'flex', alignItems: 'center', gap: '14px', boxShadow: '0 1px 3px rgba(0,0,0,0.05)' }}>
-                  <div style={{ width: '42px', height: '42px', borderRadius: '8px', background: '#EFF6FF', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#2563EB' }}>
-                    <DownloadCloud size={20} />
-                  </div>
-                  <div>
-                    <span style={{ fontSize: '12px', color: '#64748B', fontWeight: 500, display: 'block' }}>Lượt tải xuống</span>
-                    <strong style={{ fontSize: '20px', color: '#1E293B', fontWeight: 700 }}>
-                      {dashboardStats?.total_downloads !== undefined ? dashboardStats.total_downloads : '2,142'}
-                    </strong>
-                  </div>
-                </div>
-
-                <div style={{ background: '#FFFFFF', borderRadius: '10px', padding: '14px 18px', border: '1px solid #E2E8F0', display: 'flex', alignItems: 'center', gap: '14px', boxShadow: '0 1px 3px rgba(0,0,0,0.05)' }}>
-                  <div style={{ width: '42px', height: '42px', borderRadius: '8px', background: '#ECFDF5', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#059669' }}>
-                    <HardDrive size={20} />
-                  </div>
-                  <div>
-                    <span style={{ fontSize: '12px', color: '#64748B', fontWeight: 500, display: 'block' }}>Dung lượng lưu trữ</span>
-                    <strong style={{ fontSize: '20px', color: '#1E293B', fontWeight: 700 }}>
-                      {dashboardStats?.storage_used_formatted || '34.2 MB'}
-                    </strong>
-                  </div>
-                </div>
+              <div>
+                <span style={{ fontSize: '12px', color: '#64748B', fontWeight: 500, display: 'block' }}>Tổng số tài liệu</span>
+                <strong style={{ fontSize: '20px', color: '#1E293B', fontWeight: 700 }}>
+                  {dashboardStats?.total_documents !== undefined ? dashboardStats.total_documents : documents.length}
+                </strong>
               </div>
+            </div>
 
-              {/* Filter & Search Toolbar */}
-              <DocumentFilterBar
-                selectedGrade={selectedGrade}
-                onChangeGrade={setSelectedGrade}
-                selectedSubject={selectedSubject}
-                onChangeSubject={setSelectedSubject}
-                selectedType={selectedType}
-                onChangeType={setSelectedType}
-                searchQuery={searchQuery}
-                onChangeSearch={setSearchQuery}
-              />
-
-              {/* Document Cards Grid */}
-              <div className="doc-cards-grid">
-                {filteredDocuments.length > 0 ? (
-                  filteredDocuments.map((doc) => (
-                    <DocumentCard
-                      key={doc.id}
-                      doc={doc}
-                      onPreview={(d) => setSelectedDoc(d)}
-                      onDownload={(d) => showToast(`Bắt đầu tải xuống: ${d.title}`, 'info', 'Tải tài liệu')}
-                      onEdit={(d) => setEditingDoc(d)}
-                      onDelete={(d) => requestDeleteDocument(d)}
-                      onMore={(d) => requestDeleteDocument(d)}
-                    />
-                  ))
-                ) : (
-                  <div className="doc-empty-state">
-                    <p>Không tìm thấy tài liệu phù hợp với bộ lọc hiện tại.</p>
-                  </div>
-                )}
+            <div style={{ background: '#FFFFFF', borderRadius: '10px', padding: '14px 18px', border: '1px solid #E2E8F0', display: 'flex', alignItems: 'center', gap: '14px', boxShadow: '0 1px 3px rgba(0,0,0,0.05)' }}>
+              <div style={{ width: '42px', height: '42px', borderRadius: '8px', background: '#EFF6FF', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#2563EB' }}>
+                <DownloadCloud size={20} />
               </div>
-
-              {/* Bottom Pagination Row */}
-              <div className="doc-pagination-row">
-                <span className="pagination-info">
-                  Hiển thị <strong>1</strong> đến <strong>{filteredDocuments.length}</strong> trong số <strong>24</strong> tài liệu
-                </span>
-
-                <div className="pagination-controls">
-                  <button 
-                    type="button" 
-                    className="pagination-btn arrow-btn"
-                    disabled={currentPage === 1}
-                    onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
-                  >
-                    <ChevronLeft size={16} />
-                  </button>
-
-                  <button 
-                    type="button" 
-                    className={`pagination-btn page-num-btn ${currentPage === 1 ? 'active' : ''}`}
-                    onClick={() => setCurrentPage(1)}
-                  >
-                    1
-                  </button>
-
-                  <button 
-                    type="button" 
-                    className={`pagination-btn page-num-btn ${currentPage === 2 ? 'active' : ''}`}
-                    onClick={() => setCurrentPage(2)}
-                  >
-                    2
-                  </button>
-
-                  <button 
-                    type="button" 
-                    className="pagination-btn arrow-btn"
-                    disabled={currentPage === 2}
-                    onClick={() => setCurrentPage(prev => prev + 1)}
-                  >
-                    <ChevronRight size={16} />
-                  </button>
-                </div>
+              <div>
+                <span style={{ fontSize: '12px', color: '#64748B', fontWeight: 500, display: 'block' }}>Lượt tải xuống</span>
+                <strong style={{ fontSize: '20px', color: '#1E293B', fontWeight: 700 }}>
+                  {dashboardStats?.total_downloads !== undefined ? dashboardStats.total_downloads : 0}
+                </strong>
               </div>
-            </>
-          )}
+            </div>
+
+            <div style={{ background: '#FFFFFF', borderRadius: '10px', padding: '14px 18px', border: '1px solid #E2E8F0', display: 'flex', alignItems: 'center', gap: '14px', boxShadow: '0 1px 3px rgba(0,0,0,0.05)' }}>
+              <div style={{ width: '42px', height: '42px', borderRadius: '8px', background: '#ECFDF5', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#059669' }}>
+                <HardDrive size={20} />
+              </div>
+              <div>
+                <span style={{ fontSize: '12px', color: '#64748B', fontWeight: 500, display: 'block' }}>Dung lượng lưu trữ</span>
+                <strong style={{ fontSize: '20px', color: '#1E293B', fontWeight: 700 }}>
+                  {dashboardStats?.storage_formatted || dashboardStats?.storage_used_formatted || '0 MB'}
+                </strong>
+              </div>
+            </div>
+          </div>
+
+          {/* Filter & Search Toolbar */}
+          <DocumentFilterBar
+            selectedGrade={selectedGrade}
+            onChangeGrade={setSelectedGrade}
+            selectedSubject={selectedSubject}
+            onChangeSubject={setSelectedSubject}
+            selectedType={selectedType}
+            onChangeType={setSelectedType}
+            searchQuery={searchQuery}
+            onChangeSearch={setSearchQuery}
+          />
+
+          {/* Document Cards Grid */}
+          <div className="doc-cards-grid">
+            {filteredDocuments.length > 0 ? (
+              filteredDocuments.map((doc) => (
+                <DocumentCard
+                  key={doc.id}
+                  doc={doc}
+                  onPreview={(d) => setSelectedDoc(d)}
+                  onDownload={(d) => handleDownloadDocument(d)}
+                  onEdit={(d) => setEditingDoc(d)}
+                  onDelete={(d) => requestDeleteDocument(d)}
+                  onMore={(d) => requestDeleteDocument(d)}
+                />
+              ))
+            ) : (
+              <div className="doc-empty-state">
+                <p>Không tìm thấy tài liệu phù hợp với bộ lọc hiện tại.</p>
+              </div>
+            )}
+          </div>
+
+          {/* Bottom Pagination Row */}
+          <div className="doc-pagination-row">
+            <span className="pagination-info">
+              Hiển thị <strong>{filteredDocuments.length}</strong> trong số <strong>{documents.length}</strong> tài liệu
+            </span>
+          </div>
+        </>
+      )}
 
       {/* Upload Document Modal */}
       <UploadDocumentModal
@@ -485,7 +353,7 @@ export default function DocumentRepositoryPage() {
         doc={previewDoc}
         isOpen={!!previewDoc}
         onClose={() => setPreviewDoc(null)}
-        onDownload={(d) => showToast(`Bắt đầu tải xuống: ${d.title}`, 'info', 'Tải tài liệu')}
+        onDownload={(d) => handleDownloadDocument(d)}
       />
 
       {/* Create Exercise Modal */}

@@ -104,3 +104,57 @@ def test_age_validation_on_enrollment(client: TestClient):
     )
     assert res.status_code == status.HTTP_400_BAD_REQUEST
     assert res.json()["detail"]["code"] == "ERR-USER-INVALID_AGE_STUDENT"
+
+
+def test_document_security_and_status_validation(client: TestClient):
+    admin_token = get_admin_token(client)
+    admin_headers = {"Authorization": f"Bearer {admin_token}"}
+
+    # Upload document as admin
+    files = {"file": ("tailieu_test.pdf", io.BytesIO(b"%PDF dummy content"), "application/pdf")}
+    form_data = {"title": "Tai Lieu Security Test", "grade": "12", "document_type": "reference"}
+    upload_res = client.post("/api/v1/documents/upload", headers=admin_headers, files=files, data=form_data)
+    assert upload_res.status_code == status.HTTP_201_CREATED
+    doc_id = upload_res.json()["document_id"]
+
+    # 1. Setting status to DELETED via update endpoint should be rejected (422)
+    bad_update = client.put(f"/api/v1/documents/{doc_id}", headers=admin_headers, json={"status": "DELETED"})
+    assert bad_update.status_code == status.HTTP_422_UNPROCESSABLE_ENTITY
+
+    # 2. Setting invalid status string should be rejected (422)
+    invalid_update = client.put(f"/api/v1/documents/{doc_id}", headers=admin_headers, json={"status": "ARBITRARY_STATUS"})
+    assert invalid_update.status_code == status.HTTP_422_UNPROCESSABLE_ENTITY
+
+    # 3. Valid status update (Archived)
+    valid_update = client.put(f"/api/v1/documents/{doc_id}", headers=admin_headers, json={"status": "Archived"})
+    assert valid_update.status_code == status.HTTP_200_OK
+    assert valid_update.json()["status"] == "Archived"
+
+
+def test_teacher_schedule_auth_and_idor_prevention(client: TestClient):
+    # 1. Unauthenticated request to /notes must return 401 (no fallback bypass)
+    unauth_res = client.get("/api/v1/teacher/schedule/notes")
+    assert unauth_res.status_code == status.HTTP_401_UNAUTHORIZED
+
+    # 2. Unauthenticated create note must return 401
+    unauth_create = client.post("/api/v1/teacher/schedule/notes", json={"text": "Hack note"})
+    assert unauth_create.status_code == status.HTTP_401_UNAUTHORIZED
+
+    # 3. Authenticated as Admin
+    admin_token = get_admin_token(client)
+    headers = {"Authorization": f"Bearer {admin_token}"}
+
+    create_res = client.post("/api/v1/teacher/schedule/notes", headers=headers, json={"text": "Admin private reminder"})
+    assert create_res.status_code == status.HTTP_201_CREATED
+    note_id = create_res.json()["id"]
+
+    # Delete non-existent or other user's note returns 404
+    random_uuid = str(uuid.uuid4())
+    del_res = client.delete(f"/api/v1/teacher/schedule/notes/{random_uuid}", headers=headers)
+    assert del_res.status_code == status.HTTP_404_NOT_FOUND
+
+    # Delete own note succeeds
+    del_own = client.delete(f"/api/v1/teacher/schedule/notes/{note_id}", headers=headers)
+    assert del_own.status_code == status.HTTP_200_OK
+    assert del_own.json()["status"] == "DELETED"
+

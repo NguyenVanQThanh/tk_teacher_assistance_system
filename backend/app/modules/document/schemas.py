@@ -2,13 +2,13 @@
 # Description: Pydantic schemas for Document Repository and Document Dashboard.
 # Created At: 2026-09-27
 # Created By: Tam Khang
-# Updated At: 2026-09-27
+# Updated At: 2026-10-29
 # Updated By: Tam Khang
 
 from datetime import datetime
 from typing import List, Optional, Dict, Any
 from uuid import UUID
-from pydantic import BaseModel, Field, ConfigDict
+from pydantic import BaseModel, Field, ConfigDict, field_validator
 
 
 class DocumentCreate(BaseModel):
@@ -18,6 +18,27 @@ class DocumentCreate(BaseModel):
     document_type: Optional[str] = Field("reference", description="Document type: lecture, exam, reference")
     description: Optional[str] = Field(None, description="Optional document summary")
     is_public: Optional[bool] = Field(False, description="Public visibility")
+
+
+class DocumentUpdate(BaseModel):
+    title: Optional[str] = Field(None, min_length=3, max_length=255, description="Document title")
+    subject_id: Optional[UUID] = Field(None, description="Associated subject UUID")
+    grade: Optional[str] = Field(None, description="Grade level (10, 11, 12)")
+    document_type: Optional[str] = Field(None, description="Document type: lecture, exam, reference")
+    description: Optional[str] = Field(None, description="Optional document summary")
+    status: Optional[str] = Field(None, description="Document status")
+
+    @field_validator("status")
+    @classmethod
+    def validate_status(cls, v: Optional[str]) -> Optional[str]:
+        if v is None:
+            return v
+        allowed = {"Uploaded", "Draft", "Archived"}
+        if v.upper() == "DELETED":
+            raise ValueError("Cannot set status to DELETED via update. Use DELETE endpoint instead.")
+        if v not in allowed:
+            raise ValueError(f"Invalid status '{v}'. Allowed statuses: {', '.join(sorted(allowed))}")
+        return v
 
 
 class DocumentOut(BaseModel):
@@ -32,6 +53,7 @@ class DocumentOut(BaseModel):
     subject_name: Optional[str] = None
     grade: Optional[str] = "12"
     document_type: Optional[str] = "reference"
+    description: Optional[str] = None
     uploaded_by: UUID
     author_name: Optional[str] = None
     download_count: Optional[int] = 0
@@ -65,6 +87,7 @@ class DocumentDashboardOut(BaseModel):
     total_downloads: int
     total_storage_bytes: int
     storage_formatted: str
+    storage_used_formatted: Optional[str] = None
     by_subject: List[DocumentSubjectStat]
     by_type: List[DocumentTypeStat]
     recent_documents: List[DocumentOut]

@@ -26,7 +26,7 @@ import {
   Trash2,
   Loader2
 } from 'lucide-react';
-import { exercisesApi, questionsApi } from '../../services/api';
+import { exercisesApi, questionsApi, documentsApi } from '../../services/api';
 import MathRenderer from '../common/MathRenderer';
 import AddQuestionModal from './AddQuestionModal';
 import './EditDocumentModal.css';
@@ -110,7 +110,8 @@ export default function EditDocumentModal({ isOpen, doc, onClose, onSave }) {
   // Header Data
   const [docTitle, setDocTitle] = useState(doc.title || 'Đề cương ôn tập Toán 12 - Học kì 1 (Nâng cao)');
   const docCode = doc.code || '#TL-TOAN12-HK1';
-  const gradeSubject = doc.subject && doc.grade ? `${doc.subject} - Lớp ${doc.grade}` : 'Toán học - Lớp 12';
+  const subjectLabel = doc.subjectName || doc.subject;
+  const gradeSubject = subjectLabel && doc.grade ? `${subjectLabel} - Lớp ${doc.grade}` : 'Toán học - Lớp 12';
 
   // Topic Metadata
   const [lessonTitle, setLessonTitle] = useState(
@@ -901,12 +902,16 @@ Tam giác vuông SAB tại A: tan(∠SBA) = SA / AB = a√3 / a = √3 => ∠SBA
 
     if (isUuid(targetId)) {
       try {
-        // 1. Update exercise title if modified
+        // 1. Update document/exercise title if modified
         if (docTitle.trim() && docTitle.trim() !== doc.title) {
           try {
-            await exercisesApi.updateExercise(targetId, { title: docTitle.trim() });
+            await documentsApi.updateDocument(targetId, { title: docTitle.trim() });
           } catch (e) {
-            console.warn('Could not update exercise title in backend:', e);
+            try {
+              await exercisesApi.updateExercise(targetId, { title: docTitle.trim() });
+            } catch (err2) {
+              console.warn('Could not update title in backend:', err2);
+            }
           }
         }
 
