@@ -82,3 +82,13 @@ Initial test runs also encountered unrelated local infrastructure: another appli
 - `list_documents`: grade and document_type filters use `coalesce` so legacy NULL rows match their display defaults.
 - Not bugs, verified: `/dashboard` is declared before `/{document_id}`; alembic has a single head `a1c7e9d04b52`.
 - Known gap: an invalid `note_date` (as opposed to `date`) returns pydantic's standard 422.
+
+## Follow-up: fifth review round and PR split (2026-10-29)
+
+- Bot blocked the PR for diff size (+1,803/-1,250 vs `dev`, 37 files). Work was split into small PRs against `dev`, merged in order (#12, #9, #8, #14, #16, #17, #18, #19): schedule notes and `require_roles`; documents; auth permissions and seed fixes; homeroom pages; grading card and `assignment_title`; grading page; classes CSS; classes page. After the last merge `dev` matched the original branch tree (except `docker-compose.yml`).
+- Stacked split branches conflicted once `dev` squash-merged the earlier PRs. Fix: rebuild the branch from `origin/dev`, cherry-pick its own commit, force-push with lease. Prefer branching each small PR from `dev` after the previous one merges.
+- Document metadata: upload and update validate `grade` in {10, 11, 12} and `document_type` in {lecture, exam, reference} (`ALLOWED_GRADES`, `ALLOWED_DOCUMENT_TYPES` in `document/schemas.py`) so dashboard buckets and list filters agree.
+- Download: `GET /{id}/download` returns 404 before counting when the file is missing on disk; the UI shows an error toast instead of saving a corrupt file.
+- Schedule page: removed hard-coded fallback notes and local-only `local-` notes. Save and delete failures show an error toast and leave the list unchanged.
+- Tests added in `backend/tests/exercise/test_document_and_grading_dashboard.py`: student 403, other teacher's Draft 404, metadata validation. pytest 7/7, E2E 29/29.
+- Known gap: repository page still loads at most 100 documents (no pagination).

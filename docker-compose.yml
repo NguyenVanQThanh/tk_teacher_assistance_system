@@ -5,6 +5,7 @@ services:
     image: postgres:16
     container_name: postgres
     restart: always
+    mem_limit: 1g
     environment:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: 123456
@@ -20,6 +21,7 @@ services:
       dockerfile: Dockerfile
     container_name: smartlms_backend
     restart: always
+    mem_limit: 1g
     environment:
       DB_HOST: postgres
       DB_PORT: 5432
@@ -43,6 +45,7 @@ services:
       dockerfile: Dockerfile
     container_name: smartlms_frontend
     restart: always
+    mem_limit: 1g
     ports:
       - "3000:3000"
     depends_on:
