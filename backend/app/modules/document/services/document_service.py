@@ -3,7 +3,7 @@
 # Created At: 2026-09-27
 # Created By: Tam Khang
 # Updated At: 2026-10-29
-# Updated By: Tam Khang
+# Updated By: AI Agent
 
 import math
 import uuid
@@ -213,10 +213,11 @@ class DocumentService:
             query = query.filter(Document.subject_id == subject_id)
 
         if grade and grade != "all":
-            query = query.filter(Document.grade == grade)
+            # Treat legacy NULLs as the display defaults used by to_document_out.
+            query = query.filter(func.coalesce(Document.grade, "12") == grade)
 
         if document_type and document_type != "all":
-            query = query.filter(Document.document_type == document_type)
+            query = query.filter(func.coalesce(Document.document_type, "reference") == document_type)
 
         if search:
             search_pattern = f"%{search.strip()}%"

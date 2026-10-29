@@ -72,3 +72,13 @@ Initial test runs also encountered unrelated local infrastructure: another appli
 - Subject filter: `DocumentRepositoryPage.jsx` maps backend subject names to the filter keys (`math`, `physics`, ...) and keeps `subjectName` for display; unknown subjects map to `other`.
 - Removed unused `isMounted`. `restore_document` was already correct (`get_document_by_id` does not filter DELETED).
 - Verified over HTTP: teacher B cannot see teacher A's draft in dashboard/list/detail (404), A and Admin can; delete then restore works; deleting all notes keeps the list empty. E2E 29/29.
+
+## Follow-up: third and fourth review rounds (2026-10-29)
+
+- Soft-deleted documents: `check_document_access` returns 404 for DELETED on every route except restore (`allow_deleted=True`). PUT can no longer resurrect a deleted document.
+- Seed script: password check moved from import time to `get_student_password()`, called only when seeding runs.
+- `TeacherClassesPage.jsx`: 10s polling and `focus` listener removed. Refresh happens only on tab visibility, at most every 30s and never while another refresh runs. `loadData` is stable (user id read through a ref).
+- `ScheduleNoteCreate`: the `date` field shadowed the `date` type inside the class body, so `note_date: Optional[date]` was typed `Optional[None]` and every `note_date` payload returned 422. Now annotated with the `Date` alias; invalid `date` strings return 400 instead of silently becoming today.
+- `list_documents`: grade and document_type filters use `coalesce` so legacy NULL rows match their display defaults.
+- Not bugs, verified: `/dashboard` is declared before `/{document_id}`; alembic has a single head `a1c7e9d04b52`.
+- Known gap: an invalid `note_date` (as opposed to `date`) returns pydantic's standard 422.

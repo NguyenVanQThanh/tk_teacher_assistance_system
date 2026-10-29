@@ -3,10 +3,10 @@
 # Created At: 2026-10-07
 # Created By: Tam Khang
 # Updated At: 2026-10-29
-# Updated By: Tam Khang
+# Updated By: AI Agent
 
 from typing import List, Optional
-from datetime import date, timedelta
+from datetime import date, date as Date, timedelta
 from uuid import UUID
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel
@@ -95,7 +95,8 @@ class ScheduleNoteCreate(BaseModel):
     text: Optional[str] = None
     content: Optional[str] = None
     date: Optional[str] = None
-    note_date: Optional[date] = None
+    # Annotated with the Date alias: the `date` field above shadows the type name in the class body.
+    note_date: Optional[Date] = None
 
 
 class ScheduleNoteOut(BaseModel):
@@ -200,7 +201,10 @@ def create_schedule_note(
         try:
             parsed_date = date.fromisoformat(payload.date)
         except ValueError:
-            parsed_date = date.today()
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Invalid date format. Expected ISO date (YYYY-MM-DD)."
+            )
     if not parsed_date:
         parsed_date = date.today()
 
