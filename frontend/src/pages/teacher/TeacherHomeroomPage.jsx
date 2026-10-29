@@ -1,8 +1,8 @@
 // File Name: TeacherHomeroomPage.jsx
-// Description: Homeroom class management page displaying student roster, GPA/subject score filtering, status badges, and export/add student actions.
+// Description: Homeroom class management page displaying student roster, GPA/subject score filtering, status badges, and RBAC-controlled student management.
 // Created At: 2026-09-01
 // Created By: Tam Khang
-// Updated At: 2026-09-01
+// Updated At: 2026-10-28
 // Updated By: Tam Khang
 
 import React, { useState, useEffect, useMemo } from 'react';
@@ -27,6 +27,7 @@ import {
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { classesApi } from '../../services/api';
+import { useAuth } from '../../context/AuthContext';
 import StudentDetailModal from '../../components/teacher/StudentDetailModal';
 import EditStudentInfoModal from '../../components/teacher/EditStudentInfoModal';
 import EditStudentGradesModal from '../../components/teacher/EditStudentGradesModal';
@@ -35,6 +36,7 @@ import AddStudentModal from '../../components/teacher/AddStudentModal';
 import './TeacherHomeroomPage.css';
 
 export default function TeacherHomeroomPage() {
+  const { hasPermission } = useAuth();
   const [showSidebar, setShowSidebar] = useState(true);
   const [classesList, setClassesList] = useState([]);
   const [selectedClassId, setSelectedClassId] = useState('');
@@ -310,16 +312,18 @@ export default function TeacherHomeroomPage() {
               </div>
             </div>
 
-            <div className="header-card-actions">
-              <button 
-                type="button" 
-                className="btn-add-student"
-                onClick={handleAddStudent}
-              >
-                <Plus size={16} strokeWidth={2.5} />
-                <span>Thêm học sinh</span>
-              </button>
-            </div>
+            {hasPermission('ACAD_ENROLLMENT_MANAGE') && (
+              <div className="header-card-actions">
+                <button 
+                  type="button" 
+                  className="btn-add-student"
+                  onClick={handleAddStudent}
+                >
+                  <Plus size={16} strokeWidth={2.5} />
+                  <span>Thêm học sinh</span>
+                </button>
+              </div>
+            )}
           </div>
 
           {/* Student Roster Table Card */}
@@ -586,7 +590,7 @@ export default function TeacherHomeroomPage() {
       )}
 
       {/* Add New Student Modal */}
-      {showAddStudentModal && (
+      {showAddStudentModal && hasPermission('ACAD_ENROLLMENT_MANAGE') && (
         <AddStudentModal
           isOpen={showAddStudentModal}
           onClose={() => setShowAddStudentModal(false)}

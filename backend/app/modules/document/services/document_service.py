@@ -17,7 +17,8 @@ from sqlalchemy.orm import Session
 from models.models import Document, Subject, User, Role
 from app.modules.document.schemas import (
     DocumentOut, DocumentListOut, DocumentDashboardOut,
-    DocumentSubjectStat, DocumentTypeStat, DocumentUpdate
+    DocumentSubjectStat, DocumentTypeStat, DocumentUpdate,
+    ALLOWED_GRADES, ALLOWED_DOCUMENT_TYPES
 )
 
 UPLOAD_DIR = Path("uploads/documents")
@@ -144,6 +145,14 @@ class DocumentService:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail={"code": "ERR-DOC-INVALID_TITLE", "message": "Title must be at least 3 characters."}
+            )
+
+        grade = grade or "12"
+        document_type = document_type or "reference"
+        if grade not in ALLOWED_GRADES or document_type not in ALLOWED_DOCUMENT_TYPES:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail={"code": "ERR-DOC-INVALID_METADATA", "message": "Invalid grade or document type."}
             )
 
         file_ext = Path(file.filename).suffix.lower()
