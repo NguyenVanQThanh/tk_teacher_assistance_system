@@ -64,7 +64,9 @@ export default function RecentSubmissionsSummaryCard({ recentSubmissions }) {
           <div 
             key={item.id} 
             className="recent-item-row"
-            onClick={() => navigate('/teacher/grading')}
+            onClick={() => item.id ? navigate(`/teacher/grading?attempt_id=${item.id}`) : navigate('/teacher/grading')}
+            title="Bấm để xem chi tiết bài nộp và chấm điểm"
+            style={{ cursor: 'pointer' }}
           >
             <div className="student-profile-cell">
               <div 

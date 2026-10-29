@@ -200,3 +200,35 @@ Updated By: Tam Khang
 .btn-action-grade:hover {
   text-decoration: underline;
 }
+
+/* Clickable submission row hover effect */
+.clickable-submission-row {
+  cursor: pointer;
+  transition: background-color 0.15s ease;
+}
+
+.clickable-submission-row:hover {
+  background-color: #F8F5FF !important;
+}
+
+.clickable-submission-row:hover .btn-action-grade {
+  color: #2563EB;
+  font-weight: 500;
+}
+
+/* Loading & Empty state styles */
+.submissions-state-cell {
+  text-align: center;
+  padding: 28px 20px !important;
+  color: #64748B;
+  font-size: 13.5px;
+}
+
+.submissions-loading-spinner-wrapper {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  color: #4D308D;
+  font-weight: 500;
+}

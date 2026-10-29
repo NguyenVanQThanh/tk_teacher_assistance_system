@@ -29,6 +29,55 @@ Updated By: Tam Khang
   }
 }
 
+/* Dashboard Full Loading State */
+.dashboard-loading-overlay {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 480px;
+  width: 100%;
+}
+
+.dashboard-loading-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 48px 36px;
+  background-color: #FFFFFF;
+  border-radius: 16px;
+  border: 1px solid #EBE8F0;
+  box-shadow: 0 4px 20px rgba(77, 48, 141, 0.05);
+  text-align: center;
+  max-width: 440px;
+  animation: pageFadeIn 0.3s ease-out;
+}
+
+.dashboard-loading-icon {
+  color: #4D308D;
+  margin-bottom: 16px;
+  animation: spin 1s linear infinite;
+}
+
+.dashboard-loading-title {
+  font-size: 17px;
+  font-weight: 700;
+  color: #1D1928;
+  margin: 0 0 8px 0;
+}
+
+.dashboard-loading-desc {
+  font-size: 13.5px;
+  color: #64748B;
+  margin: 0;
+  line-height: 1.5;
+}
+
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
 /* Top Banner Row */
 .dashboard-top-banner-row {
   display: flex;

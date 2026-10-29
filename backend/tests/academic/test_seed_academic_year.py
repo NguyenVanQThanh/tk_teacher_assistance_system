@@ -1,9 +1,9 @@
 # File Name: test_seed_academic_year.py
 # Description: Check academic seed year boundaries without loading database or environment configuration.
 # Created At: 2026-10-29
-# Created By: AI Agent
-# Updated At: 2026-10-29
-# Updated By: AI Agent
+# Created By: Tam Khang
+# Updated At: 2026-10-30
+# Updated By: Tam Khang
 
 import ast
 from datetime import date
@@ -19,7 +19,7 @@ class AcademicSeedYearTests(unittest.TestCase):
         function = next(node for node in tree.body if isinstance(node, ast.FunctionDef)
                         and node.name == "seed_academic_sample_data")
         statements = next(node for node in function.body if isinstance(node, ast.Try)).body
-        names = {"today", "start_year", "academic_year", "classes_data"}
+        names = {"today", "start_year", "academic_year", "current_year", "prev_year_1", "prev_year_2", "classes_data"}
         assignments = [node for node in statements if isinstance(node, ast.Assign)
                        and any(isinstance(target, ast.Name) and target.id in names
                                for target in node.targets)]
@@ -37,8 +37,7 @@ class AcademicSeedYearTests(unittest.TestCase):
                 exec(code, scope)
                 self.assertEqual(scope["academic_year"], expected)
                 self.assertEqual(len(scope["classes_data"]), 3)
-                self.assertTrue(all(item["school_year"] == expected
-                                    for item in scope["classes_data"]))
+                self.assertEqual(scope["classes_data"][0]["school_year"], expected)
 
 
 if __name__ == "__main__":

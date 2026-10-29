@@ -13,10 +13,7 @@ import { getTeacherProfileDefaults } from '../../utils/teacherSubjectHelper';
 import './LearningQualityCard.css';
 
 export default function LearningQualityCard({ 
-  learningQuality, 
-  classesList = [], 
-  selectedClassId = '', 
-  onSelectClass 
+  learningQuality 
 }) {
   const { user } = useAuth();
   const profileDefaults = getTeacherProfileDefaults(user);
@@ -41,32 +38,7 @@ export default function LearningQualityCard({
   return (
     <div className="learning-quality-card">
       <div className="card-header">
-        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
-          <h2 className="card-title">Chất lượng học tập trung bình</h2>
-          {classesList && classesList.length > 1 && (
-            <select
-              value={selectedClassId}
-              onChange={(e) => onSelectClass && onSelectClass(e.target.value)}
-              style={{
-                padding: '4px 8px',
-                borderRadius: '6px',
-                border: '1px solid #CBD5E1',
-                fontSize: '12.5px',
-                background: '#FFFFFF',
-                color: '#1E293B',
-                cursor: 'pointer',
-                fontWeight: 600
-              }}
-              title="Chọn lớp chủ nhiệm để xem đánh giá"
-            >
-              {classesList.map(c => (
-                <option key={c.class_id} value={c.class_id}>
-                  {c.class_name} {c.school_year ? `(${c.school_year})` : ''}
-                </option>
-              ))}
-            </select>
-          )}
-        </div>
+        <h2 className="card-title">Chất lượng học tập trung bình</h2>
         <button className="icon-more-btn" aria-label="More options" type="button">
           <MoreHorizontal size={18} />
         </button>

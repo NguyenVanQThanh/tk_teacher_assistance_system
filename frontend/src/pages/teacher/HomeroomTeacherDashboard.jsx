@@ -8,97 +8,30 @@
 import React, { useState, useEffect } from 'react';
 import { 
   ClipboardCheck,
-  BookOpen
+  BookOpen,
+  Loader2
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
-import { teacherApi, classesApi } from '../../services/api';
+import { teacherApi } from '../../services/api';
 import LearningQualityCard from '../../components/teacher/LearningQualityCard';
 import RecentSubmissionsTable from '../../components/teacher/RecentSubmissionsTable';
 import TeachingScheduleCard from '../../components/teacher/TeachingScheduleCard';
 import './TeacherDashboard.css';
-
-/**
- * Calculates current academic school year (e.g., '2026-2027' for October 2026).
- * School years in Vietnam typically begin in August/September.
- */
-function getCurrentAcademicYear() {
-  const now = new Date();
-  const year = now.getFullYear();
-  const month = now.getMonth() + 1;
-  return month >= 8 ? `${year}-${year + 1}` : `${year - 1}-${year}`;
-}
 
 export default function HomeroomTeacherDashboard() {
   const { user } = useAuth();
   const navigate = useNavigate();
   const [dashboardData, setDashboardData] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [classesList, setClassesList] = useState([]);
-  const [selectedClassId, setSelectedClassId] = useState(
-    localStorage.getItem('selected_homeroom_class_id') || ''
-  );
 
   useEffect(() => {
     let isMounted = true;
     async function loadData() {
       try {
         setLoading(true);
-        const currentYear = getCurrentAcademicYear();
-
-        // 1. Fetch classes to know available homeroom options
-        const classesRes = await classesApi.getClasses();
-        let activeClassId = localStorage.getItem('selected_homeroom_class_id') || '';
-
-        if (Array.isArray(classesRes) && classesRes.length > 0) {
-          // Filter classes where current user is the homeroom teacher
-          const userHomeroomClasses = classesRes.filter(c => 
-            c.homeroom_teacher_id === user?.user_id || 
-            (user?.full_name && c.homeroom_teacher_name?.includes(user?.full_name))
-          );
-          const availableClasses = userHomeroomClasses.length > 0 ? userHomeroomClasses : classesRes;
-
-          // Deduplicate to ensure at most 1 homeroom class per academic year
-          const sortedCandidates = [...availableClasses].sort((a, b) => {
-            const yearA = a.school_year || a.academic_year || '';
-            const yearB = b.school_year || b.academic_year || '';
-            if (yearA === currentYear && yearB !== currentYear) return -1;
-            if (yearB === currentYear && yearA !== currentYear) return 1;
-            if (yearA !== yearB) return yearB.localeCompare(yearA);
-            return (a.class_name || '').localeCompare(b.class_name || '');
-          });
-
-          const seenYears = new Set();
-          const uniqueYearClasses = [];
-          for (const c of sortedCandidates) {
-            const yr = c.school_year || c.academic_year || 'unknown';
-            if (!seenYears.has(yr)) {
-              seenYears.add(yr);
-              uniqueYearClasses.push(c);
-            }
-          }
-
-          const sortedClasses = uniqueYearClasses.length > 0 ? uniqueYearClasses : sortedCandidates;
-
-          if (isMounted) setClassesList(sortedClasses);
-
-          // Find preferred class:
-          // Check if activeClassId exists in current list
-          let target = activeClassId ? sortedClasses.find(c => c.class_id === activeClassId) : null;
-          if (!target || (target.school_year !== currentYear && sortedClasses.some(c => (c.school_year === currentYear || c.academic_year === currentYear)))) {
-            const userHomeroom = sortedClasses.find(c => 
-              (c.school_year === currentYear || c.academic_year === currentYear)
-            );
-            target = userHomeroom || sortedClasses[0];
-          }
-
-          activeClassId = target.class_id;
-          if (isMounted) setSelectedClassId(activeClassId);
-          localStorage.setItem('selected_homeroom_class_id', activeClassId);
-        }
-
-        // 2. Load dashboard with the selected homeroom class
-        const data = await teacherApi.getDashboard(activeClassId ? { class_id: activeClassId } : {});
+        // Load consolidated dashboard for current academic year homeroom class
+        const data = await teacherApi.getDashboard();
         if (isMounted) setDashboardData(data);
       } catch (err) {
         console.error('Failed to load teacher dashboard:', err);
@@ -109,20 +42,6 @@ export default function HomeroomTeacherDashboard() {
     loadData();
     return () => { isMounted = false; };
   }, [user]);
-
-  const handleSelectClass = async (classId) => {
-    setSelectedClassId(classId);
-    localStorage.setItem('selected_homeroom_class_id', classId);
-    try {
-      setLoading(true);
-      const data = await teacherApi.getDashboard({ class_id: classId });
-      setDashboardData(data);
-    } catch (err) {
-      console.error('Failed to reload dashboard for class:', err);
-    } finally {
-      setLoading(false);
-    }
-  };
 
   // Derive dynamic greeting title (e.g. "Thầy Nguyễn" or "Cô Mai")
   const getGreetingData = (fullName) => {
@@ -140,6 +59,21 @@ export default function HomeroomTeacherDashboard() {
   };
 
   const { title: teacherTitle, name: greetingName } = getGreetingData(user?.full_name);
+
+  // High-UX Loading State: While BE is returning response, show loading animation instead of empty/placeholder layout
+  if (loading && !dashboardData) {
+    return (
+      <div className="teacher-dashboard-container">
+        <div className="dashboard-loading-overlay">
+          <div className="dashboard-loading-card">
+            <Loader2 className="dashboard-loading-icon" size={38} />
+            <h3 className="dashboard-loading-title">Đang đồng bộ dữ liệu giảng dạy...</h3>
+            <p className="dashboard-loading-desc">Hệ thống đang tải số liệu lớp học, chất lượng học tập và lịch giảng dạy từ máy chủ.</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="teacher-dashboard-container">
@@ -197,11 +131,12 @@ export default function HomeroomTeacherDashboard() {
         <div className="dashboard-left-column">
           <LearningQualityCard 
             learningQuality={dashboardData?.learning_quality} 
-            classesList={classesList}
-            selectedClassId={selectedClassId}
-            onSelectClass={handleSelectClass}
           />
-          <RecentSubmissionsTable submissions={dashboardData?.recent_submissions} />
+          <RecentSubmissionsTable 
+            submissions={dashboardData?.recent_submissions} 
+            loading={loading}
+            onGradeSubmission={(attemptId) => navigate(`/teacher/grading?attempt_id=${attemptId}`)}
+          />
         </div>
 
         {/* Right Column: Lịch giảng dạy tuần này */}

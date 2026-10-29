@@ -2,13 +2,13 @@
 # Description: API Router for Teacher and Homeroom Teacher Dashboard metrics, learning quality radar analytics, recent submissions, and weekly schedule.
 # Created At: 2026-10-25
 # Created By: Tam Khang
-# Updated At: 2026-10-29
+# Updated At: 2026-10-30
 # Updated By: Tam Khang
 
 from typing import List, Optional, Dict, Any
 from uuid import UUID
 from datetime import datetime, date, timezone, timedelta
-from fastapi import APIRouter, Depends, status
+from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 from sqlalchemy import func, or_
@@ -19,6 +19,7 @@ from models.models import (
     ClassAssignment, Exercise, StudentExerciseAttempt
 )
 from app.modules.auth.dependencies import require_perm, get_current_user
+from app.modules.academic.scoping import get_user_role_name
 from app.modules.exercise.routers.teacher_schedule import get_synced_schedule_items
 from app.modules.exercise.services.attempt_service import AttemptService
 from app.modules.exercise.services.learning_quality_service import LearningQualityService
@@ -84,6 +85,44 @@ class TeacherDashboardResponse(BaseModel):
     weekly_schedule: List[WeeklyScheduleItem]
 
 
+def validate_class_access_for_dashboard(
+    db: Session,
+    current_user: User,
+    class_id: UUID
+) -> Class:
+    """
+    Validate that target class exists and caller has permission to view its homeroom analytics.
+    Non-admin callers must be the homeroom teacher or an assigned subject teacher of this class.
+    Raises 404 if class does not exist or is soft-deleted.
+    Raises 403 if caller lacks authorization.
+    """
+    cls = db.query(Class).filter(
+        Class.class_id == class_id,
+        Class.status != "DELETED"
+    ).first()
+    if not cls:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Class not found."
+        )
+
+    role_name = get_user_role_name(db, current_user)
+    if role_name != "Admin":
+        is_homeroom = (cls.homeroom_teacher_id == current_user.user_id)
+        is_assigned = db.query(TeacherSubject.teacher_id).filter(
+            TeacherSubject.class_id == class_id,
+            TeacherSubject.teacher_id == current_user.user_id,
+            TeacherSubject.status != "DELETED"
+        ).first() is not None
+
+        if not (is_homeroom or is_assigned):
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Access denied: You are not authorized to view data for this class."
+            )
+    return cls
+
+
 @router.get(
     "/dashboard",
     response_model=TeacherDashboardResponse,
@@ -99,6 +138,7 @@ def get_teacher_dashboard(
     and weekly timetable schedule for the authenticated teacher.
     """
     teacher_id = current_user.user_id
+    role_name = get_user_role_name(db, current_user)
 
     # 1. Fetch assigned classes and homeroom class (prioritizing current academic year)
     today = date.today()
@@ -113,10 +153,7 @@ def get_teacher_dashboard(
 
     homeroom_class = None
     if class_id:
-        homeroom_class = db.query(Class).filter(
-            Class.class_id == class_id,
-            Class.status != "DELETED"
-        ).first()
+        homeroom_class = validate_class_access_for_dashboard(db, current_user, class_id)
 
     if not homeroom_class:
         homeroom_class = db.query(Class).filter(
@@ -125,18 +162,12 @@ def get_teacher_dashboard(
             Class.status != "DELETED"
         ).first()
 
-    if not homeroom_class:
-        homeroom_class = db.query(Class).filter(
-            Class.homeroom_teacher_id == teacher_id,
-            Class.status != "DELETED"
-        ).order_by(Class.academic_year.desc()).first()
-
     all_class_ids = set(assigned_class_ids)
     if homeroom_class:
         all_class_ids.add(homeroom_class.class_id)
 
-    # Fallback to all classes if no direct assignments found for full platform view
-    if not all_class_ids:
+    # Only Admin has platform-wide fallback view if they have no explicit assignments
+    if not all_class_ids and role_name == "Admin":
         all_classes = db.query(Class).filter(Class.status != "DELETED").all()
         all_class_ids = {c.class_id for c in all_classes}
 
@@ -165,7 +196,11 @@ def get_teacher_dashboard(
     )
 
     all_attempts = attempts_query.order_by(
-        StudentExerciseAttempt.start_time.desc()
+        func.coalesce(
+            StudentExerciseAttempt.end_time,
+            StudentExerciseAttempt.start_time,
+            StudentExerciseAttempt.created_at
+        ).desc()
     ).limit(50).all()
 
     # Pending grading count: reuse the exact same service used by the Grading & Feedback page
@@ -189,11 +224,15 @@ def get_teacher_dashboard(
         name_parts = (stu.full_name or "Học sinh").strip().split(" ")
         initial = (name_parts[0][0] + name_parts[-1][0]).upper() if len(name_parts) >= 2 else (stu.full_name or "HS")[:2].upper()
 
-        # Format submitted time
+        # Format submitted time in Vietnam timezone (UTC+7)
         time_ref = att.end_time or att.start_time
         time_str = "Hôm nay, 10:30"
         if time_ref:
-            time_str = time_ref.strftime("%d/%m, %H:%M")
+            if time_ref.tzinfo is None:
+                time_ref = time_ref.replace(tzinfo=timezone.utc)
+            tz_vn = timezone(timedelta(hours=7))
+            local_time = time_ref.astimezone(tz_vn)
+            time_str = local_time.strftime("%d/%m, %H:%M")
 
         is_late = False
         status_code = "submitted"
@@ -294,7 +333,7 @@ def get_teacher_dashboard(
     quality_service = LearningQualityService(db)
     quality_dict = quality_service.get_homeroom_learning_quality(
         teacher_user=current_user,
-        class_id=class_id
+        class_id=homeroom_class.class_id if homeroom_class else class_id
     )
 
     radar_subjects = [
@@ -339,6 +378,9 @@ def get_teacher_learning_quality(
     Retrieve academic learning quality radar scores (class average vs grade cohort average)
     and pedagogical comparison remarks for a homeroom class.
     """
+    if class_id:
+        validate_class_access_for_dashboard(db, current_user, class_id)
+
     quality_service = LearningQualityService(db)
     quality_dict = quality_service.get_homeroom_learning_quality(
         teacher_user=current_user,
