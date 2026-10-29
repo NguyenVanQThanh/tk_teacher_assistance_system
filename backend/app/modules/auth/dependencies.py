@@ -13,7 +13,7 @@ from uuid import UUID
 
 from app.core.security import SECRET_KEY, ALGORITHM
 from app.core.database import get_db
-from models.models import User
+from models.models import User, Role
 from app.modules.auth.services.permission_service import PermissionService
 
 # Configure OAuth2PasswordBearer, auto_error=False to allow custom error envelopes for missing tokens
@@ -91,6 +91,27 @@ def get_current_user(token: str = Depends(oauth2_scheme), db: Session = Depends(
         )
         
     return user
+
+def require_roles(*role_names: str):
+    """
+    Enforces that the current authenticated user holds one of the given roles (case-insensitive).
+    Returns a callable dependency that yields the current user.
+    """
+    allowed = {name.lower() for name in role_names}
+
+    def dependency(user: User = Depends(get_current_user), db: Session = Depends(get_db)) -> User:
+        role = db.query(Role).filter(Role.role_id == user.role_id).first()
+        if not role or role.name.lower() not in allowed:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail={
+                    "code": "ERR-AUTH-FORBIDDEN",
+                    "message": "You do not have permission to access this resource."
+                }
+            )
+        return user
+    return dependency
+
 
 def require_perm(permission_code: str):
     """

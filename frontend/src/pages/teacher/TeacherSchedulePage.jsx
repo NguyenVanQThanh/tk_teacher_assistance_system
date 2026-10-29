@@ -1,8 +1,8 @@
 // File Name: TeacherSchedulePage.jsx
-// Description: Examination and Teaching Schedule interface with interactive calendar, urgency color bars, equal-sized grid cells, horizontal urgency legend, and detailed daily timeline.
+// Description: Examination and Teaching Schedule interface with interactive calendar, urgency color bars, equal-sized grid cells, horizontal urgency legend, and synchronized schedule notes API.
 // Created At: 2026-09-01
 // Created By: Tam Khang
-// Updated At: 2026-09-27
+// Updated At: 2026-10-28
 // Updated By: Tam Khang
 
 import React, { useState, useMemo, useEffect } from 'react';
@@ -30,10 +30,8 @@ export default function TeacherSchedulePage() {
   const [currentMonth, setCurrentMonth] = useState(today.getMonth()); // 0-indexed month
   const [selectedDay, setSelectedDay] = useState(today.getDate());
   const [selectedGrade, setSelectedGrade] = useState('all'); // 'all' | '10' | '11' | '12'
-  const [notes, setNotes] = useState([
-    { id: 1, text: 'Chuẩn bị đề kiểm tra 15 phút Giải tích 12' },
-    { id: 2, text: 'Nộp báo cáo chuyên môn cho Tổ trưởng trước thứ 6' }
-  ]);
+  const [notes, setNotes] = useState([]);
+  const [isNotesLoading, setIsNotesLoading] = useState(false);
   const [newNoteInput, setNewNoteInput] = useState('');
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [toastMessage, setToastMessage] = useState(null);
@@ -263,7 +261,31 @@ export default function TeacherSchedulePage() {
         console.warn('Teacher schedule fetched fallback to defaults:', err);
       }
     }
+
+    async function loadNotes() {
+      try {
+        setIsNotesLoading(true);
+        const data = await teacherApi.getScheduleNotes();
+        if (isMounted && data?.items) {
+          setNotes(data.items);
+        }
+      } catch (err) {
+        console.warn('Teacher schedule notes fallback to defaults:', err);
+        if (isMounted) {
+          setNotes([
+            { id: 'fallback-1', text: 'Chuẩn bị đề kiểm tra 15 phút Giải tích 12' },
+            { id: 'fallback-2', text: 'Nộp báo cáo chuyên môn cho Tổ trưởng trước thứ 6' }
+          ]);
+        }
+      } finally {
+        if (isMounted) {
+          setIsNotesLoading(false);
+        }
+      }
+    }
+
     loadSchedule();
+    loadNotes();
     return () => { isMounted = false; };
   }, []);
 
@@ -391,23 +413,46 @@ export default function TeacherSchedulePage() {
     });
   }, [scheduleList, currentYear, currentMonth, selectedDay, selectedGrade]);
 
-  // Add new note
-  const handleAddNote = (e) => {
+  // Add new note via API
+  const handleAddNote = async (e) => {
     e.preventDefault();
-    if (!newNoteInput.trim()) return;
-    const newNote = {
-      id: Date.now(),
-      date: `${currentYear}-${String(currentMonth + 1).padStart(2, '0')}-${String(selectedDay).padStart(2, '0')}`,
-      text: newNoteInput.trim()
-    };
-    setNotes(prev => [newNote, ...prev]);
+    const trimmed = newNoteInput.trim();
+    if (!trimmed) return;
+
+    const formattedDate = `${currentYear}-${String(currentMonth + 1).padStart(2, '0')}-${String(selectedDay).padStart(2, '0')}`;
+    try {
+      const created = await teacherApi.createScheduleNote({
+        text: trimmed,
+        date: formattedDate
+      });
+      setNotes(prev => [created, ...prev]);
+      setToastMessage('Đã thêm ghi chú mới thành công!');
+    } catch (err) {
+      console.warn('Failed to save note to API, falling back to local state:', err);
+      const fallbackNote = {
+        id: `local-${Date.now()}`,
+        date: formattedDate,
+        text: trimmed
+      };
+      setNotes(prev => [fallbackNote, ...prev]);
+      setToastMessage('Đã thêm ghi chú mới!');
+    }
     setNewNoteInput('');
-    setToastMessage('Đã thêm ghi chú mới thành công!');
     setTimeout(() => setToastMessage(null), 3000);
   };
 
-  const handleDeleteNote = (id) => {
-    setNotes(prev => prev.filter(n => n.id !== id));
+  // Delete note via API (strict soft delete on server)
+  const handleDeleteNote = async (id) => {
+    try {
+      setNotes(prev => prev.filter(n => n.id !== id));
+      if (!String(id).startsWith('fallback-') && !String(id).startsWith('local-')) {
+        await teacherApi.deleteScheduleNote(id);
+      }
+      setToastMessage('Đã xóa ghi chú thành công!');
+      setTimeout(() => setToastMessage(null), 3000);
+    } catch (err) {
+      console.warn('Failed to delete note via API:', err);
+    }
   };
 
   // Add new schedule handler
@@ -723,6 +768,9 @@ export default function TeacherSchedulePage() {
 
               {/* Notes List */}
               <div className="notes-items-list">
+                {!isNotesLoading && notes.length === 0 && (
+                  <span className="note-text">Chưa có ghi chú nào.</span>
+                )}
                 {notes.map((note) => (
                   <div key={note.id} className="single-note-item">
                     <div className="note-bullet" />

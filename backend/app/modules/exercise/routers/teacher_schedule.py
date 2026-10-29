@@ -1,20 +1,23 @@
 # File Name: teacher_schedule.py
-# Description: Router providing the teaching timetable for teachers. Single source of truth shared by
-#              the Teaching Schedule page and the Teacher Dashboard (today's classes + weekly schedule).
+# Description: Router providing the teaching timetable and schedule notes/reminders for teachers.
 # Created At: 2026-10-07
 # Created By: Tam Khang
-# Updated At: 2026-10-25
-# Updated By: Tam Khang
+# Updated At: 2026-10-29
+# Updated By: AI Agent
 
 from typing import List, Optional
-from datetime import date, timedelta
-from fastapi import APIRouter, Depends
+from datetime import date, date as Date, timedelta
+from uuid import UUID
+from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
-from app.modules.auth.dependencies import get_current_user
-from app.modules.auth.models import User
+from app.modules.auth.dependencies import require_roles
+from models.models import User, ScheduleNote
+
+# Schedule and notes are teacher-facing; students must not reach these endpoints.
+get_current_user = require_roles("Teacher", "HomeroomTeacher", "Admin")
 
 router = APIRouter(prefix="/api/v1/teacher/schedule", tags=["Teacher Schedule"])
 
@@ -88,6 +91,29 @@ class TeacherScheduleResponse(BaseModel):
     items: List[TeacherScheduleItemOut]
 
 
+class ScheduleNoteCreate(BaseModel):
+    text: Optional[str] = None
+    content: Optional[str] = None
+    date: Optional[str] = None
+    # Annotated with the Date alias: the `date` field above shadows the type name in the class body.
+    note_date: Optional[Date] = None
+
+
+class ScheduleNoteOut(BaseModel):
+    id: str
+    text: str
+    content: str
+    date: Optional[str] = None
+    note_date: Optional[str] = None
+    status: str = "ACTIVE"
+    created_at: Optional[str] = None
+
+
+class ScheduleNotesResponse(BaseModel):
+    items: List[ScheduleNoteOut]
+    total: int
+
+
 def get_synced_schedule_items(start_date: Optional[date] = None) -> List[TeacherScheduleItemOut]:
     """Generate timetable sessions for the next SCHEDULE_WINDOW_DAYS days starting from start_date (default today)."""
     start = start_date or date.today()
@@ -124,3 +150,122 @@ def get_teacher_schedule(
         academic_year="2026 - 2027",
         items=get_synced_schedule_items(),
     )
+
+
+@router.get("/notes", response_model=ScheduleNotesResponse)
+def get_schedule_notes(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """
+    Retrieve active schedule notes and reminders for the current teacher (read-only).
+    """
+    notes = db.query(ScheduleNote).filter(
+        ScheduleNote.user_id == current_user.user_id,
+        ScheduleNote.status != "DELETED"
+    ).order_by(ScheduleNote.created_at.desc()).all()
+
+    items = [
+        ScheduleNoteOut(
+            id=str(n.note_id),
+            text=n.content,
+            content=n.content,
+            date=n.note_date.isoformat() if n.note_date else None,
+            note_date=n.note_date.isoformat() if n.note_date else None,
+            status=n.status,
+            created_at=n.created_at.isoformat() if n.created_at else None,
+        )
+        for n in notes
+    ]
+    return ScheduleNotesResponse(items=items, total=len(items))
+
+
+@router.post("/notes", response_model=ScheduleNoteOut, status_code=status.HTTP_201_CREATED)
+def create_schedule_note(
+    payload: ScheduleNoteCreate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """
+    Create a new schedule note for the current teacher.
+    """
+    note_text = (payload.text or payload.content or "").strip()
+    if not note_text:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Note text cannot be empty."
+        )
+
+    parsed_date = payload.note_date
+    if not parsed_date and payload.date:
+        try:
+            parsed_date = date.fromisoformat(payload.date)
+        except ValueError:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Invalid date format. Expected ISO date (YYYY-MM-DD)."
+            )
+    if not parsed_date:
+        parsed_date = date.today()
+
+    new_note = ScheduleNote(
+        user_id=current_user.user_id,
+        content=note_text,
+        note_date=parsed_date,
+        status="ACTIVE"
+    )
+    db.add(new_note)
+    db.commit()
+    db.refresh(new_note)
+
+    return ScheduleNoteOut(
+        id=str(new_note.note_id),
+        text=new_note.content,
+        content=new_note.content,
+        date=new_note.note_date.isoformat() if new_note.note_date else None,
+        note_date=new_note.note_date.isoformat() if new_note.note_date else None,
+        status=new_note.status,
+        created_at=new_note.created_at.isoformat() if new_note.created_at else None,
+    )
+
+
+@router.delete("/notes/{note_id}")
+def delete_schedule_note(
+    note_id: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """
+    Soft-delete a schedule note by updating its status to 'DELETED'.
+    Hard delete is strictly prohibited per architecture rules.
+    Restricted to the note owner only to prevent IDOR.
+    """
+    try:
+        uuid_val = UUID(note_id)
+    except ValueError:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Invalid note ID format."
+        )
+
+    note = db.query(ScheduleNote).filter(
+        ScheduleNote.note_id == uuid_val,
+        ScheduleNote.user_id == current_user.user_id,
+        ScheduleNote.status != "DELETED"
+    ).first()
+
+    if not note:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Schedule note not found or access denied."
+        )
+
+    # Soft delete
+    note.status = "DELETED"
+    db.commit()
+
+    return {
+        "message": "Schedule note soft deleted successfully.",
+        "note_id": str(note_id),
+        "status": "DELETED"
+    }
