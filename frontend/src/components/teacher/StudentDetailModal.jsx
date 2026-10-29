@@ -337,9 +337,9 @@ export default function StudentDetailModal({
     return realAttempts.map((att, idx) => ({
       id: att.attempt_id || `real-${idx}`,
       subjectId: 'math',
-      subjectName: att.assignment_title?.includes('Vật lý') ? 'Vật lý' : 'Toán',
+      subjectName: att.subject_name || (att.assignment_title?.includes('Vật lý') || att.exercise_title?.includes('Vật lý') ? 'Vật lý' : 'Toán'),
       badgeColor: '#7C3AED',
-      title: att.assignment_title || `Bài tập #${att.assignment_id || idx + 1}`,
+      title: att.assignment_title || att.exercise_title || (att.exercise && att.exercise.title) || `Bài tập ${idx + 1}`,
       attemptsCount: 1,
       attemptsDetails: [
         { 
