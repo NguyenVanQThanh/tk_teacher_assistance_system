@@ -158,3 +158,41 @@ def test_teacher_schedule_auth_and_idor_prevention(client: TestClient):
     assert del_own.status_code == status.HTTP_200_OK
     assert del_own.json()["status"] == "DELETED"
 
+
+
+def _login(client: TestClient, phone: str) -> dict:
+    res = client.post("/api/v1/auth/login", json={"phone": phone, "password": "password123"})
+    return {"Authorization": f"Bearer {res.json()['access_token']}"}
+
+
+def test_student_blocked_and_draft_hidden_from_other_teacher(client: TestClient):
+    admin = {"Authorization": f"Bearer {get_admin_token(client)}"}
+    teacher = _login(client, "0912345678")
+    student = _login(client, "0934567890")
+
+    files = {"file": ("draft_doc.pdf", io.BytesIO(b"%PDF draft"), "application/pdf")}
+    up = client.post("/api/v1/documents/upload", headers=admin, files=files,
+                     data={"title": "Draft Only Doc", "grade": "12", "document_type": "lecture"})
+    doc_id = up.json()["document_id"]
+    client.put(f"/api/v1/documents/{doc_id}", headers=admin, json={"status": "Draft"})
+
+    # Students are rejected by the role gate
+    assert client.get("/api/v1/documents", headers=student).status_code == status.HTTP_403_FORBIDDEN
+    assert client.get("/api/v1/teacher/schedule/notes", headers=student).status_code == status.HTTP_403_FORBIDDEN
+    # A Draft owned by someone else is invisible to another teacher
+    assert client.get(f"/api/v1/documents/{doc_id}", headers=teacher).status_code == status.HTTP_404_NOT_FOUND
+
+
+def test_document_metadata_validation_and_missing_file_download(client: TestClient):
+    admin = {"Authorization": f"Bearer {get_admin_token(client)}"}
+    files = {"file": ("meta.pdf", io.BytesIO(b"%PDF meta"), "application/pdf")}
+    bad = client.post("/api/v1/documents/upload", headers=admin, files=files,
+                      data={"title": "Bad Meta Doc", "grade": "99", "document_type": "lecture"})
+    assert bad.status_code == status.HTTP_400_BAD_REQUEST
+
+    files = {"file": ("meta2.pdf", io.BytesIO(b"%PDF meta"), "application/pdf")}
+    ok = client.post("/api/v1/documents/upload", headers=admin, files=files,
+                     data={"title": "Good Meta Doc", "grade": "11", "document_type": "exam"})
+    doc_id = ok.json()["document_id"]
+    assert client.put(f"/api/v1/documents/{doc_id}", headers=admin,
+                      json={"document_type": "bogus"}).status_code == status.HTTP_422_UNPROCESSABLE_ENTITY
