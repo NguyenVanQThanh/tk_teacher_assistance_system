@@ -2,13 +2,14 @@
 # Description: Idempotent database seed script for academic subjects, classes, teachers, student accounts, and enrollments.
 # Created At: 2026-09-01
 # Created By: Tam Khang
-# Updated At: 2026-09-01
-# Updated By: Tam Khang
+# Updated At: 2026-10-29
+# Updated By: AI Agent
 
 import os
 import sys
 import json
 import uuid
+from datetime import date
 from pathlib import Path
 
 # Ensure UTF-8 output encoding on Windows console
@@ -180,20 +181,23 @@ def seed_academic_sample_data():
         # 12A1: Homeroom is Sample Teacher (0999000002)
         # 11B2: Homeroom is Thầy An (0999000004)
         # 10A3: Homeroom is Cô Mai (0999000005)
+        today = date.today()
+        start_year = today.year if today.month >= 8 else today.year - 1
+        academic_year = f"{start_year}-{start_year + 1}"
         classes_data = [
             {
                 "name": "12A1",
-                "school_year": "2023-2024",
+                "school_year": academic_year,
                 "homeroom_phone": "0999000002"
             },
             {
                 "name": "11B2",
-                "school_year": "2023-2024",
+                "school_year": academic_year,
                 "homeroom_phone": "0999000004"
             },
             {
                 "name": "10A3",
-                "school_year": "2023-2024",
+                "school_year": academic_year,
                 "homeroom_phone": "0999000005"
             }
         ]

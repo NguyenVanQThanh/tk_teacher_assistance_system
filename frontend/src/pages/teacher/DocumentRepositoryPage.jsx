@@ -9,7 +9,6 @@ import React, { useState, useMemo, useRef, useEffect, useCallback } from 'react'
 import { 
   ChevronRight, 
   Upload, 
-  ChevronLeft, 
   CheckCircle2, 
   AlertCircle, 
   AlertTriangle,
@@ -52,10 +51,7 @@ const mapBackendDoc = (doc) => ({
   authorInitial: (doc.author_name || 'TK').split(' ').map(n => n[0]).join('').slice(-2).toUpperCase(),
   folder: `${doc.subject_name || 'Tài liệu'} ${doc.grade || ''}`.trim(),
   description: doc.description || 'Tài liệu học tập được chia sẻ cho học sinh và giáo viên.',
-  viewsCount: `${(doc.download_count || 0) * 3 + 12}`,
   downloadsCount: `${doc.download_count || 0}`,
-  ratingScore: '4.9/5',
-  ratingsCount: '35',
   fileUrl: doc.file_url,
 });
 
@@ -64,7 +60,6 @@ export default function DocumentRepositoryPage() {
   const [selectedSubject, setSelectedSubject] = useState('all');
   const [selectedType, setSelectedType] = useState('all');
   const [searchQuery, setSearchQuery] = useState('');
-  const [currentPage, setCurrentPage] = useState(1);
   const [isUploadOpen, setIsUploadOpen] = useState(false);
   const [isCreateExerciseOpen, setIsCreateExerciseOpen] = useState(false);
   const [previewDoc, setPreviewDoc] = useState(null);
@@ -94,7 +89,7 @@ export default function DocumentRepositoryPage() {
     try {
       const [dashRes, docsRes] = await Promise.allSettled([
         documentsApi.getDocumentDashboard(),
-        documentsApi.getDocuments({ status: 'Uploaded' })
+        documentsApi.getDocuments({ status: 'ALL', page_size: 100 })
       ]);
       if (dashRes.status === 'fulfilled' && dashRes.value) {
         setDashboardStats(dashRes.value);
@@ -330,29 +325,8 @@ export default function DocumentRepositoryPage() {
           {/* Bottom Pagination Row */}
           <div className="doc-pagination-row">
             <span className="pagination-info">
-              Hiển thị <strong>{filteredDocuments.length > 0 ? 1 : 0}</strong> đến <strong>{filteredDocuments.length}</strong> trong số <strong>{dashboardStats?.total_documents !== undefined ? dashboardStats.total_documents : documents.length}</strong> tài liệu
+              Hiển thị <strong>{filteredDocuments.length}</strong> trong số <strong>{documents.length}</strong> tài liệu
             </span>
-
-            <div className="pagination-controls">
-              <button 
-                type="button" 
-                className="pagination-btn arrow-btn"
-                disabled={currentPage === 1}
-                onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
-              >
-                <ChevronLeft size={16} />
-              </button>
-              <button type="button" className="pagination-btn page-num active">
-                1
-              </button>
-              <button 
-                type="button" 
-                className="pagination-btn arrow-btn"
-                disabled={true}
-              >
-                <ChevronRight size={16} />
-              </button>
-            </div>
           </div>
         </>
       )}

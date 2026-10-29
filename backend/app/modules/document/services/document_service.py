@@ -11,6 +11,7 @@ from pathlib import Path
 from typing import Optional, List
 from uuid import UUID
 from fastapi import UploadFile, HTTPException, status
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from models.models import Document, Subject, User, Role
@@ -50,7 +51,8 @@ class DocumentService:
                 detail={"code": "ERR-DOC-PERMISSION_DENIED", "message": "You do not have permission to modify this document."}
             )
 
-        if doc.status == "DELETED" and not (is_owner or is_admin):
+        # Only published ("Uploaded") documents are visible to non-owners; Draft, Archived and DELETED stay private.
+        if doc.status != "Uploaded" and not (is_owner or is_admin):
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail={"code": "ERR-DOC-NOT_FOUND", "message": "Document not found."}
@@ -162,6 +164,7 @@ class DocumentService:
     @staticmethod
     def list_documents(
         db: Session,
+        current_user: User,
         subject_id: Optional[UUID] = None,
         grade: Optional[str] = None,
         document_type: Optional[str] = None,
@@ -173,12 +176,19 @@ class DocumentService:
         """List documents with filtering, search, and pagination."""
         query = db.query(Document)
 
-        if status_val == "ALL":
-            pass
-        elif status_val:
+        # "ALL" (or empty) means every non-deleted status; DELETED is only listed when explicitly requested.
+        if status_val and status_val != "ALL":
             query = query.filter(Document.status == status_val)
         else:
             query = query.filter(Document.status != "DELETED")
+
+        # Non-published documents (Draft, Archived, DELETED) are visible to their owner or an admin only.
+        admin_role = db.query(Role).filter(Role.name == "Admin").first()
+        is_admin = bool(admin_role and current_user.role_id == admin_role.role_id)
+        if not is_admin:
+            query = query.filter(
+                (Document.status == "Uploaded") | (Document.uploaded_by == current_user.user_id)
+            )
 
         if subject_id:
             query = query.filter(Document.subject_id == subject_id)
@@ -285,7 +295,11 @@ class DocumentService:
         """Increment document download counter and return entity after access check."""
         doc = DocumentService.get_document_by_id(db, document_id)
         DocumentService.check_document_access(db, doc, current_user, requires_ownership=False)
-        doc.download_count = (doc.download_count or 0) + 1
+        # Atomic SQL increment avoids lost updates under concurrent downloads.
+        db.query(Document).filter(Document.document_id == document_id).update(
+            {Document.download_count: func.coalesce(Document.download_count, 0) + 1},
+            synchronize_session=False,
+        )
         db.commit()
         db.refresh(doc)
         return doc

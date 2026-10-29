@@ -33,7 +33,7 @@ class DocumentUpdate(BaseModel):
     def validate_status(cls, v: Optional[str]) -> Optional[str]:
         if v is None:
             return v
-        allowed = {"Uploaded", "Draft", "Archived", "ACTIVE"}
+        allowed = {"Uploaded", "Draft", "Archived"}
         if v.upper() == "DELETED":
             raise ValueError("Cannot set status to DELETED via update. Use DELETE endpoint instead.")
         if v not in allowed:

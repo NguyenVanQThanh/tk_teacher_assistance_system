@@ -13,8 +13,11 @@ from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
-from app.modules.auth.dependencies import get_current_user
+from app.modules.auth.dependencies import require_roles
 from models.models import User, ScheduleNote
+
+# Schedule and notes are teacher-facing; students must not reach these endpoints.
+get_current_user = require_roles("Teacher", "HomeroomTeacher", "Admin")
 
 router = APIRouter(prefix="/api/v1/teacher/schedule", tags=["Teacher Schedule"])
 

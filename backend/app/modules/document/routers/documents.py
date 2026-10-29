@@ -14,10 +14,13 @@ from pathlib import Path
 
 from app.core.database import get_db
 from models.models import User
-from app.modules.auth.dependencies import get_current_user
+from app.modules.auth.dependencies import require_roles
 from app.modules.document.schemas import DocumentOut, DocumentListOut, DocumentDashboardOut, DocumentUpdate
 from app.modules.document.services import document_service
 from app.modules.document.services.document_service import DocumentService, UPLOAD_DIR
+
+# The repository is a teacher resource; students are rejected on every route.
+get_current_user = require_roles("Teacher", "HomeroomTeacher", "Admin")
 
 router = APIRouter(prefix="/api/v1/documents", tags=["documents"])
 
@@ -67,7 +70,7 @@ def list_documents(
     grade: Optional[str] = Query(None, description="Filter by grade"),
     document_type: Optional[str] = Query(None, description="Filter by document type"),
     search: Optional[str] = Query(None, description="Search query"),
-    status: Optional[str] = Query("Uploaded", description="Filter by status or ALL"),
+    status: Optional[str] = Query("Uploaded", description="Filter by status, or ALL for every non-deleted status"),
     page: int = Query(1, ge=1, description="Page number"),
     page_size: int = Query(12, ge=1, le=100, description="Items per page"),
     db: Session = Depends(get_db),
@@ -78,6 +81,7 @@ def list_documents(
     """
     return DocumentService.list_documents(
         db=db,
+        current_user=current_user,
         subject_id=subject_id,
         grade=grade,
         document_type=document_type,

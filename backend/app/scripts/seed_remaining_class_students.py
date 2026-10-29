@@ -20,7 +20,9 @@ from app.core.database import SessionLocal
 from models.models import User, Role, Class, StudentClass
 from app.core.security import get_password_hash
 
-DEFAULT_STUDENT_PASSWORD = os.environ.get("SEED_STUDENT_PASSWORD", "Student@1234")
+DEFAULT_STUDENT_PASSWORD = os.environ.get("SEED_STUDENT_PASSWORD")
+if not DEFAULT_STUDENT_PASSWORD:
+    sys.exit("SEED_STUDENT_PASSWORD environment variable is required.")
 
 SAMPLE_NAMES_11 = [
     "Nguyễn Thị Hương", "Lê Quốc Trung", "Trần Văn Minh", "Phạm Thị Thu",
