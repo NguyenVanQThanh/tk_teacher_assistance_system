@@ -20,6 +20,11 @@ class DocumentCreate(BaseModel):
     is_public: Optional[bool] = Field(False, description="Public visibility")
 
 
+# Values the dashboard buckets and list filters understand; anything else would make counts and filters disagree.
+ALLOWED_GRADES = {"10", "11", "12"}
+ALLOWED_DOCUMENT_TYPES = {"lecture", "exam", "reference"}
+
+
 class DocumentUpdate(BaseModel):
     title: Optional[str] = Field(None, min_length=3, max_length=255, description="Document title")
     subject_id: Optional[UUID] = Field(None, description="Associated subject UUID")
@@ -27,6 +32,20 @@ class DocumentUpdate(BaseModel):
     document_type: Optional[str] = Field(None, description="Document type: lecture, exam, reference")
     description: Optional[str] = Field(None, description="Optional document summary")
     status: Optional[str] = Field(None, description="Document status")
+
+    @field_validator("grade")
+    @classmethod
+    def validate_grade(cls, v: Optional[str]) -> Optional[str]:
+        if v is not None and v not in ALLOWED_GRADES:
+            raise ValueError(f"Invalid grade '{v}'. Allowed grades: {', '.join(sorted(ALLOWED_GRADES))}")
+        return v
+
+    @field_validator("document_type")
+    @classmethod
+    def validate_document_type(cls, v: Optional[str]) -> Optional[str]:
+        if v is not None and v not in ALLOWED_DOCUMENT_TYPES:
+            raise ValueError(f"Invalid document type '{v}'. Allowed types: {', '.join(sorted(ALLOWED_DOCUMENT_TYPES))}")
+        return v
 
     @field_validator("status")
     @classmethod
