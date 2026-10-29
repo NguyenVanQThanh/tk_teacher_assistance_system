@@ -1,8 +1,8 @@
 # File Name: enrollments.py
-# Description: API router for Enrollment & Restore endpoints (F-ACAD-03).
+# Description: API router for Enrollment & Restore endpoints strictly enforcing ACAD_ENROLLMENT_MANAGE permission (F-ACAD-03).
 # Created At: 2026-07-23
 # Created By: Tam Khang
-# Updated At: 2026-07-26
+# Updated At: 2026-10-29
 # Updated By: Tam Khang
 
 from uuid import UUID

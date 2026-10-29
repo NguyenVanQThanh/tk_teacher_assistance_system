@@ -1,8 +1,8 @@
 # File Name: auth.py
-# Description: Routers for authentication API endpoints including Login, Me, and Logout.
+# Description: Routers for authentication API endpoints including Login, Me, and Logout with effective permissions.
 # Created At: 2026-07-17
 # Created By: Tam Khang
-# Updated At: 2026-07-17
+# Updated At: 2026-10-28
 # Updated By: Tam Khang
 
 from fastapi import APIRouter, Depends, status, HTTPException
@@ -16,6 +16,7 @@ from app.modules.auth.schemas import (
 )
 from app.modules.auth.services.auth_service import AuthService
 from app.modules.auth.services.password_service import PasswordService
+from app.modules.auth.services.permission_service import PermissionService
 from app.modules.auth.dependencies import get_current_user, require_perm
 
 router = APIRouter(prefix="/api/v1/auth", tags=["auth"])
@@ -89,6 +90,7 @@ def get_me(current_user: User = Depends(get_current_user), db: Session = Depends
         ).all()
         teaching_subjects = [row[0] for row in ts_records] if ts_records else ["Toán học"]
 
+    perms = list(PermissionService.get_effective_permissions(db, current_user.user_id, current_user.role_id))
     return UserProfileOut(
         user_id=current_user.user_id,
         full_name=current_user.full_name,
@@ -99,7 +101,8 @@ def get_me(current_user: User = Depends(get_current_user), db: Session = Depends
         student_code=student_code,
         class_id=class_id,
         class_name=class_name,
-        teaching_subjects=teaching_subjects
+        teaching_subjects=teaching_subjects,
+        permissions=perms
     )
 
 @router.put("/profile", response_model=UserProfileOut, dependencies=[Depends(require_perm("AUTH_ME_VIEW"))])
