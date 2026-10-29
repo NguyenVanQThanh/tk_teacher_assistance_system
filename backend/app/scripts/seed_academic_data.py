@@ -3,7 +3,7 @@
 # Created At: 2026-09-01
 # Created By: Tam Khang
 # Updated At: 2026-10-29
-# Updated By: AI Agent
+# Updated By: Tam Khang
 
 import os
 import sys
@@ -177,28 +177,38 @@ def seed_academic_sample_data():
 
         session.commit()
 
-        print("--- [4] Seeding Classes (3 Classes) ---")
-        # 12A1: Homeroom is Sample Teacher (0999000002)
-        # 11B2: Homeroom is Thầy An (0999000004)
-        # 10A3: Homeroom is Cô Mai (0999000005)
+        print("--- [4] Seeding Classes (Exactly 1 Homeroom Class Per Year Per Teacher) ---")
         today = date.today()
         start_year = today.year if today.month >= 8 else today.year - 1
-        academic_year = f"{start_year}-{start_year + 1}"
+        current_year = f"{start_year}-{start_year + 1}"
+        prev_year_1 = f"{start_year - 1}-{start_year}"
+        prev_year_2 = f"{start_year - 2}-{start_year - 1}"
+
         classes_data = [
             {
                 "name": "12A1",
-                "school_year": academic_year,
-                "homeroom_phone": "0999000002"
+                "school_year": current_year,
+                "homeroom_phone": "0999000002"  # Nguyen Van A (2026-2027)
+            },
+            {
+                "name": "12A2",
+                "school_year": current_year,
+                "homeroom_phone": "0999000003"  # Thầy Long (2026-2027)
+            },
+            {
+                "name": "11A2",
+                "school_year": prev_year_1,
+                "homeroom_phone": "0999000002"  # Nguyen Van A (2025-2026)
             },
             {
                 "name": "11B2",
-                "school_year": academic_year,
-                "homeroom_phone": "0999000004"
+                "school_year": prev_year_1,
+                "homeroom_phone": "0999000004"  # Thầy An (2025-2026)
             },
             {
                 "name": "10A3",
-                "school_year": academic_year,
-                "homeroom_phone": "0999000005"
+                "school_year": prev_year_2,
+                "homeroom_phone": "0999000002"  # Nguyen Van A (2024-2025)
             }
         ]
         classes_dict = {}

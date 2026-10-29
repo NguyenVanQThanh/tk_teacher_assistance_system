@@ -2,7 +2,7 @@
 # Description: API Router for Teacher and Homeroom Teacher Dashboard metrics, learning quality radar analytics, recent submissions, and weekly schedule.
 # Created At: 2026-10-25
 # Created By: Tam Khang
-# Updated At: 2026-10-25
+# Updated At: 2026-10-29
 # Updated By: Tam Khang
 
 from typing import List, Optional, Dict, Any
@@ -21,6 +21,7 @@ from models.models import (
 from app.modules.auth.dependencies import require_perm, get_current_user
 from app.modules.exercise.routers.teacher_schedule import get_synced_schedule_items
 from app.modules.exercise.services.attempt_service import AttemptService
+from app.modules.exercise.services.learning_quality_service import LearningQualityService
 
 router = APIRouter(prefix="/api/v1/teacher", tags=["teacher-dashboard"])
 
@@ -89,6 +90,7 @@ class TeacherDashboardResponse(BaseModel):
     dependencies=[Depends(require_perm("EXE_ATTEMPT_VIEW"))]
 )
 def get_teacher_dashboard(
+    class_id: Optional[UUID] = None,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
@@ -98,17 +100,36 @@ def get_teacher_dashboard(
     """
     teacher_id = current_user.user_id
 
-    # 1. Fetch assigned classes and homeroom class
+    # 1. Fetch assigned classes and homeroom class (prioritizing current academic year)
+    today = date.today()
+    start_year = today.year if today.month >= 8 else today.year - 1
+    current_year = f"{start_year}-{start_year + 1}"
+
     assigned_records = db.query(TeacherSubject.class_id).filter(
         TeacherSubject.teacher_id == teacher_id,
         TeacherSubject.status != "DELETED"
     ).all()
     assigned_class_ids = {r[0] for r in assigned_records}
 
-    homeroom_class = db.query(Class).filter(
-        Class.homeroom_teacher_id == teacher_id,
-        Class.status != "DELETED"
-    ).first()
+    homeroom_class = None
+    if class_id:
+        homeroom_class = db.query(Class).filter(
+            Class.class_id == class_id,
+            Class.status != "DELETED"
+        ).first()
+
+    if not homeroom_class:
+        homeroom_class = db.query(Class).filter(
+            Class.homeroom_teacher_id == teacher_id,
+            Class.academic_year == current_year,
+            Class.status != "DELETED"
+        ).first()
+
+    if not homeroom_class:
+        homeroom_class = db.query(Class).filter(
+            Class.homeroom_teacher_id == teacher_id,
+            Class.status != "DELETED"
+        ).order_by(Class.academic_year.desc()).first()
 
     all_class_ids = set(assigned_class_ids)
     if homeroom_class:
@@ -269,23 +290,27 @@ def get_teacher_dashboard(
     today_iso = date.today().isoformat()
     today_classes_count = sum(1 for s in weekly_schedule if s.date_str == today_iso)
 
-    # 6. Build learning quality radar competencies
-    active_class_name = homeroom_class.class_name if homeroom_class else "12A1"
+    # 6. Build learning quality radar competencies with class average and grade comparison
+    quality_service = LearningQualityService(db)
+    quality_dict = quality_service.get_homeroom_learning_quality(
+        teacher_user=current_user,
+        class_id=class_id
+    )
+
     radar_subjects = [
-        RadarSubjectScore(subject_name="Toán Học", class_score=8.6, grade_score=7.8),
-        RadarSubjectScore(subject_name="Vật Lí", class_score=8.1, grade_score=7.4),
-        RadarSubjectScore(subject_name="Hóa Học", class_score=8.4, grade_score=7.6),
-        RadarSubjectScore(subject_name="Tiếng Anh", class_score=7.9, grade_score=7.5),
-        RadarSubjectScore(subject_name="Lịch Sử", class_score=8.0, grade_score=7.2),
-        RadarSubjectScore(subject_name="Tin học", class_score=8.8, grade_score=8.0),
+        RadarSubjectScore(
+            subject_name=r["subject_name"],
+            class_score=r["class_score"],
+            grade_score=r["grade_score"]
+        )
+        for r in quality_dict["radar_data"]
     ]
 
-    feedback_notes = [
-        "Điểm trung bình môn Toán và Khoa học tăng nhẹ so với học kỳ trước.",
-        "Cần cải thiện điểm thi giữa kỳ và hoàn thành bài tập về nhà đúng hạn.",
-        "Tích cực tham gia thảo luận trên lớp và hoàn thiện các dự án nhóm.",
-        "Khuyến nghị ôn tập thêm phần đọc hiểu và kỹ năng phân tích dữ liệu."
-    ]
+    learning_quality = LearningQualityData(
+        class_name=quality_dict["class_name"],
+        radar_data=radar_subjects,
+        feedback_notes=quality_dict["feedback_notes"]
+    )
 
     return TeacherDashboardResponse(
         metrics=TeacherDashboardMetrics(
@@ -294,11 +319,41 @@ def get_teacher_dashboard(
             total_classes_count=total_classes,
             total_students_count=student_count
         ),
-        learning_quality=LearningQualityData(
-            class_name=f"Lớp {active_class_name}",
-            radar_data=radar_subjects,
-            feedback_notes=feedback_notes
-        ),
+        learning_quality=learning_quality,
         recent_submissions=recent_submissions,
         weekly_schedule=weekly_schedule
     )
+
+
+@router.get(
+    "/learning-quality",
+    response_model=LearningQualityData,
+    dependencies=[Depends(require_perm("EXE_ATTEMPT_VIEW"))]
+)
+def get_teacher_learning_quality(
+    class_id: Optional[UUID] = None,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Retrieve academic learning quality radar scores (class average vs grade cohort average)
+    and pedagogical comparison remarks for a homeroom class.
+    """
+    quality_service = LearningQualityService(db)
+    quality_dict = quality_service.get_homeroom_learning_quality(
+        teacher_user=current_user,
+        class_id=class_id
+    )
+    return LearningQualityData(
+        class_name=quality_dict["class_name"],
+        radar_data=[
+            RadarSubjectScore(
+                subject_name=r["subject_name"],
+                class_score=r["class_score"],
+                grade_score=r["grade_score"]
+            )
+            for r in quality_dict["radar_data"]
+        ],
+        feedback_notes=quality_dict["feedback_notes"]
+    )
+
