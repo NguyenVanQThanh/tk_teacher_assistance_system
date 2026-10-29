@@ -457,6 +457,7 @@ class AttemptListItemOut(BaseModel):
     class_name: str
     exercise_id: UUID
     exercise_title: str
+    assignment_title: Optional[str] = None
     subject_id: Optional[UUID] = None
     subject_name: Optional[str] = None
     score: Optional[float] = None

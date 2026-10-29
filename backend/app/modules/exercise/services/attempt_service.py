@@ -229,6 +229,7 @@ class AttemptService:
                     class_name=class_name,
                     exercise_id=exercise_id,
                     exercise_title=exercise_title,
+                    assignment_title=exercise_title,
                     subject_id=subject_id,
                     score=float(att.score) if att.score is not None else None,
                     is_finished=att.is_finished,
