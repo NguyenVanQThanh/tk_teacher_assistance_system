@@ -386,8 +386,8 @@ export default function TeacherClassDetailPage() {
                   filteredAssignments.map((assign) => {
                     const expired = isDueExpired(assign.due_at);
                     const subCount = assign.submission_count ?? 0;
-                    const totCount = assign.total_students || students.length || 25;
-                    const pct = Math.round((subCount / totCount) * 100);
+                    const totCount = assign.total_students || students.length || 0;
+                    const pct = totCount > 0 ? Math.round((subCount / totCount) * 100) : 0;
                     return (
                       <tr key={assign.assignment_id} className="roster-row">
                         <td className="td-name">
