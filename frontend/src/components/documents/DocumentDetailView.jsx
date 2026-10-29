@@ -16,8 +16,7 @@ import {
   Calendar, 
   FileText, 
   Folder, 
-  Check, 
-  Star 
+  Check
 } from 'lucide-react';
 import './DocumentDetailView.css';
 
@@ -35,10 +34,7 @@ export default function DocumentDetailView({
     'Tài liệu tổng hợp các kiến thức trọng tâm học kì 1 môn Toán lớp 12, bao gồm các chuyên đề: Ứng dụng đạo hàm để khảo sát và vẽ đồ thị hàm số, Hàm số lũy thừa, hàm số mũ và hàm số logarit. Kèm theo hệ thống bài tập tự luyện từ cơ bản đến nâng cao có đáp án chi tiết, phù hợp cho học sinh ôn thi THPT Quốc gia.';
 
   const folderName = doc.folder || `Toán ${doc.grade || '12'}`;
-  const viewsCount = doc.viewsCount || '1,245';
-  const downloadsCount = doc.downloadsCount || '342';
-  const ratingScore = doc.ratingScore || '4.8/5';
-  const ratingsCount = doc.ratingsCount || '56';
+  const downloadsCount = doc.downloadsCount !== undefined && doc.downloadsCount !== null ? String(doc.downloadsCount) : '0';
 
   return (
     <div className="doc-detail-view-container">
@@ -150,31 +146,13 @@ export default function DocumentDetailView({
 
       {/* Metric / Statistics Cards Row */}
       <div className="doc-analytics-cards-grid">
-        {/* Metric 1: Views */}
-        <div className="doc-stat-card">
-          <div className="stat-icon-wrap blue">
-            <Eye size={22} />
-          </div>
-          <div className="stat-number">{viewsCount}</div>
-          <div className="stat-label">Lượt xem</div>
-        </div>
-
-        {/* Metric 2: Downloads */}
+        {/* Downloads (the only metric tracked by the backend) */}
         <div className="doc-stat-card">
           <div className="stat-icon-wrap green">
             <Check size={22} strokeWidth={2.5} />
           </div>
           <div className="stat-number">{downloadsCount}</div>
           <div className="stat-label">Lượt tải về</div>
-        </div>
-
-        {/* Metric 3: Ratings */}
-        <div className="doc-stat-card">
-          <div className="stat-icon-wrap purple">
-            <Star size={22} />
-          </div>
-          <div className="stat-number">{ratingScore}</div>
-          <div className="stat-label">Đánh giá ({ratingsCount})</div>
         </div>
       </div>
     </div>

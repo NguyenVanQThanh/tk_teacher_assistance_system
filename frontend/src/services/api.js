@@ -261,6 +261,14 @@ export const documentsApi = {
     });
     return response.data;
   },
+  getDocumentDetail: async (documentId) => {
+    const response = await api.get(`/api/v1/documents/${documentId}`);
+    return response.data;
+  },
+  updateDocument: async (documentId, data) => {
+    const response = await api.put(`/api/v1/documents/${documentId}`, data);
+    return response.data;
+  },
   deleteDocument: async (documentId) => {
     await api.delete(`/api/v1/documents/${documentId}`);
   },
