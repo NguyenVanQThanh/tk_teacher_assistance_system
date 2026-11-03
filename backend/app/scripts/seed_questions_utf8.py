@@ -5,11 +5,15 @@
 # Updated At: 2026-10-30
 # Updated By: Tam Khang
 
+import sys
 import uuid
 from app.core.database import SessionLocal
 from models.models import Exercise, Question, AnswerOption, StudentExerciseAttempt, ClassAssignment
 
 def run():
+    # Destructive: replaces questions for fixed exercise IDs, which orphans student answers.
+    if "--force" not in sys.argv:
+        sys.exit("Refusing to run: this script deletes existing questions. Re-run with --force on a seed/dev database only.")
     db = SessionLocal()
     try:
         # 1. Exercise: Bài tập tin (60fa9f84-009f-4e88-b66e-bb2e6333d854)

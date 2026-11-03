@@ -19,11 +19,11 @@ from models.models import (
 
 RADAR_AXES = [
     {"name": "Toán Học", "keywords": ["toán"]},
-    {"name": "Vật Lí", "keywords": ["vật lý", "vật lí", "vật"]},
-    {"name": "Hóa Học", "keywords": ["hóa học", "hóa"]},
-    {"name": "Tiếng Anh", "keywords": ["tiếng anh", "anh"]},
-    {"name": "Lịch Sử", "keywords": ["lịch sử", "sử"]},
-    {"name": "Tin học", "keywords": ["tin học", "tin"]},
+    {"name": "Vật Lí", "keywords": ["vật lý", "vật lí"]},
+    {"name": "Hóa Học", "keywords": ["hóa học"]},
+    {"name": "Tiếng Anh", "keywords": ["tiếng anh"]},
+    {"name": "Lịch Sử", "keywords": ["lịch sử"]},
+    {"name": "Tin học", "keywords": ["tin học"]},
 ]
 
 
@@ -115,12 +115,14 @@ class LearningQualityService:
             matched_subject = None
             for s in all_subjects:
                 s_lower = s.subject_name.lower()
-                if any(kw in s_lower for kw in axis["keywords"]):
+                if any(kw in s_lower for kw in axis["keywords"]) or s_lower == axis["name"].lower():
                     matched_subject = s
                     break
 
             c_score = 0.0
             g_score = 0.0
+            has_data = False
+            class_has_data = False
 
             if matched_subject:
                 # Average score of all graded attempts for students of target_class in the current academic year
@@ -159,6 +161,8 @@ class LearningQualityService:
                     StudentExerciseAttempt.score.isnot(None)
                 ).scalar()
 
+                has_data = class_avg is not None or grade_avg is not None
+                class_has_data = class_avg is not None
                 if class_avg is not None:
                     c_score = round(float(class_avg), 1)
                 if grade_avg is not None:
@@ -167,7 +171,9 @@ class LearningQualityService:
             radar_data.append({
                 "subject_name": axis_name,
                 "class_score": c_score,
-                "grade_score": g_score
+                "grade_score": g_score,
+                "has_data": has_data,
+                "class_has_data": class_has_data
             })
 
         # 5. Formulate genuine qualitative observations comparing class against grade
@@ -196,14 +202,14 @@ class LearningQualityService:
         Does not fabricate benchmarks when attempts are missing or exclusive to target class.
         """
         # Subjects with actual attempt scores
-        attempted = [item for item in radar_items if item["class_score"] > 0 or item["grade_score"] > 0]
+        attempted = [item for item in radar_items if item.get("has_data")]
         if not attempted:
             return [
                 f"{class_name} chưa có dữ liệu bài tập nào được chấm điểm trong năm học này.",
                 "Khuyến nghị giáo viên giao bài tập định kỳ để hệ thống tổng hợp và phân tích chất lượng học tập."
             ]
 
-        class_attempted = [item for item in attempted if item["class_score"] > 0]
+        class_attempted = [item for item in attempted if item.get("class_has_data")]
         if not class_attempted:
             return [
                 f"{class_name} chưa có học sinh nộp bài tập nào để ghi nhận điểm trung bình.",

@@ -42,58 +42,8 @@ export default function GradingFeedbackModal({
   const isPendingReview = submission.status === 'pending_review' || submission.statusLabel === 'Chờ duyệt';
   const isAiExercise = submission.exerciseTypeCode === 'ai' || submission.exerciseType === 'Tạo sinh';
 
-  // Base mock questions fallback
-  const initialQuestions = [
-    {
-      id: 1,
-      type: 'multiple_choice',
-      typeName: 'CÂU 1 (TRẮC NGHIỆM)',
-      maxPoints: 0.25,
-      studentOption: 'A',
-      correctOption: 'A',
-      currentPoints: 0.25,
-      isCorrect: true,
-      needsManualGrading: false,
-      stem: 'Tìm đạo hàm của hàm số y = x^3 - 3x^2 + 2 tại điểm x = 2.',
-      options: [
-        { key: 'A', text: "y'(2) = 0" },
-        { key: 'B', text: "y'(2) = 3" },
-        { key: 'C', text: "y'(2) = -3" },
-        { key: 'D', text: "y'(2) = 6" },
-      ]
-    },
-    {
-      id: 2,
-      type: 'true_false',
-      typeName: 'CÂU 2 (TRẮC NGHIỆM ĐÚNG/SAI)',
-      maxPoints: 0.25,
-      studentOption: 'true',
-      correctOption: 'true',
-      currentPoints: 0.25,
-      isCorrect: true,
-      needsManualGrading: false,
-      stem: 'Hàm số y = x^2 + 1 là hàm số chẵn. Đúng hay Sai?',
-      options: [
-        { key: 'true', text: 'Đúng' },
-        { key: 'false', text: 'Sai' }
-      ]
-    },
-    {
-      id: 3,
-      type: 'short_answer',
-      typeName: 'CÂU 3 (TRẢ LỜI NGẮN)',
-      maxPoints: 0.4,
-      studentAnswer: '5',
-      correctAnswer: '5',
-      isCorrect: isPendingGrading ? true : (submission.score !== null ? submission.score >= 8 : true),
-      currentPoints: 0.4,
-      needsManualGrading: isPendingGrading,
-      stem: 'Tìm giá trị cực đại của hàm số y = -x^2 + 4x + 1.'
-    }
-  ];
-
   const [questions, setQuestions] = useState([]);
-  const [score, setScore] = useState(submission.score !== null && submission.score !== undefined ? submission.score : 8.5);
+  const [score, setScore] = useState(submission.score !== null && submission.score !== undefined ? submission.score : 0);
   const [feedback, setFeedback] = useState(submission.feedback || '');
   const [isGeneratingAi, setIsGeneratingAi] = useState(false);
   const [hasModifiedAnswerKey, setHasModifiedAnswerKey] = useState(false);
@@ -114,7 +64,8 @@ export default function GradingFeedbackModal({
   useEffect(() => {
     if (!submission) return;
 
-    const initScore = submission.score !== null && submission.score !== undefined ? submission.score : 8.5;
+    setLoadingDetails(true);
+    const initScore = submission.score !== null && submission.score !== undefined ? submission.score : 0;
     setScore(initScore);
     setFeedback(submission.feedback || 'Em làm bài tốt, tư duy giải mạch lạc.');
     setHasModifiedAnswerKey(false);
@@ -714,6 +665,7 @@ export default function GradingFeedbackModal({
                 type="button" 
                 className="btn-submit-grade" 
                 onClick={handleInitiateSave}
+                disabled={loadingDetails || (questions.length === 0 && (submission.score === null || submission.score === undefined))}
               >
                 <CheckCircle2 size={16} />
                 <span>Hoàn tất</span>

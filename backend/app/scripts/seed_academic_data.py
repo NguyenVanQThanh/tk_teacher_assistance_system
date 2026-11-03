@@ -227,7 +227,7 @@ def seed_academic_sample_data():
             else:
                 if homeroom_id:
                     cls.homeroom_teacher_id = homeroom_id
-                cls.academic_year = c_info["school_year"]
+                # Keep existing academic_year so re-seeding never moves live data between years
                 cls.status = "ACTIVE"
                 session.flush()
             classes_dict[c_info["name"]] = cls

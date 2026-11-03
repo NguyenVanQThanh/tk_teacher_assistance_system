@@ -85,6 +85,9 @@ class TeacherDashboardResponse(BaseModel):
     weekly_schedule: List[WeeklyScheduleItem]
 
 
+# Roles limited to their own classes; any other known role (Admin, Principal, ...) is platform-wide.
+_SCOPED_ROLES = {"Teacher", "Student", "Unknown"}
+
 def validate_class_access_for_dashboard(
     db: Session,
     current_user: User,
@@ -107,7 +110,7 @@ def validate_class_access_for_dashboard(
         )
 
     role_name = get_user_role_name(db, current_user)
-    if role_name != "Admin":
+    if role_name in _SCOPED_ROLES:
         is_homeroom = (cls.homeroom_teacher_id == current_user.user_id)
         is_assigned = db.query(TeacherSubject.teacher_id).filter(
             TeacherSubject.class_id == class_id,
@@ -167,7 +170,7 @@ def get_teacher_dashboard(
         all_class_ids.add(homeroom_class.class_id)
 
     # Only Admin has platform-wide fallback view if they have no explicit assignments
-    if not all_class_ids and role_name == "Admin":
+    if not all_class_ids and role_name not in _SCOPED_ROLES:
         all_classes = db.query(Class).filter(Class.status != "DELETED").all()
         all_class_ids = {c.class_id for c in all_classes}
 
