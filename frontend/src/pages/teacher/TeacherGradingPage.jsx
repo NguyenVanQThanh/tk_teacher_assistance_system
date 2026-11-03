@@ -2,10 +2,10 @@
 // Description: Teacher Grading & Feedback management page with submission metrics, multi-criteria filtering, submission roster table, and interactive grading modal.
 // Created At: 2026-09-01
 // Created By: Tam Khang
-// Updated At: 2026-10-29
+// Updated At: 2026-10-30
 // Updated By: Tam Khang
 
-import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { 
   ChevronRight, 
   Search, 
@@ -28,8 +28,19 @@ import GradingFeedbackModal from '../../components/teacher/GradingFeedbackModal'
 import { attemptsApi, classesApi, subjectsApi } from '../../services/api';
 import './TeacherGradingPage.css';
 
+const formatSubmissionTime = (timeVal) => {
+  if (!timeVal) return 'Vừa xong';
+  const d = new Date(timeVal);
+  if (isNaN(d.getTime())) return String(timeVal);
+  const day = String(d.getDate()).padStart(2, '0');
+  const month = String(d.getMonth() + 1).padStart(2, '0');
+  const hours = String(d.getHours()).padStart(2, '0');
+  const minutes = String(d.getMinutes()).padStart(2, '0');
+  return `${day}/${month}, ${hours}:${minutes}`;
+};
+
 export default function TeacherGradingPage() {
-  const [searchParams] = useSearchParams();
+  const [searchParams, setSearchParams] = useSearchParams();
   const [showSidebar, setShowSidebar] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [gradeFilter, setGradeFilter] = useState('all');
@@ -49,6 +60,17 @@ export default function TeacherGradingPage() {
 
   // Submissions dataset populated from real backend API
   const [submissions, setSubmissions] = useState([]);
+  const autoOpenedAttemptIdRef = useRef(null);
+
+  const handleCloseModal = useCallback(() => {
+    setGradingSubmission(null);
+    setSearchParams((prev) => {
+      const next = new URLSearchParams(prev);
+      next.delete('attempt_id');
+      next.delete('submission_id');
+      return next;
+    }, { replace: true });
+  }, [setSearchParams]);
 
   useEffect(() => {
     const s = searchParams.get('status');
@@ -100,9 +122,7 @@ export default function TeacherGradingPage() {
           const nameParts = (att.student_name || 'Học sinh').trim().split(' ');
           const avatarInitial = nameParts.length >= 2 ? (nameParts[0][0] + nameParts[nameParts.length - 1][0]).toUpperCase() : nameParts[0].slice(0, 2).toUpperCase();
 
-          const submittedFormatted = att.end_time
-            ? new Date(att.end_time).toLocaleDateString('vi-VN', { hour: '2-digit', minute: '2-digit', day: '2-digit', month: '2-digit' })
-            : (att.start_time ? new Date(att.start_time).toLocaleDateString('vi-VN', { hour: '2-digit', minute: '2-digit', day: '2-digit', month: '2-digit' }) : 'Vừa xong');
+          const submittedFormatted = formatSubmissionTime(att.end_time || att.start_time);
 
           const itemStatus = (att.status === 'pending_grading' || att.status === 'pending_review' || att.status === 'approved')
             ? att.status
@@ -149,6 +169,81 @@ export default function TeacherGradingPage() {
   useEffect(() => {
     loadData();
   }, [loadData]);
+
+  // Auto-open grading detail modal if attempt_id is present in query parameters (e.g. redirected from dashboard)
+  useEffect(() => {
+    const targetAttemptId = searchParams.get('attempt_id') || searchParams.get('submission_id');
+    if (!targetAttemptId) {
+      autoOpenedAttemptIdRef.current = null;
+      return;
+    }
+
+    if (autoOpenedAttemptIdRef.current === String(targetAttemptId)) return;
+
+    if (submissions.length > 0) {
+      const found = submissions.find(
+        (s) => String(s.id) === String(targetAttemptId) || String(s.attempt_id) === String(targetAttemptId)
+      );
+      if (found) {
+        autoOpenedAttemptIdRef.current = String(targetAttemptId);
+        if (statusFilter !== 'all' && found.status !== statusFilter) {
+          setStatusFilter('all');
+        }
+        setGradingSubmission(found);
+      } else {
+        // Fetch specific attempt directly if not present in default list
+        attemptsApi.getAttemptDetail(targetAttemptId).then((att) => {
+          if (att) {
+            autoOpenedAttemptIdRef.current = String(targetAttemptId);
+            const rawScore = att.score;
+            const hasScore = rawScore !== null && rawScore !== undefined;
+            const nameParts = (att.student_name || 'Học sinh').trim().split(' ');
+            const avatarInitial = nameParts.length >= 2
+              ? (nameParts[0][0] + nameParts[nameParts.length - 1][0]).toUpperCase()
+              : nameParts[0].slice(0, 2).toUpperCase();
+
+            const submittedFormatted = formatSubmissionTime(att.end_time || att.start_time);
+
+            const itemStatus = (att.status === 'pending_grading' || att.status === 'pending_review' || att.status === 'approved')
+              ? att.status
+              : (hasScore ? 'approved' : 'pending_grading');
+            const itemStatusLabel = itemStatus === 'pending_grading'
+              ? 'Chờ chấm'
+              : (itemStatus === 'pending_review' ? 'Chờ duyệt' : 'Đã duyệt');
+
+            const item = {
+              id: att.attempt_id,
+              attempt_id: att.attempt_id,
+              assignment_id: att.assignment_id,
+              exercise_id: att.exercise_id,
+              student_id: att.student_id,
+              studentName: att.student_name || 'Học sinh',
+              avatarInitial,
+              avatarColor: '#8B5CF6',
+              className: att.class_name || '12A1',
+              class_id: att.class_id,
+              grade: '12',
+              subject: 'math',
+              subjectName: att.subject_name || 'Toán học',
+              exerciseTitle: att.exercise_title || att.assignment_title || 'Bài tập trực tuyến',
+              exerciseType: 'Bài tập trực tuyến',
+              exerciseTypeCode: 'classroom',
+              submittedTime: submittedFormatted,
+              timeType: 'normal',
+              status: itemStatus,
+              statusLabel: itemStatusLabel,
+              score: hasScore ? Number(rawScore) : null,
+              feedback: att.feedback || '',
+              raw: att
+            };
+            setGradingSubmission(item);
+          }
+        }).catch((err) => {
+          console.error('Failed to load target attempt for grading modal:', err);
+        });
+      }
+    }
+  }, [searchParams, submissions, statusFilter]);
 
   // Handle grade/approval saved from modal (transitions to 'approved' and supports cascade batch regrade)
   const handleSaveGrade = async (updatedSubmission) => {
@@ -576,7 +671,18 @@ export default function TeacherGradingPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {currentRecords.length === 0 ? (
+                  {loading ? (
+                    <tr>
+                      <td colSpan={7} className="no-data-cell">
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '10px', padding: '36px 0' }}>
+                          <Loader2 size={22} className="animate-spin" style={{ color: '#6366F1' }} />
+                          <span style={{ color: '#64748B', fontSize: '14px', fontWeight: 500 }}>
+                            Đang tải danh sách bài nộp từ hệ thống...
+                          </span>
+                        </div>
+                      </td>
+                    </tr>
+                  ) : currentRecords.length === 0 ? (
                     <tr>
                       <td colSpan={7} className="no-data-cell">
                         Không tìm thấy bài nộp nào phù hợp với bộ lọc.
@@ -745,7 +851,7 @@ export default function TeacherGradingPage() {
       {/* Interactive Grading and Feedback Modal */}
       <GradingFeedbackModal
         isOpen={Boolean(gradingSubmission)}
-        onClose={() => setGradingSubmission(null)}
+        onClose={handleCloseModal}
         submission={gradingSubmission}
         onSaveGrade={handleSaveGrade}
         hasNextPending={submissions.some(

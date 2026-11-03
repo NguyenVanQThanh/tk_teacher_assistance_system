@@ -2,7 +2,7 @@
 // Description: Learning quality analytics card featuring multi-axis radar chart and detailed teacher qualitative feedback notes matching Image.
 // Created At: 2026-08-30
 // Created By: Tam Khang
-// Updated At: 2026-10-25
+// Updated At: 2026-10-29
 // Updated By: Tam Khang
 
 import React from 'react';
@@ -12,7 +12,9 @@ import { useAuth } from '../../context/AuthContext';
 import { getTeacherProfileDefaults } from '../../utils/teacherSubjectHelper';
 import './LearningQualityCard.css';
 
-export default function LearningQualityCard({ learningQuality }) {
+export default function LearningQualityCard({ 
+  learningQuality 
+}) {
   const { user } = useAuth();
   const profileDefaults = getTeacherProfileDefaults(user);
   const className = learningQuality?.class_name || (profileDefaults.homeroomClass ? `Lớp ${profileDefaults.homeroomClass}` : 'Lớp 12A1');

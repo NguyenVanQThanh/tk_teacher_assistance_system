@@ -2,7 +2,7 @@
 // Description: Homeroom class management page displaying student roster, GPA/subject score filtering, status badges, and RBAC-controlled student management.
 // Created At: 2026-09-01
 // Created By: Tam Khang
-// Updated At: 2026-10-28
+// Updated At: 2026-10-29
 // Updated By: Tam Khang
 
 import React, { useState, useEffect, useMemo } from 'react';
@@ -35,8 +35,19 @@ import StudentTranscriptPrintModal from '../../components/teacher/StudentTranscr
 import AddStudentModal from '../../components/teacher/AddStudentModal';
 import './TeacherHomeroomPage.css';
 
+/**
+ * Calculates current academic school year (e.g., '2026-2027' for October 2026).
+ * School years in Vietnam typically begin in August/September.
+ */
+function getCurrentAcademicYear() {
+  const now = new Date();
+  const year = now.getFullYear();
+  const month = now.getMonth() + 1;
+  return month >= 8 ? `${year}-${year + 1}` : `${year - 1}-${year}`;
+}
+
 export default function TeacherHomeroomPage() {
-  const { hasPermission } = useAuth();
+  const { user, hasPermission } = useAuth();
   const [showSidebar, setShowSidebar] = useState(true);
   const [classesList, setClassesList] = useState([]);
   const [selectedClassId, setSelectedClassId] = useState('');
@@ -70,7 +81,7 @@ export default function TeacherHomeroomPage() {
 
   const [studentsList, setStudentsList] = useState([]);
 
-  // Load available classes on mount
+  // Load available classes on mount with current academic year prioritization
   useEffect(() => {
     let isMounted = true;
     async function loadClasses() {
@@ -80,9 +91,61 @@ export default function TeacherHomeroomPage() {
         const res = await classesApi.getClasses();
         if (!isMounted) return;
         if (Array.isArray(res) && res.length > 0) {
-          setClassesList(res);
-          setSelectedClassId(res[0].class_id);
-          setCurrentClassInfo(res[0]);
+          const currentYear = getCurrentAcademicYear();
+
+          // Filter classes where current user is the homeroom teacher
+          const userHomeroomClasses = res.filter(c => 
+            c.homeroom_teacher_id === user?.user_id || 
+            (user?.full_name && c.homeroom_teacher_name?.includes(user?.full_name))
+          );
+          // If teacher has assigned homeroom classes, ONLY display those. Otherwise fallback to res for admin.
+          const availableClasses = userHomeroomClasses.length > 0 ? userHomeroomClasses : res;
+
+          // Deduplicate to ensure at most 1 homeroom class per academic year
+          // Sort available classes: prioritize current academic year first, then preceding years descending
+          const sortedCandidates = [...availableClasses].sort((a, b) => {
+            const yearA = a.school_year || a.academic_year || '';
+            const yearB = b.school_year || b.academic_year || '';
+            if (yearA === currentYear && yearB !== currentYear) return -1;
+            if (yearB === currentYear && yearA !== currentYear) return 1;
+            if (yearA !== yearB) return yearB.localeCompare(yearA);
+            return (a.class_name || '').localeCompare(b.class_name || '');
+          });
+
+          const seenYears = new Set();
+          const uniqueYearClasses = [];
+          for (const c of sortedCandidates) {
+            const yr = c.school_year || c.academic_year || 'unknown';
+            if (!seenYears.has(yr)) {
+              seenYears.add(yr);
+              uniqueYearClasses.push(c);
+            }
+          }
+
+          const sortedClasses = uniqueYearClasses.length > 0 ? uniqueYearClasses : sortedCandidates;
+
+          // Priority 1: Check if user already has a saved selection from current session
+          const savedClassId = localStorage.getItem('selected_homeroom_class_id');
+          let targetClass = savedClassId ? sortedClasses.find(c => c.class_id === savedClassId) : null;
+
+          // Priority 2: Homeroom class of the logged-in teacher in current academic year
+          if (!targetClass || (targetClass.school_year !== currentYear && sortedClasses.some(c => (c.school_year === currentYear || c.academic_year === currentYear)))) {
+            const userHomeroomCurrent = sortedClasses.find(c => 
+              (c.school_year === currentYear || c.academic_year === currentYear)
+            );
+            if (userHomeroomCurrent) {
+              targetClass = userHomeroomCurrent;
+            }
+          }
+
+          if (!targetClass) {
+            targetClass = sortedClasses[0];
+          }
+
+          setClassesList(sortedClasses);
+          setSelectedClassId(targetClass.class_id);
+          setCurrentClassInfo(targetClass);
+          localStorage.setItem('selected_homeroom_class_id', targetClass.class_id);
         }
       } catch (err) {
         if (isMounted) setError('Không thể tải danh sách lớp học.');
@@ -94,7 +157,7 @@ export default function TeacherHomeroomPage() {
     return () => {
       isMounted = false;
     };
-  }, []);
+  }, [user]);
 
   // Load students for selected class
   useEffect(() => {
@@ -289,7 +352,13 @@ export default function TeacherHomeroomPage() {
                 {classesList.length > 1 && (
                   <select
                     value={selectedClassId}
-                    onChange={(e) => setSelectedClassId(e.target.value)}
+                    onChange={(e) => {
+                      const newId = e.target.value;
+                      setSelectedClassId(newId);
+                      localStorage.setItem('selected_homeroom_class_id', newId);
+                      const chosen = classesList.find(c => c.class_id === newId);
+                      if (chosen) setCurrentClassInfo(chosen);
+                    }}
                     style={{ padding: '6px 12px', borderRadius: '6px', border: '1px solid #CBD5E1', fontSize: '13px', background: '#FFFFFF', color: '#1E293B', cursor: 'pointer', fontWeight: 600 }}
                   >
                     {classesList.map(c => (

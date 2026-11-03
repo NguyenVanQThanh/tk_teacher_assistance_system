@@ -7,6 +7,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
+import { Loader2 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { getTeacherSubjectInfo } from '../../utils/teacherSubjectHelper';
 import { teacherApi } from '../../services/api';
@@ -57,6 +58,21 @@ export default function SubjectTeacherDashboard() {
   };
 
   const { title: teacherTitle, name: greetingName } = getGreetingData(user?.full_name);
+
+  // High-UX Loading State: While BE response is loading, render clear loading animation
+  if (loading && !dashboardData) {
+    return (
+      <div className="subject-dashboard-container">
+        <div className="dashboard-loading-overlay">
+          <div className="dashboard-loading-card">
+            <Loader2 className="dashboard-loading-icon" size={38} />
+            <h3 className="dashboard-loading-title">Đang đồng bộ dữ liệu giảng dạy...</h3>
+            <p className="dashboard-loading-desc">Hệ thống đang tải dữ liệu lịch giảng dạy và bài nộp từ máy chủ.</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="subject-dashboard-container">

@@ -2,7 +2,7 @@
 // Description: Centralized Axios API client configuration with token management, academic, assignment, and schedule service APIs.
 // Created At: 2026-08-30
 // Created By: Tam Khang
-// Updated At: 2026-10-28
+// Updated At: 2026-10-29
 // Updated By: Tam Khang
 
 import axios from 'axios';
@@ -376,8 +376,12 @@ export const studentApi = {
 };
 
 export const teacherApi = {
-  getDashboard: async () => {
-    const response = await api.get('/api/v1/teacher/dashboard');
+  getDashboard: async (params = {}) => {
+    const response = await api.get('/api/v1/teacher/dashboard', { params });
+    return response.data;
+  },
+  getLearningQuality: async (params = {}) => {
+    const response = await api.get('/api/v1/teacher/learning-quality', { params });
     return response.data;
   },
   getSchedule: async () => {
