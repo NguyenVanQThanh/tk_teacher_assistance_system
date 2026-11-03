@@ -54,6 +54,7 @@ const mapBackendDoc = (doc) => ({
   id: doc.document_id,
   title: doc.title,
   fileType: doc.document_type || 'lecture',
+  fileExtension: (doc.file_type || (doc.file_url ? doc.file_url.split('.').pop() : 'pdf')).toLowerCase(),
   fileSize: formatFileSize(doc.file_size),
   uploadDate: doc.created_at ? new Date(doc.created_at).toLocaleDateString('vi-VN') : '',
   grade: doc.grade || '12',
@@ -235,7 +236,7 @@ export default function DocumentRepositoryPage() {
           onViewDocument={(d) => setPreviewDoc(d)}
           onDownloadDocument={(d) => handleDownloadDocument(d)}
           onEditDocument={(d) => setEditingDoc(d)}
-          onMoreOptions={(d) => showToast(`Tùy chọn khác cho: ${d.title}`, 'info', 'Tùy chọn')}
+          onDeleteDocument={(d) => requestDeleteDocument(d)}
         />
       ) : (
         /* Document List View */
@@ -320,6 +321,7 @@ export default function DocumentRepositoryPage() {
                   key={doc.id}
                   doc={doc}
                   onPreview={(d) => setSelectedDoc(d)}
+                  onView={(d) => setPreviewDoc(d)}
                   onDownload={(d) => handleDownloadDocument(d)}
                   onEdit={(d) => setEditingDoc(d)}
                   onDelete={(d) => requestDeleteDocument(d)}
