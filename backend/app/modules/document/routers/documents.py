@@ -2,7 +2,7 @@
 # Description: API Router for Teacher Document Repository & Document Dashboard.
 # Created At: 2026-09-27
 # Created By: Tam Khang
-# Updated At: 2026-10-29
+# Updated At: 2026-11-03
 # Updated By: Tam Khang
 
 from typing import Optional
@@ -115,6 +115,39 @@ def update_document(
     Update document metadata (title, subject_id, grade, document_type, description, status).
     """
     return DocumentService.update_document(db, document_id, payload, current_user)
+
+
+@router.get("/{document_id}/view")
+def view_document(
+    document_id: UUID,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """
+    Stream document file for inline viewing (PDF/doc preview) without incrementing download counter.
+    """
+    doc = DocumentService.get_document_by_id(db, document_id)
+    DocumentService.check_document_access(db, doc, current_user, requires_ownership=False)
+    file_path = UPLOAD_DIR / Path(doc.file_url).name if doc.file_url else None
+    if file_path is None or not file_path.exists():
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail={"code": "ERR-DOC-NOT_FOUND", "message": "File attachment not found."}
+        )
+
+    ext = (doc.file_type or "").lower()
+    media_type = "application/pdf" if ext == "pdf" else "application/octet-stream"
+    if ext in ["png", "jpg", "jpeg"]:
+        media_type = f"image/{ext}"
+    # Only PDF/images are safe to render inline; everything else is offered as attachment.
+    disposition = "inline" if media_type != "application/octet-stream" else "attachment"
+
+    return FileResponse(
+        path=file_path,
+        filename=f"{doc.title}.{doc.file_type or 'pdf'}",
+        media_type=media_type,
+        content_disposition_type=disposition
+    )
 
 
 @router.get("/{document_id}/download")

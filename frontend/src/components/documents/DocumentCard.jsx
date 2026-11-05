@@ -2,7 +2,7 @@
 // Description: Reusable card component for displaying educational documents and learning materials.
 // Created At: 2026-08-30
 // Created By: Tam Khang
-// Updated At: 2026-09-12
+// Updated At: 2026-11-03
 // Updated By: Tam Khang
 
 import React from 'react';
@@ -18,7 +18,7 @@ import {
 } from 'lucide-react';
 import './DocumentCard.css';
 
-export default function DocumentCard({ doc, onPreview, onDownload, onEdit, onMore, onDelete, onRemove }) {
+export default function DocumentCard({ doc, onPreview, onDownload, onEdit, onMore, onDelete, onRemove, onView }) {
   // Determine icon and color scheme based on file/document type
   const renderTypeIcon = () => {
     const type = doc.fileType?.toLowerCase();
@@ -121,7 +121,7 @@ export default function DocumentCard({ doc, onPreview, onDownload, onEdit, onMor
           className="btn-action-preview"
           onClick={(e) => {
             e.stopPropagation();
-            onPreview && onPreview(doc);
+            if (onView) { onView(doc); } else if (onPreview) { onPreview(doc); }
           }}
         >
           <Eye size={15} />
@@ -129,17 +129,6 @@ export default function DocumentCard({ doc, onPreview, onDownload, onEdit, onMor
         </button>
 
         <div className="doc-action-icons">
-          <button 
-            type="button" 
-            className="icon-action-btn"
-            onClick={(e) => {
-              e.stopPropagation();
-              onDownload && onDownload(doc);
-            }}
-            title="Tải xuống tài liệu"
-          >
-            <Download size={16} />
-          </button>
           <button 
             type="button" 
             className="icon-action-btn"
