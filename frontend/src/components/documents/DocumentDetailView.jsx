@@ -1,17 +1,16 @@
 // File Name: DocumentDetailView.jsx
-// Description: Document detail view displaying metadata, description, action buttons (view, download, edit), and analytics metrics.
+// Description: Document detail view displaying metadata, description, action buttons (view, edit, delete), and analytics metrics.
 // Created At: 2026-09-01
 // Created By: Tam Khang
-// Updated At: 2026-09-01
+// Updated At: 2026-11-03
 // Updated By: Tam Khang
 
 import React from 'react';
 import { 
   ArrowLeft, 
-  MoreVertical, 
   Eye, 
-  Download, 
   Edit3, 
+  Trash2,
   User, 
   Calendar, 
   FileText, 
@@ -24,9 +23,8 @@ export default function DocumentDetailView({
   doc, 
   onBack, 
   onViewDocument, 
-  onDownloadDocument, 
   onEditDocument, 
-  onMoreOptions 
+  onDeleteDocument 
 }) {
   if (!doc) return null;
 
@@ -95,16 +93,6 @@ export default function DocumentDetailView({
               </div>
             </div>
           </div>
-
-          {/* More Options Button */}
-          <button 
-            type="button" 
-            className="btn-doc-more-options"
-            onClick={() => onMoreOptions && onMoreOptions(doc)}
-            aria-label="Tùy chọn khác"
-          >
-            <MoreVertical size={20} />
-          </button>
         </div>
 
         {/* Description Box */}
@@ -126,20 +114,20 @@ export default function DocumentDetailView({
 
           <button 
             type="button" 
-            className="btn-action-download"
-            onClick={() => onDownloadDocument ? onDownloadDocument(doc) : alert(`Bắt đầu tải xuống: ${doc.title}`)}
+            className="btn-action-edit"
+            onClick={() => onEditDocument ? onEditDocument(doc) : null}
           >
-            <Download size={16} />
-            <span>Tải xuống</span>
+            <Edit3 size={16} />
+            <span>Chỉnh sửa</span>
           </button>
 
           <button 
             type="button" 
-            className="btn-action-edit"
-            onClick={() => onEditDocument ? onEditDocument(doc) : alert(`Chỉnh sửa tài liệu: ${doc.title}`)}
+            className="btn-action-delete"
+            onClick={() => onDeleteDocument ? onDeleteDocument(doc) : null}
           >
-            <Edit3 size={16} />
-            <span>Chỉnh sửa</span>
+            <Trash2 size={16} />
+            <span>Xóa tài liệu</span>
           </button>
         </div>
       </div>

@@ -2,7 +2,7 @@
 // Description: Centralized Axios API client configuration with token management, academic, assignment, and schedule service APIs.
 // Created At: 2026-08-30
 // Created By: Tam Khang
-// Updated At: 2026-10-29
+// Updated At: 2026-11-03
 // Updated By: Tam Khang
 
 import axios from 'axios';
@@ -252,6 +252,12 @@ export const documentsApi = {
       headers: {
         'Content-Type': 'multipart/form-data',
       },
+    });
+    return response.data;
+  },
+  viewDocument: async (documentId) => {
+    const response = await api.get('/api/v1/documents/' + documentId + '/view', {
+      responseType: 'blob',
     });
     return response.data;
   },
