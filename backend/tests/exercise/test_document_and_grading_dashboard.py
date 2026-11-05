@@ -2,7 +2,7 @@
 # Description: Unit and integration tests for Document Repository, Document Dashboard, Grading Dashboard, and User Age Validation.
 # Created At: 2026-09-27
 # Created By: Tam Khang
-# Updated At: 2026-09-27
+# Updated At: 2026-11-03
 # Updated By: Tam Khang
 
 import uuid
@@ -67,6 +67,12 @@ def test_document_repository_and_dashboard_lifecycle(client: TestClient):
     list_res = client.get("/api/v1/documents", headers=headers)
     assert list_res.status_code == status.HTTP_200_OK
     assert list_res.json()["total"] >= 1
+    # 3.1. Inline view document (PDF stream without counting as download)
+    view_res = client.get(f"/api/v1/documents/{doc_id}/view", headers=headers)
+    assert view_res.status_code == status.HTTP_200_OK
+    assert "application/pdf" in view_res.headers["content-type"]
+    assert "inline" in view_res.headers.get("content-disposition", "")
+    assert view_res.content == pdf_content
 
     # 4. Soft Delete document
     del_res = client.delete(f"/api/v1/documents/{doc_id}", headers=headers)
