@@ -139,12 +139,14 @@ def view_document(
     media_type = "application/pdf" if ext == "pdf" else "application/octet-stream"
     if ext in ["png", "jpg", "jpeg"]:
         media_type = f"image/{ext}"
+    # Only PDF/images are safe to render inline; everything else is offered as attachment.
+    disposition = "inline" if media_type != "application/octet-stream" else "attachment"
 
     return FileResponse(
         path=file_path,
         filename=f"{doc.title}.{doc.file_type or 'pdf'}",
         media_type=media_type,
-        content_disposition_type="inline"
+        content_disposition_type=disposition
     )
 
 

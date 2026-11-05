@@ -157,7 +157,7 @@ export default function DocumentRepositoryPage() {
         await documentsApi.updateDocument(updatedDoc.id, {
           title: updatedDoc.title,
           grade: updatedDoc.grade,
-          document_type: updatedDoc.fileType,
+          document_type: updatedDoc.document_type,
           description: updatedDoc.description,
         });
       }

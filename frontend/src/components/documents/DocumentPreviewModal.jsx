@@ -1,5 +1,5 @@
 // File Name: DocumentPreviewModal.jsx
-// Description: Interactive PDF Document Viewer modal with complete function toolbar (Download, Print, Close) and native PDF controls.
+// Description: Interactive PDF Document Viewer modal with close button; download/print via native PDF toolbar and native PDF controls.
 // Created At: 2026-08-30
 // Created By: Tam Khang
 // Updated At: 2026-11-03
@@ -8,8 +8,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { 
   X, 
-  Download,
-  Printer,
   FileText, 
   Loader2, 
   AlertCircle,
@@ -18,7 +16,7 @@ import {
 import { documentsApi } from '../../services/api';
 import './DocumentPreviewModal.css';
 
-export default function DocumentPreviewModal({ doc, isOpen, onClose, onDownload }) {
+export default function DocumentPreviewModal({ doc, isOpen, onClose }) {
   if (!isOpen || !doc) return null;
 
   const [pdfBlobUrl, setPdfBlobUrl] = useState(null);
@@ -94,26 +92,6 @@ export default function DocumentPreviewModal({ doc, isOpen, onClose, onDownload 
     };
   }, [isOpen, doc?.id, isPdf]);
 
-  const handlePrint = () => {
-    if (iframeRef.current && iframeRef.current.contentWindow) {
-      try {
-        iframeRef.current.contentWindow.print();
-        return;
-      } catch (e) {
-        console.warn('Could not print via iframe contentWindow:', e);
-      }
-    }
-    if (pdfBlobUrl) {
-      const printWindow = window.open(pdfBlobUrl, '_blank');
-      if (printWindow) {
-        printWindow.focus();
-        printWindow.print();
-      }
-    } else {
-      window.print();
-    }
-  };
-
   const displayFormat = isPdf ? 'PDF' : fileExt.toUpperCase();
 
   return (
@@ -133,31 +111,8 @@ export default function DocumentPreviewModal({ doc, isOpen, onClose, onDownload 
             </div>
           </div>
 
-          {/* Right Action Tools: Download, Print, Close */}
+          {/* Right Action Tools: Close only (native PDF toolbar handles download/print) */}
           <div className="reader-right-actions">
-            {/* <button 
-              type="button" 
-              className="btn-reader-action"
-              onClick={() => onDownload ? onDownload(doc) : null}
-              title="Tải xuống tệp tin"
-            >
-              <Download size={15} />
-              <span>Tải xuống</span>
-            </button>
-
-            {isPdf && !error && (
-              <button 
-                type="button" 
-                className="btn-reader-action secondary"
-                onClick={handlePrint}
-                title="In tài liệu"
-                disabled={loading || !pdfBlobUrl}
-              >
-                <Printer size={15} />
-                <span>In</span>
-              </button>
-            )} */}
-
             <button 
               type="button" 
               className="btn-reader-close" 
@@ -190,14 +145,6 @@ export default function DocumentPreviewModal({ doc, isOpen, onClose, onDownload 
               <div className="pdf-state-actions">
                 <button 
                   type="button" 
-                  className="btn-reader-action"
-                  onClick={() => onDownload && onDownload(doc)}
-                >
-                  <Download size={15} />
-                  <span>Tải xuống</span>
-                </button>
-                <button 
-                  type="button" 
                   className="btn-reader-action secondary"
                   onClick={onClose}
                 >
@@ -213,14 +160,6 @@ export default function DocumentPreviewModal({ doc, isOpen, onClose, onDownload 
               <h4 className="pdf-state-title">Không thể xem trực tiếp tài liệu</h4>
               <p className="pdf-state-desc">{error}</p>
               <div className="pdf-state-actions">
-                <button 
-                  type="button" 
-                  className="btn-reader-action"
-                  onClick={() => onDownload && onDownload(doc)}
-                >
-                  <Download size={15} />
-                  <span>Tải xuống</span>
-                </button>
                 <button 
                   type="button" 
                   className="btn-reader-action secondary"

@@ -32,7 +32,7 @@ export default function EditDocumentModal({ isOpen, doc, onClose, onSave }) {
   const [title, setTitle] = useState(doc.title || '');
   const [selectedSubjectKey, setSelectedSubjectKey] = useState(doc.subject || 'math');
   const [selectedSubjectId, setSelectedSubjectId] = useState(doc.subject_id || doc.subjectId || null);
-  const [docType, setDocType] = useState(doc.fileType || doc.document_type || 'reference');
+  const [docType, setDocType] = useState(doc.document_type || doc.documentType || 'reference');
   const [availableSubjects, setAvailableSubjects] = useState(DEFAULT_SUBJECTS);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
@@ -77,7 +77,7 @@ export default function EditDocumentModal({ isOpen, doc, onClose, onSave }) {
       setTitle(doc.title || '');
       setSelectedSubjectKey(doc.subject || 'math');
       setSelectedSubjectId(doc.subject_id || doc.subjectId || null);
-      setDocType(doc.fileType || doc.document_type || 'reference');
+      setDocType(doc.document_type || doc.documentType || 'reference');
       setErrorMessage('');
     }
   }, [doc]);
@@ -119,7 +119,7 @@ export default function EditDocumentModal({ isOpen, doc, onClose, onSave }) {
         folder: `${subjectName} ${doc.grade || '12'}`.trim(),
         document_type: docType,
         documentType: docType,
-        fileType: docType,
+        fileType: docType, // list mapping uses fileType for document type; file extension lives in fileExtension
       });
       onClose();
     } catch (err) {
