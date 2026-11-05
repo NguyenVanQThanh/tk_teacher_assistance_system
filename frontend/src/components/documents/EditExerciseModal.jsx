@@ -2,7 +2,7 @@
 // Description: Full-featured interactive modal dialog matching Image 1 exactly with left question list, right selected question LaTeX editor, live KaTeX preview, Desmos SVG attachment, formula toolbar, and save synchronization.
 // Created At: 2026-09-12
 // Created By: Tam Khang
-// Updated At: 2026-10-06
+// Updated At: 2026-11-05
 // Updated By: Tam Khang
 
 import React, { useState, useEffect, useRef } from 'react';
@@ -104,8 +104,13 @@ const buildQuestionPayload = (q, displayOrder) => {
   };
 };
 
-export default function EditExerciseModal({ isOpen, doc, onClose, onSave }) {
-  if (!isOpen || !doc) return null;
+// Wrapper keeps hooks unconditional and remounts the editor per exercise so state never leaks between exercises.
+export default function EditExerciseModal(props) {
+  if (!props.isOpen || !props.doc) return null;
+  return <EditExerciseModalInner key={props.doc.id || props.doc.exercise_id} {...props} />;
+}
+
+function EditExerciseModalInner({ isOpen, doc, onClose, onSave }) {
 
   // Header Data
   const [docTitle, setDocTitle] = useState(doc.title || 'Đề cương ôn tập Toán 12 - Học kì 1 (Nâng cao)');
@@ -127,6 +132,7 @@ export default function EditExerciseModal({ isOpen, doc, onClose, onSave }) {
   const [isSaving, setIsSaving] = useState(false);
   const [deletedQuestionIds, setDeletedQuestionIds] = useState([]);
   const [saveStatusText, setSaveStatusText] = useState('');
+  const [saveError, setSaveError] = useState('');
 
   // Initial 5 Questions Matching Image 1 & 2
   const initialQuestions = [
@@ -701,7 +707,6 @@ Tam giác vuông SAB tại A: tan(∠SBA) = SA / AB = a√3 / a = √3 => ∠SBA
     const textarea = textareaRef.current;
     if (!textarea) {
       setCurrentContent(prev => prev + ' ' + snippet);
-      setLastInserted({ code: snippet, name: tipName || snippet });
       return;
     }
 
@@ -898,6 +903,7 @@ Tam giác vuông SAB tại A: tan(∠SBA) = SA / AB = a√3 / a = √3 => ∠SBA
   // Main Save Handler with Full Backend Persistence
   const handleMainSave = async () => {
     setIsSaving(true);
+    setSaveError('');
     const targetId = doc.id || doc.exercise_id;
 
     if (isUuid(targetId)) {
@@ -950,8 +956,10 @@ Tam giác vuông SAB tại A: tan(∠SBA) = SA / AB = a√3 / a = √3 => ∠SBA
         }
       } catch (err) {
         console.error('Failed to sync all changes to backend:', err);
-      } finally {
+        // Keep the modal open so unsaved edits are not lost.
+        setSaveError('Failed to save changes. Please try again.');
         setIsSaving(false);
+        return;
       }
     }
 
@@ -965,10 +973,17 @@ Tam giác vuông SAB tại A: tan(∠SBA) = SA / AB = a√3 / a = √3 => ∠SBA
       questions,
       updatedAt: new Date().toISOString()
     };
-    if (onSave) {
-      await onSave(updated);
+    try {
+      if (onSave) {
+        await onSave(updated);
+      }
+      onClose();
+    } catch (err) {
+      console.error('Failed to save exercise:', err);
+      setSaveError('Failed to save changes. Please try again.');
+    } finally {
+      setIsSaving(false);
     }
-    onClose();
   };
 
   // Helper to get Level Badge styling class
@@ -1517,6 +1532,7 @@ Tam giác vuông SAB tại A: tan(∠SBA) = SA / AB = a√3 / a = √3 => ∠SBA
         {/* 5. MODAL FOOTER */}
         {/* ============================================================ */}
         <footer className="edit-modal-footer">
+          {saveError && <div role="alert" style={{ color: '#e11d48', fontSize: 13 }}>{saveError}</div>}
           <div className="footer-version-info">
             <ShieldCheck size={15} />
             <span>Phiên bản v2.4 • Người cập nhật: <strong>GV. Nguyễn Văn A</strong></span>
