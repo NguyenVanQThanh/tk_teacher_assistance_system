@@ -23,7 +23,7 @@ import ExerciseFilterBar from '../../components/exercises/ExerciseFilterBar';
 import ExerciseCard from '../../components/exercises/ExerciseCard';
 import CreateExerciseModal from '../../components/exercises/CreateExerciseModal';
 import ExercisePreviewModal from '../../components/exercises/ExercisePreviewModal';
-import EditDocumentModal from '../../components/documents/EditDocumentModal';
+import EditExerciseModal from '../../components/documents/EditExerciseModal';
 import AssignExerciseModal from '../../components/exercises/AssignExerciseModal';
 import { exercisesApi, subjectsApi } from '../../services/api';
 import './ExerciseRepositoryPage.css';
@@ -429,7 +429,7 @@ export default function ExerciseRepositoryPage() {
       />
 
       {/* Edit Exercise / Document Modal Matching Image 1 */}
-      <EditDocumentModal
+      <EditExerciseModal
         isOpen={!!editingExercise}
         doc={editingExercise}
         onClose={() => setEditingExercise(null)}
