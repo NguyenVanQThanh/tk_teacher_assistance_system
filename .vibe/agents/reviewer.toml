@@ -1,0 +1,24 @@
+# File Name: reviewer.toml
+# Description: Read-only code-review subagent for this repo (spawn via the task tool with config_name = "reviewer")
+# Created At: 2026-11-08
+# Created By: Tam Khang
+# Updated At: 2026-11-08
+# Updated By: Tam Khang
+
+agent_type = "subagent"
+description = "Read-only reviewer for SmartLMS. Reviews diffs/changes against .claude/rules (English-only code, file headers with Created By/Updated By = Tam Khang, soft-delete only, no .env access, Alembic migration rules) and returns a severity-grouped report with an APPROVE / REQUEST CHANGES verdict. Spawn with the task tool: config_name = \"reviewer\"."
+
+# System prompt resolved from .vibe/prompts/reviewer.md (project-local first).
+system_prompt_id = "reviewer"
+
+# Read-only: no edits, no shell.
+disabled_tools = ["write_file", "edit", "bash"]
+
+[tools.read_file]
+permission = "always"
+
+[tools.grep]
+permission = "always"
+
+# Reviewer only loads the skills it needs.
+enabled_skills = ["repo-rules", "receiving-code-review"]

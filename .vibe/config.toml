@@ -1,0 +1,45 @@
+# File Name: config.toml
+# Description: Project-level configuration for Mistral Vibe (overrides ~/.vibe/config.toml when running in this repo)
+# Created At: 2026-11-08
+# Created By: Tam Khang
+# Updated At: 2026-11-08
+# Updated By: Tam Khang
+#
+# Docs: https://docs.mistral.ai/vibe/ and https://github.com/mistralai/mistral-vibe
+# Rules consolidated here come from .agents/AGENTS.md and .claude/rules/.
+
+# Default agent profile: auto-approves file edits only, asks for everything else.
+default_agent = "accept-edits"
+
+# Model used for the main session. Leave commented to use the account default,
+# or set explicitly, e.g. active_model = "devstral-2" for coding-heavy work.
+# active_model = "mistral-medium-latest"
+
+# System prompt loaded from .vibe/prompts/project-rules.md (resolved project-local first).
+# It encodes the repo rules from .agents/AGENTS.md and .claude/rules/*.md.
+system_prompt_id = "project-rules"
+
+# Enable every skill shipped in .vibe/skills/ (superpowers + repo-rules).
+# Use disabled_skills = ["pattern", ...] here to turn individual skills off.
+enabled_skills = ["*"]
+
+# ---------------------------------------------------------------------------
+# Security rules (from .claude/rules/coding_rules.md section 6)
+# Never read, modify, or interact with .env / secret files through the shell.
+# Patterns are globs matched against the full command text.
+# ---------------------------------------------------------------------------
+[tools.bash]
+permission = "ask"
+denylist = [
+  "*.env",
+  "*/.env",
+  "*.env.local",
+  "*.env.*.local",
+  "*printenv*",
+  "*env |*",
+]
+
+# Keep file reads inside the project workspace.
+[tools.read_file]
+permission = "always"
+denylist = ["*.env", "*/.env"]
