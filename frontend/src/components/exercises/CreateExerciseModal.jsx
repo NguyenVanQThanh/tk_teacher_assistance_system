@@ -15,6 +15,7 @@ import {
   ArrowLeft, 
   UploadCloud, 
   SlidersHorizontal,
+  GraduationCap,
   FileText,
   BookOpen,
   CheckCircle2, 
@@ -460,6 +461,27 @@ export default function CreateExerciseModal({ isOpen, onClose, onCreateSuccess }
                   <span>{errorMsg}</span>
                 </div>
               )}
+
+              {/* SECTION 0: Khối lớp (bài tập giao cho khối nào) */}
+              <div className="ai-config-section">
+                <div className="ai-section-header">
+                  <GraduationCap size={18} className="ai-section-icon" />
+                  <span className="ai-section-title">Khối lớp (bài tập giao cho khối nào)</span>
+                </div>
+                <div className="ai-grade-row">
+                  <select
+                    className="ai-grade-select"
+                    value={grade}
+                    onChange={(e) => { setGrade(e.target.value); setDocGradeFilter(e.target.value); }}
+                    title="Chọn khối lớp cho bài tập"
+                  >
+                    <option value="10">Khối 10</option>
+                    <option value="11">Khối 11</option>
+                    <option value="12">Khối 12</option>
+                  </select>
+                  <span className="ai-grade-hint">Khối đã chọn sẽ tự động lọc các tài liệu tham khảo tương ứng ở bên dưới.</span>
+                </div>
+              </div>
 
               {/* SECTION 1: Số lượng câu hỏi & Mức độ */}
               <div className="ai-config-section">
