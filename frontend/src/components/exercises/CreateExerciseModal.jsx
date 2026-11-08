@@ -55,6 +55,8 @@ export default function CreateExerciseModal({ isOpen, onClose, onCreateSuccess }
   const [progressPercent, setProgressPercent] = useState(0);
   const [progressStage, setProgressStage] = useState('');
   const [errorMsg, setErrorMsg] = useState('');
+  const [toast, setToast] = useState(null);
+  const toastTimerRef = useRef(null);
   const [subjectsList, setSubjectsList] = useState([]);
 
   // AI Generation Specific State
@@ -209,45 +211,64 @@ export default function CreateExerciseModal({ isOpen, onClose, onCreateSuccess }
     return total;
   };
 
-  const handleStartAiGeneration = (e) => {
+  const showToast = (message, type = 'info', title = '') => {
+    if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
+    setToast({ message, type, title });
+    toastTimerRef.current = setTimeout(() => setToast(null), 4200);
+  };
+
+  const handleStartAiGeneration = async (e) => {
     e.preventDefault();
 
     const totalQuestions = calculateTotalQuestions();
 
     if (totalQuestions === 0 && !aiPrompt.trim()) {
-      setErrorMsg('Vui lòng thiết lập số lượng câu hỏi hoặc nhập mô tả yêu cầu.');
+      const msg = 'Vui lòng thiết lập số lượng câu hỏi hoặc nhập mô tả yêu cầu.';
+      setErrorMsg(msg);
+      showToast(msg, 'error', 'Không thể tạo bài tập');
       return;
     }
 
     setIsSubmitting(true);
     setErrorMsg('');
 
-    setTimeout(() => {
-      setIsSubmitting(false);
-      const generatedTitle = aiPrompt.trim() 
-        ? (aiPrompt.length > 40 ? `${aiPrompt.substring(0, 40)}...` : aiPrompt)
-        : `Bài tập AI Sinh tự động (${totalQuestions || 10} câu)`;
-
-      const newExercise = {
-        id: `ai-${Date.now()}`,
-        title: generatedTitle,
-        type: 'quiz',
-        grade: grade,
-        subject: 'math',
-        subjectName: subjectsList[0]?.subject_name || 'Toán học',
-        questionCount: `${totalQuestions || 10} câu hỏi AI`,
-        duration: '20 phút',
-        date: new Date().toLocaleDateString('vi-VN'),
-        authorName: 'Giáo viên',
-        authorInitial: 'GV',
-        hasShare: true,
+    try {
+      const payload = {
+        subject_name: subjectsList[0]?.subject_name || 'Toán học',
+        grade_name: `Lớp ${grade}`,
+        topic_prompt: aiPrompt.trim() || `Ôn tập kiến thức khối ${grade}`,
+        duration_minutes: 45,
       };
+      const p1 = questionCounts.mcq.recognize + questionCounts.mcq.understand + questionCounts.mcq.apply;
+      const p2 = questionCounts.tf.recognize + questionCounts.tf.understand + questionCounts.tf.apply;
+      const p3 = questionCounts.shortAnswer.recognize + questionCounts.shortAnswer.understand + questionCounts.shortAnswer.apply;
+      if (p1 > 0) payload.part1_count = p1;
+      if (p2 > 0) payload.part2_count = p2;
+      if (p3 > 0) payload.part3_count = p3;
 
-      if (onCreateSuccess) {
-        onCreateSuccess(newExercise);
+      const res = await exercisesApi.generateAiExercise(payload);
+
+      // Persist the custom name entered by the teacher
+      if (title.trim() && res.exercise_id) {
+        try {
+          await exercisesApi.updateExercise(res.exercise_id, { title: title.trim() });
+          res.title = title.trim();
+        } catch {
+          // Title update is best-effort; the exercise was still created
+        }
       }
+
+      showToast(`Đã tạo thành công bài tập "${res.title}" (${res.total_questions} câu hỏi).`, 'success', 'Tạo bài tập AI thành công');
+      if (onCreateSuccess) onCreateSuccess();
       handleClose();
-    }, 800);
+    } catch (err) {
+      const detail = err.response?.data?.detail;
+      const msg = (detail && typeof detail === 'object' ? detail.message : detail) || err.message || 'Tạo bài tập AI thất bại. Vui lòng thử lại.';
+      setErrorMsg(msg);
+      showToast(msg, 'error', 'Bài tập tạo sinh gặp lỗi');
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const handleSubmitUpload = async (e) => {
@@ -359,6 +380,19 @@ export default function CreateExerciseModal({ isOpen, onClose, onCreateSuccess }
         onClick={(e) => e.stopPropagation()}
         style={{ position: 'relative' }}
       >
+        {/* Toast notification (e.g. AI generation failure) */}
+        {toast && (
+          <div className={`ai-toast toast-${toast.type}`} role="alert">
+            {toast.type === 'error' ? <AlertCircle size={16} /> : <CheckCircle2 size={16} />}
+            <div className="ai-toast-text">
+              <strong>{toast.title}</strong>
+              <span>{toast.message}</span>
+            </div>
+            <button type="button" className="ai-toast-close" onClick={() => setToast(null)} aria-label="Đóng thông báo">
+              <X size={14} />
+            </button>
+          </div>
+        )}
         {/* ================= FULL MODAL OCR PROCESSING OVERLAY (SCREEN LOCK) ================= */}
         {isSubmitting && (
           <div className="modal-ocr-loading-overlay">
@@ -491,6 +525,21 @@ export default function CreateExerciseModal({ isOpen, onClose, onCreateSuccess }
                   <span>{errorMsg}</span>
                 </div>
               )}
+
+              {/* SECTION: Đặt tên cho bài tập */}
+              <div className="ai-config-section">
+                <div className="ai-section-header">
+                  <FileEdit size={18} className="ai-section-icon" />
+                  <span className="ai-section-title">Đặt tên cho bài tập</span>
+                </div>
+                <input
+                  type="text"
+                  className="ai-title-input"
+                  placeholder="VD: Đề kiểm tra 15 phút chương Đạo hàm - Khối 12"
+                  value={title}
+                  onChange={(e) => setTitle(e.target.value)}
+                />
+              </div>
 
               {/* SECTION 0: Khối lớp (bài tập giao cho khối nào) */}
               <div className="ai-config-section">
