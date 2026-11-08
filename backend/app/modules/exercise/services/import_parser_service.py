@@ -390,27 +390,63 @@ class ImportParserService:
         for section in sections:
             pages: Optional[List[int]] = section["pages"]
             label: Optional[str] = section["label"]
-            images = (
-                [page_images[p - 1] for p in pages if 1 <= p <= len(page_images)]
-                if pages is not None else page_images
-            )
 
-            section_result: Optional[ParseResult] = None
-
-            # 1. AI Vision OCR providers (config-driven order with automatic fallback)
-            if images or pages is None:
+            # Legacy path: PDF unreadable page-wise -> single whole-file call
+            if pages is None:
+                section_result: Optional[ParseResult] = None
                 for provider_name, provider in cls.get_ai_vision_providers():
                     try:
-                        logger.info(f"Using {provider_name} Vision API for PDF OCR (exam '{label or 'default'}', pages {pages})...")
-                        if pages is None:
-                            ai_result = provider.parse_pdf_document(file_bytes, test_code=test_code)
-                        else:
-                            ai_result = provider.parse_images(images, page_numbers=pages, test_code=test_code)
+                        logger.info(f"Using {provider_name} Vision API for PDF OCR (whole file)...")
+                        ai_result = provider.parse_pdf_document(file_bytes, test_code=test_code)
                         if ai_result.questions:
                             merged = cls.merge_ai_result_with_answer_key(
                                 ai_result, answer_file_bytes, answer_filename, test_code
                             )
                             section_result = merged if merged is not None else ai_result
+                            break
+                        logger.warning(f"{provider_name} OCR returned no questions ({ai_result.errors}). Trying next provider/local parser.")
+                    except Exception as e:
+                        logger.warning(f"{provider_name} Vision Parser error: {e}. Trying next provider/local parser.")
+                if section_result is None or not section_result.questions:
+                    local_result = cls._parse_local_document(
+                        file_bytes, filename, pages=None,
+                        answer_file_bytes=answer_file_bytes,
+                        answer_filename=answer_filename, test_code=test_code,
+                    )
+                    if local_result.questions or section_result is None:
+                        section_result = local_result
+                if section_result is not None:
+                    for q in section_result.questions:
+                        q.exam_label = label
+                    all_questions.extend(section_result.questions)
+                    all_errors.extend(section_result.errors)
+                continue
+
+            # Chunk the section's pages: vision models cap output tokens, so a 3-4 page
+            # section in one request gets its JSON truncated mid-string. Small chunks
+            # (default 2 pages) keep responses within the output limit.
+            max_pages = cls.get_max_pages_per_call()
+            chunks = [pages[i:i + max_pages] for i in range(0, len(pages), max_pages)] or [pages]
+
+            section_questions: List[ParsedQuestion] = []
+            section_errors: List[ParseError] = []
+            for chunk in chunks:
+                images = [page_images[p - 1] for p in chunk if 1 <= p <= len(page_images)]
+                if not images:
+                    continue
+
+                chunk_result: Optional[ParseResult] = None
+
+                # 1. AI Vision OCR providers (config-driven order with automatic fallback)
+                for provider_name, provider in cls.get_ai_vision_providers():
+                    try:
+                        logger.info(f"Using {provider_name} Vision API for PDF OCR (exam '{label or 'default'}', pages {chunk})...")
+                        ai_result = provider.parse_images(images, page_numbers=chunk, test_code=test_code)
+                        if ai_result.questions:
+                            merged = cls.merge_ai_result_with_answer_key(
+                                ai_result, answer_file_bytes, answer_filename, test_code
+                            )
+                            chunk_result = merged if merged is not None else ai_result
                             break
                         logger.warning(
                             f"{provider_name} OCR returned no questions ({ai_result.errors}). Trying next provider/local parser."
@@ -418,22 +454,24 @@ class ImportParserService:
                     except Exception as e:
                         logger.warning(f"{provider_name} Vision Parser error: {e}. Trying next provider/local parser.")
 
-            # 2. Local fallback parser (pdfplumber / docx + regex) for this section
-            if section_result is None or not section_result.questions:
-                local_result = cls._parse_local_document(
-                    file_bytes, filename, pages=pages,
-                    answer_file_bytes=answer_file_bytes,
-                    answer_filename=answer_filename, test_code=test_code,
-                )
-                if local_result.questions or section_result is None:
-                    section_result = local_result
+                # 2. Local fallback parser (pdfplumber / docx + regex) for this chunk
+                if chunk_result is None or not chunk_result.questions:
+                    local_result = cls._parse_local_document(
+                        file_bytes, filename, pages=chunk,
+                        answer_file_bytes=answer_file_bytes,
+                        answer_filename=answer_filename, test_code=test_code,
+                    )
+                    if local_result.questions or chunk_result is None:
+                        chunk_result = local_result
 
-            if section_result is None:
-                continue
-            for q in section_result.questions:
+                if chunk_result is not None:
+                    section_questions.extend(chunk_result.questions)
+                    section_errors.extend(chunk_result.errors)
+
+            for q in section_questions:
                 q.exam_label = label
-            all_questions.extend(section_result.questions)
-            all_errors.extend(section_result.errors)
+            all_questions.extend(section_questions)
+            all_errors.extend(section_errors)
 
         if not all_questions and any(sec["pages"] is not None for sec in sections):
             # Last resort: splitting into sections can break parsing (e.g. a header was
@@ -721,6 +759,15 @@ class ImportParserService:
                 candidates.sort(key=lambda t: abs(t[0] - q_top))
                 return pinfo["page"], candidates[0][1]
         return None
+
+    @staticmethod
+    def get_max_pages_per_call() -> int:
+        """Max PDF pages sent per vision API request (output-token caps truncate big responses).
+        Override via SCAN_MAX_PAGES_PER_CALL (default 2)."""
+        try:
+            return max(1, int(os.environ.get("SCAN_MAX_PAGES_PER_CALL", "2")))
+        except ValueError:
+            return 2
 
     @staticmethod
     def get_ai_vision_providers() -> List[Tuple[str, Any]]:

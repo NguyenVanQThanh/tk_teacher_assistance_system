@@ -1,3 +1,4 @@
+import json
 # File Name: mistral_vision_parser_service.py
 # Description: Service for extracting and parsing exam questions from PDF/Images using Mistral AI Vision API (Pixtral), with config-driven provider selection.
 # Created At: 2026-11-08
@@ -128,7 +129,9 @@ class MistralVisionParserService:
                     {"role": "system", "content": VISION_OCR_SYSTEM_PROMPT},
                     {"role": "user", "content": user_content},
                 ],
-                "response_format": {"type": "json_object"},
+                # NDJSON stream (one question object per line) - response_format json_object
+                # is intentionally omitted because it forces a single JSON document
+                "stream": True,
                 "temperature": 0.1,
                 "max_tokens": cls.get_max_tokens(),
             }
@@ -137,14 +140,34 @@ class MistralVisionParserService:
                 "Content-Type": "application/json",
             }
 
+            # Stream the SSE response and accumulate delta content line by line. A
+            # token-truncated tail only cuts the last partial line, not the whole payload.
+            raw_parts: List[str] = []
             with httpx.Client(timeout=300.0) as client:
-                response = client.post(cls.get_api_url(), json=payload, headers=headers)
-                response.raise_for_status()
+                with client.stream("POST", cls.get_api_url(), json=payload, headers=headers) as response:
+                    response.raise_for_status()
+                    for line in response.iter_lines():
+                        if not line:
+                            continue
+                        if line.startswith("data:"):
+                            data = line[len("data:"):].strip()
+                            if data == "[DONE]":
+                                break
+                            try:
+                                chunk = json.loads(data)
+                                delta = chunk["choices"][0].get("delta", {})
+                                content = delta.get("content")
+                                if content:
+                                    raw_parts.append(content)
+                            except Exception:
+                                continue
+                        else:
+                            # non-SSE plain text fallback
+                            raw_parts.append(line)
 
-            data = response.json()
-            raw_json = data["choices"][0]["message"]["content"] or "{}"
-            # JSON repair/parsing is provider-agnostic, reused from the Gemini service
-            return GeminiVisionParserService._process_gemini_json_response(raw_json)
+            raw_text = "".join(raw_parts)
+            # NDJSON / whole-JSON parsing is provider-agnostic, reused from the Gemini service
+            return GeminiVisionParserService._process_streamed_response(raw_text or "{}", provider="Mistral")
 
         except Exception as e:
             logger.error(f"Mistral Vision API execution failed: {e}", exc_info=True)

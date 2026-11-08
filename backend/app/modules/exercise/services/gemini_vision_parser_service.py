@@ -47,28 +47,13 @@ Quy tắc bóc tách bắt buộc:
    - bbox là tọa độ của khung hình trên trang đó theo chuẩn hóa 0-1000 (phần nghìn kích thước trang): x0,y0 là góc trên-trái, x1,y1 là góc dưới-phải của hình.
    - KHÔNG bịa đặt trường "image" nếu câu hỏi không có hình ảnh.
 
-6. CẤU TRÚC JSON ĐẦU RA (Bắt buộc trả về đúng format JSON này, không thêm markdown ticks bên ngoài):
-{
-  "questions": [
-    {
-      "question_number": 1,
-      "part": "Part1",
-      "question_type": "MultipleChoice",
-      "difficulty": "NhanBiet",
-      "content": "Cho hàm số $f(x) = x^3 - 3x^2 + 2$. Giá trị cực đại của hàm số là:",
-      "content_markdown": "Cho hàm số $f(x) = x^3 - 3x^2 + 2$. Giá trị cực đại của hàm số là:",
-      "content_latex": "$f(x) = x^3 - 3x^2 + 2$",
-      "answer_options": [
-        {"content": "$0$", "is_correct": false, "display_order": 0},
-        {"content": "$2$", "is_correct": true, "display_order": 1},
-        {"content": "$-2$", "is_correct": false, "display_order": 2},
-        {"content": "$4$", "is_correct": false, "display_order": 3}
-      ],
-      "correct_answer": "B",
-      "image": {"page": 1, "bbox": [120, 300, 480, 620]}
-    }
-  ]
-}
+6. ĐỊNH DẠNG ĐẦU RA DẠNG STREAM NDJSON (BẮT BUỘC):
+   - Trả về kết quả dưới dạng NDJSON: MỖI DÒNG là MỘT JSON object hoàn chỉnh của MỘT câu hỏi.
+   - KHÔNG bọc trong mảng "questions", KHÔNG thêm markdown fence, không thêm chữ nào khác ngoài các dòng JSON.
+   - Ví dụ 2 dòng đầu ra mong đợi (mỗi dòng là một object độc lập):
+{"question_number": 1, "part": "Part1", "question_type": "MultipleChoice", "difficulty": "NhanBiet", "content": "Cho hàm số $f(x) = x^3 - 3x^2 + 2$. Giá trị cực đại của hàm số là:", "answer_options": [{"content": "$0$", "is_correct": false, "display_order": 0}, {"content": "$2$", "is_correct": true, "display_order": 1}], "correct_answer": "B", "image": {"page": 1, "bbox": [120, 300, 480, 620]}}
+{"question_number": 2, "part": "Part1", "question_type": "MultipleChoice", "difficulty": "ThongHieu", "content": "...", "answer_options": [], "correct_answer": "A"}
+   - Backend đọc stream từng dòng nên dòng cuối bị cắt do hết token sẽ tự bỏ, các câu hoàn chỉnh phía trước vẫn được giữ nguyên.
 """
 
 
@@ -164,21 +149,21 @@ class GeminiVisionParserService:
 
             contents.append("Hãy bóc tách toàn bộ các câu hỏi từ tất cả các trang trên và trả về kết quả JSON.")
 
-            # Request structured JSON response with expanded token window and disable AFC warnings
-            response = client.models.generate_content(
+            # Stream the response (NDJSON: one question object per line) so a token-truncated
+            # tail only drops the last partial line instead of invalidating the whole payload.
+            stream = client.models.generate_content(
                 model=model_name,
                 contents=contents,
+                stream=True,
                 config=types.GenerateContentConfig(
                     system_instruction=GEMINI_SYSTEM_PROMPT,
-                    response_mime_type="application/json",
                     max_output_tokens=16384,
                     temperature=0.1,
                     automatic_function_calling=types.AutomaticFunctionCallingConfig(disable=True)
                 )
             )
-
-            raw_json = response.text or "{}"
-            return cls._process_gemini_json_response(raw_json)
+            raw_text = "".join(getattr(ch, "text", "") or "" for ch in stream)
+            return cls._process_streamed_response(raw_text or "{}", provider="Gemini")
 
         except Exception as e:
             logger.error(f"Gemini Vision API execution failed: {e}", exc_info=True)
@@ -187,87 +172,12 @@ class GeminiVisionParserService:
     # Common provider-chain interface (used by ImportParserService)
     parse_images = parse_images_with_gemini
 
-    @staticmethod
-    def sanitize_json_latex_escapes(raw: str) -> str:
-        """
-        Sanitizes raw JSON string containing unescaped LaTeX backslashes in a single pass
-        so that json.loads doesn't fail on \\frac, \\vec, \\log, \\mathbb, etc.
-        """
-        def fix_escape(match):
-            full = match.group(0)
-            esc_char = match.group(1)
-            rest = match.group(2)
-            
-            if esc_char in ('"', '\\', '/'):
-                return full
-            if esc_char == 'n' and (not rest or not rest[0].isalpha()):
-                return full
-            if esc_char == 'u' and len(rest) >= 4 and re.match(r'^[0-9a-fA-F]{4}', rest):
-                return full
-            if esc_char in ('r', 't', 'b', 'f') and (not rest or not rest[0].isalpha()):
-                return full
-                
-            return '\\\\' + esc_char + rest
-
-        return re.sub(r'\\([a-zA-Z0-9"\\/])([a-zA-Z]*)', fix_escape, raw)
-
     @classmethod
-    def _process_gemini_json_response(cls, raw_json_str: str) -> ParseResult:
-        """
-        Parses raw JSON string from Gemini, auto-repairs any token-truncated JSON,
-        and builds sorted List[ParsedQuestion].
-        """
+    def _build_result_from_items(cls, raw_questions: List[Any], provider: str = "Gemini") -> ParseResult:
+        """Build a sorted ParseResult from a list of raw question item dicts."""
         from app.modules.exercise.services.import_parser_service import ImportParserService
-        clean_text = raw_json_str.strip()
-
-        # Extract JSON block between ```json ... ``` or outermost { ... }
-        match_fenced = re.search(r'```(?:json)?\s*([\s\S]*?)\s*```', clean_text)
-        if match_fenced:
-            clean_text = match_fenced.group(1).strip()
-        else:
-            match_braces = re.search(r'(\{[\s\S]*\}|\[[\s\S]*\])', clean_text)
-            if match_braces:
-                clean_text = match_braces.group(1).strip()
-
-        # Sanitize LaTeX backslashes inside JSON
-        clean_text = cls.sanitize_json_latex_escapes(clean_text)
-
-        # Sanitize python boolean literals or None if generated
-        clean_text = re.sub(r':\s*True\b', ': true', clean_text)
-        clean_text = re.sub(r':\s*False\b', ': false', clean_text)
-        clean_text = re.sub(r':\s*None\b', ': null', clean_text)
-
-        data = None
-        try:
-            data = json.loads(clean_text)
-        except json.JSONDecodeError as e:
-            # Auto-repair truncated JSON if cut off at the end
-            last_brace_idx = clean_text.rfind("}")
-            if last_brace_idx != -1:
-                repaired = clean_text[:last_brace_idx + 1]
-                if not repaired.endswith("]}"):
-                    if not repaired.endswith("]"):
-                        repaired += "\n]}"
-                    else:
-                        repaired += "\n}"
-                try:
-                    data = json.loads(repaired)
-                    logger.warning("Successfully auto-repaired truncated Gemini JSON response.")
-                except Exception:
-                    data = None
-
-            if not data:
-                logger.error(f"Failed to decode Gemini JSON response: {e}\nRaw: {clean_text[:500]}")
-                return ParseResult(errors=[ParseError(question_number=None, message=f"Invalid JSON from Gemini Vision: {str(e)}")])
-
-        raw_questions = data.get("questions") if isinstance(data, dict) else (data if isinstance(data, list) else [])
-        if raw_questions is None:
-            raw_questions = []
-        elif isinstance(raw_questions, dict):
-            raw_questions = list(raw_questions.values())
-
         if not raw_questions:
-            return ParseResult(errors=[ParseError(question_number=None, message="Gemini Vision did not identify any questions in document.")])
+            return ParseResult(errors=[ParseError(question_number=None, message=f"{provider} Vision did not identify any questions in document.")])
 
         parsed_questions: List[ParsedQuestion] = []
         for item in raw_questions:
@@ -281,7 +191,7 @@ class GeminiVisionParserService:
                 q_num = len(parsed_questions) + 1
 
             part = str(item.get("part", "Part1")).strip()
-            
+
             # Map question type enum
             q_type_str = str(item.get("question_type", "MultipleChoice")).strip()
             if part == "Part2" or q_type_str.lower() in ["truefalse", "true_false"]:
@@ -381,3 +291,127 @@ class GeminiVisionParserService:
         ))
 
         return ParseResult(questions=parsed_questions, errors=[])
+
+    @classmethod
+    def _process_streamed_response(cls, raw_text: str, provider: str = "Gemini") -> ParseResult:
+        """
+        Parse a streamed vision response. Preferred format is NDJSON: one complete
+        question object per line, so a token-truncated tail only drops the last partial
+        line while every complete question is kept. If the model ignored NDJSON and
+        returned a single JSON document, fall back to whole-document parsing.
+        """
+        items: List[Any] = []
+        for line in raw_text.splitlines():
+            line = line.strip()
+            if not line or line == "[DONE]":
+                continue
+            if line.startswith("data:"):
+                line = line[5:].strip()
+            if not line.startswith("{") and not line.startswith("["):
+                continue
+            try:
+                obj = json.loads(cls.sanitize_json_latex_escapes(line))
+            except Exception:
+                continue  # partial tail line cut by the output-token cap -> drop it
+            if isinstance(obj, dict) and isinstance(obj.get("questions"), list):
+                items.extend(obj["questions"])
+            elif isinstance(obj, dict):
+                items.append(obj)
+            elif isinstance(obj, list):
+                items.extend(obj)
+        if items:
+            return cls._build_result_from_items(items, provider)
+        return cls._process_gemini_json_response(raw_text, provider=provider)
+
+    @staticmethod
+    def _repair_truncated_json(text: str, max_attempts: int = 60) -> Optional[Any]:
+        """
+        Best-effort repair of JSON cut off by the model output-token limit.
+        Walks back over closing braces, drops the partial tail, and tries to close
+        any open containers (], }, ]}). Returns parsed data or None.
+        """
+        candidates = [text]
+        idx = text.rfind("}")
+        attempts = 0
+        while idx != -1 and attempts < max_attempts:
+            candidates.append(text[:idx + 1])
+            idx = text.rfind("}", 0, idx)
+            attempts += 1
+        for cand in candidates:
+            for suffix in ("", "]", "}", "]}", "}]", "\n]}", "\n}]"):
+                try:
+                    return json.loads(cand + suffix)
+                except Exception:
+                    continue
+        return None
+
+    @staticmethod
+    def sanitize_json_latex_escapes(raw: str) -> str:
+        """
+        Sanitizes raw JSON string containing unescaped LaTeX backslashes in a single pass
+        so that json.loads doesn't fail on \\frac, \\vec, \\log, \\mathbb, etc.
+        """
+        def fix_escape(match):
+            full = match.group(0)
+            esc_char = match.group(1)
+            rest = match.group(2)
+            
+            if esc_char in ('"', '\\', '/'):
+                return full
+            if esc_char == 'n' and (not rest or not rest[0].isalpha()):
+                return full
+            if esc_char == 'u' and len(rest) >= 4 and re.match(r'^[0-9a-fA-F]{4}', rest):
+                return full
+            if esc_char in ('r', 't', 'b', 'f') and (not rest or not rest[0].isalpha()):
+                return full
+                
+            return '\\\\' + esc_char + rest
+
+        return re.sub(r'\\([a-zA-Z0-9"\\/])([a-zA-Z]*)', fix_escape, raw)
+
+    @classmethod
+    def _process_gemini_json_response(cls, raw_json_str: str, provider: str = "Gemini") -> ParseResult:
+        """
+        Parses a whole-document JSON string from a vision provider (fallback when the
+        and builds sorted List[ParsedQuestion].
+        """
+        from app.modules.exercise.services.import_parser_service import ImportParserService
+        clean_text = raw_json_str.strip()
+
+        # Extract JSON block between ```json ... ``` or outermost { ... }
+        match_fenced = re.search(r'```(?:json)?\s*([\s\S]*?)\s*```', clean_text)
+        if match_fenced:
+            clean_text = match_fenced.group(1).strip()
+        else:
+            match_braces = re.search(r'(\{[\s\S]*\}|\[[\s\S]*\])', clean_text)
+            if match_braces:
+                clean_text = match_braces.group(1).strip()
+
+        # Sanitize LaTeX backslashes inside JSON
+        clean_text = cls.sanitize_json_latex_escapes(clean_text)
+
+        # Sanitize python boolean literals or None if generated
+        clean_text = re.sub(r':\s*True\b', ': true', clean_text)
+        clean_text = re.sub(r':\s*False\b', ': false', clean_text)
+        clean_text = re.sub(r':\s*None\b', ': null', clean_text)
+
+        data = None
+        try:
+            data = json.loads(clean_text)
+        except json.JSONDecodeError as e:
+            # Auto-repair JSON truncated by the output-token cap (drop the partial tail)
+            data = cls._repair_truncated_json(clean_text)
+            if data is not None:
+                logger.warning(f"Auto-repaired token-truncated {provider} JSON response (partial tail dropped).")
+
+            if data is None:
+                logger.error(f"Failed to decode {provider} JSON response: {e}\nRaw: {clean_text[:500]}")
+                return ParseResult(errors=[ParseError(question_number=None, message=f"Invalid JSON from {provider} Vision: {str(e)}")])
+
+        raw_questions = data.get("questions") if isinstance(data, dict) else (data if isinstance(data, list) else [])
+        if raw_questions is None:
+            raw_questions = []
+        elif isinstance(raw_questions, dict):
+            raw_questions = list(raw_questions.values())
+
+        return cls._build_result_from_items(raw_questions, provider)
