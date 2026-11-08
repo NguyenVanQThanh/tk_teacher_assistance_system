@@ -56,7 +56,10 @@ class ParseResult:
     errors: List[ParseError] = field(default_factory=list)
 
 
-UPLOAD_DIR = os.path.join("uploads", "questions")
+from app.core.config import QUESTION_IMAGE_DIR, QUESTION_IMAGE_URL_PREFIX
+
+UPLOAD_DIR = str(QUESTION_IMAGE_DIR)
+IMAGE_URL_PREFIX = QUESTION_IMAGE_URL_PREFIX
 
 
 class ImportParserService:
@@ -88,7 +91,7 @@ class ImportParserService:
                 filepath = os.path.join(UPLOAD_DIR, filename)
                 with open(filepath, "wb") as f:
                     f.write(image_bytes)
-                image_url = f"/uploads/questions/{filename}"
+                image_url = f"{IMAGE_URL_PREFIX}/{filename}"
                 inline_images.append({
                     "url": image_url,
                     "index": image_count

@@ -42,6 +42,7 @@ class QuestionService:
             explanation=payload.explanation,
             display_order=payload.display_order,
             image_url=payload.image_url,
+            image_metadata=payload.image_metadata,
             is_ai_generated=False,
             status='ACTIVE'
         )
@@ -99,6 +100,7 @@ class QuestionService:
             explanation=payload.explanation,
             display_order=payload.display_order,
             image_url=payload.image_url,
+            image_metadata=payload.image_metadata,
             answer_options=options
         )
         return updated_question

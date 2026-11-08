@@ -76,6 +76,7 @@ class QuestionCreate(BaseModel):
     display_order: int = Field(0, description="Display order within exercise")
     document_id: Optional[UUID] = Field(None, description="Associated source document ID")
     image_url: Optional[str] = Field(None, description="URL of question image")
+    image_metadata: Optional[dict] = Field(None, description="Metadata of the question image (filename, size, dimensions, content_type, ...)")
     answer_options: Optional[List[AnswerOptionCreate]] = Field(default=None, description="List of answer choices")
 
     @field_validator("difficulty", mode="before")
@@ -142,6 +143,7 @@ class QuestionUpdate(BaseModel):
     explanation: Optional[str] = None
     display_order: Optional[int] = None
     image_url: Optional[str] = None
+    image_metadata: Optional[dict] = None
     answer_options: Optional[List[AnswerOptionCreate]] = None
 
     @field_validator("difficulty", mode="before")
@@ -199,6 +201,7 @@ class QuestionOut(BaseModel):
     explanation: Optional[str] = None
     display_order: int
     image_url: Optional[str] = None
+    image_metadata: Optional[Any] = None
     is_ai_generated: bool
     status: str
     created_at: datetime
@@ -585,3 +588,13 @@ class AiExerciseGenerateOut(BaseModel):
     created_at: datetime
 
     model_config = {"from_attributes": True}
+
+
+class QuestionImageUploadOut(BaseModel):
+    url: str = Field(..., description="Public URL of the stored image")
+    filename: str = Field(..., description="Stored filename on BE storage")
+    original_name: Optional[str] = Field(None, description="Original uploaded filename")
+    size_bytes: int = Field(..., description="File size in bytes")
+    content_type: Optional[str] = Field(None, description="MIME type of the image")
+    width: Optional[int] = Field(None, description="Image width in pixels (when detectable)")
+    height: Optional[int] = Field(None, description="Image height in pixels (when detectable)")
