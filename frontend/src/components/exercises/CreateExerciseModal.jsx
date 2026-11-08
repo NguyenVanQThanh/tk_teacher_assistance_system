@@ -143,6 +143,17 @@ export default function CreateExerciseModal({ isOpen, onClose, onCreateSuccess }
     }
   }
 
+  const toggleDocumentSelection = (docId) => {
+    setSelectedDocIds((prev) =>
+      prev.includes(docId) ? prev.filter((id) => id !== docId) : [...prev, docId]
+    );
+  };
+
+  const removeSelectedDocument = (docId, e) => {
+    e.stopPropagation();
+    setSelectedDocIds((prev) => prev.filter((id) => id !== docId));
+  };
+
   if (!isOpen) return null;
 
   const handleClose = () => {
