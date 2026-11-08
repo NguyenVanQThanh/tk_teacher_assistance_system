@@ -65,8 +65,60 @@ export default function StudentScheduleDetailCard({
   // State to control modal for adding new schedule
   const [isAddScheduleModalOpen, setIsAddScheduleModalOpen] = useState(false);
   const [newScheduleTitle, setNewScheduleTitle] = useState('');
-  const [newScheduleTime, setNewScheduleTime] = useState('14:00 – 15:30');
-  const [newScheduleTag, setNewScheduleTag] = useState('Tự học');
+  // Khung giờ gồm 3 phần: giờ (1-12), phút (00-59), AM/PM theo múi giờ GMT+7
+  const [newScheduleHour, setNewScheduleHour] = useState('');
+  const [newScheduleMinute, setNewScheduleMinute] = useState('');
+  const [newScheduleAmPm, setNewScheduleAmPm] = useState('AM');
+  const [scheduleTimeError, setScheduleTimeError] = useState('');
+
+  // Regex kiểm tra khung nhập giờ: giờ 12h (1-12), phút (00-59)
+  const HOUR_REGEX = /^(1[0-2]|[1-9])$/;
+  const MINUTE_REGEX = /^[0-5][0-9]$/;
+
+  // Đổi giờ 12h + AM/PM sang giờ 24h
+  const to24Hour = (h12, ampm) => {
+    if (ampm === 'AM') return h12 === 12 ? 0 : h12;
+    return h12 === 12 ? 12 : h12 + 12;
+  };
+
+  const hourValid = HOUR_REGEX.test(newScheduleHour);
+  const minuteValid = MINUTE_REGEX.test(newScheduleMinute);
+  const timeInputsValid = hourValid && minuteValid;
+
+  // Instant tương ứng khung giờ đã chọn theo múi giờ GMT+7
+  // (Date.UTC của giờ địa phương rồi trừ 7 giờ để về đúng instant)
+  const scheduleInstantGMT7 = useMemo(() => {
+    if (!timeInputsValid) return null;
+    const h24 = to24Hour(Number(newScheduleHour), newScheduleAmPm);
+    return Date.UTC(currentYear, currentMonth - 1, currentDay, h24, Number(newScheduleMinute)) - 7 * 60 * 60 * 1000;
+  }, [timeInputsValid, newScheduleHour, newScheduleMinute, newScheduleAmPm, currentYear, currentMonth, currentDay]);
+
+  // Không cho tạo lịch trong quá khứ (so sánh theo giờ GMT+7)
+  const isPastSchedule = scheduleInstantGMT7 !== null && scheduleInstantGMT7 <= Date.now();
+
+  // Chỉ cho nhập số: khung giờ tối đa 2 chữ số, khung phút tối đa 2 chữ số
+  const handleHourChange = (e) => {
+    setNewScheduleHour(e.target.value.replace(/[^0-9]/g, '').slice(0, 2));
+    setScheduleTimeError('');
+  };
+
+  const handleMinuteChange = (e) => {
+    setNewScheduleMinute(e.target.value.replace(/[^0-9]/g, '').slice(0, 2));
+    setScheduleTimeError('');
+  };
+
+  // Mở modal và gợi ý sẵn khung giờ là giờ kế tiếp theo GMT+7
+  const openAddScheduleModal = () => {
+    const now = new Date();
+    const nowGMT7 = new Date(now.getTime() + (now.getTimezoneOffset() + 7 * 60) * 60000);
+    const h24next = (nowGMT7.getHours() + 1) % 24;
+    const h12 = h24next % 12 === 0 ? 12 : h24next % 12;
+    setNewScheduleHour(String(h12));
+    setNewScheduleMinute('00');
+    setNewScheduleAmPm(h24next >= 12 ? 'PM' : 'AM');
+    setScheduleTimeError('');
+    setIsAddScheduleModalOpen(true);
+  };
 
   // Compute daily schedule items combining backend weekly_schedule, assignments due, and custom schedules
   const dailyScheduleItems = useMemo(() => {
@@ -211,15 +263,32 @@ export default function StudentScheduleDetailCard({
     e.preventDefault();
     if (!newScheduleTitle.trim()) return;
 
+    if (!timeInputsValid) {
+      setScheduleTimeError('Khung giờ không hợp lệ: nhập giờ 1–12 và phút 00–59.');
+      return;
+    }
+
+    const hourNum = Number(newScheduleHour);
+    const minuteNum = Number(newScheduleMinute);
+    const h24 = to24Hour(hourNum, newScheduleAmPm);
+    // Chuyển khung giờ GMT+7 thành instant để chặn lịch trong quá khứ
+    const instantGMT7 = Date.UTC(currentYear, currentMonth - 1, currentDay, h24, minuteNum) - 7 * 60 * 60 * 1000;
+    if (instantGMT7 <= Date.now()) {
+      setScheduleTimeError('Không thể tạo lịch trong quá khứ (giờ GMT+7). Vui lòng chọn thời điểm ở tương lai.');
+      return;
+    }
+
+    const timeLabel = `${hourNum}:${String(minuteNum).padStart(2, '0')} ${newScheduleAmPm}`;
+
     const newSchedule = {
       id: `custom_${Date.now()}`,
       day: currentDay,
       month: currentMonth,
       year: currentYear,
       title: newScheduleTitle.trim(),
-      time: newScheduleTime.trim() || '14:00 – 15:30',
+      time: timeLabel,
       classTag: 'Tự học',
-      badgeTag: newScheduleTag || 'Cá nhân',
+      badgeTag: 'Cá nhân',
       badgeClass: 'badge-green',
       accent: 'green'
     };
@@ -233,6 +302,10 @@ export default function StudentScheduleDetailCard({
     }
 
     setNewScheduleTitle('');
+    setNewScheduleHour('');
+    setNewScheduleMinute('');
+    setNewScheduleAmPm('AM');
+    setScheduleTimeError('');
     setIsAddScheduleModalOpen(false);
   };
 
@@ -332,7 +405,7 @@ export default function StudentScheduleDetailCard({
             if (onAddNewSchedule) {
               onAddNewSchedule();
             } else {
-              setIsAddScheduleModalOpen(true);
+              openAddScheduleModal();
             }
           }}
         >
@@ -368,25 +441,43 @@ export default function StudentScheduleDetailCard({
                   />
                 </div>
 
-                <div className="form-group-row">
-                  <div className="form-group-item">
-                    <label>Khung giờ:</label>
+                <div className="form-group-item">
+                  <label>Khung giờ (GMT+7):</label>
+                  <div className="time-inputs-row">
                     <input
                       type="text"
-                      placeholder="Ví dụ: 14:00 – 15:30"
-                      value={newScheduleTime}
-                      onChange={(e) => setNewScheduleTime(e.target.value)}
+                      inputMode="numeric"
+                      className={`time-input time-input-hour${hourValid || !newScheduleHour ? '' : ' time-input-invalid'}`}
+                      placeholder="Giờ (1–12)"
+                      value={newScheduleHour}
+                      onChange={handleHourChange}
                     />
-                  </div>
-                  <div className="form-group-item">
-                    <label>Loại lịch:</label>
+                    <span className="time-separator">:</span>
                     <input
                       type="text"
-                      placeholder="Ví dụ: Tự học, Ôn thi..."
-                      value={newScheduleTag}
-                      onChange={(e) => setNewScheduleTag(e.target.value)}
+                      inputMode="numeric"
+                      className={`time-input time-input-minute${minuteValid || !newScheduleMinute ? '' : ' time-input-invalid'}`}
+                      placeholder="Phút (00–59)"
+                      value={newScheduleMinute}
+                      onChange={handleMinuteChange}
                     />
+                    <select
+                      className="time-input time-input-ampm"
+                      value={newScheduleAmPm}
+                      onChange={(e) => {
+                        setNewScheduleAmPm(e.target.value);
+                        setScheduleTimeError('');
+                      }}
+                    >
+                      <option value="AM">AM</option>
+                      <option value="PM">PM</option>
+                    </select>
                   </div>
+                  {(scheduleTimeError || isPastSchedule) && (
+                    <span className="form-error-text">
+                      {scheduleTimeError || 'Không thể tạo lịch trong quá khứ (giờ GMT+7). Vui lòng chọn thời điểm ở tương lai.'}
+                    </span>
+                  )}
                 </div>
 
                 <div className="modal-actions-row">
@@ -400,7 +491,7 @@ export default function StudentScheduleDetailCard({
                   <button 
                     type="submit" 
                     className="btn-submit-modal"
-                    disabled={!newScheduleTitle.trim()}
+                    disabled={!newScheduleTitle.trim() || !timeInputsValid || isPastSchedule}
                   >
                     <Check size={14} />
                     <span>Lưu lịch học</span>
