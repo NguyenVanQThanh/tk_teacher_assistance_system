@@ -236,3 +236,18 @@ Updated By: Tam Khang
   transform: scale(0.95);
 }
 
+
+/* Khối (grade) chip on document card meta row */
+.doc-grade-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11.5px;
+  font-weight: 600;
+  color: #6D28D9;
+  background-color: #F5EEFF;
+  border: 1px solid #DDD6FE;
+  padding: 1px 8px;
+  border-radius: 999px;
+  white-space: nowrap;
+}

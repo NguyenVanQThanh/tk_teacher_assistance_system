@@ -28,8 +28,14 @@ import {
   FileCheck,
   Lock
 } from 'lucide-react';
-import { exercisesApi, subjectsApi } from '../../services/api';
+import { exercisesApi, subjectsApi, documentsApi } from '../../services/api';
 import './CreateExerciseModal.css';
+
+const formatFileSize = (bytes) => {
+  if (!bytes || bytes <= 0) return '0 KB';
+  if (bytes < 1024 * 1024) return `${Math.round(bytes / 1024)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+};
 
 export default function CreateExerciseModal({ isOpen, onClose, onCreateSuccess }) {
   const navigate = useNavigate();
@@ -61,16 +67,8 @@ export default function CreateExerciseModal({ isOpen, onClose, onCreateSuccess }
     shortAnswer: { recognize: 0, understand: 0, apply: 0 }
   });
 
-  // Available Documents in Repository
-  const availableDocuments = [
-    { id: 'doc-1', title: 'Sách giáo khoa Toán 11', type: 'book', tag: 'Sách giáo khoa', size: '14.2 MB', grade: '11' },
-    { id: 'doc-2', title: 'Đề cương ôn tập học kỳ 1', type: 'outline', tag: 'Đề cương', size: '2.4 MB', grade: '12' },
-    { id: 'doc-3', title: 'Tài liệu bồi dưỡng HSG', type: 'doc', tag: 'Nâng cao', size: '5.1 MB', grade: '12' },
-    { id: 'doc-4', title: 'Bài tập bổ trợ Giải tích 12', type: 'exercise', tag: 'Bài tập', size: '3.8 MB', grade: '12' },
-    { id: 'doc-5', title: 'Tuyển tập 50 đề thi thử THPT Quốc Gia - Toán', type: 'doc', tag: 'Đề thi', size: '8.6 MB', grade: '12' },
-    { id: 'doc-6', title: 'Chuyên đề Hình học không gian Oxyz', type: 'outline', tag: 'Chuyên đề', size: '4.2 MB', grade: '11' },
-    { id: 'doc-7', title: 'Sổ tay công thức Đạo hàm & Tích phân', type: 'book', tag: 'Tóm tắt', size: '1.9 MB', grade: '10' },
-  ];
+  // Available Documents in the teacher's repository (loaded from BE API)
+  const [availableDocuments, setAvailableDocuments] = useState([]);
 
   // Selected Documents for AI Context
   const [selectedDocIds, setSelectedDocIds] = useState([]);
@@ -110,6 +108,27 @@ export default function CreateExerciseModal({ isOpen, onClose, onCreateSuccess }
       }
     }
     loadSubjects();
+
+    async function loadDocuments() {
+      try {
+        const res = await documentsApi.getDocuments({ status: 'ALL', page_size: 100 });
+        const items = Array.isArray(res) ? res : (res.items || []);
+        if (isMounted) {
+          setAvailableDocuments(items.map((d) => ({
+            id: d.document_id,
+            title: d.title,
+            tag: d.document_type || 'Tài liệu',
+            size: formatFileSize(d.file_size || 0),
+            grade: d.grade || '',
+            subjectName: d.subject_name || '',
+          })));
+        }
+      } catch {
+        // Keep the picker empty if the repository cannot be loaded
+      }
+    }
+    loadDocuments();
+
     document.addEventListener('mousedown', handleClickOutside);
     return () => {
       isMounted = false;
