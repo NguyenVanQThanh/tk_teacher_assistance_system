@@ -20,6 +20,7 @@ import {
 } from 'lucide-react';
 import { exercisesApi, classesApi, assignmentsApi } from '../../services/api';
 import MathRenderer from '../common/MathRenderer';
+import { getQuestionItems } from '../../utils/questionItems';
 import './ExercisePreviewModal.css';
 
 export default function ExercisePreviewModal({ exercise, isOpen, onClose }) {
@@ -259,7 +260,7 @@ export default function ExercisePreviewModal({ exercise, isOpen, onClose }) {
           ) : questions.length > 0 ? (
             questions.map((q, idx) => {
               const optionLabels = ['A', 'B', 'C', 'D', 'E', 'F'];
-              const options = q.answer_options || [];
+              const options = getQuestionItems(q);
               const isTrueFalse = q.question_type === 'TrueFalse' || q.part === 'Part2' || (options.length > 0 && /^[a-d]\)/i.test(options[0]?.content || ''));
               const isShortAnswer = q.question_type === 'ShortAnswer' || q.part === 'Part3' || (options.length === 0 && Boolean(q.correct_answer));
 

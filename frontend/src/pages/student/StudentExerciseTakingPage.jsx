@@ -6,6 +6,7 @@
 // Updated By: Tam Khang
 
 import React, { useState, useEffect, useMemo } from 'react';
+import { getQuestionItems } from '../../utils/questionItems';
 import { 
   Clock, 
   HelpCircle, 
@@ -881,8 +882,8 @@ export default function StudentExerciseTakingPage() {
 
       if (qType === 'single_choice') {
         const letters = ['A', 'B', 'C', 'D', 'E', 'F'];
-        const options = (bQ.answer_options && bQ.answer_options.length > 0)
-          ? bQ.answer_options.map((opt, oIdx) => {
+        const options = (getQuestionItems(bQ).length > 0)
+          ? getQuestionItems(bQ).map((opt, oIdx) => {
               let text = opt.content || '';
               text = text.replace(/^[A-Da-d][\.\)]\s*/, '').trim();
               text = text.replace(/[\r\n\s\.]*[√✓\u221a]\s*$/, '').trim();
@@ -914,8 +915,8 @@ export default function StudentExerciseTakingPage() {
         };
       } else if (qType === 'true_false') {
         const letters = ['a', 'b', 'c', 'd'];
-        const items = (bQ.answer_options && bQ.answer_options.length > 0)
-          ? bQ.answer_options.map((opt, oIdx) => {
+        const items = (getQuestionItems(bQ).length > 0)
+          ? getQuestionItems(bQ).map((opt, oIdx) => {
               const letter = letters[oIdx] || String(oIdx + 1);
               let text = opt.content || '';
               text = text.replace(/^[a-dA-D][\.\)]\s*/, '').trim();
