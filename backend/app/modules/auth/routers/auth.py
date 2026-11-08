@@ -24,7 +24,7 @@ router = APIRouter(prefix="/api/v1/auth", tags=["auth"])
 @router.post("/login", response_model=LoginResponse)
 def login(request_data: LoginRequest, db: Session = Depends(get_db)):
     """
-    Authenticate user with email/phone and password, then issue a JWT access token.
+    Authenticate user with phone number and password, then issue a JWT access token.
     """
     # 1. Check rate limit lockout status
     is_blocked, retry_after = check_rate_limit(request_data.phone)

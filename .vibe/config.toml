@@ -15,9 +15,9 @@ default_agent = "accept-edits"
 # or set explicitly, e.g. active_model = "devstral-2" for coding-heavy work.
 # active_model = "mistral-medium-latest"
 
-# System prompt loaded from .vibe/prompts/project-rules.md (resolved project-local first).
-# It encodes the repo rules from .agents/AGENTS.md and .claude/rules/*.md.
-system_prompt_id = "project-rules"
+# System prompt variant for the main CLI session ("cli", "explore", "tests", "lean", "minimal").
+# Project-specific rules are loaded automatically from root AGENTS.md and .vibe/skills/repo-rules/.
+system_prompt_id = "cli"
 
 # Enable every skill shipped in .vibe/skills/ (superpowers + repo-rules).
 # Use disabled_skills = ["pattern", ...] here to turn individual skills off.

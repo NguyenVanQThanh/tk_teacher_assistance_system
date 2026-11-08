@@ -319,6 +319,24 @@ class ApprovalRequest(Base):
     reviewer = relationship("User", foreign_keys=[reviewed_by], backref="reviewed_requests")
 
 
+class SupportTicket(Base):
+    __tablename__ = 'support_tickets'
+
+    ticket_id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    full_name = Column(String(100), nullable=True)
+    phone = Column(String(20), nullable=False)
+    request_type = Column(String(30), nullable=False)  # forgot_password | new_account
+    message = Column(Text, nullable=True)
+    status = Column(String(20), default='PENDING', nullable=False)  # PENDING | PROCESSED | DELETED (Strict Soft Delete)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+
+    __table_args__ = (
+        CheckConstraint("request_type IN ('forgot_password', 'new_account')", name='chk_support_ticket_request_type'),
+        CheckConstraint("status IN ('PENDING', 'PROCESSED', 'DELETED')", name='chk_support_ticket_status'),
+    )
+
+
 class AuditLog(Base):
     __tablename__ = 'audit_logs'
 
