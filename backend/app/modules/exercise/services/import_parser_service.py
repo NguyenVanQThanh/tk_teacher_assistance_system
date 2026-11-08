@@ -293,8 +293,13 @@ class ImportParserService:
         tables_data = []
         inline_images = []
 
-        # Try using marker-pdf for LaTeX math formula extraction
+        # Try using marker-pdf for LaTeX math formula extraction.
+        # Disabled via ENABLE_MARKER_PDF=0 (e.g. in the memory-limited Docker container,
+        # where importing marker pulls in torch and can OOM the process).
+        marker_enabled = os.environ.get("ENABLE_MARKER_PDF", "1") != "0"
         try:
+            if not marker_enabled:
+                raise ImportError("marker-pdf disabled via ENABLE_MARKER_PDF=0")
             import tempfile
             from marker.convert import convert_single_pdf
             from marker.models import load_all_models

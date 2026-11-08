@@ -22,6 +22,10 @@ services:
     container_name: smartlms_backend
     restart: always
     mem_limit: 1g
+    # Load AI keys / storage config from backend/.env (compose `environment`
+    # below still overrides individual values, e.g. DB_HOST=postgres)
+    env_file:
+      - ./backend/.env
     environment:
       DB_HOST: postgres
       DB_PORT: 5432
@@ -31,6 +35,8 @@ services:
       SECRET_KEY: dev_secret_key_jwt_token_change_in_production
       ACCESS_TOKEN_EXPIRE_MINUTES: 60
       TZ: Asia/Ho_Chi_Minh
+      # marker-pdf pulls in torch (~GBs of RAM); keep it off in the 1g container
+      ENABLE_MARKER_PDF: "0"
     ports:
       - "8000:8000"
     depends_on:
