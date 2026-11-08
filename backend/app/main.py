@@ -13,10 +13,32 @@ backend_root = str(Path(__file__).resolve().parent.parent)
 if backend_root not in sys.path:
     sys.path.insert(0, backend_root)
 
+import logging
+import os
+
 from dotenv import load_dotenv
 
 # Load environment variables from .env file
 load_dotenv()
+
+logger = logging.getLogger("smartlms.startup")
+
+
+def _mask_key(value: str) -> str:
+    """Mask an API key for logs: show only length, never the secret itself."""
+    if not value:
+        return "MISSING"
+    return f"set({len(value)} chars)"
+
+
+# Log scan OCR provider config at startup (masked) so Docker/env issues are visible in logs
+logger.warning(
+    "Scan OCR config: SCAN_AI_PROVIDER=%s | MISTRAL_API_KEY=%s | GEMINI_API_KEY=%s | ENABLE_MARKER_PDF=%s",
+    os.environ.get("SCAN_AI_PROVIDER", "mistral"),
+    _mask_key(os.environ.get("MISTRAL_API_KEY") or os.environ.get("MISTRAL_KEY")),
+    _mask_key(os.environ.get("GEMINI_API_KEY") or os.environ.get("GOOGLE_API_KEY") or os.environ.get("GEMINI_KEY")),
+    os.environ.get("ENABLE_MARKER_PDF", "1"),
+)
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
