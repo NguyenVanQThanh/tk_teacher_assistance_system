@@ -62,20 +62,36 @@ export default function CreateExerciseModal({ isOpen, onClose, onCreateSuccess }
 
   // Available Documents in Repository
   const availableDocuments = [
-    { id: 'doc-1', title: 'Sách giáo khoa Toán 11', type: 'book', tag: 'Sách giáo khoa', size: '14.2 MB' },
-    { id: 'doc-2', title: 'Đề cương ôn tập học kỳ 1', type: 'outline', tag: 'Đề cương', size: '2.4 MB' },
-    { id: 'doc-3', title: 'Tài liệu bồi dưỡng HSG', type: 'doc', tag: 'Nâng cao', size: '5.1 MB' },
-    { id: 'doc-4', title: 'Bài tập bổ trợ Giải tích 12', type: 'exercise', tag: 'Bài tập', size: '3.8 MB' },
-    { id: 'doc-5', title: 'Tuyển tập 50 đề thi thử THPT Quốc Gia - Toán', type: 'doc', tag: 'Đề thi', size: '8.6 MB' },
-    { id: 'doc-6', title: 'Chuyên đề Hình học không gian Oxyz', type: 'outline', tag: 'Chuyên đề', size: '4.2 MB' },
-    { id: 'doc-7', title: 'Sổ tay công thức Đạo hàm & Tích phân', type: 'book', tag: 'Tóm tắt', size: '1.9 MB' },
+    { id: 'doc-1', title: 'Sách giáo khoa Toán 11', type: 'book', tag: 'Sách giáo khoa', size: '14.2 MB', grade: '11' },
+    { id: 'doc-2', title: 'Đề cương ôn tập học kỳ 1', type: 'outline', tag: 'Đề cương', size: '2.4 MB', grade: '12' },
+    { id: 'doc-3', title: 'Tài liệu bồi dưỡng HSG', type: 'doc', tag: 'Nâng cao', size: '5.1 MB', grade: '12' },
+    { id: 'doc-4', title: 'Bài tập bổ trợ Giải tích 12', type: 'exercise', tag: 'Bài tập', size: '3.8 MB', grade: '12' },
+    { id: 'doc-5', title: 'Tuyển tập 50 đề thi thử THPT Quốc Gia - Toán', type: 'doc', tag: 'Đề thi', size: '8.6 MB', grade: '12' },
+    { id: 'doc-6', title: 'Chuyên đề Hình học không gian Oxyz', type: 'outline', tag: 'Chuyên đề', size: '4.2 MB', grade: '11' },
+    { id: 'doc-7', title: 'Sổ tay công thức Đạo hàm & Tích phân', type: 'book', tag: 'Tóm tắt', size: '1.9 MB', grade: '10' },
   ];
 
   // Selected Documents for AI Context
   const [selectedDocIds, setSelectedDocIds] = useState([]);
   const [isDocDropdownOpen, setIsDocDropdownOpen] = useState(false);
   const [docSearchQuery, setDocSearchQuery] = useState('');
+  const [docGradeFilter, setDocGradeFilter] = useState('all');
   const docDropdownRef = useRef(null);
+
+  // Documents filtered by search text AND khối (grade block) filter
+  const filteredDocs = availableDocuments.filter((doc) => {
+    const q = docSearchQuery.trim().toLowerCase();
+    const matchSearch = !q || doc.title.toLowerCase().includes(q);
+    const matchGrade = docGradeFilter === 'all' || doc.grade === docGradeFilter;
+    return matchSearch && matchGrade;
+  });
+
+  // Modal title changes according to the selected creation method
+  const METHOD_TITLES = {
+    select_method: 'Lựa chọn hình thức tạo mới',
+    ai: 'Tạo sinh bài tập AI',
+    upload: 'Tải lên từ file có sẵn',
+  };
 
   useEffect(() => {
     let isMounted = true;
@@ -352,7 +368,7 @@ export default function CreateExerciseModal({ isOpen, onClose, onCreateSuccess }
           <div className="method-selection-view">
             {/* Header */}
             <div className="selection-modal-header">
-              <h2 className="selection-modal-title">Lựa chọn hình thức tạo mới</h2>
+              <h2 className="selection-modal-title">{METHOD_TITLES[currentStep] || 'Lifestyle chọn hình thức tạo mới'}</h2>
               <button 
                 type="button" 
                 className="btn-modal-close"
@@ -426,7 +442,7 @@ export default function CreateExerciseModal({ isOpen, onClose, onCreateSuccess }
           <div className="ai-creation-view">
             {/* Header */}
             <div className="selection-modal-header">
-              <h2 className="selection-modal-title">Lựa chọn hình thức tạo mới</h2>
+              <h2 className="selection-modal-title">{METHOD_TITLES[currentStep] || 'Lifestyle chọn hình thức tạo mới'}</h2>
               <button 
                 type="button" 
                 className="btn-modal-close"
@@ -607,7 +623,8 @@ export default function CreateExerciseModal({ isOpen, onClose, onCreateSuccess }
                   {/* Dropdown Menu */}
                   {isDocDropdownOpen && (
                     <div className="doc-dropdown-menu">
-                      <div className="doc-search-box">
+                      <div className="doc-filter-row">
+                        <div className="doc-search-box">
                         <Search size={14} className="doc-search-icon" />
                         <input 
                           type="text" 
@@ -616,6 +633,19 @@ export default function CreateExerciseModal({ isOpen, onClose, onCreateSuccess }
                           onChange={(e) => setDocSearchQuery(e.target.value)}
                           onClick={(e) => e.stopPropagation()}
                         />
+                      </div>
+                        <select
+                          className="doc-grade-filter"
+                          value={docGradeFilter}
+                          onChange={(e) => setDocGradeFilter(e.target.value)}
+                          onClick={(e) => e.stopPropagation()}
+                          title="Lọc tài liệu theo khối lớp"
+                        >
+                          <option value="all">Tất cả khối</option>
+                          <option value="10">Khối 10</option>
+                          <option value="11">Khối 11</option>
+                          <option value="12">Khối 12</option>
+                        </select>
                       </div>
 
                       <div className="doc-list-scroll">
@@ -635,6 +665,7 @@ export default function CreateExerciseModal({ isOpen, onClose, onCreateSuccess }
                                   <span className="doc-item-title">{doc.title}</span>
                                   <div className="doc-item-badges">
                                     <span className="doc-type-badge">{doc.tag}</span>
+                                    <span className="doc-grade-badge">Khối {doc.grade}</span>
                                     <span className="doc-size-text">{doc.size}</span>
                                   </div>
                                 </div>

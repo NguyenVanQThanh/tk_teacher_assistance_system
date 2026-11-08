@@ -996,3 +996,51 @@ Updated By: Tam Khang
   0%, 100% { transform: scale(1); opacity: 0.9; }
   50% { transform: scale(1.15); opacity: 1; }
 }
+
+/* Khối (grade) filter row inside the document picker dropdown */
+.doc-filter-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  border-bottom: 1px solid #F1F5F9;
+  background-color: #F8FAFC;
+}
+
+.doc-filter-row .doc-search-box {
+  flex: 1;
+  min-width: 0;
+  padding: 4px 6px;
+  border-bottom: none;
+  background: transparent;
+}
+
+.doc-grade-filter {
+  flex-shrink: 0;
+  border: 1px solid #E2E8F0;
+  border-radius: 8px;
+  background-color: #FFFFFF;
+  font-size: 12px;
+  font-weight: 500;
+  color: #334155;
+  padding: 5px 8px;
+  outline: none;
+  cursor: pointer;
+  font-family: 'Be Vietnam Pro', -apple-system, BlinkMacSystemFont, sans-serif;
+}
+
+.doc-grade-filter:focus {
+  border-color: #7C3AED;
+  box-shadow: 0 0 0 2px rgba(124, 58, 237, 0.12);
+}
+
+.doc-grade-badge {
+  font-size: 10.5px;
+  font-weight: 600;
+  color: #6D28D9;
+  background-color: #F5EEFF;
+  border: 1px solid #DDD6FE;
+  padding: 1px 7px;
+  border-radius: 999px;
+  white-space: nowrap;
+}
