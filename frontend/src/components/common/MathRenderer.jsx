@@ -173,3 +173,92 @@ export default function MathRenderer({ text, className = '' }) {
   return <span className={`math-renderer-wrapper ${className}`}>{content}</span>;
 }
 
+/**
+ * Resolve a media URL (image) to an absolute URL.
+ * Relative paths returned by the BE (e.g. /uploads/questions/...) are prefixed
+ * with the configured API base URL.
+ */
+export function resolveMediaUrl(url) {
+  if (!url || typeof url !== 'string') return '';
+  if (/^(https?:|data:|blob:)/i.test(url)) return url;
+  const base = (import.meta.env && import.meta.env.VITE_API_BASE_URL) || '';
+  return `${base}${url.startsWith('/') ? '' : '/'}${url}`;
+}
+
+const IMAGE_MD_REGEX = /!\[([^\]]*)\]\(([^)\s]+)(?:\s+"[^"]*")?\)/g;
+
+/**
+ * Render a single text line: markdown images become <img>, everything else
+ * goes through MathRenderer so inline $...$ formulas are visualized.
+ */
+export function MathInline({ text }) {
+  const parts = String(text || '').split(IMAGE_MD_REGEX);
+  const out = [];
+  for (let i = 0; i < parts.length; i += 3) {
+    const pre = parts[i];
+    const alt = parts[i + 1];
+    const url = parts[i + 2];
+    if (pre) out.push(<MathRenderer key={`${i}-t`} text={pre} />);
+    if (url !== undefined) {
+      out.push(
+        <img
+          key={`${i}-img`}
+          src={resolveMediaUrl(url)}
+          alt={alt || ''}
+          className="math-content-image"
+        />
+      );
+    }
+  }
+  return <>{out}</>;
+}
+
+/**
+ * Render multi-line content safely: blank-line separated blocks, lines that are
+ * complete $$...$$ display formulas render as centered formula cards, everything
+ * else renders line-by-line. An unclosed $$ while typing falls back to plain text
+ * so KaTeX never breaks mid-edit.
+ */
+export function MathContent({ text, className = '' }) {
+  const content = useMemo(() => {
+    if (!text || typeof text !== 'string') return null;
+
+    const blocks = text.split(/\n\s*\n/);
+    return blocks.map((block, bIdx) => {
+      const trimmed = block.trim();
+      if (!trimmed) return null;
+
+      if (trimmed.startsWith('$$') && trimmed.endsWith('$$') && trimmed.length > 4) {
+        return (
+          <div key={bIdx} className="math-content-display">
+            <MathRenderer text={trimmed} />
+          </div>
+        );
+      }
+
+      return (
+        <div key={bIdx} className="math-content-block">
+          {block.split('\n').map((line, lIdx) => {
+            const t = line.trim();
+            if (!t) return null;
+            if (t.startsWith('$$') && t.endsWith('$$') && t.length > 4) {
+              return (
+                <div key={lIdx} className="math-content-display">
+                  <MathRenderer text={t} />
+                </div>
+              );
+            }
+            return (
+              <div key={lIdx} className="math-content-line">
+                <MathInline text={line} />
+              </div>
+            );
+          })}
+        </div>
+      );
+    });
+  }, [text]);
+
+  if (!text) return null;
+  return <div className={`math-content ${className}`}>{content}</div>;
+}
