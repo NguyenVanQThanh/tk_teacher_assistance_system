@@ -22,6 +22,9 @@ logger = logging.getLogger("smartlms.exercise.mistral_vision")
 
 DEFAULT_MISTRAL_API_URL = "https://api.mistral.ai/v1/chat/completions"
 DEFAULT_MISTRAL_MODEL = "pixtral-12b-2409"
+# Pixtral accepts at most ~1568px per image side and 8192 output tokens
+MISTRAL_MAX_IMAGE_SIDE = 1568
+DEFAULT_MISTRAL_MAX_TOKENS = 8192
 
 
 class MistralVisionParserService:
@@ -49,18 +52,28 @@ class MistralVisionParserService:
         """Retrieve Mistral chat completions endpoint (override for proxies/self-hosted)."""
         return os.environ.get("MISTRAL_API_URL", DEFAULT_MISTRAL_API_URL)
 
+    @staticmethod
+    def get_max_tokens() -> int:
+        """Max output tokens (Pixtral models cap at 8192; override via MISTRAL_MAX_TOKENS)."""
+        try:
+            return int(os.environ.get("MISTRAL_MAX_TOKENS", str(DEFAULT_MISTRAL_MAX_TOKENS)))
+        except ValueError:
+            return DEFAULT_MISTRAL_MAX_TOKENS
+
+    @staticmethod
+    def _image_to_data_url(img: Image.Image) -> str:
+        """Downscale and encode a page image as a JPEG data URL (Pixtral-friendly size)."""
+        img = img.convert("RGB")
+        img.thumbnail((MISTRAL_MAX_IMAGE_SIDE, MISTRAL_MAX_IMAGE_SIDE))
+        buffer = io.BytesIO()
+        img.save(buffer, format="JPEG", quality=85)
+        encoded = base64.b64encode(buffer.getvalue()).decode("ascii")
+        return f"data:image/jpeg;base64,{encoded}"
+
     @classmethod
     def is_available(cls) -> bool:
         """Check if Mistral API key is configured."""
         return bool(cls.get_api_key())
-
-    @staticmethod
-    def _image_to_data_url(img: Image.Image) -> str:
-        """Encode a PIL image as a base64 PNG data URL for the Mistral API."""
-        buffer = io.BytesIO()
-        img.convert("RGB").save(buffer, format="PNG")
-        encoded = base64.b64encode(buffer.getvalue()).decode("ascii")
-        return f"data:image/png;base64,{encoded}"
 
     @classmethod
     def parse_pdf_document(
@@ -117,7 +130,7 @@ class MistralVisionParserService:
                 ],
                 "response_format": {"type": "json_object"},
                 "temperature": 0.1,
-                "max_tokens": 16384,
+                "max_tokens": cls.get_max_tokens(),
             }
             headers = {
                 "Authorization": f"Bearer {api_key}",

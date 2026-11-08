@@ -272,11 +272,12 @@ async def import_questions(
             {"question_number": err.question_number, "message": err.message}
             for err in parse_result.errors
         ]
+        first_msgs = " | ".join(err["message"] for err in err_details[:3])
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
             detail={
                 "code": "ERR-EXE-IMPORT_INVALID_QUESTION",
-                "message": "Import failed due to validation errors.",
+                "message": f"Import failed due to validation errors. {first_msgs}",
                 "errors": err_details
             }
         )

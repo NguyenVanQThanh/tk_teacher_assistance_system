@@ -430,6 +430,32 @@ class ImportParserService:
             all_questions.extend(section_result.questions)
             all_errors.extend(section_result.errors)
 
+        if not all_questions and any(sec["pages"] is not None for sec in sections):
+            # Last resort: splitting into sections can break parsing (e.g. a header was
+            # mis-detected) - retry the whole file as a single document, AI providers first.
+            logger.warning("No questions from per-exam sections; retrying the whole file as one document.")
+            for provider_name, provider in cls.get_ai_vision_providers():
+                try:
+                    ai_result = provider.parse_pdf_document(file_bytes, test_code=test_code)
+                    if ai_result.questions:
+                        merged = cls.merge_ai_result_with_answer_key(
+                            ai_result, answer_file_bytes, answer_filename, test_code
+                        )
+                        whole = merged if merged is not None else ai_result
+                        all_questions.extend(whole.questions)
+                        all_errors.extend(whole.errors)
+                        break
+                except Exception as e:
+                    logger.warning(f"{provider_name} whole-file OCR error: {e}")
+            if not all_questions:
+                whole_local = cls._parse_local_document(
+                    file_bytes, filename, pages=None,
+                    answer_file_bytes=answer_file_bytes,
+                    answer_filename=answer_filename, test_code=test_code,
+                )
+                all_questions.extend(whole_local.questions)
+                all_errors.extend(whole_local.errors)
+
         if not all_questions:
             errs = all_errors or [ParseError(question_number=None, message="No valid questions could be identified in the file.")]
             return ParseResult(questions=[], errors=errs)
