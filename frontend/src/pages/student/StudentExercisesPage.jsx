@@ -38,6 +38,8 @@ import {
   ArrowRight, 
   RotateCcw,
   Loader2,
+  Flag,
+  AlertTriangle,
   Search
 } from 'lucide-react';
 import { classesApi, assignmentsApi, attemptsApi, subjectsApi, exercisesApi } from '../../services/api';
@@ -651,6 +653,12 @@ export default function StudentExercisesPage() {
   const [generationStep, setGenerationStep] = useState(0);
   const [generatedExerciseId, setGeneratedExerciseId] = useState(null);
   const [generatedAiResult, setGeneratedAiResult] = useState(null);
+  const [aiResultSummary, setAiResultSummary] = useState(null);
+  const [reportTarget, setReportTarget] = useState(null);
+  const [reportReason, setReportReason] = useState('');
+  const [isReporting, setIsReporting] = useState(false);
+  const [reportError, setReportError] = useState('');
+  const [notifyDialog, setNotifyDialog] = useState(null); // { title, message }
 
   // Form Configuration for AI Exercise
   const [aiSubject, setAiSubject] = useState('Hóa học');
@@ -682,18 +690,30 @@ export default function StudentExercisesPage() {
     { label: 'Grammar: Cleft Sentences (Tiếng Anh)', subject: 'Tiếng Anh', prompt: 'Advanced English Grammar: Cleft Sentences, Inversion, and Conditional Sentences' }
   ];
 
-  // Increment / Decrement handlers for difficulty counts
+  // Increment / Decrement / nhập tay số câu cho từng cấp độ; mỗi ô tối đa 15 và tổng mỗi phần không quá 15
+  const MAX_QUESTIONS_PER_PART = 15;
+  const clampLevel = (levels, key, value) => {
+    const num = Math.max(0, Math.min(MAX_QUESTIONS_PER_PART, parseInt(value, 10) || 0));
+    const others = Object.keys(levels).filter(k => k !== key).reduce((s, k) => s + levels[k], 0);
+    return Math.min(num, MAX_QUESTIONS_PER_PART - others);
+  };
   const handleLevelChange = (setter, key, delta) => {
     setter(prev => ({
       ...prev,
-      [key]: Math.max(0, prev[key] + delta)
+      [key]: clampLevel(prev, key, prev[key] + delta)
+    }));
+  };
+  const handleLevelInput = (setter, key, raw) => {
+    setter(prev => ({
+      ...prev,
+      [key]: clampLevel(prev, key, raw)
     }));
   };
 
   // Submit AI Generation Handler (Persisted to Database)
   const handleGenerateAiExercise = async () => {
     if (totalAiQuestions === 0) {
-      alert('Vui lòng chọn số lượng câu hỏi lớn hơn 0.');
+      setNotifyDialog({ title: 'Chưa chọn số câu hỏi', message: 'Vui lòng chọn số lượng câu hỏi lớn hơn 0.' });
       return;
     }
 
@@ -716,10 +736,31 @@ export default function StudentExercisesPage() {
         part1_count: part1Total,
         part2_count: part2Total,
         part3_count: part3Total,
+        part1_levels: { know: part1Levels.know, comp: part1Levels.comp, app: part1Levels.app },
+        part2_levels: { know: part2Levels.know, comp: part2Levels.comp, app: part2Levels.app },
+        part3_levels: { know: part3Levels.know, comp: part3Levels.comp, app: part3Levels.app },
         duration_minutes: aiDuration
       };
 
       const result = await exercisesApi.generateAiExercise(payload);
+
+      // Lấy số liệu thực tế từ CSDL (tổng số câu, phân bố cấp độ) thay vì số đã yêu cầu ở form
+      let summary = null;
+      try {
+        const detail = await exercisesApi.getExerciseDetail(result.exercise_id);
+        const qs = detail?.questions || [];
+        const s = { total: qs.length, know: 0, comp: 0, app: 0 };
+        qs.forEach(q => {
+          const d = String(q.difficulty || '').toLowerCase();
+          if (d.includes('nhanbiet')) s.know += 1;
+          else if (d.includes('thonghieu')) s.comp += 1;
+          else s.app += 1;
+        });
+        summary = s;
+      } catch (e) {
+        console.warn('Could not load generated exercise summary', e);
+      }
+      setAiResultSummary(summary);
 
       clearTimeout(step2Timer);
       clearTimeout(step3Timer);
@@ -765,9 +806,33 @@ export default function StudentExercisesPage() {
       clearTimeout(step3Timer);
       console.error('Failed to generate AI exercise in DB:', err);
       const errMsg = err.response?.data?.detail?.message || err.message || 'Có lỗi khi tạo bài tập trên máy chủ. Vui lòng thử lại.';
-      alert(errMsg);
+      setNotifyDialog({ title: 'Không thể tạo bài tập', message: errMsg });
       setIsGenerating(false);
       setGenerationStep(0);
+    }
+  };
+
+  // Báo lỗi bài tập (AI tạo sinh) gửi admin qua popup dialog
+  const openReportDialog = (item) => {
+    setReportTarget(item);
+    setReportReason('');
+    setReportError('');
+  };
+
+  const submitReport = async () => {
+    if (!reportTarget || !reportReason.trim() || isReporting) return;
+    setIsReporting(true);
+    setReportError('');
+    try {
+      const exerciseId = reportTarget.exercise_id || reportTarget.id;
+      await exercisesApi.reportExercise(exerciseId, { reason: reportReason.trim() });
+      setReportTarget(null);
+      setReportReason('');
+      alert('Đã gửi báo cáo tới admin. Cảm ơn bạn!');
+    } catch (err) {
+      setReportError(err.response?.data?.detail?.message || err.message || 'Gửi báo cáo thất bại. Vui lòng thử lại.');
+    } finally {
+      setIsReporting(false);
     }
   };
 
@@ -777,6 +842,7 @@ export default function StudentExercisesPage() {
     setGenerationStep(0);
     setGeneratedExerciseId(null);
     setGeneratedAiResult(null);
+    setAiResultSummary(null);
     clearSessionCache();
     setLocalAiExercisesTrigger(prev => prev + 1);
   };
@@ -1068,9 +1134,25 @@ export default function StudentExercisesPage() {
                       {displayCategoryLabel}
                     </span>
                   </div>
-                  <span className={`card-status-pill ${currentStatus}`}>
-                    {currentStatusLabel}
-                  </span>
+                  <div className="card-top-right-group">
+                    <span className={`card-status-pill ${currentStatus}`}>
+                      {currentStatusLabel}
+                    </span>
+                    {(item.isAiGenerated || item.category === 'ai_generated') && (
+                      <button
+                        type="button"
+                        className="btn-report-exercise"
+                        title="Báo lỗi bài tập cho admin"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          openReportDialog(item);
+                        }}
+                      >
+                        <Flag size={14} />
+                        <span>Báo lỗi</span>
+                      </button>
+                    )}
+                  </div>
                 </div>
 
                 <div className="card-body-content">
@@ -1195,6 +1277,122 @@ export default function StudentExercisesPage() {
       </div>
 
       {/* ============================================================ */}
+      {/* NOTIFY DIALOG (thông báo chung, ví dụ giới hạn bài tập AI) */}
+      {/* ============================================================ */}
+      {notifyDialog && (
+        <div className="ai-modal-backdrop notify-backdrop" onClick={() => setNotifyDialog(null)}>
+          <div className="ai-generator-modal-card notify-dialog-card" onClick={(e) => e.stopPropagation()}>
+            <div className="ai-modal-header">
+              <div className="ai-modal-header-left">
+                <div className="ai-modal-icon-badge notify-icon-badge">
+                  <AlertTriangle size={22} />
+                </div>
+                <div>
+                  <h2 className="ai-modal-title">{notifyDialog.title}</h2>
+                </div>
+              </div>
+              <button
+                type="button"
+                className="ai-modal-close-btn"
+                onClick={() => setNotifyDialog(null)}
+                title="Đóng"
+              >
+                <X size={20} />
+              </button>
+            </div>
+
+            <div className="report-dialog-body">
+              <p className="notify-dialog-message">{notifyDialog.message}</p>
+            </div>
+
+            <div className="report-actions-row">
+              <button
+                type="button"
+                className="btn-modal-start-generated"
+                onClick={() => setNotifyDialog(null)}
+                autoFocus
+              >
+                Đã hiểu
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ============================================================ */}
+      {/* REPORT EXERCISE DIALOG (báo lỗi bài tập cho admin) */}
+      {/* ============================================================ */}
+      {reportTarget && (
+        <div className="ai-modal-backdrop" onClick={() => { if (!isReporting) setReportTarget(null); }}>
+          <div className="ai-generator-modal-card report-dialog-card" onClick={(e) => e.stopPropagation()}>
+            <div className="ai-modal-header">
+              <div className="ai-modal-header-left">
+                <div className="ai-modal-icon-badge report-icon-badge">
+                  <Flag size={22} />
+                </div>
+                <div>
+                  <h2 className="ai-modal-title">Báo lỗi bài tập</h2>
+                  <p className="ai-modal-subtitle">Gửi báo cáo tới admin về bài tập "{reportTarget.title}"</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                className="ai-modal-close-btn"
+                onClick={() => { if (!isReporting) setReportTarget(null); }}
+                title="Đóng"
+              >
+                <X size={20} />
+              </button>
+            </div>
+
+            <div className="report-dialog-body">
+              <label className="report-field-label">Mô tả lỗi gặp phải:</label>
+              <textarea
+                className="report-reason-textarea"
+                rows={5}
+                placeholder="Ví dụ: câu 4 và câu 9 trùng nhau, đáp án câu 12 không đúng theo SGK, công thức hiển thị lỗi..."
+                value={reportReason}
+                onChange={(e) => setReportReason(e.target.value)}
+                autoFocus
+              />
+              <div className="report-quick-reasons">
+                {['Nội dung sai theo SGK', 'Câu hỏi trùng lặp', 'Lỗi hiển thị', 'Đáp án không rõ ràng', 'Khác'].map((r) => (
+                  <button
+                    key={r}
+                    type="button"
+                    className="report-quick-chip"
+                    onClick={() => setReportReason((prev) => (prev ? `${prev}\n- ${r}` : `- ${r}`))}
+                  >
+                    {r}
+                  </button>
+                ))}
+              </div>
+              {reportError && <p className="report-error-text">{reportError}</p>}
+            </div>
+
+            <div className="report-actions-row">
+              <button
+                type="button"
+                className="btn-modal-cancel"
+                onClick={() => setReportTarget(null)}
+                disabled={isReporting}
+              >
+                Hủy
+              </button>
+              <button
+                type="button"
+                className="btn-modal-start-generated"
+                disabled={!reportReason.trim() || isReporting}
+                onClick={submitReport}
+              >
+                {isReporting ? 'Đang gửi...' : 'Gửi báo cáo'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ============================================================ */}
       {/* AI EXERCISE GENERATION MODAL */}
       {/* ============================================================ */}
       {isAiModalOpen && (
@@ -1232,13 +1430,13 @@ export default function StudentExercisesPage() {
                 </div>
                 <h3 className="ai-success-title">Khởi tạo bài tập AI thành công!</h3>
                 <p className="ai-success-desc">
-                  Bài tập <strong>"{aiSubject} – {aiTopicPrompt.slice(0, 45)}"</strong> gồm <strong>{totalAiQuestions} câu hỏi</strong> đã được tạo xong và thêm vào Kho bài tập của bạn.
+                  Bài tập <strong>"{aiSubject} – {aiTopicPrompt.slice(0, 45)}"</strong> gồm <strong>{aiResultSummary?.total ?? totalAiQuestions} câu hỏi</strong> đã được tạo xong và thêm vào Kho bài tập của bạn.
                 </p>
 
                 <div className="ai-success-matrix-pill-row">
-                  <span className="pill-item fill-know">Nhận biết: <strong>{totalKnow} câu</strong></span>
-                  <span className="pill-item fill-comp">Thông hiểu: <strong>{totalComp} câu</strong></span>
-                  <span className="pill-item fill-app">Vận dụng: <strong>{totalApp} câu</strong></span>
+                  <span className="pill-item fill-know">Nhận biết: <strong>{aiResultSummary ? aiResultSummary.know : totalKnow} câu</strong></span>
+                  <span className="pill-item fill-comp">Thông hiểu: <strong>{aiResultSummary ? aiResultSummary.comp : totalComp} câu</strong></span>
+                  <span className="pill-item fill-app">Vận dụng: <strong>{aiResultSummary ? aiResultSummary.app : totalApp} câu</strong></span>
                   <span className="pill-item fill-time">Thời gian: <strong>{aiDuration} phút</strong></span>
                 </div>
 
@@ -1436,7 +1634,14 @@ export default function StudentExercisesPage() {
                             >
                               <Minus size={13} />
                             </button>
-                            <span className="counter-num-display">{part1Levels.know}</span>
+                            <input
+                              type="number"
+                              className="counter-num-input"
+                              min={0}
+                              max={MAX_QUESTIONS_PER_PART}
+                              value={part1Levels.know}
+                              onChange={(e) => handleLevelInput(part1Levels, 'know', e.target.value)}
+                            />
                             <button 
                               type="button" 
                               className="btn-counter-ctrl"
@@ -1460,7 +1665,14 @@ export default function StudentExercisesPage() {
                             >
                               <Minus size={13} />
                             </button>
-                            <span className="counter-num-display">{part1Levels.comp}</span>
+                            <input
+                              type="number"
+                              className="counter-num-input"
+                              min={0}
+                              max={MAX_QUESTIONS_PER_PART}
+                              value={part1Levels.comp}
+                              onChange={(e) => handleLevelInput(part1Levels, 'comp', e.target.value)}
+                            />
                             <button 
                               type="button" 
                               className="btn-counter-ctrl"
@@ -1484,7 +1696,14 @@ export default function StudentExercisesPage() {
                             >
                               <Minus size={13} />
                             </button>
-                            <span className="counter-num-display">{part1Levels.app}</span>
+                            <input
+                              type="number"
+                              className="counter-num-input"
+                              min={0}
+                              max={MAX_QUESTIONS_PER_PART}
+                              value={part1Levels.app}
+                              onChange={(e) => handleLevelInput(part1Levels, 'app', e.target.value)}
+                            />
                             <button 
                               type="button" 
                               className="btn-counter-ctrl"
@@ -1524,7 +1743,14 @@ export default function StudentExercisesPage() {
                             >
                               <Minus size={13} />
                             </button>
-                            <span className="counter-num-display">{part2Levels.know}</span>
+                            <input
+                              type="number"
+                              className="counter-num-input"
+                              min={0}
+                              max={MAX_QUESTIONS_PER_PART}
+                              value={part2Levels.know}
+                              onChange={(e) => handleLevelInput(part2Levels, 'know', e.target.value)}
+                            />
                             <button 
                               type="button" 
                               className="btn-counter-ctrl"
@@ -1548,7 +1774,14 @@ export default function StudentExercisesPage() {
                             >
                               <Minus size={13} />
                             </button>
-                            <span className="counter-num-display">{part2Levels.comp}</span>
+                            <input
+                              type="number"
+                              className="counter-num-input"
+                              min={0}
+                              max={MAX_QUESTIONS_PER_PART}
+                              value={part2Levels.comp}
+                              onChange={(e) => handleLevelInput(part2Levels, 'comp', e.target.value)}
+                            />
                             <button 
                               type="button" 
                               className="btn-counter-ctrl"
@@ -1572,7 +1805,14 @@ export default function StudentExercisesPage() {
                             >
                               <Minus size={13} />
                             </button>
-                            <span className="counter-num-display">{part2Levels.app}</span>
+                            <input
+                              type="number"
+                              className="counter-num-input"
+                              min={0}
+                              max={MAX_QUESTIONS_PER_PART}
+                              value={part2Levels.app}
+                              onChange={(e) => handleLevelInput(part2Levels, 'app', e.target.value)}
+                            />
                             <button 
                               type="button" 
                               className="btn-counter-ctrl"
@@ -1612,7 +1852,14 @@ export default function StudentExercisesPage() {
                             >
                               <Minus size={13} />
                             </button>
-                            <span className="counter-num-display">{part3Levels.know}</span>
+                            <input
+                              type="number"
+                              className="counter-num-input"
+                              min={0}
+                              max={MAX_QUESTIONS_PER_PART}
+                              value={part3Levels.know}
+                              onChange={(e) => handleLevelInput(part3Levels, 'know', e.target.value)}
+                            />
                             <button 
                               type="button" 
                               className="btn-counter-ctrl"
@@ -1636,7 +1883,14 @@ export default function StudentExercisesPage() {
                             >
                               <Minus size={13} />
                             </button>
-                            <span className="counter-num-display">{part3Levels.comp}</span>
+                            <input
+                              type="number"
+                              className="counter-num-input"
+                              min={0}
+                              max={MAX_QUESTIONS_PER_PART}
+                              value={part3Levels.comp}
+                              onChange={(e) => handleLevelInput(part3Levels, 'comp', e.target.value)}
+                            />
                             <button 
                               type="button" 
                               className="btn-counter-ctrl"
@@ -1660,7 +1914,14 @@ export default function StudentExercisesPage() {
                             >
                               <Minus size={13} />
                             </button>
-                            <span className="counter-num-display">{part3Levels.app}</span>
+                            <input
+                              type="number"
+                              className="counter-num-input"
+                              min={0}
+                              max={MAX_QUESTIONS_PER_PART}
+                              value={part3Levels.app}
+                              onChange={(e) => handleLevelInput(part3Levels, 'app', e.target.value)}
+                            />
                             <button 
                               type="button" 
                               className="btn-counter-ctrl"

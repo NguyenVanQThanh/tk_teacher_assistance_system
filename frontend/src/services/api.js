@@ -141,6 +141,10 @@ export const exercisesApi = {
     const response = await api.post('/api/v1/exercises/ai-generate', data);
     return response.data;
   },
+  reportExercise: async (exerciseId, data) => {
+    const response = await api.post(`/api/v1/exercises/${exerciseId}/report`, data);
+    return response.data;
+  },
 };
 
 export const questionsApi = {

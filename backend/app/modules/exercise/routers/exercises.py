@@ -17,7 +17,7 @@ from app.modules.exercise.schemas import (
     ExerciseCreate, ExerciseUpdate, ExerciseOut,
     PaginatedExerciseOut, CursorPaginatedExerciseOut,
     QuestionCreate, QuestionOut, AnswerOptionCreate,
-    AiExerciseGenerateRequest, AiExerciseGenerateOut
+    AiExerciseGenerateRequest, AiExerciseGenerateOut, ExerciseReportRequest, ExerciseReportOut
 )
 from app.modules.exercise.services.exercise_service import ExerciseService
 from app.modules.exercise.services.question_service import QuestionService
@@ -88,6 +88,24 @@ def generate_ai_exercise(
     and persist Exercise, Question, AnswerOption, and ClassAssignment records into PostgreSQL.
     """
     return service.generate_ai_exercise(current_user, payload)
+
+
+@router.post(
+    "/{exercise_id}/report",
+    response_model=ExerciseReportOut,
+    status_code=status.HTTP_201_CREATED,
+    dependencies=[Depends(require_any_perm("EXE_ATTEMPT_SUBMIT", "EXE_EXERCISE_VIEW"))]
+)
+def report_exercise(
+    exercise_id: UUID,
+    payload: ExerciseReportRequest,
+    service: ExerciseService = Depends(get_exercise_service),
+    current_user: User = Depends(get_current_user)
+):
+    """
+    Học sinh báo cáo lỗi bài tập (ví dụ bài tập tạo sinh AI) gửi tới admin.
+    """
+    return service.report_exercise(current_user, exercise_id, payload)
 
 
 @router.get(

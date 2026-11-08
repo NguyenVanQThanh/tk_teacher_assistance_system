@@ -20,14 +20,32 @@ class GradingService:
         self.db = db
         self.exercise_repo = ExerciseRepository(db)
 
+    @staticmethod
+    def _norm_answer_text(s: Any) -> str:
+        return str(s).strip().replace(',', '.').lower()
+
+    @classmethod
+    def _answers_match(cls, student: Any, correct: Any) -> bool:
+        """So khớp câu trả lời ngắn: chuẩn hóa dấu phẩy/thập phân, không phân biệt hoa thường;
+        nếu là số thì so sánh theo giá trị (2 == 2.0)."""
+        ns = cls._norm_answer_text(student)
+        nc = cls._norm_answer_text(correct)
+        if ns == nc:
+            return True
+        try:
+            return abs(float(ns) - float(nc)) < 1e-9
+        except (ValueError, TypeError):
+            return False
+
     def grade_attempt(
         self,
         exercise_id: UUID,
         answers: List[AnswerInput]
     ) -> Tuple[Optional[float], Dict[str, Any]]:
         """
-        Grades an attempt submission. Evaluates MultipleChoice questions automatically
-        and marks ShortAnswer questions as pending manual grading.
+        Grades an attempt submission. Tự động chấm cả 3 loại câu (MultipleChoice, TrueFalse, ShortAnswer);
+        điểm chia đều trên tổng số câu hỏi (thang 10). ShortAnswer chỉ "pending_manual_grade" khi đề không có
+        correct_answer để so sánh.
 
         Returns (score, detailed_results_dict).
         """
@@ -44,10 +62,9 @@ class GradingService:
             [q for q in exercise.questions if getattr(q, 'status', None) != 'DELETED'],
             key=get_display_order
         )
-        mc_questions = [q for q in active_questions if q.question_type == 'MultipleChoice']
-
-        total_mc_count = len(mc_questions)
-        points_per_mc = (10.0 / total_mc_count) if total_mc_count > 0 else 0.0
+        # Điểm chia đều cho TẤT CẢ câu hỏi (Trắc nghiệm + Đúng/Sai + Trả lời ngắn), tổng thang điểm 10
+        total_questions = len(active_questions)
+        points_per_question = (10.0 / total_questions) if total_questions > 0 else 0.0
 
         earned_points = 0.0
         question_results = []
@@ -69,7 +86,7 @@ class GradingService:
                     )
                     if matched_opt and matched_opt.is_correct:
                         is_correct = True
-                        earned_points += points_per_mc
+                        earned_points += points_per_question
 
                 question_results.append({
                     "question_id": str(q.question_id),
@@ -89,23 +106,37 @@ class GradingService:
                             k, v = part.split(':', 1)
                             sub_answers[k.strip().lower()] = (v.strip().lower() == 'true')
 
-                tf_correct_count = 0
-                tf_total_count = len(q.answer_options) if q.answer_options else 0
-                sub_results = {}
+                # Danh sách ý Đúng/Sai: ưu tiên answer_options, nếu không có thì lấy từ segments (key/is_correct)
+                tf_items = []
                 if q.answer_options:
                     for idx, opt in enumerate(q.answer_options):
                         opt_label = chr(ord('a') + idx)
+                        content_lower = (opt.content or '').strip().lower()
                         for key in ['a', 'b', 'c', 'd']:
-                            if opt.content.strip().lower().startswith(key):
+                            if content_lower.startswith(key):
                                 opt_label = key
                                 break
-                        user_val = sub_answers.get(opt_label)
-                        is_sub_correct = (user_val == opt.is_correct) if user_val is not None else False
-                        sub_results[opt_label] = is_sub_correct
-                        if is_sub_correct:
-                            tf_correct_count += 1
+                        tf_items.append((opt_label, bool(opt.is_correct)))
+                else:
+                    segments = getattr(q, 'segments', None) or []
+                    for idx, seg in enumerate(segments):
+                        if isinstance(seg, dict):
+                            key = str(seg.get('key') or chr(ord('a') + idx)).lower()
+                            tf_items.append((key, bool(seg.get('is_correct'))))
+
+                tf_correct_count = 0
+                tf_total_count = len(tf_items)
+                sub_results = {}
+                for opt_label, opt_correct in tf_items:
+                    user_val = sub_answers.get(opt_label)
+                    is_sub_correct = (user_val == opt_correct) if user_val is not None else False
+                    sub_results[opt_label] = is_sub_correct
+                    if is_sub_correct:
+                        tf_correct_count += 1
 
                 all_correct = (tf_correct_count == tf_total_count) if tf_total_count > 0 else False
+                if all_correct:
+                    earned_points += points_per_question
                 question_results.append({
                     "question_id": str(q.question_id),
                     "question_type": "TrueFalse",
@@ -117,23 +148,33 @@ class GradingService:
 
             elif q.question_type == 'ShortAnswer':
                 student_text = ans.answer_text if ans else None
-                is_correct = None
                 correct_ans = getattr(q, 'correct_answer', None)
-                if student_text and isinstance(correct_ans, str) and correct_ans.strip():
-                    norm_student = str(student_text).strip().replace(',', '.')
-                    norm_correct = correct_ans.strip().replace(',', '.')
-                    if norm_student.lower() == norm_correct.lower():
+                correct_ans = correct_ans if isinstance(correct_ans, str) and correct_ans.strip() else None
+
+                is_correct = None
+                pending = False
+                if student_text and student_text.strip() and correct_ans:
+                    if GradingService._answers_match(student_text, correct_ans):
                         is_correct = True
+                        earned_points += points_per_question
+                    else:
+                        is_correct = False
+                elif correct_ans:
+                    # học sinh chưa trả lời -> sai; vẫn chấm được tự động
+                    is_correct = False
+                else:
+                    # đề không có đáp án chuẩn -> cần chấm tay
+                    pending = True
 
                 question_results.append({
                     "question_id": str(q.question_id),
                     "question_type": "ShortAnswer",
                     "student_answer_text": student_text,
                     "is_correct": is_correct,
-                    "pending_manual_grade": True
+                    "pending_manual_grade": pending
                 })
         has_pending = any(qr.get("pending_manual_grade") for qr in question_results)
-        final_score = round(earned_points, 2) if (total_mc_count > 0 or not has_pending) else None
+        final_score = round(earned_points, 2)
 
         detailed_results = {
             "questions": question_results

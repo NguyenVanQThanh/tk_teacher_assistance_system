@@ -12,8 +12,8 @@ from datetime import datetime, timezone, timedelta
 from fastapi import HTTPException, status
 from sqlalchemy.orm import Session
 
-from models.models import User, Subject, TeacherSubject, Exercise, Question, AnswerOption, ClassAssignment, StudentClass, Class
-from app.modules.exercise.schemas import ExerciseCreate, ExerciseUpdate, AiExerciseGenerateRequest, AiExerciseGenerateOut
+from models.models import User, Subject, TeacherSubject, Exercise, Question, AnswerOption, ClassAssignment, StudentClass, Class, Document, AuditLog, StudentExerciseAttempt
+from app.modules.exercise.schemas import ExerciseCreate, ExerciseUpdate, AiExerciseGenerateRequest, AiExerciseGenerateOut, ExerciseReportRequest, ExerciseReportOut
 from app.modules.exercise.repository import ExerciseRepository
 from app.modules.academic.scoping import get_user_role_name
 from app.modules.exercise.services.ai_generator_service import AiExerciseGeneratorService
@@ -190,11 +190,123 @@ class ExerciseService:
 
         return self.repo.restore(exercise)
 
+    def _build_sgk_context(self, subject: Subject, topic_prompt: Optional[str], grade_name: Optional[str]) -> str:
+        """Lấy trích đoạn nội dung SGK/tài liệu liên quan theo môn học làm ngữ cảnh cho AI sinh câu hỏi bám SGK."""
+        try:
+            query = self.db.query(Document).filter(
+                Document.subject_id == subject.subject_id,
+                Document.status != 'DELETED',
+                Document.raw_content.isnot(None)
+            )
+            docs = query.order_by(Document.created_at.desc()).limit(10).all()
+            # Ưu tiên tài liệu có tiêu đề khớp với từ khóa chủ đề
+            words = [w for w in (topic_prompt or '').split() if len(w) >= 4]
+            if words:
+                kw = words[0].lower()
+                matched = [d for d in docs if kw in (d.title or '').lower()]
+                rest = [d for d in docs if d not in matched]
+                docs = (matched + rest)[:3]
+            else:
+                docs = docs[:3]
+            chunks = []
+            for d in docs:
+                text = (d.raw_content or '').strip()
+                if text:
+                    chunks.append(f"--- {d.title} ---\n{text[:4000]}")
+            return "\n\n".join(chunks)
+        except Exception:
+            return ""
+
+    # Số bài tập AI tối đa được tồn tại cùng lúc ở trạng thái CHƯA hoàn thành mỗi học sinh
+    MAX_UNFINISHED_AI_EXERCISES = 3
+
+    def _enforce_ai_exercise_limits(self, current_user: User) -> None:
+        """Khống chế tài nguyên AI theo cửa sổ trượt: mỗi lần học sinh chỉ được tạo tối đa 3 bài tập AI,
+        và muốn tạo tiếp thì số bài tập AI CHƯA hoàn thành phải nhỏ hơn 3 (phải làm trọn vẹn + nộp bài đã tạo).
+        Khi học sinh cố tạo quá 3 bài chưa hoàn thành thì notify (audit log) cho admin kèm nội dung quy định."""
+        ai_assignments = [
+            a for a in self.db.query(ClassAssignment).filter(
+                ClassAssignment.assigned_by == current_user.user_id,
+                ClassAssignment.status != 'DELETED'
+            ).all()
+            if a.exercise_id and (getattr(a.exercise, "ai_metadata", None) or {}).get("is_ai_generated")
+        ]
+        if ai_assignments:
+            finished = self.db.query(StudentExerciseAttempt).filter(
+                StudentExerciseAttempt.assignment_id.in_([a.assignment_id for a in ai_assignments]),
+                StudentExerciseAttempt.student_id == current_user.user_id,
+                StudentExerciseAttempt.is_finished.is_(True),
+                StudentExerciseAttempt.status != 'DELETED'
+            ).all()
+        else:
+            finished = []
+        finished_ids = {a.assignment_id for a in finished}
+        unfinished_count = sum(1 for a in ai_assignments if a.assignment_id not in finished_ids)
+
+        if unfinished_count >= self.MAX_UNFINISHED_AI_EXERCISES:
+            rule_text = (
+                f"Mỗi lần chỉ được tạo tối đa {self.MAX_UNFINISHED_AI_EXERCISES} bài tập tạo sinh AI; "
+                "sau khi hoàn thành (làm trọn vẹn và nộp) bài tập thì mới được tiếp tục tạo sinh bài tập mới."
+            )
+            # Notify admin qua audit log (hiển thị trên dashboard admin)
+            self.db.add(AuditLog(
+                title=f"Cảnh báo: học sinh đang có {unfinished_count} bài tập AI chưa hoàn thành",
+                description=(
+                    f"Học sinh {current_user.full_name} (ID {current_user.user_id}) đang có "
+                    f"{unfinished_count}/{self.MAX_UNFINISHED_AI_EXERCISES} bài tập tạo sinh AI chưa hoàn thành "
+                    f"và vẫn yêu cầu tạo thêm (bị từ chối). Quy định: {rule_text}"
+                ),
+                actor_name=current_user.full_name,
+                severity="warning",
+                status="ACTIVE"
+            ))
+            self.db.commit()
+            raise HTTPException(
+                status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+                detail={
+                    "code": "ERR-EXE-AI_UNFINISHED_LIMIT",
+                    "message": (
+                        f"Mỗi lần bạn chỉ được tạo tối đa {self.MAX_UNFINISHED_AI_EXERCISES} bài tập tạo sinh AI "
+                        f"(hiện đang có {unfinished_count}/{self.MAX_UNFINISHED_AI_EXERCISES} bài chưa hoàn thành). "
+                        "Sau khi hoàn thành (làm trọn vẹn và nộp) bài tập thì bạn mới được tiếp tục tạo sinh bài tập mới."
+                    )
+                }
+            )
+
+    def report_exercise(self, current_user: User, exercise_id: UUID, payload: ExerciseReportRequest) -> ExerciseReportOut:
+        """Học sinh báo cáo lỗi bài tập (đặc biệt bài AI tạo sinh) gửi tới admin qua audit log."""
+        exercise = self.db.query(Exercise).filter(
+            Exercise.exercise_id == exercise_id,
+            Exercise.status != 'DELETED'
+        ).first()
+        if not exercise:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail={"code": "ERR-EXE-EXERCISE_NOT_FOUND", "message": "Exercise not found."}
+            )
+        is_ai = bool((exercise.ai_metadata or {}).get("is_ai_generated"))
+        self.db.add(AuditLog(
+            title=f"Báo cáo lỗi bài tập{' (AI tạo sinh)' if is_ai else ''}: {exercise.title}",
+            description=(
+                f"Học sinh {current_user.full_name} (ID {current_user.user_id}) báo lỗi bài tập "
+                f'Bài tập "{exercise.title}" (ID {exercise_id}, AI tạo sinh: {is_ai}). '
+                f"Lý do: {payload.reason.strip()}"
+            ),
+            actor_name=current_user.full_name,
+            severity="danger",
+            status="ACTIVE"
+        ))
+        self.db.commit()
+        return ExerciseReportOut(reported=True, message="Đã gửi báo cáo tới admin. Cảm ơn bạn!")
+
     def generate_ai_exercise(self, current_user: User, payload: AiExerciseGenerateRequest) -> AiExerciseGenerateOut:
         """
         Generates realistic exam questions (Part 1, 2, 3), creates real Exercise,
         Question, AnswerOption, and ClassAssignment records, persisting them into PostgreSQL.
         """
+        # 0. Khống chế tài nguyên AI (tối đa 3 bài, phải nộp bài hiện tại trước)
+        self._enforce_ai_exercise_limits(current_user)
+
         # 1. Resolve Subject
         subject = None
         if payload.subject_name:
@@ -208,6 +320,9 @@ class ExerciseService:
             subject = Subject(subject_name=payload.subject_name or "Toán học", status="ACTIVE")
             self.db.add(subject)
             self.db.flush()
+
+        # 1b. Ngữ cảnh SGK/tài liệu của giáo viên để câu hỏi bám sát nội dung SGK
+        doc_context = self._build_sgk_context(subject, payload.topic_prompt, payload.grade_name)
 
         # 2. Resolve Class
         class_obj = None
@@ -261,7 +376,11 @@ class ExerciseService:
             topic_prompt=payload.topic_prompt,
             part1_count=payload.part1_count,
             part2_count=payload.part2_count,
-            part3_count=payload.part3_count
+            part3_count=payload.part3_count,
+            document_context=doc_context,
+            part1_levels=payload.part1_levels,
+            part2_levels=payload.part2_levels,
+            part3_levels=payload.part3_levels
         )
 
         total_questions = len(raw_questions)

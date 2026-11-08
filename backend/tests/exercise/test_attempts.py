@@ -188,8 +188,8 @@ class TestStudentSubmissionModule:
         attempt_result = submit_resp.json()
 
         assert attempt_result["is_finished"] is True
-        # Score calculation: 2 MC questions = 5.0 points per question. 1 correct -> 5.0 score.
-        assert attempt_result["score"] == 5.0
+        # Điểm chia đều cho cả 3 câu (2 MC + 1 SA): mỗi câu 10/3. 1 MC đúng -> 3.33 điểm.
+        assert attempt_result["score"] == 3.33
         assert attempt_result["total_time_seconds"] is not None
 
         detailed = attempt_result["detailed_results"]["questions"]
@@ -202,7 +202,9 @@ class TestStudentSubmissionModule:
         assert q2_res["is_correct"] is False
 
         q3_res = next(r for r in detailed if r["question_id"] == q3_id)
-        assert q3_res["pending_manual_grade"] is True
+        # Trả lời ngắn nay chấm tự động: có đáp án chuẩn mà trả lời khác -> sai, không pending
+        assert q3_res["is_correct"] is False
+        assert q3_res["pending_manual_grade"] is False
 
         # Try submitting again -> 409 Conflict
         resubmit_resp = client.put(

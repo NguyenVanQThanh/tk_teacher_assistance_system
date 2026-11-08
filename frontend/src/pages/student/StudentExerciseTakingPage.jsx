@@ -173,9 +173,15 @@ export default function StudentExerciseTakingPage() {
             const openAttempt = matchingAttempts.find(a => !a.is_finished);
             const finishedAttempt = matchingAttempts.find(a => a.is_finished);
             
-            const isExamExercise = Boolean(
+            const isAiGeneratedExercise = Boolean(
+              backendExercise?.ai_metadata?.is_ai_generated ||
+              (Array.isArray(sortedQ) && sortedQ.some(q => q.is_ai_generated))
+            );
+            const isExamExercise = !isAiGeneratedExercise && Boolean(
               backendExercise?.category === 'exam' ||
               (backendExercise?.title || '').toLowerCase().includes('đề thi') ||
+              (backendExercise?.title || '').toLowerCase().includes('bài thi') ||
+              (backendExercise?.title || '').toLowerCase().includes('bài kiểm tra') ||
               (location.state?.title || '').toLowerCase().includes('đề thi')
             );
             const isExamLocked = isExamExercise && finishedAttempt && !openAttempt;
@@ -339,19 +345,37 @@ export default function StudentExerciseTakingPage() {
       const p2 = qList.filter(q => normalizeQType(q.question_type) === 'TRUE_FALSE').length;
       const p3 = qList.filter(q => normalizeQType(q.question_type) === 'SHORT_ANSWER').length;
       const isMath = (backendExercise.title || '').toLowerCase().includes('toán');
+      // Bài tập tạo sinh AI luôn được làm lại; bài tập trên lớp của GV cũng được ôn lại;
+      // chỉ bài thi/bài kiểm tra chính thức (đề thi) mới khóa sau khi nộp.
+      const isAiGenerated = Boolean(
+        backendExercise.ai_metadata?.is_ai_generated ||
+        qList.some(q => q.is_ai_generated)
+      );
+      const titleLower = (backendExercise.title || '').toLowerCase();
+      const isFormalExam = !isAiGenerated && (
+        backendExercise.category === 'exam' ||
+        titleLower.includes('đề thi') ||
+        titleLower.includes('bài thi') ||
+        titleLower.includes('bài kiểm tra')
+      );
+      const category = isAiGenerated ? 'ai_generated' : (isFormalExam ? 'exam' : 'class_exercise');
+      const categoryLabel = isAiGenerated
+        ? 'Bài tập tạo sinh AI'
+        : (isFormalExam ? 'Bài thi chính thức' : 'Bài tập trên lớp');
       return {
         id: backendExercise.exercise_id,
         title: backendExercise.title || location.state?.title || 'Đề thi trực tuyến',
         subject: location.state?.subject || (isMath ? 'Toán học' : 'Hóa học'),
-        category: 'exam',
-        categoryLabel: 'Bài thi chính thức',
+        category,
+        categoryLabel,
         teacher: location.state?.teacher || 'Sample Teacher (Thầy Nguyễn Văn A)',
         totalQuestions: qList.length || 20,
         part1Count: p1,
         part2Count: p2,
         part3Count: p3,
-        durationMinutes: 45,
-        isExam: true,
+        durationMinutes: backendExercise.ai_metadata?.duration_minutes || 45,
+        isExam: isFormalExam,
+        isAiGenerated,
         isBackend: true
       };
     }
@@ -914,26 +938,42 @@ export default function StudentExerciseTakingPage() {
         };
       } else if (qType === 'true_false') {
         const letters = ['a', 'b', 'c', 'd'];
-        const items = (bQ.answer_options && bQ.answer_options.length > 0)
-          ? bQ.answer_options.map((opt, oIdx) => {
-              const letter = letters[oIdx] || String(oIdx + 1);
-              let text = opt.content || '';
-              text = text.replace(/^[a-dA-D][\.\)]\s*/, '').trim();
-              text = text.replace(/[\r\n\s\.]*[√✓\u221a]\s*$/, '').trim();
-              text = text.replace(/[\r\n\s\.]*\(\s*\)\s*$/, '').trim();
-              return {
-                key: letter,
-                text,
-                optionId: opt.option_id,
-                isCorrect: Boolean(opt.is_correct)
-              };
-            })
-          : [
-              { key: 'a', text: 'Mệnh đề a', isCorrect: true },
-              { key: 'b', text: 'Mệnh đề b', isCorrect: false },
-              { key: 'c', text: 'Mệnh đề c', isCorrect: true },
-              { key: 'd', text: 'Mệnh đề d', isCorrect: false }
-            ];
+        // Ưu tiên đọc các mệnh đề từ segments (key/statement/is_correct) lưu trong DB
+        const segItems = (Array.isArray(bQ.segments) ? bQ.segments : [])
+          .map((seg, sIdx) => {
+            const raw = seg?.statement ?? seg?.content ?? seg?.text ?? '';
+            let text = String(raw || '');
+            text = text.replace(/^[a-dA-D][\.\)]\s*/, '').trim();
+            text = text.replace(/[\r\n\s\.]*[√✓\u221a]\s*$/, '').trim();
+            return {
+              key: seg?.key || letters[sIdx] || String(sIdx + 1),
+              text,
+              isCorrect: Boolean(seg?.is_correct)
+            };
+          })
+          .filter(it => it.text);
+        const items = segItems.length > 0
+          ? segItems
+          : ((bQ.answer_options && bQ.answer_options.length > 0)
+            ? bQ.answer_options.map((opt, oIdx) => {
+                const letter = letters[oIdx] || String(oIdx + 1);
+                let text = opt.content || '';
+                text = text.replace(/^[a-dA-D][\.\)]\s*/, '').trim();
+                text = text.replace(/[\r\n\s\.]*[√✓\u221a]\s*$/, '').trim();
+                text = text.replace(/[\r\n\s\.]*\(\s*\)\s*$/, '').trim();
+                return {
+                  key: letter,
+                  text,
+                  optionId: opt.option_id,
+                  isCorrect: Boolean(opt.is_correct)
+                };
+              })
+            : [
+                { key: 'a', text: 'Mệnh đề a', isCorrect: true },
+                { key: 'b', text: 'Mệnh đề b', isCorrect: false },
+                { key: 'c', text: 'Mệnh đề c', isCorrect: true },
+                { key: 'd', text: 'Mệnh đề d', isCorrect: false }
+              ]);
         return {
           id: bQ.question_id,
           part: partLabel,

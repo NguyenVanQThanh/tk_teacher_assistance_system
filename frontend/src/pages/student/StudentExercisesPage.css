@@ -1936,3 +1936,159 @@ Updated By: Tam Khang
   gap: 4px;
 }
 
+
+.card-top-right-group {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.btn-report-exercise {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 10px;
+  border: 1px solid #FECACA;
+  background: #FEF2F2;
+  color: #DC2626;
+  border-radius: 999px;
+  font-size: 11.5px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.btn-report-exercise:hover {
+  background: #FEE2E2;
+}
+
+/* Report exercise dialog */
+.report-dialog-card {
+  max-width: 580px;
+  width: calc(100% - 32px);
+  border: 1px solid #E2E8F0;
+}
+
+.report-icon-badge {
+  background: #FEE2E2;
+  color: #DC2626;
+}
+
+.report-dialog-body {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 18px 26px 0;
+}
+
+.report-field-label {
+  font-size: 13px;
+  font-weight: 600;
+  color: #475569;
+}
+
+.report-reason-textarea {
+  width: 100%;
+  resize: vertical;
+  padding: 10px 12px;
+  border: 1.5px solid #E2E8F0;
+  border-radius: 10px;
+  font-size: 13.5px;
+  font-family: inherit;
+  outline: none;
+  transition: border-color 0.2s;
+}
+
+.report-reason-textarea:focus {
+  border-color: #7C3AED;
+}
+
+.report-quick-reasons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.report-quick-chip {
+  padding: 4px 10px;
+  border-radius: 999px;
+  border: 1px solid #E2E8F0;
+  background: #F8FAFC;
+  font-size: 12px;
+  color: #475569;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.report-quick-chip:hover {
+  background: #EDE9FE;
+  border-color: #C4B5FD;
+  color: #6D28D9;
+}
+
+.report-error-text {
+  margin: 0;
+  font-size: 12.5px;
+  font-weight: 500;
+  color: #DC2626;
+}
+
+.report-actions-row {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 16px;
+  padding: 14px 26px 20px;
+  border-top: 1px solid #F1F5F9;
+}
+
+.counter-num-input {
+  font-size: 13px;
+  font-weight: 800;
+  color: #0F172A;
+  min-width: 18px;
+  width: 34px;
+  text-align: center;
+  border: none;
+  background: transparent;
+  outline: none;
+  padding: 0;
+  appearance: textfield;
+  -moz-appearance: textfield;
+}
+
+.counter-num-input::-webkit-outer-spin-button,
+.counter-num-input::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+.counter-num-input:focus {
+  background-color: #F8FAFC;
+  border-radius: 6px;
+}
+
+/* Notify popup dialog */
+.notify-dialog-card {
+  max-width: 460px;
+  width: calc(100% - 32px);
+  border: 1px solid #E2E8F0;
+}
+
+.notify-icon-badge {
+  background: #FEF3C7;
+  color: #D97706;
+}
+
+.notify-dialog-message {
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.6;
+  color: #334155;
+  white-space: pre-line;
+}
+
+/* Notify dialog nổi trên cả modal tạo bài tập AI (z-index 1100) */
+.ai-modal-backdrop.notify-backdrop {
+  z-index: 1200;
+}

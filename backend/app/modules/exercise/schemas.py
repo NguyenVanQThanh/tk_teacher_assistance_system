@@ -8,7 +8,7 @@
 from enum import Enum
 from uuid import UUID
 from datetime import datetime
-from typing import Optional, List, Any
+from typing import Optional, List, Any, Dict
 from pydantic import BaseModel, Field, field_validator, model_validator
 
 
@@ -568,9 +568,13 @@ class AiExerciseGenerateRequest(BaseModel):
     subject_name: str
     grade_name: Optional[str] = "Lớp 12"
     topic_prompt: str
-    part1_count: int = 4
-    part2_count: int = 1
-    part3_count: int = 1
+    part1_count: int = Field(4, ge=0, le=15, description="Số câu Phần 1 (tối đa 15 câu)")
+    part2_count: int = Field(1, ge=0, le=15, description="Số câu Phần 2 (tối đa 15 câu)")
+    part3_count: int = Field(1, ge=0, le=15, description="Số câu Phần 3 (tối đa 15 câu)")
+    # Ma trận cấp độ nhận thức người dùng chọn cho từng phần: {"know": n, "comp": n, "app": n}
+    part1_levels: Optional[Dict[str, int]] = None
+    part2_levels: Optional[Dict[str, int]] = None
+    part3_levels: Optional[Dict[str, int]] = None
     duration_minutes: int = 45
     class_id: Optional[UUID] = None
 
@@ -588,6 +592,15 @@ class AiExerciseGenerateOut(BaseModel):
     created_at: datetime
 
     model_config = {"from_attributes": True}
+
+
+class ExerciseReportRequest(BaseModel):
+    reason: str = Field(..., min_length=1, max_length=2000, description="Lý do báo cáo lỗi bài tập gửi admin")
+
+
+class ExerciseReportOut(BaseModel):
+    reported: bool = True
+    message: str = "Đã gửi báo cáo tới admin."
 
 
 class QuestionImageUploadOut(BaseModel):

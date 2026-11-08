@@ -131,8 +131,8 @@ class TestGradingServiceUnit:
 
         score, detailed = service.grade_attempt(exercise_id, answers)
 
-        # 1 MC question worth 10.0 points
-        assert score == 10.00
+        # 2 câu (1 MC + 1 SA), điểm chia đều: MC đúng được 10/2 = 5.0; SA thiếu đáp án chuẩn -> pending, 0 điểm
+        assert score == 5.00
         assert len(detailed["questions"]) == 2
 
         sa_result = next(q for q in detailed["questions"] if q["question_id"] == str(sa_id))
@@ -195,7 +195,123 @@ class TestGradingServiceUnit:
 
         score, detailed = service.grade_attempt(exercise_id, answers)
 
-        assert score is None
+        # thiếu đáp án chuẩn -> chấm tay (pending), điểm tự động = 0.0
+        assert score == 0.0
         assert len(detailed["questions"]) == 2
         assert all(q["pending_manual_grade"] is True for q in detailed["questions"])
         assert all(q["is_correct"] is None for q in detailed["questions"])
+
+
+    def test_short_answer_correct_earns_points(self):
+        """Đúng 1 câu trả lời ngắn (kể cả khác định dạng số: '2' vs '2.0') phải được cộng điểm."""
+        db = MagicMock()
+        service = GradingService(db)
+
+        exercise_id = uuid.uuid4()
+        sa_id = uuid.uuid4()
+        q_sa = create_mock_question(sa_id, "ShortAnswer", [])
+        q_sa.correct_answer = "2.0"
+
+        mock_exercise = MagicMock()
+        mock_exercise.questions = [q_sa]
+        service.exercise_repo.get_by_id = MagicMock(return_value=mock_exercise)
+
+        answers = [AnswerInput(question_id=sa_id, answer_text="2")]
+        score, detailed = service.grade_attempt(exercise_id, answers)
+
+        assert score == 10.00
+        sa_result = detailed["questions"][0]
+        assert sa_result["is_correct"] is True
+        assert sa_result["pending_manual_grade"] is False
+
+    def test_user_scenario_only_short_answer_correct(self):
+        """Kịch bản thực tế: đề 9 câu (4 MC + 1 Đúng/Sai + 4 trả lời ngắn), chỉ đúng 1 câu trả lời ngắn -> điểm = 10/9."""
+        db = MagicMock()
+        service = GradingService(db)
+
+        exercise_id = uuid.uuid4()
+        questions = []
+        answers = []
+        for i in range(4):
+            q_id = uuid.uuid4()
+            opt_correct = uuid.uuid4()
+            opt_wrong = uuid.uuid4()
+            q = create_mock_question(q_id, "MultipleChoice",
+                                     [create_mock_option(opt_correct, True), create_mock_option(opt_wrong, False)])
+            questions.append(q)
+            answers.append(AnswerInput(question_id=q_id, answer_option_id=opt_wrong))  # MC sai
+
+        tf_id = uuid.uuid4()
+        q_tf = create_mock_question(tf_id, "TrueFalse", [])
+        q_tf.segments = [
+            {"key": "a", "statement": "Ý a", "is_correct": True},
+            {"key": "b", "statement": "Ý b", "is_correct": False},
+        ]
+        questions.append(q_tf)
+        answers.append(AnswerInput(question_id=tf_id, answer_text="a:false;b:true"))  # Đ/Sai sai
+
+        sa_correct_id = uuid.uuid4()
+        q_sa_ok = create_mock_question(sa_correct_id, "ShortAnswer", [])
+        q_sa_ok.correct_answer = "2"
+        questions.append(q_sa_ok)
+        answers.append(AnswerInput(question_id=sa_correct_id, answer_text="2"))  # trả lời ngắn ĐÚNG
+
+        for i in range(3):
+            q_id = uuid.uuid4()
+            q = create_mock_question(q_id, "ShortAnswer", [])
+            q.correct_answer = str(100 + i)
+            questions.append(q)
+            answers.append(AnswerInput(question_id=q_id, answer_text="sai"))
+
+        mock_exercise = MagicMock()
+        mock_exercise.questions = questions
+        service.exercise_repo.get_by_id = MagicMock(return_value=mock_exercise)
+
+        score, detailed = service.grade_attempt(exercise_id, answers)
+        assert len(detailed["questions"]) == 9
+        assert score == round(10.0 / 9, 2)  # ~1.11
+        sa_res = next(q for q in detailed["questions"] if q["question_id"] == str(sa_correct_id))
+        assert sa_res["is_correct"] is True
+
+    def test_truefalse_from_segments_earns_points(self):
+        """Câu Đúng/Sai lưu bằng segments (không có answer_options) vẫn chấm được và cộng điểm khi đúng cả."""
+        db = MagicMock()
+        service = GradingService(db)
+
+        exercise_id = uuid.uuid4()
+        tf_id = uuid.uuid4()
+        q_tf = create_mock_question(tf_id, "TrueFalse", [])
+        q_tf.segments = [
+            {"key": "a", "statement": "Ý a", "is_correct": True},
+            {"key": "b", "statement": "Ý b", "is_correct": False},
+            {"key": "c", "statement": "Ý c", "is_correct": True},
+            {"key": "d", "statement": "Ý d", "is_correct": False},
+        ]
+        mock_exercise = MagicMock()
+        mock_exercise.questions = [q_tf]
+        service.exercise_repo.get_by_id = MagicMock(return_value=mock_exercise)
+
+        answers = [AnswerInput(question_id=tf_id, answer_text="a:true;b:false;c:true;d:false")]
+        score, detailed = service.grade_attempt(exercise_id, answers)
+
+        assert score == 10.00
+        tf_res = detailed["questions"][0]
+        assert tf_res["is_correct"] is True
+        assert tf_res["sub_results"] == {"a": True, "b": True, "c": True, "d": True}
+
+    def test_short_answer_wrong_gets_zero(self):
+        """Trả lời ngắn sai -> is_correct False, không pending, không cộng điểm."""
+        db = MagicMock()
+        service = GradingService(db)
+        exercise_id = uuid.uuid4()
+        sa_id = uuid.uuid4()
+        q_sa = create_mock_question(sa_id, "ShortAnswer", [])
+        q_sa.correct_answer = "46"
+        mock_exercise = MagicMock()
+        mock_exercise.questions = [q_sa]
+        service.exercise_repo.get_by_id = MagicMock(return_value=mock_exercise)
+
+        score, detailed = service.grade_attempt(exercise_id, [AnswerInput(question_id=sa_id, answer_text="45")])
+        assert score == 0.0
+        assert detailed["questions"][0]["is_correct"] is False
+        assert detailed["questions"][0]["pending_manual_grade"] is False
