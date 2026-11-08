@@ -401,7 +401,7 @@ class ImportParserService:
                             ai_result = provider.parse_pdf_document(file_bytes, test_code=test_code)
                         else:
                             ai_result = provider.parse_images(images, page_numbers=pages, test_code=test_code)
-                        if ai_result.questions and not ai_result.errors:
+                        if ai_result.questions:
                             merged = cls.merge_ai_result_with_answer_key(
                                 ai_result, answer_file_bytes, answer_filename, test_code
                             )
@@ -431,9 +431,8 @@ class ImportParserService:
             all_errors.extend(section_result.errors)
 
         if not all_questions:
-            if all_errors:
-                return ParseResult(questions=[], errors=all_errors)
-            return ParseResult(errors=[ParseError(question_number=None, message="No valid questions could be identified in the file.")])
+            errs = all_errors or [ParseError(question_number=None, message="No valid questions could be identified in the file.")]
+            return ParseResult(questions=[], errors=errs)
 
         # 3. Crop and store figures attached to each question
         try:
@@ -441,7 +440,9 @@ class ImportParserService:
         except Exception as e:
             logger.warning(f"attach_question_images failed: {e}")
 
-        return ParseResult(questions=all_questions, errors=all_errors)
+        # Non-fatal per-section warnings are dropped: the router rejects the whole
+        # import (422) whenever errors are present, so only fail when nothing parsed.
+        return ParseResult(questions=all_questions, errors=[])
 
     @classmethod
     def detect_pdf_exam_sections(cls, file_bytes: bytes) -> List[Dict[str, Any]]:
