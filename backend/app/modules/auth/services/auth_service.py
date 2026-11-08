@@ -61,17 +61,13 @@ class AuthService:
     @staticmethod
     def authenticate_user(db: Session, identifier: str, password_plain: str) -> User:
         """
-        Authenticate a user by checking email first, then phone number.
+        Authenticate a user by phone number only (email login is not allowed).
         Verifies the hashed password and checks the user status.
         """
-        # 1. Search for user by email
-        user = UserRepository.get_by_email(db, identifier)
-        
-        # 2. If not found by email, search by phone number
-        if not user:
-            user = UserRepository.get_by_phone(db, identifier)
-            
-        # 3. If user not found, raise invalid credentials error
+        # 1. Search for user by phone number only
+        user = UserRepository.get_by_phone(db, identifier)
+
+        # 2. If user not found, raise invalid credentials error
         if not user:
             logger.warning("Domain Event: EVT-AUTH-LOGIN_FAILED - User not found for identifier: %s", identifier)
             raise HTTPException(

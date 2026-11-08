@@ -13,13 +13,12 @@ from pydantic import BaseModel, Field, ConfigDict
 class LoginRequest(BaseModel):
     """
     Schema for login request.
-    Accepts phone number (10 digits starting with 0) or email as login credential.
+    Only accepts a phone number (10 digits starting with 0) as the login credential.
     """
     phone: str = Field(
-        ..., 
-        description="Phone number or Email used for login",
-        min_length=3,
-        max_length=128
+        ...,
+        description="Phone number used for login (10 digits, starting with 0)",
+        pattern=r"^0\d{9}$"
     )
     password: str = Field(
         ..., 
