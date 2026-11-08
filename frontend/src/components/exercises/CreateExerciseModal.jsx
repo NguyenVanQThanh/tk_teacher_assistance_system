@@ -5,7 +5,7 @@
 // Updated At: 2026-09-13
 // Updated By: Tam Khang
 
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { 
   X, 
@@ -15,6 +15,7 @@ import {
   ArrowLeft, 
   UploadCloud, 
   SlidersHorizontal,
+  GraduationCap,
   FileText,
   BookOpen,
   CheckCircle2, 
@@ -27,8 +28,24 @@ import {
   FileCheck,
   Lock
 } from 'lucide-react';
-import { exercisesApi, subjectsApi } from '../../services/api';
+import { exercisesApi, subjectsApi, documentsApi } from '../../services/api';
 import './CreateExerciseModal.css';
+
+const formatFileSize = (bytes) => {
+  if (!bytes || bytes <= 0) return '0 KB';
+  if (bytes < 1024 * 1024) return `${Math.round(bytes / 1024)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+};
+
+// Normalize grade values coming from the API ('Lớp 10', '10', ...) to plain digits ('10')
+const normalizeGrade = (grade) => String(grade ?? '').replace(/\D/g, '');
+
+// Modal title per creation method step
+const METHOD_TITLES = {
+  select_method: 'Lựa chọn hình thức tạo mới',
+  ai: 'Tạo sinh bài tập AI',
+  upload: 'Tải lên từ file có sẵn (Word / PDF)',
+};
 
 export default function CreateExerciseModal({ isOpen, onClose, onCreateSuccess }) {
   const navigate = useNavigate();
@@ -48,6 +65,9 @@ export default function CreateExerciseModal({ isOpen, onClose, onCreateSuccess }
   const [progressPercent, setProgressPercent] = useState(0);
   const [progressStage, setProgressStage] = useState('');
   const [errorMsg, setErrorMsg] = useState('');
+  const [toast, setToast] = useState(null);
+  const toastTimerRef = useRef(null);
+  const closeTimerRef = useRef(null);
   const [subjectsList, setSubjectsList] = useState([]);
 
   // AI Generation Specific State
@@ -60,24 +80,29 @@ export default function CreateExerciseModal({ isOpen, onClose, onCreateSuccess }
     shortAnswer: { recognize: 0, understand: 0, apply: 0 }
   });
 
-  // Available Documents in Repository
-  const availableDocuments = [
-    { id: 'doc-1', title: 'Sách giáo khoa Toán 11', type: 'book', tag: 'Sách giáo khoa', size: '14.2 MB' },
-    { id: 'doc-2', title: 'Đề cương ôn tập học kỳ 1', type: 'outline', tag: 'Đề cương', size: '2.4 MB' },
-    { id: 'doc-3', title: 'Tài liệu bồi dưỡng HSG', type: 'doc', tag: 'Nâng cao', size: '5.1 MB' },
-    { id: 'doc-4', title: 'Bài tập bổ trợ Giải tích 12', type: 'exercise', tag: 'Bài tập', size: '3.8 MB' },
-    { id: 'doc-5', title: 'Tuyển tập 50 đề thi thử THPT Quốc Gia - Toán', type: 'doc', tag: 'Đề thi', size: '8.6 MB' },
-    { id: 'doc-6', title: 'Chuyên đề Hình học không gian Oxyz', type: 'outline', tag: 'Chuyên đề', size: '4.2 MB' },
-    { id: 'doc-7', title: 'Sổ tay công thức Đạo hàm & Tích phân', type: 'book', tag: 'Tóm tắt', size: '1.9 MB' },
-  ];
+  // Available Documents in the teacher's repository (loaded from BE API)
+  const [availableDocuments, setAvailableDocuments] = useState([]);
 
   // Selected Documents for AI Context
   const [selectedDocIds, setSelectedDocIds] = useState([]);
   const [isDocDropdownOpen, setIsDocDropdownOpen] = useState(false);
   const [docSearchQuery, setDocSearchQuery] = useState('');
+  const [docGradeFilter, setDocGradeFilter] = useState('all');
   const docDropdownRef = useRef(null);
 
+  // Documents filtered by search text AND khối (grade block) filter (memoized)
+  const filteredDocs = useMemo(() => availableDocuments.filter((doc) => {
+    const q = docSearchQuery.trim().toLowerCase();
+    const matchSearch = !q || doc.title.toLowerCase().includes(q);
+    const matchGrade = docGradeFilter === 'all' || normalizeGrade(doc.grade) === docGradeFilter;
+    return matchSearch && matchGrade;
+  }), [availableDocuments, docSearchQuery, docGradeFilter]);
+
+  // Modal title changes according to the selected creation method
+  const modalTitle = METHOD_TITLES[currentStep] || METHOD_TITLES.select_method;
+
   useEffect(() => {
+    if (!isOpen) return undefined;
     let isMounted = true;
     async function loadSubjects() {
       try {
@@ -93,11 +118,38 @@ export default function CreateExerciseModal({ isOpen, onClose, onCreateSuccess }
       }
     }
     loadSubjects();
+
+    async function loadDocuments() {
+      try {
+        const res = await documentsApi.getDocuments({ status: 'ALL', page_size: 100 });
+        const items = Array.isArray(res) ? res : (res.items || []);
+        if (isMounted) {
+          setAvailableDocuments(items.map((d) => ({
+            id: d.document_id,
+            title: d.title,
+            tag: d.document_type || 'Tài liệu',
+            size: formatFileSize(d.file_size || 0),
+            grade: normalizeGrade(d.grade),
+            subjectName: d.subject_name || '',
+          })));
+        }
+      } catch {
+        // Keep the picker empty if the repository cannot be loaded
+      }
+    }
+    loadDocuments();
+
     document.addEventListener('mousedown', handleClickOutside);
     return () => {
       isMounted = false;
       document.removeEventListener('mousedown', handleClickOutside);
     };
+  }, [isOpen]);
+
+  // Clear pending toast/close timers when the component unmounts
+  useEffect(() => () => {
+    if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
+    if (closeTimerRef.current) clearTimeout(closeTimerRef.current);
   }, []);
 
   // Close document dropdown when clicking outside
@@ -107,10 +159,30 @@ export default function CreateExerciseModal({ isOpen, onClose, onCreateSuccess }
     }
   }
 
+  const toggleDocumentSelection = (docId) => {
+    setSelectedDocIds((prev) =>
+      prev.includes(docId) ? prev.filter((id) => id !== docId) : [...prev, docId]
+    );
+  };
+
+  const removeSelectedDocument = (docId, e) => {
+    e.stopPropagation();
+    setSelectedDocIds((prev) => prev.filter((id) => id !== docId));
+  };
+
   if (!isOpen) return null;
 
   const handleClose = () => {
     if (isSubmitting) return; // Prevent closing while processing OCR
+    if (toastTimerRef.current) {
+      clearTimeout(toastTimerRef.current);
+      toastTimerRef.current = null;
+    }
+    if (closeTimerRef.current) {
+      clearTimeout(closeTimerRef.current);
+      closeTimerRef.current = null;
+    }
+    setToast(null);
     setCurrentStep('select_method');
     setTitle('');
     setAiPrompt('');
@@ -162,45 +234,83 @@ export default function CreateExerciseModal({ isOpen, onClose, onCreateSuccess }
     return total;
   };
 
-  const handleStartAiGeneration = (e) => {
+  const showToast = (message, type = 'info', title = '') => {
+    if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
+    setToast({ message, type, title });
+    toastTimerRef.current = setTimeout(() => setToast(null), 4200);
+  };
+
+  const handleStartAiGeneration = async (e) => {
     e.preventDefault();
 
     const totalQuestions = calculateTotalQuestions();
 
     if (totalQuestions === 0 && !aiPrompt.trim()) {
-      setErrorMsg('Vui lòng thiết lập số lượng câu hỏi hoặc nhập mô tả yêu cầu.');
+      const msg = 'Vui lòng thiết lập số lượng câu hỏi hoặc nhập mô tả yêu cầu.';
+      setErrorMsg(msg);
+      showToast(msg, 'error', 'Không thể tạo bài tập');
       return;
     }
 
     setIsSubmitting(true);
     setErrorMsg('');
 
-    setTimeout(() => {
-      setIsSubmitting(false);
-      const generatedTitle = aiPrompt.trim() 
-        ? (aiPrompt.length > 40 ? `${aiPrompt.substring(0, 40)}...` : aiPrompt)
-        : `Bài tập AI Sinh tự động (${totalQuestions || 10} câu)`;
+    try {
+      const payload = {
+        subject_name: subjectsList[0]?.subject_name || 'Toán học',
+        grade_name: `Lớp ${grade}`,
+        topic_prompt: aiPrompt.trim() || `Ôn tập kiến thức khối ${grade}`,
+        duration_minutes: 45,
+      };
+      const p1 = questionCounts.mcq.recognize + questionCounts.mcq.understand + questionCounts.mcq.apply;
+      const p2 = questionCounts.tf.recognize + questionCounts.tf.understand + questionCounts.tf.apply;
+      const p3 = questionCounts.shortAnswer.recognize + questionCounts.shortAnswer.understand + questionCounts.shortAnswer.apply;
+      if (p1 > 0) payload.part1_count = p1;
+      if (p2 > 0) payload.part2_count = p2;
+      if (p3 > 0) payload.part3_count = p3;
 
-      const newExercise = {
-        id: `ai-${Date.now()}`,
-        title: generatedTitle,
-        type: 'quiz',
+      const res = await exercisesApi.generateAiExercise(payload);
+
+      // Persist the custom name entered by the teacher
+      if (title.trim() && res.exercise_id) {
+        try {
+          await exercisesApi.updateExercise(res.exercise_id, { title: title.trim() });
+          res.title = title.trim();
+        } catch {
+          // Title update is best-effort; the exercise was still created
+        }
+      }
+
+      const createdExercise = {
+        id: res.exercise_id,
+        title: res.title,
+        type: type,
         grade: grade,
-        subject: 'math',
+        subject: subject,
         subjectName: subjectsList[0]?.subject_name || 'Toán học',
-        questionCount: `${totalQuestions || 10} câu hỏi AI`,
-        duration: '20 phút',
+        questionCount: `${res.total_questions || 0} câu hỏi`,
+        duration: type === 'quiz' ? '15 phút' : '45 phút',
         date: new Date().toLocaleDateString('vi-VN'),
         authorName: 'Giáo viên',
         authorInitial: 'GV',
         hasShare: true,
       };
 
-      if (onCreateSuccess) {
-        onCreateSuccess(newExercise);
-      }
-      handleClose();
-    }, 800);
+      showToast(`Đã tạo thành công bài tập "${res.title}" (${res.total_questions} câu hỏi).`, 'success', 'Tạo bài tập AI thành công');
+      if (onCreateSuccess) onCreateSuccess(createdExercise);
+      // Keep the modal mounted until the success toast has been seen, otherwise it unmounts instantly
+      closeTimerRef.current = setTimeout(() => {
+        closeTimerRef.current = null;
+        handleClose();
+      }, 4200);
+    } catch (err) {
+      const detail = err.response?.data?.detail;
+      const msg = (detail && typeof detail === 'object' ? detail.message : detail) || err.message || 'Tạo bài tập AI thất bại. Vui lòng thử lại.';
+      setErrorMsg(msg);
+      showToast(msg, 'error', 'Bài tập tạo sinh gặp lỗi');
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const handleSubmitUpload = async (e) => {
@@ -312,6 +422,19 @@ export default function CreateExerciseModal({ isOpen, onClose, onCreateSuccess }
         onClick={(e) => e.stopPropagation()}
         style={{ position: 'relative' }}
       >
+        {/* Toast notification (e.g. AI generation failure) */}
+        {toast && (
+          <div className={`ai-toast toast-${toast.type}`} role="alert">
+            {toast.type === 'error' ? <AlertCircle size={16} /> : <CheckCircle2 size={16} />}
+            <div className="ai-toast-text">
+              <strong>{toast.title}</strong>
+              <span>{toast.message}</span>
+            </div>
+            <button type="button" className="ai-toast-close" onClick={() => setToast(null)} aria-label="Đóng thông báo">
+              <X size={14} />
+            </button>
+          </div>
+        )}
         {/* ================= FULL MODAL OCR PROCESSING OVERLAY (SCREEN LOCK) ================= */}
         {isSubmitting && (
           <div className="modal-ocr-loading-overlay">
@@ -352,7 +475,7 @@ export default function CreateExerciseModal({ isOpen, onClose, onCreateSuccess }
           <div className="method-selection-view">
             {/* Header */}
             <div className="selection-modal-header">
-              <h2 className="selection-modal-title">Lựa chọn hình thức tạo mới</h2>
+              <h2 className="selection-modal-title">{modalTitle}</h2>
               <button 
                 type="button" 
                 className="btn-modal-close"
@@ -426,7 +549,7 @@ export default function CreateExerciseModal({ isOpen, onClose, onCreateSuccess }
           <div className="ai-creation-view">
             {/* Header */}
             <div className="selection-modal-header">
-              <h2 className="selection-modal-title">Lựa chọn hình thức tạo mới</h2>
+              <h2 className="selection-modal-title">{modalTitle}</h2>
               <button 
                 type="button" 
                 className="btn-modal-close"
@@ -444,6 +567,42 @@ export default function CreateExerciseModal({ isOpen, onClose, onCreateSuccess }
                   <span>{errorMsg}</span>
                 </div>
               )}
+
+              {/* SECTION: Đặt tên cho bài tập */}
+              <div className="ai-config-section">
+                <div className="ai-section-header">
+                  <FileEdit size={18} className="ai-section-icon" />
+                  <span className="ai-section-title">Đặt tên cho bài tập</span>
+                </div>
+                <input
+                  type="text"
+                  className="ai-title-input"
+                  placeholder="VD: Đề kiểm tra 15 phút chương Đạo hàm - Khối 12"
+                  value={title}
+                  onChange={(e) => setTitle(e.target.value)}
+                />
+              </div>
+
+              {/* SECTION 0: Khối lớp (bài tập giao cho khối nào) */}
+              <div className="ai-config-section">
+                <div className="ai-section-header">
+                  <GraduationCap size={18} className="ai-section-icon" />
+                  <span className="ai-section-title">Khối lớp (bài tập giao cho khối nào)</span>
+                </div>
+                <div className="ai-grade-row">
+                  <select
+                    className="ai-grade-select"
+                    value={grade}
+                    onChange={(e) => { setGrade(e.target.value); setDocGradeFilter(e.target.value); }}
+                    title="Chọn khối lớp cho bài tập"
+                  >
+                    <option value="10">Khối 10</option>
+                    <option value="11">Khối 11</option>
+                    <option value="12">Khối 12</option>
+                  </select>
+                  <span className="ai-grade-hint">Khối đã chọn sẽ tự động lọc các tài liệu tham khảo tương ứng ở bên dưới.</span>
+                </div>
+              </div>
 
               {/* SECTION 1: Số lượng câu hỏi & Mức độ */}
               <div className="ai-config-section">
@@ -607,7 +766,8 @@ export default function CreateExerciseModal({ isOpen, onClose, onCreateSuccess }
                   {/* Dropdown Menu */}
                   {isDocDropdownOpen && (
                     <div className="doc-dropdown-menu">
-                      <div className="doc-search-box">
+                      <div className="doc-filter-row">
+                        <div className="doc-search-box">
                         <Search size={14} className="doc-search-icon" />
                         <input 
                           type="text" 
@@ -616,6 +776,19 @@ export default function CreateExerciseModal({ isOpen, onClose, onCreateSuccess }
                           onChange={(e) => setDocSearchQuery(e.target.value)}
                           onClick={(e) => e.stopPropagation()}
                         />
+                      </div>
+                        <select
+                          className="doc-grade-filter"
+                          value={docGradeFilter}
+                          onChange={(e) => setDocGradeFilter(e.target.value)}
+                          onClick={(e) => e.stopPropagation()}
+                          title="Lọc tài liệu theo khối lớp"
+                        >
+                          <option value="all">Tất cả khối</option>
+                          <option value="10">Khối 10</option>
+                          <option value="11">Khối 11</option>
+                          <option value="12">Khối 12</option>
+                        </select>
                       </div>
 
                       <div className="doc-list-scroll">
@@ -635,6 +808,9 @@ export default function CreateExerciseModal({ isOpen, onClose, onCreateSuccess }
                                   <span className="doc-item-title">{doc.title}</span>
                                   <div className="doc-item-badges">
                                     <span className="doc-type-badge">{doc.tag}</span>
+                                    {doc.grade
+                                      ? <span className="doc-grade-badge">Khối {doc.grade}</span>
+                                      : <span className="doc-grade-badge">Chưa gán khối</span>}
                                     <span className="doc-size-text">{doc.size}</span>
                                   </div>
                                 </div>
@@ -715,7 +891,7 @@ export default function CreateExerciseModal({ isOpen, onClose, onCreateSuccess }
                 >
                   <ArrowLeft size={18} />
                 </button>
-                <h3 className="form-modal-title">Tải lên từ file có sẵn (Word / PDF)</h3>
+                <h3 className="form-modal-title">{modalTitle}</h3>
               </div>
               <button 
                 type="button" 

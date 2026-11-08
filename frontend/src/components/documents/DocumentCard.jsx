@@ -14,7 +14,8 @@ import {
   Eye, 
   Download, 
   Edit3, 
-  HardDrive 
+  HardDrive,
+  GraduationCap
 } from 'lucide-react';
 import './DocumentCard.css';
 
@@ -104,6 +105,15 @@ export default function DocumentCard({ doc, onPreview, onDownload, onEdit, onMor
         <span>{doc.fileSize}</span>
         <span className="meta-dot">•</span>
         <span>{doc.uploadDate}</span>
+        {doc.grade && (
+          <>
+            <span className="meta-dot">•</span>
+            <span className="doc-grade-chip" title={`Khối ${doc.grade}`}>
+              <GraduationCap size={12} className="meta-icon" />
+              Khối {doc.grade}
+            </span>
+          </>
+        )}
       </div>
 
       {/* Teacher Uploader */}
