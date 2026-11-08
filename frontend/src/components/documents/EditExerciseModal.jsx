@@ -11,11 +11,9 @@ import {
   Save, 
   FileEdit, 
   Image as ImageIcon, 
-  Code, 
   Plus, 
   Eye, 
   RefreshCw, 
-  Link2, 
   ChevronDown, 
   Check, 
   ShieldCheck, 
@@ -24,10 +22,12 @@ import {
   ListChecks,
   Info,
   Trash2,
-  Loader2
+  Loader2,
+  Sigma
 } from 'lucide-react';
 import { exercisesApi, questionsApi, documentsApi } from '../../services/api';
-import MathRenderer from '../common/MathRenderer';
+import MathRenderer, { MathContent, resolveMediaUrl } from '../common/MathRenderer';
+import MathLiveEditor from '../common/MathLiveEditor';
 import AddQuestionModal from './AddQuestionModal';
 import './EditExerciseModal.css';
 
@@ -99,6 +99,8 @@ const buildQuestionPayload = (q, displayOrder) => {
     difficulty: difficulty,
     correct_answer: q.correctOption || q.shortAnswerExpected || (qType === 'TrueFalse' ? 'Đúng' : 'A'),
     explanation: q.solutionGuide?.trim() || null,
+    image_url: q.imageUrl || null,
+    image_metadata: q.imageMeta || null,
     display_order: displayOrder,
     answer_options: optionsPayload.length > 0 ? optionsPayload : undefined
   };
@@ -385,7 +387,9 @@ Tam giác vuông SAB tại A: tan(∠SBA) = SA / AB = a√3 / a = √3 => ∠SBA
                   { key: 'C', text: '', isCorrect: false },
                   { key: 'D', text: '', isCorrect: false }
                 ],
-                solutionGuide: q.explanation || ''
+                solutionGuide: q.explanation || '',
+                imageUrl: q.image_url || null,
+                imageMeta: q.image_metadata || null
               };
             });
             setQuestions(mapped);
@@ -438,11 +442,17 @@ Tam giác vuông SAB tại A: tan(∠SBA) = SA / AB = a√3 / a = √3 => ∠SBA
   const [currentSolutionGuide, setCurrentSolutionGuide] = useState(activeQuestion?.solutionGuide || '');
   const [saveToast, setSaveToast] = useState(false);
   const textareaRef = useRef(null);
+  const guideRef = useRef(null);
+  const optionInputRefs = useRef({});
+  const activeFieldRef = useRef('content');
+  const imageInputRef = useRef(null);
+  const [isUploadingImage, setIsUploadingImage] = useState(false);
   const isSwitchingRef = useRef(false);
 
   // Select question handler with safety against race condition
   const handleSelectQuestion = (qId) => {
     isSwitchingRef.current = true;
+    activeFieldRef.current = 'content';
     setSelectedQuestionId(qId);
     const targetQ = questions.find(q => q.id === qId);
     if (targetQ) {
@@ -702,33 +712,120 @@ Tam giác vuông SAB tại A: tan(∠SBA) = SA / AB = a√3 / a = √3 => ∠SBA
 
   const currentSubjectData = symbolCategoriesBySubject[activeSubjectTab] || symbolCategoriesBySubject.math;
 
-  // Insert LaTeX snippet at textarea cursor position and update preview (inserts raw snippet as-is)
-  const insertSnippet = (snippet, tipName) => {
-    const textarea = textareaRef.current;
-    if (!textarea) {
-      setCurrentContent(prev => prev + ' ' + snippet);
-      return;
+  // Wrap an inline snippet in $...$ so it is visualized immediately (not raw LaTeX)
+  const wrapInlineMath = (snippet) => {
+    const trimmed = (snippet || '').trim();
+    if (!trimmed) return snippet;
+    if (trimmed.startsWith('$') || trimmed.startsWith('\[') || trimmed.startsWith('\(')) return snippet;
+    return `$${trimmed}$`;
+  };
+
+  // Resolve the currently focused editable field (content / option / guide)
+  const getActiveField = () => {
+    const field = activeFieldRef.current;
+    if (field === 'guide') {
+      return {
+        el: guideRef.current,
+        get: () => currentSolutionGuide,
+        set: (v) => setCurrentSolutionGuide(v)
+      };
+    }
+    if (field.startsWith('option:')) {
+      const key = field.slice('option:'.length);
+      return {
+        el: optionInputRefs.current[key] || null,
+        get: () => (currentOptions.find(o => o.key === key) || {}).text || '',
+        set: (v) => setCurrentOptions(prev => prev.map(o => (o.key === key ? { ...o, text: v } : o)))
+      };
+    }
+    return {
+      el: textareaRef.current,
+      get: () => currentContent,
+      set: (v) => setCurrentContent(v)
+    };
+  };
+
+  // Insert a snippet at the caret of the active field. Inline snippets are wrapped
+  // in $...$ so they render immediately; block snippets ($$...$$) go on their own lines.
+  const insertSnippet = (snippet, tipName, opts = {}) => {
+    const { el, get, set } = getActiveField();
+    const currentText = get() || '';
+    const start = el && typeof el.selectionStart === 'number' ? el.selectionStart : currentText.length;
+    const end = el && typeof el.selectionEnd === 'number' ? el.selectionEnd : currentText.length;
+
+    let textToInsert;
+    if (opts.raw) {
+      textToInsert = snippet;
+    } else if (opts.block) {
+      const prefix = start > 0 && currentText[start - 1] !== '\n' ? '\n' : '';
+      const suffix = end < currentText.length && currentText[end] !== '\n' ? '\n' : '';
+      textToInsert = `${prefix}${snippet}${suffix}`;
+    } else {
+      textToInsert = wrapInlineMath(snippet);
     }
 
-    const start = textarea.selectionStart ?? currentContent.length;
-    const end = textarea.selectionEnd ?? currentContent.length;
-    const currentText = currentContent;
-
-    // Directly insert the snippet as-is without automatically wrapping with $ or $$
-    const textToInsert = snippet;
-
     const newText = currentText.substring(0, start) + textToInsert + currentText.substring(end);
-    setCurrentContent(newText);
+    set(newText);
 
-    setTimeout(() => {
-      textarea.focus();
-      const newCursorPos = start + textToInsert.length;
-      textarea.setSelectionRange(newCursorPos, newCursorPos);
-    }, 50);
+    if (el) {
+      setTimeout(() => {
+        el.focus();
+        const pos = start + textToInsert.length;
+        try { el.setSelectionRange(pos, pos); } catch (err) { /* element without selection API */ }
+      }, 50);
+    }
+  };
+
+  // Upload a real image to BE storage, insert its markdown into the active field,
+  // and persist the returned metadata on the active question (saved to DB on save).
+  const handleImagePick = async (e) => {
+    const file = e.target.files && e.target.files[0];
+    e.target.value = '';
+    if (!file) return;
+    if (!/^image\//.test(file.type || '')) {
+      setSaveError('Chỉ chấp nhận tệp hình ảnh (png, jpg, jpeg, gif, bmp, webp, svg).');
+      return;
+    }
+    setIsUploadingImage(true);
+    try {
+      const formData = new FormData();
+      formData.append('file', file);
+      const meta = await questionsApi.uploadImage(formData);
+      const alt = (meta.original_name || 'hinh-anh').replace(/[[\]]/g, '');
+      insertSnippet(`![${alt}](${meta.url})`, 'Hình ảnh', { raw: true });
+      const imageMeta = {
+        url: meta.url,
+        filename: meta.filename,
+        original_name: meta.original_name,
+        size_bytes: meta.size_bytes,
+        content_type: meta.content_type,
+        width: meta.width,
+        height: meta.height,
+        uploaded_at: new Date().toISOString()
+      };
+      setQuestions(prev => prev.map(q => (q.id === activeQuestion.id ? { ...q, imageUrl: meta.url, imageMeta } : q)));
+      setSaveStatusText('Đã tải ảnh lên!');
+      setSaveToast(true);
+      setTimeout(() => { setSaveToast(false); setSaveStatusText(''); }, 2200);
+    } catch (err) {
+      console.error('Upload image failed:', err);
+      setSaveError('Không thể tải ảnh lên. Vui lòng thử lại.');
+    } finally {
+      setIsUploadingImage(false);
+    }
   };
 
   // Save changes to current question in list and sync with DB if real exercise
   const handleSaveActiveQuestion = async () => {
+    let updatedAnswersMeta = currentCorrectOption 
+      ? `${currentOptions?.length || 4} đáp án (${currentCorrectOption}*)` 
+      : `${currentOptions?.length || 4} đáp án (Chưa chọn)`;
+    if (activeQuestion?.questionType === 'ShortAnswer') {
+      updatedAnswersMeta = `Đáp án: ${currentCorrectOption || 'Chưa nhập'}`;
+    } else if (activeQuestion?.questionType === 'TrueFalse') {
+      updatedAnswersMeta = `${currentOptions?.length || 4} mệnh đề (Đúng/Sai)`;
+    }
+
     const currentQData = {
       levelRange: currentLevel,
       level: getSimpleLevel(currentLevel),
@@ -1170,38 +1267,52 @@ Tam giác vuông SAB tại A: tan(∠SBA) = SA / AB = a√3 / a = √3 => ∠SBA
 
             {/* Quick Insert Actions Row */}
             <div className="toolbar-bottom-actions">
-              <button 
-                type="button" 
+              <button
+                type="button"
                 className="btn-toolbar-tool"
-                onClick={() => insertSnippet('\n![Minh họa đồ thị](Do_thi_ham_bac_ba_cau_1.svg)\n', 'Hình vẽ SVG')}
+                onClick={() => imageInputRef.current && imageInputRef.current.click()}
+                disabled={isUploadingImage}
+                title="Tải ảnh từ máy lên BE storage rồi chèn vào ô đang soạn thảo"
               >
-                <ImageIcon size={14} />
-                <span>Chèn hình vẽ</span>
+                {isUploadingImage ? <Loader2 size={14} className="animate-spin" /> : <ImageIcon size={14} />}
+                <span>{isUploadingImage ? 'Đang tải ảnh...' : 'Chèn hình ảnh'}</span>
+              </button>
+              <input
+                ref={imageInputRef}
+                type="file"
+                accept="image/*"
+                style={{ display: 'none' }}
+                onChange={handleImagePick}
+              />
+
+              <button
+                type="button"
+                className="btn-toolbar-tool"
+                onClick={() => insertSnippet('$$ax^2 + bx + c = 0$$', 'Phương trình bậc 2', { block: true })}
+                title="Chèn phương trình bậc 2: ax² + bx + c = 0"
+              >
+                <Sigma size={14} />
+                <span>PT bậc 2</span>
               </button>
 
-              <button 
-                type="button" 
+              <button
+                type="button"
                 className="btn-toolbar-tool"
-                onClick={() => insertSnippet('$$\n\\int_{a}^{b} f(x)\\,dx\n$$', 'Khối LaTeX')}
+                onClick={() => insertSnippet('$$ax^3 + bx^2 + cx + d = 0$$', 'Phương trình bậc 3', { block: true })}
+                title="Chèn phương trình bậc 3: ax³ + bx² + cx + d = 0"
               >
-                <Code size={14} />
-                <span>Chèn khối LaTeX</span>
+                <Sigma size={14} />
+                <span>PT bậc 3</span>
               </button>
 
-              <button 
-                type="button" 
+              <button
+                type="button"
                 className="btn-toolbar-tool"
-                onClick={() => insertSnippet('$$\n\\begin{cases}\nax + by = c \\\\\na\'x + b\'y = c\'\n\\end{cases}\n$$', 'Hệ phương trình')}
+                onClick={() => insertSnippet('$$ax^4 + bx^3 + cx^2 + dx + e = 0$$', 'Phương trình bậc 4', { block: true })}
+                title="Chèn phương trình bậc 4: ax⁴ + bx³ + cx² + dx + e = 0"
               >
-                <span>Chèn hệ phương trình</span>
-              </button>
-
-              <button 
-                type="button" 
-                className="btn-toolbar-tool"
-                onClick={() => insertSnippet('$$\n\\begin{pmatrix}\na & b \\\\\nc & d\n\\end{pmatrix}\n$$', 'Ma trận')}
-              >
-                <span>Chèn ma trận</span>
+                <Sigma size={14} />
+                <span>PT bậc 4</span>
               </button>
             </div>
           </section>
@@ -1348,18 +1459,19 @@ Tam giác vuông SAB tại A: tan(∠SBA) = SA / AB = a√3 / a = √3 => ∠SBA
                 <div className="textarea-section-header">
                   <div className="section-header-left">
                     <FileCode2 size={15} />
-                    <span>Nội dung câu hỏi & Mã LaTeX</span>
+                    <span>Nội dung bài tập</span>
                   </div>
                   <span className="katex-support-hint">Hỗ trợ KaTeX & Markdown</span>
                 </div>
 
-                <textarea 
+                <MathLiveEditor
                   ref={textareaRef}
                   className="question-latex-textarea"
                   rows={7}
                   value={currentContent}
-                  onChange={(e) => setCurrentContent(e.target.value)}
-                  spellCheck={false}
+                  onChange={(val) => setCurrentContent(val)}
+                  onFocus={() => { activeFieldRef.current = 'content'; }}
+                  placeholder="Nhập nội dung bài tập... (chọn công thức ở thanh ký hiệu phía trên để chèn và hiển thị trực quan)"
                 />
               </div>
 
@@ -1392,10 +1504,12 @@ Tam giác vuông SAB tại A: tan(∠SBA) = SA / AB = a√3 / a = √3 => ∠SBA
                           </span>
                           <span className="option-choice-letter">{opt.key}.</span>
                           <input
+                            ref={(el) => { optionInputRefs.current[opt.key] = el; }}
                             type="text"
                             className="option-choice-input"
                             value={opt.text}
                             onChange={(e) => handleOptionTextChange(opt.key, e.target.value)}
+                            onFocus={() => { activeFieldRef.current = `option:${opt.key}`; }}
                             placeholder={`Nhập đáp án ${opt.key}...`}
                             onClick={(e) => e.stopPropagation()}
                           />
@@ -1414,10 +1528,12 @@ Tam giác vuông SAB tại A: tan(∠SBA) = SA / AB = a√3 / a = √3 => ∠SBA
                   <label className="solution-guide-label">
                     Hướng dẫn giải (hiển thị cho học sinh sau khi nộp bài)
                   </label>
-                  <textarea 
+                  <textarea
+                    ref={guideRef}
                     className="solution-guide-textarea"
                     value={currentSolutionGuide}
                     onChange={(e) => setCurrentSolutionGuide(e.target.value)}
+                    onFocus={() => { activeFieldRef.current = 'guide'; }}
                     rows={3}
                     placeholder="Nhập hướng dẫn giải và lời giải chi tiết..."
                   />
@@ -1448,13 +1564,27 @@ Tam giác vuông SAB tại A: tan(∠SBA) = SA / AB = a√3 / a = √3 => ∠SBA
                   </div>
 
                   {/* SVG Attachment Banner */}
-                  {activeQuestion?.attachmentName && (
+                  {activeQuestion?.imageUrl && (
                     <div className="preview-svg-attachment-banner">
                       <div className="attachment-left-info">
-                        <Link2 size={16} className="attachment-link-icon" />
-                        <span className="attachment-file-text">{activeQuestion.attachmentName}</span>
+                        <ImageIcon size={16} className="attachment-link-icon" />
+                        <img
+                          src={resolveMediaUrl(activeQuestion.imageUrl)}
+                          alt={activeQuestion.imageMeta?.original_name || 'Hình ảnh câu hỏi'}
+                          className="preview-attachment-thumb"
+                        />
+                        <span className="attachment-file-text">
+                          {activeQuestion.imageMeta?.original_name || activeQuestion.imageUrl}
+                          {activeQuestion.imageMeta?.width
+                            ? ` • ${activeQuestion.imageMeta.width}×${activeQuestion.imageMeta.height}px`
+                            : ''}
+                        </span>
                       </div>
-                      <button type="button" className="btn-view-image-link">
+                      <button
+                        type="button"
+                        className="btn-view-image-link"
+                        onClick={() => window.open(resolveMediaUrl(activeQuestion.imageUrl), '_blank')}
+                      >
                         <span>Xem ảnh</span>
                       </button>
                     </div>

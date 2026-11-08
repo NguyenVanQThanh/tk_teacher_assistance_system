@@ -144,6 +144,14 @@ export const exercisesApi = {
 };
 
 export const questionsApi = {
+  uploadImage: async (formData) => {
+    const response = await api.post('/api/v1/questions/upload-image', formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data',
+      },
+    });
+    return response.data;
+  },
   updateQuestion: async (questionId, data) => {
     const response = await api.put(`/api/v1/questions/${questionId}`, data);
     return response.data;
