@@ -337,37 +337,27 @@ class ImportParserService:
     ) -> ParseResult:
         """
         Main entry point to parse question document and optional separate answer key.
-        Integrates GeminiVisionParserService as top-priority AI OCR for PDFs with automatic fallback.
+        For PDFs, tries AI Vision OCR providers in order (SCAN_AI_PROVIDER first, then the
+        other provider as fallback), and finally falls back to the local text parser.
         """
         is_pdf = filename.lower().endswith(".pdf")
 
-        # 1. Try Gemini Multimodal Vision API first if available and file is PDF
+        # 1. Try AI Vision OCR providers (config-driven order with automatic fallback) for PDFs
         if is_pdf:
-            try:
-                from app.modules.exercise.services.gemini_vision_parser_service import GeminiVisionParserService
-                if GeminiVisionParserService.is_available():
-                    logger.info("Using Google Gemini Multimodal Vision API for PDF OCR...")
-                    gemini_result = GeminiVisionParserService.parse_pdf_document(file_bytes, test_code=test_code)
-                    if gemini_result.questions and not gemini_result.errors:
-                        # If a separate answer key file was uploaded, merge answer keys
-                        if answer_file_bytes and answer_filename:
-                            if answer_filename.lower().endswith(".pdf"):
-                                ans_text, ans_tables, _ = cls.extract_pdf_content(answer_file_bytes)
-                            else:
-                                ans_text, ans_tables, _ = cls.extract_docx_content(answer_file_bytes)
-                            
-                            if ans_text or ans_tables:
-                                parsed_answers = cls.parse_answer_keys(ans_text, ans_tables, test_code)
-                                if parsed_answers:
-                                    merged_q, merge_errs = cls.merge_questions_and_answers(gemini_result.questions, parsed_answers)
-                                    if merged_q:
-                                        return ParseResult(questions=merged_q, errors=[])
-
-                        return gemini_result
-                    else:
-                        logger.warning(f"Gemini OCR did not return questions ({gemini_result.errors}). Falling back to local parser.")
-            except Exception as e:
-                logger.warning(f"Gemini Vision Parser encountered an error: {e}. Falling back to local parser.")
+            for provider_name, provider in cls.get_ai_vision_providers():
+                try:
+                    logger.info(f"Using {provider_name} Vision API for PDF OCR...")
+                    ai_result = provider.parse_pdf_document(file_bytes, test_code=test_code)
+                    if ai_result.questions and not ai_result.errors:
+                        merged = cls.merge_ai_result_with_answer_key(
+                            ai_result, answer_file_bytes, answer_filename, test_code
+                        )
+                        return merged if merged is not None else ai_result
+                    logger.warning(
+                        f"{provider_name} OCR did not return questions ({ai_result.errors}). Trying next provider/local parser."
+                    )
+                except Exception as e:
+                    logger.warning(f"{provider_name} Vision Parser encountered an error: {e}. Trying next provider/local parser.")
 
         # 2. Local Fallback Parser (pdfplumber / docx + regex)
         if is_pdf:
@@ -407,6 +397,65 @@ class ImportParserService:
             return ParseResult(questions=[], errors=merge_errors)
 
         return ParseResult(questions=merged_questions, errors=[])
+
+    @staticmethod
+    def get_ai_vision_providers() -> List[Tuple[str, Any]]:
+        """
+        Ordered list of available AI vision OCR providers for scanned exams.
+        Primary provider is chosen via SCAN_AI_PROVIDER (default: 'mistral');
+        the other configured provider is kept as automatic fallback.
+        """
+        if not os.environ.get("PYTEST_CURRENT_TEST"):
+            if not any(k in os.environ for k in ("SCAN_AI_PROVIDER", "MISTRAL_API_KEY", "GEMINI_API_KEY")):
+                from dotenv import load_dotenv, find_dotenv
+                load_dotenv(find_dotenv())
+
+        from app.modules.exercise.services.gemini_vision_parser_service import GeminiVisionParserService
+        from app.modules.exercise.services.mistral_vision_parser_service import MistralVisionParserService
+
+        primary = (os.environ.get("SCAN_AI_PROVIDER", "mistral") or "mistral").strip().lower()
+        registry = {
+            "mistral": ("Mistral", MistralVisionParserService),
+            "gemini": ("Google Gemini", GeminiVisionParserService),
+        }
+        fallback = "gemini" if primary == "mistral" else "mistral"
+
+        ordered: List[Tuple[str, Any]] = []
+        for key in (primary, fallback):
+            if key in registry and all(k != key for k, _ in ordered):
+                name, service = registry[key]
+                if service.is_available():
+                    ordered.append((name, service))
+        return ordered
+
+    @classmethod
+    def merge_ai_result_with_answer_key(
+        cls,
+        ai_result: ParseResult,
+        answer_file_bytes: Optional[bytes],
+        answer_filename: Optional[str],
+        test_code: Optional[str] = None
+    ) -> Optional[ParseResult]:
+        """
+        If a separate answer key file was uploaded, parse it and merge into the AI OCR result.
+        Returns the merged ParseResult, or None if there is nothing to merge.
+        """
+        if not (answer_file_bytes and answer_filename):
+            return None
+        if answer_filename.lower().endswith(".pdf"):
+            ans_text, ans_tables, _ = cls.extract_pdf_content(answer_file_bytes)
+        else:
+            ans_text, ans_tables, _ = cls.extract_docx_content(answer_file_bytes)
+
+        if not (ans_text or ans_tables):
+            return None
+        parsed_answers = cls.parse_answer_keys(ans_text, ans_tables, test_code)
+        if not parsed_answers:
+            return None
+        merged_q, _ = cls.merge_questions_and_answers(ai_result.questions, parsed_answers)
+        if merged_q:
+            return ParseResult(questions=merged_q, errors=[])
+        return None
 
     @classmethod
     def parse_questions(cls, full_text: str, inline_images: List[Dict[str, Any]]) -> Tuple[List[ParsedQuestion], List[ParseError]]:
