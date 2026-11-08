@@ -5,13 +5,14 @@
 # Updated At: 2026-10-03
 # Updated By: Tam Khang
 
+import re
 from uuid import UUID
 from typing import List, Optional, Tuple
 from fastapi import APIRouter, Depends, Query, UploadFile, File, Form, HTTPException, Response, status
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
-from models.models import User
+from models.models import User, Exercise
 from app.modules.auth.dependencies import require_perm, get_current_user
 from app.modules.exercise.schemas import (
     ExerciseCreate, ExerciseUpdate, ExerciseOut,
@@ -267,7 +268,7 @@ async def import_questions(
         test_code=test_code
     )
 
-    if parse_result.errors:
+    if parse_result.errors and not parse_result.questions:
         err_details = [
             {"question_number": err.question_number, "message": err.message}
             for err in parse_result.errors
@@ -295,7 +296,20 @@ async def import_questions(
             groups.append((label, [parsed_q]))
 
     base_exercise = exercise_service.get_exercise_detail(current_user, exercise_id)
+    if base_exercise is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail={"code": "ERR-EXE-EXERCISE_NOT_FOUND", "message": "Exercise not found."},
+        )
     multiple_exams = len(groups) > 1
+    # Strip a previously appended exam suffix so re-importing does not stack
+    # suffixes ("X - ĐỀ SỐ 1 - ĐỀ SỐ 1")
+    base_title = re.sub(
+        r"\s*-\s*(?:ĐỀ\s*SỐ|MÃ\s*ĐỀ|ĐỀ)\s*[\w]+\s*$",
+        "",
+        base_exercise.title or "",
+        flags=re.IGNORECASE,
+    )
 
     created_questions = []
     for g_idx, (label, group_questions) in enumerate(groups):
@@ -303,19 +317,31 @@ async def import_questions(
         target_exercise_id = exercise_id
         if multiple_exams:
             suffix = label or f"Đề {g_idx + 1}"
-            new_title = f"{base_exercise.title} - {suffix}"
+            new_title = f"{base_title} - {suffix}"
             if g_idx == 0:
                 exercise_service.update_exercise(current_user, exercise_id, ExerciseUpdate(title=new_title))
             else:
-                new_ex = exercise_service.create_exercise(
-                    current_user,
-                    ExerciseCreate(
-                        title=new_title,
-                        subject_id=base_exercise.subject_id,
-                        ai_metadata=base_exercise.ai_metadata,
-                    ),
+                existing_ex = (
+                    exercise_service.db.query(Exercise)
+                    .filter(
+                        Exercise.created_by == current_user.user_id,
+                        Exercise.title == new_title,
+                        Exercise.status != "DELETED",
+                    )
+                    .first()
                 )
-                target_exercise_id = new_ex.exercise_id
+                if existing_ex is not None:
+                    target_exercise_id = existing_ex.exercise_id
+                else:
+                    new_ex = exercise_service.create_exercise(
+                        current_user,
+                        ExerciseCreate(
+                            title=new_title,
+                            subject_id=base_exercise.subject_id,
+                            ai_metadata=base_exercise.ai_metadata,
+                        ),
+                    )
+                    target_exercise_id = new_ex.exercise_id
 
         # 4b. Clear old questions of the target exercise before re-importing
         existing_exercise = exercise_service.get_exercise_detail(current_user, target_exercise_id)

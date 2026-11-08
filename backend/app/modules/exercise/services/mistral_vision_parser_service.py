@@ -1,4 +1,3 @@
-import json
 # File Name: mistral_vision_parser_service.py
 # Description: Service for extracting and parsing exam questions from PDF/Images using Mistral AI Vision API (Pixtral), with config-driven provider selection.
 # Created At: 2026-11-08
@@ -7,6 +6,7 @@ import json
 import os
 import io
 import base64
+import json
 import logging
 from typing import List, Optional, Any
 
@@ -173,5 +173,8 @@ class MistralVisionParserService:
             logger.error(f"Mistral Vision API execution failed: {e}", exc_info=True)
             return ParseResult(errors=[ParseError(question_number=None, message=f"Mistral Vision OCR error: {str(e)}")])
 
-    # Common provider-chain interface (used by ImportParserService)
-    parse_images = parse_images_with_mistral
+    @classmethod
+    def parse_images(cls, images: List[Image.Image], test_code: Optional[str] = None,
+                     page_numbers: Optional[List[int]] = None) -> ParseResult:
+        """Common provider-chain interface (used by ImportParserService)."""
+        return cls.parse_images_with_mistral(images, test_code=test_code, page_numbers=page_numbers)

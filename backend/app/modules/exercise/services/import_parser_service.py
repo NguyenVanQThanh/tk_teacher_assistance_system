@@ -509,9 +509,9 @@ class ImportParserService:
         except Exception as e:
             logger.warning(f"attach_question_images failed: {e}")
 
-        # Non-fatal per-section warnings are dropped: the router rejects the whole
-        # import (422) whenever errors are present, so only fail when nothing parsed.
-        return ParseResult(questions=all_questions, errors=[])
+        # Non-fatal per-chunk warnings are returned alongside the questions; the router
+        # only rejects the import (422) when no questions were parsed at all.
+        return ParseResult(questions=all_questions, errors=all_errors)
 
     @classmethod
     def detect_pdf_exam_sections(cls, file_bytes: bytes) -> List[Dict[str, Any]]:

@@ -151,10 +151,9 @@ class GeminiVisionParserService:
 
             # Stream the response (NDJSON: one question object per line) so a token-truncated
             # tail only drops the last partial line instead of invalidating the whole payload.
-            stream = client.models.generate_content(
+            stream = client.models.generate_content_stream(
                 model=model_name,
                 contents=contents,
-                stream=True,
                 config=types.GenerateContentConfig(
                     system_instruction=GEMINI_SYSTEM_PROMPT,
                     max_output_tokens=16384,
@@ -169,8 +168,11 @@ class GeminiVisionParserService:
             logger.error(f"Gemini Vision API execution failed: {e}", exc_info=True)
             return ParseResult(errors=[ParseError(question_number=None, message=f"Gemini Vision OCR error: {str(e)}")])
 
-    # Common provider-chain interface (used by ImportParserService)
-    parse_images = parse_images_with_gemini
+    @classmethod
+    def parse_images(cls, images: List[Image.Image], test_code: Optional[str] = None,
+                     page_numbers: Optional[List[int]] = None) -> ParseResult:
+        """Common provider-chain interface (used by ImportParserService)."""
+        return cls.parse_images_with_gemini(images, test_code=test_code, page_numbers=page_numbers)
 
     @classmethod
     def _build_result_from_items(cls, raw_questions: List[Any], provider: str = "Gemini") -> ParseResult:
@@ -373,7 +375,8 @@ class GeminiVisionParserService:
     def _process_gemini_json_response(cls, raw_json_str: str, provider: str = "Gemini") -> ParseResult:
         """
         Parses a whole-document JSON string from a vision provider (fallback when the
-        and builds sorted List[ParsedQuestion].
+        model did not follow the NDJSON stream format), auto-repairs token-truncated
+        JSON, and builds a sorted List[ParsedQuestion].
         """
         from app.modules.exercise.services.import_parser_service import ImportParserService
         clean_text = raw_json_str.strip()
