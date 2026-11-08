@@ -5,7 +5,7 @@
 // Updated At: 2026-09-13
 // Updated By: Tam Khang
 
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { 
   X, 
@@ -37,6 +37,16 @@ const formatFileSize = (bytes) => {
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 };
 
+// Normalize grade values coming from the API ('Lớp 10', '10', ...) to plain digits ('10')
+const normalizeGrade = (grade) => String(grade ?? '').replace(/\D/g, '');
+
+// Modal title per creation method step
+const METHOD_TITLES = {
+  select_method: 'Lựa chọn hình thức tạo mới',
+  ai: 'Tạo sinh bài tập AI',
+  upload: 'Tải lên từ file có sẵn (Word / PDF)',
+};
+
 export default function CreateExerciseModal({ isOpen, onClose, onCreateSuccess }) {
   const navigate = useNavigate();
   // Step 1: 'select_method', Step 2: 'upload', 'ai'
@@ -57,6 +67,7 @@ export default function CreateExerciseModal({ isOpen, onClose, onCreateSuccess }
   const [errorMsg, setErrorMsg] = useState('');
   const [toast, setToast] = useState(null);
   const toastTimerRef = useRef(null);
+  const closeTimerRef = useRef(null);
   const [subjectsList, setSubjectsList] = useState([]);
 
   // AI Generation Specific State
@@ -79,22 +90,19 @@ export default function CreateExerciseModal({ isOpen, onClose, onCreateSuccess }
   const [docGradeFilter, setDocGradeFilter] = useState('all');
   const docDropdownRef = useRef(null);
 
-  // Documents filtered by search text AND khối (grade block) filter
-  const filteredDocs = availableDocuments.filter((doc) => {
+  // Documents filtered by search text AND khối (grade block) filter (memoized)
+  const filteredDocs = useMemo(() => availableDocuments.filter((doc) => {
     const q = docSearchQuery.trim().toLowerCase();
     const matchSearch = !q || doc.title.toLowerCase().includes(q);
-    const matchGrade = docGradeFilter === 'all' || doc.grade === docGradeFilter;
+    const matchGrade = docGradeFilter === 'all' || normalizeGrade(doc.grade) === docGradeFilter;
     return matchSearch && matchGrade;
-  });
+  }), [availableDocuments, docSearchQuery, docGradeFilter]);
 
   // Modal title changes according to the selected creation method
-  const METHOD_TITLES = {
-    select_method: 'Lựa chọn hình thức tạo mới',
-    ai: 'Tạo sinh bài tập AI',
-    upload: 'Tải lên từ file có sẵn',
-  };
+  const modalTitle = METHOD_TITLES[currentStep] || METHOD_TITLES.select_method;
 
   useEffect(() => {
+    if (!isOpen) return undefined;
     let isMounted = true;
     async function loadSubjects() {
       try {
@@ -121,7 +129,7 @@ export default function CreateExerciseModal({ isOpen, onClose, onCreateSuccess }
             title: d.title,
             tag: d.document_type || 'Tài liệu',
             size: formatFileSize(d.file_size || 0),
-            grade: d.grade || '',
+            grade: normalizeGrade(d.grade),
             subjectName: d.subject_name || '',
           })));
         }
@@ -136,6 +144,12 @@ export default function CreateExerciseModal({ isOpen, onClose, onCreateSuccess }
       isMounted = false;
       document.removeEventListener('mousedown', handleClickOutside);
     };
+  }, [isOpen]);
+
+  // Clear pending toast/close timers when the component unmounts
+  useEffect(() => () => {
+    if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
+    if (closeTimerRef.current) clearTimeout(closeTimerRef.current);
   }, []);
 
   // Close document dropdown when clicking outside
@@ -160,6 +174,15 @@ export default function CreateExerciseModal({ isOpen, onClose, onCreateSuccess }
 
   const handleClose = () => {
     if (isSubmitting) return; // Prevent closing while processing OCR
+    if (toastTimerRef.current) {
+      clearTimeout(toastTimerRef.current);
+      toastTimerRef.current = null;
+    }
+    if (closeTimerRef.current) {
+      clearTimeout(closeTimerRef.current);
+      closeTimerRef.current = null;
+    }
+    setToast(null);
     setCurrentStep('select_method');
     setTitle('');
     setAiPrompt('');
@@ -258,9 +281,28 @@ export default function CreateExerciseModal({ isOpen, onClose, onCreateSuccess }
         }
       }
 
+      const createdExercise = {
+        id: res.exercise_id,
+        title: res.title,
+        type: type,
+        grade: grade,
+        subject: subject,
+        subjectName: subjectsList[0]?.subject_name || 'Toán học',
+        questionCount: `${res.total_questions || 0} câu hỏi`,
+        duration: type === 'quiz' ? '15 phút' : '45 phút',
+        date: new Date().toLocaleDateString('vi-VN'),
+        authorName: 'Giáo viên',
+        authorInitial: 'GV',
+        hasShare: true,
+      };
+
       showToast(`Đã tạo thành công bài tập "${res.title}" (${res.total_questions} câu hỏi).`, 'success', 'Tạo bài tập AI thành công');
-      if (onCreateSuccess) onCreateSuccess();
-      handleClose();
+      if (onCreateSuccess) onCreateSuccess(createdExercise);
+      // Keep the modal mounted until the success toast has been seen, otherwise it unmounts instantly
+      closeTimerRef.current = setTimeout(() => {
+        closeTimerRef.current = null;
+        handleClose();
+      }, 4200);
     } catch (err) {
       const detail = err.response?.data?.detail;
       const msg = (detail && typeof detail === 'object' ? detail.message : detail) || err.message || 'Tạo bài tập AI thất bại. Vui lòng thử lại.';
@@ -433,7 +475,7 @@ export default function CreateExerciseModal({ isOpen, onClose, onCreateSuccess }
           <div className="method-selection-view">
             {/* Header */}
             <div className="selection-modal-header">
-              <h2 className="selection-modal-title">{METHOD_TITLES[currentStep] || 'Lifestyle chọn hình thức tạo mới'}</h2>
+              <h2 className="selection-modal-title">{modalTitle}</h2>
               <button 
                 type="button" 
                 className="btn-modal-close"
@@ -507,7 +549,7 @@ export default function CreateExerciseModal({ isOpen, onClose, onCreateSuccess }
           <div className="ai-creation-view">
             {/* Header */}
             <div className="selection-modal-header">
-              <h2 className="selection-modal-title">{METHOD_TITLES[currentStep] || 'Lifestyle chọn hình thức tạo mới'}</h2>
+              <h2 className="selection-modal-title">{modalTitle}</h2>
               <button 
                 type="button" 
                 className="btn-modal-close"
@@ -766,7 +808,9 @@ export default function CreateExerciseModal({ isOpen, onClose, onCreateSuccess }
                                   <span className="doc-item-title">{doc.title}</span>
                                   <div className="doc-item-badges">
                                     <span className="doc-type-badge">{doc.tag}</span>
-                                    <span className="doc-grade-badge">Khối {doc.grade}</span>
+                                    {doc.grade
+                                      ? <span className="doc-grade-badge">Khối {doc.grade}</span>
+                                      : <span className="doc-grade-badge">Chưa gán khối</span>}
                                     <span className="doc-size-text">{doc.size}</span>
                                   </div>
                                 </div>
@@ -847,7 +891,7 @@ export default function CreateExerciseModal({ isOpen, onClose, onCreateSuccess }
                 >
                   <ArrowLeft size={18} />
                 </button>
-                <h3 className="form-modal-title">Tải lên từ file có sẵn (Word / PDF)</h3>
+                <h3 className="form-modal-title">{modalTitle}</h3>
               </div>
               <button 
                 type="button" 
