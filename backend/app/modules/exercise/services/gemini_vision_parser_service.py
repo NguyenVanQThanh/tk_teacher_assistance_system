@@ -42,7 +42,12 @@ Quy tắc bóc tách bắt buộc:
    - BẮT BUỘC bóc tách và trả về danh sách `questions` được sắp xếp tăng dần theo đúng số thứ tự câu hỏi trong đề: Câu 1, Câu 2, Câu 3, ..., Câu N.
    - Không được đảo lộn thứ tự giữa các trang hoặc các cột.
 
-5. CẤU TRÚC JSON ĐẦU RA (Bắt buộc trả về đúng format JSON này, không thêm markdown ticks bên ngoài):
+5. HÌNH ẢNH ĐÍNH KÈM CỦA CÂU HỎI (IMAGE):
+   - Nếu một câu hỏi có hình vẽ / biểu đồ / đồ thị đi kèm, BẮT BUỘC thêm trường "image": {"page": <số trang gốc, chính là số trong nhãn --- TRANG n --->, "bbox": [x0, y0, x1, y1]}.
+   - bbox là tọa độ của khung hình trên trang đó theo chuẩn hóa 0-1000 (phần nghìn kích thước trang): x0,y0 là góc trên-trái, x1,y1 là góc dưới-phải của hình.
+   - KHÔNG bịa đặt trường "image" nếu câu hỏi không có hình ảnh.
+
+6. CẤU TRÚC JSON ĐẦU RA (Bắt buộc trả về đúng format JSON này, không thêm markdown ticks bên ngoài):
 {
   "questions": [
     {
@@ -59,7 +64,8 @@ Quy tắc bóc tách bắt buộc:
         {"content": "$-2$", "is_correct": false, "display_order": 2},
         {"content": "$4$", "is_correct": false, "display_order": 3}
       ],
-      "correct_answer": "B"
+      "correct_answer": "B",
+      "image": {"page": 1, "bbox": [120, 300, 480, 620]}
     }
   ]
 }
@@ -130,10 +136,12 @@ class GeminiVisionParserService:
     def parse_images_with_gemini(
         cls,
         images: List[Image.Image],
-        test_code: Optional[str] = None
+        test_code: Optional[str] = None,
+        page_numbers: Optional[List[int]] = None
     ) -> ParseResult:
         """
         Sends exam page images to Google Gemini Vision API and returns parsed structured questions.
+        page_numbers carries the original 1-based PDF page number of each image (for image bboxes).
         """
         api_key = cls.get_api_key()
         if not api_key:
@@ -150,7 +158,8 @@ class GeminiVisionParserService:
 
             contents: List[Any] = []
             for idx, img in enumerate(images, 1):
-                contents.append(f"--- TRANG {idx} CỦA ĐỀ THI ---")
+                page_no = page_numbers[idx - 1] if page_numbers and idx - 1 < len(page_numbers) else idx
+                contents.append(f"--- TRANG {page_no} CỦA ĐỀ THI ---")
                 contents.append(img)
 
             contents.append("Hãy bóc tách toàn bộ các câu hỏi từ tất cả các trang trên và trả về kết quả JSON.")
@@ -174,6 +183,9 @@ class GeminiVisionParserService:
         except Exception as e:
             logger.error(f"Gemini Vision API execution failed: {e}", exc_info=True)
             return ParseResult(errors=[ParseError(question_number=None, message=f"Gemini Vision OCR error: {str(e)}")])
+
+    # Common provider-chain interface (used by ImportParserService)
+    parse_images = parse_images_with_gemini
 
     @staticmethod
     def sanitize_json_latex_escapes(raw: str) -> str:
@@ -327,6 +339,23 @@ class GeminiVisionParserService:
 
             segments, needs_review = ImportParserService.extract_segments(content)
 
+            # Optional figure location reported by the vision model (normalized 0-1000 bbox)
+            image_page = None
+            image_bbox = None
+            img_info = item.get("image")
+            if isinstance(img_info, dict):
+                try:
+                    if img_info.get("page") is not None:
+                        image_page = int(img_info.get("page"))
+                except (ValueError, TypeError):
+                    image_page = None
+                bb = img_info.get("bbox")
+                if isinstance(bb, (list, tuple)) and len(bb) == 4:
+                    try:
+                        image_bbox = [float(v) for v in bb]
+                    except (ValueError, TypeError):
+                        image_bbox = None
+
             parsed_questions.append(ParsedQuestion(
                 question_number=q_num,
                 part=part,
@@ -340,7 +369,9 @@ class GeminiVisionParserService:
                 needs_review=needs_review,
                 image_url=item.get("image_url"),
                 answer_options=options,
-                correct_answer=str(corr_ans) if corr_ans is not None else None
+                correct_answer=str(corr_ans) if corr_ans is not None else None,
+                image_page=image_page,
+                image_bbox=image_bbox
             ))
 
         # Sort questions strictly by Part and question_number (1, 2, 3, ..., N)

@@ -82,10 +82,12 @@ class MistralVisionParserService:
     def parse_images_with_mistral(
         cls,
         images: List[Image.Image],
-        test_code: Optional[str] = None
+        test_code: Optional[str] = None,
+        page_numbers: Optional[List[int]] = None
     ) -> ParseResult:
         """
         Sends exam page images to Mistral Vision API (chat completions) and returns parsed structured questions.
+        page_numbers carries the original 1-based PDF page number of each image (for image bboxes).
         """
         api_key = cls.get_api_key()
         if not api_key:
@@ -96,7 +98,8 @@ class MistralVisionParserService:
         try:
             user_content: List[Any] = []
             for idx, img in enumerate(images, 1):
-                user_content.append({"type": "text", "text": f"--- TRANG {idx} CỦA ĐỀ THI ---"})
+                page_no = page_numbers[idx - 1] if page_numbers and idx - 1 < len(page_numbers) else idx
+                user_content.append({"type": "text", "text": f"--- TRANG {page_no} CỦA ĐỀ THI ---"})
                 user_content.append({
                     "type": "image_url",
                     "image_url": {"url": cls._image_to_data_url(img)},
@@ -133,3 +136,6 @@ class MistralVisionParserService:
         except Exception as e:
             logger.error(f"Mistral Vision API execution failed: {e}", exc_info=True)
             return ParseResult(errors=[ParseError(question_number=None, message=f"Mistral Vision OCR error: {str(e)}")])
+
+    # Common provider-chain interface (used by ImportParserService)
+    parse_images = parse_images_with_mistral

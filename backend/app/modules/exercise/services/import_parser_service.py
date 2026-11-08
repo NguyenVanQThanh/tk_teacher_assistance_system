@@ -42,6 +42,13 @@ class ParsedQuestion:
     image_url: Optional[str] = None
     answer_options: List[ParsedOption] = field(default_factory=list)
     correct_answer: Optional[str] = None
+    # Exam (đề) this question belongs to when the file contains multiple exams, e.g. "ĐỀ SỐ 1"
+    exam_label: Optional[str] = None
+    # Figure location reported by the vision model (transient, used for cropping)
+    image_page: Optional[int] = None
+    image_bbox: Optional[List[float]] = None  # normalized [x0, y0, x1, y1] in 0-1000
+    # Persisted onto Question.image_metadata once the cropped figure is stored
+    image_metadata: Optional[Dict[str, Any]] = None
 
 
 @dataclass
@@ -326,6 +333,13 @@ class ImportParserService:
         return full_text, tables_data, inline_images
 
 
+    # Exam header patterns ("ĐỀ SỐ 1", "MÃ ĐỀ 0121", "ĐỀ 2", ...) detected near the top of a page
+    EXAM_HEADER_PATTERNS = [
+        re.compile(r"MÃ\s*ĐỀ\s*[:#]?\s*(\d[\w]{0,3})", re.IGNORECASE),
+        re.compile(r"ĐỀ\s*SỐ\s*[:#]?\s*(\d[\w]{0,3})", re.IGNORECASE),
+        re.compile(r"\bĐỀ\s+(\d[\w]{0,3})", re.IGNORECASE),
+    ]
+
     @classmethod
     def parse_document(
         cls,
@@ -337,31 +351,177 @@ class ImportParserService:
     ) -> ParseResult:
         """
         Main entry point to parse question document and optional separate answer key.
-        For PDFs, tries AI Vision OCR providers in order (SCAN_AI_PROVIDER first, then the
-        other provider as fallback), and finally falls back to the local text parser.
+
+        A PDF may contain multiple exams (đề): the file is split into exam sections by
+        header lines, each section is parsed with the AI Vision provider chain
+        (SCAN_AI_PROVIDER first, then the other provider as automatic fallback) or the
+        local parser, and questions are tagged with their exam label. Figures attached
+        to questions are cropped from the page renders and stored via QuestionImageService.
         """
         is_pdf = filename.lower().endswith(".pdf")
 
-        # 1. Try AI Vision OCR providers (config-driven order with automatic fallback) for PDFs
-        if is_pdf:
-            for provider_name, provider in cls.get_ai_vision_providers():
-                try:
-                    logger.info(f"Using {provider_name} Vision API for PDF OCR...")
-                    ai_result = provider.parse_pdf_document(file_bytes, test_code=test_code)
-                    if ai_result.questions and not ai_result.errors:
-                        merged = cls.merge_ai_result_with_answer_key(
-                            ai_result, answer_file_bytes, answer_filename, test_code
-                        )
-                        return merged if merged is not None else ai_result
-                    logger.warning(
-                        f"{provider_name} OCR did not return questions ({ai_result.errors}). Trying next provider/local parser."
-                    )
-                except Exception as e:
-                    logger.warning(f"{provider_name} Vision Parser encountered an error: {e}. Trying next provider/local parser.")
+        if not is_pdf:
+            return cls._parse_local_document(
+                file_bytes, filename, pages=None,
+                answer_file_bytes=answer_file_bytes,
+                answer_filename=answer_filename, test_code=test_code,
+            )
 
-        # 2. Local Fallback Parser (pdfplumber / docx + regex)
+        sections = cls.detect_pdf_exam_sections(file_bytes)
+
+        # Render all pages once (shared by the AI vision providers and image cropping);
+        # skipped when the PDF cannot be read page-wise (sections carry pages=None)
+        page_images: List[Any] = []
+        if any(sec["pages"] is not None for sec in sections):
+            try:
+                from app.modules.exercise.services.gemini_vision_parser_service import GeminiVisionParserService
+                page_images = GeminiVisionParserService.render_pdf_to_images(file_bytes)
+            except Exception as e:
+                logger.warning(f"Could not render PDF pages for vision OCR: {e}")
+
+        all_questions: List[ParsedQuestion] = []
+        all_errors: List[ParseError] = []
+
+        for section in sections:
+            pages: Optional[List[int]] = section["pages"]
+            label: Optional[str] = section["label"]
+            images = (
+                [page_images[p - 1] for p in pages if 1 <= p <= len(page_images)]
+                if pages is not None else page_images
+            )
+
+            section_result: Optional[ParseResult] = None
+
+            # 1. AI Vision OCR providers (config-driven order with automatic fallback)
+            if images or pages is None:
+                for provider_name, provider in cls.get_ai_vision_providers():
+                    try:
+                        logger.info(f"Using {provider_name} Vision API for PDF OCR (exam '{label or 'default'}', pages {pages})...")
+                        if pages is None:
+                            ai_result = provider.parse_pdf_document(file_bytes, test_code=test_code)
+                        else:
+                            ai_result = provider.parse_images(images, page_numbers=pages, test_code=test_code)
+                        if ai_result.questions and not ai_result.errors:
+                            merged = cls.merge_ai_result_with_answer_key(
+                                ai_result, answer_file_bytes, answer_filename, test_code
+                            )
+                            section_result = merged if merged is not None else ai_result
+                            break
+                        logger.warning(
+                            f"{provider_name} OCR returned no questions ({ai_result.errors}). Trying next provider/local parser."
+                        )
+                    except Exception as e:
+                        logger.warning(f"{provider_name} Vision Parser error: {e}. Trying next provider/local parser.")
+
+            # 2. Local fallback parser (pdfplumber / docx + regex) for this section
+            if section_result is None or not section_result.questions:
+                local_result = cls._parse_local_document(
+                    file_bytes, filename, pages=pages,
+                    answer_file_bytes=answer_file_bytes,
+                    answer_filename=answer_filename, test_code=test_code,
+                )
+                if local_result.questions or section_result is None:
+                    section_result = local_result
+
+            if section_result is None:
+                continue
+            for q in section_result.questions:
+                q.exam_label = label
+            all_questions.extend(section_result.questions)
+            all_errors.extend(section_result.errors)
+
+        if not all_questions:
+            if all_errors:
+                return ParseResult(questions=[], errors=all_errors)
+            return ParseResult(errors=[ParseError(question_number=None, message="No valid questions could be identified in the file.")])
+
+        # 3. Crop and store figures attached to each question
+        try:
+            cls.attach_question_images(file_bytes, all_questions, sections=sections)
+        except Exception as e:
+            logger.warning(f"attach_question_images failed: {e}")
+
+        return ParseResult(questions=all_questions, errors=all_errors)
+
+    @classmethod
+    def detect_pdf_exam_sections(cls, file_bytes: bytes) -> List[Dict[str, Any]]:
+        """
+        Split a PDF into exam sections by detecting exam headers (e.g. 'ĐỀ SỐ 1', 'MÃ ĐỀ 101')
+        near the top of pages. Returns [{'label': str|None, 'pages': [1-based pages]}];
+        falls back to a single section covering all pages when no header is found.
+        """
+        sections: List[Dict[str, Any]] = []
+        try:
+            return cls._detect_pdf_exam_sections(file_bytes)
+        except Exception as e:
+            logger.warning(f"detect_pdf_exam_sections failed ({e}); treating file as a single exam.")
+            return [{"label": None, "pages": None}]
+
+    @classmethod
+    def _detect_pdf_exam_sections(cls, file_bytes: bytes) -> List[Dict[str, Any]]:
+        sections: List[Dict[str, Any]] = []
+        with pdfplumber.open(io.BytesIO(file_bytes)) as pdf:
+            total_pages = len(pdf.pages)
+            for idx, page in enumerate(pdf.pages, 1):
+                text = page.extract_text() or ""
+                label = None
+                # exam headers may sit anywhere on the page; only accept short lines or
+                # lines that also look like a title block ("MÔN THI", "ĐỀ THI ...")
+                for line in text.splitlines():
+                    if len(line.strip()) > 120 and "MÔN" not in line.upper() and "THI" not in line.upper():
+                        continue
+                    for pattern in cls.EXAM_HEADER_PATTERNS:
+                        m = pattern.search(line)
+                        if m:
+                            label = re.sub(r"\s+", " ", m.group(0)).strip().upper()
+                            break
+                    if label:
+                        break
+                if label and (not sections or sections[-1]["label"] != label):
+                    sections.append({"label": label, "pages": [idx]})
+                elif sections:
+                    sections[-1]["pages"].append(idx)
+                else:
+                    sections.append({"label": None, "pages": [idx]})
+        if not sections:
+            sections = [{"label": None, "pages": list(range(1, total_pages + 1))}]
+        return sections
+
+    @classmethod
+    def extract_pdf_content_pages(cls, file_bytes: bytes, pages: List[int]) -> Tuple[str, List[List[List[str]]], List[Dict[str, Any]]]:
+        """Extract text and tables only from the given 1-based page numbers (pdfplumber)."""
+        full_text_lines = []
+        tables_data = []
+        with pdfplumber.open(io.BytesIO(file_bytes)) as pdf:
+            for p in pages:
+                if 1 <= p <= len(pdf.pages):
+                    page = pdf.pages[p - 1]
+                    text = page.extract_text()
+                    if text:
+                        full_text_lines.append(cls.normalize_extracted_text(text.strip()))
+                    for tbl in page.extract_tables():
+                        clean_tbl = [[str(cell or '').strip() for cell in row] for row in tbl if row]
+                        if clean_tbl:
+                            tables_data.append(clean_tbl)
+        return "\n".join(full_text_lines), tables_data, []
+
+    @classmethod
+    def _parse_local_document(
+        cls,
+        file_bytes: bytes,
+        filename: str,
+        pages: Optional[List[int]] = None,
+        answer_file_bytes: Optional[bytes] = None,
+        answer_filename: Optional[str] = None,
+        test_code: Optional[str] = None
+    ) -> ParseResult:
+        """Local (non-AI) parser: pdfplumber/docx text extraction + regex question parsing."""
+        is_pdf = filename.lower().endswith(".pdf")
         if is_pdf:
-            q_text, q_tables, q_images = cls.extract_pdf_content(file_bytes)
+            if pages:
+                q_text, q_tables, q_images = cls.extract_pdf_content_pages(file_bytes, pages)
+            else:
+                q_text, q_tables, q_images = cls.extract_pdf_content(file_bytes)
         else:
             q_text, q_tables, q_images = cls.extract_docx_content(file_bytes)
 
@@ -397,6 +557,138 @@ class ImportParserService:
             return ParseResult(questions=[], errors=merge_errors)
 
         return ParseResult(questions=merged_questions, errors=[])
+
+    @classmethod
+    def attach_question_images(cls, file_bytes: bytes, questions: List[ParsedQuestion],
+                               sections: Optional[List[Dict[str, Any]]] = None, scale: float = 2.0) -> None:
+        """
+        Crop figure images for questions from the rendered PDF pages and store them via
+        QuestionImageService. Uses vision-provided bboxes (q.image_page/q.image_bbox,
+        normalized 0-1000) when available, otherwise assigns embedded PDF images to the
+        nearest question header by vertical position (pdfplumber fallback).
+        """
+        from app.core.config import QUESTION_IMAGE_MAX_BYTES
+        from app.modules.exercise.services.gemini_vision_parser_service import GeminiVisionParserService
+        from app.modules.exercise.services.question_image_service import QuestionImageService
+
+        try:
+            page_images = GeminiVisionParserService.render_pdf_to_images(file_bytes, scale=scale)
+        except Exception as e:
+            logger.warning(f"attach_question_images: cannot render PDF pages: {e}")
+            return
+        if not page_images:
+            return
+
+        fallback_pages = None
+        try:
+            fallback_pages = cls._collect_page_images_and_question_marks(file_bytes)
+        except Exception as e:
+            logger.warning(f"attach_question_images: pdfplumber fallback unavailable: {e}")
+
+        label_pages: Dict[Optional[str], List[int]] = {}
+        if sections:
+            for sec in sections:
+                label_pages.setdefault(sec["label"], []).extend(sec["pages"])
+
+        for q in questions:
+            if q.image_url:
+                continue
+            page_no, bbox = q.image_page, q.image_bbox
+            if not (bbox and page_no and 1 <= page_no <= len(page_images)):
+                if fallback_pages:
+                    cand = cls._find_fallback_bbox(fallback_pages, q, label_pages)
+                    if cand:
+                        page_no, bbox = cand
+            if not (bbox and page_no and 1 <= page_no <= len(page_images)):
+                continue
+            try:
+                img = page_images[page_no - 1]
+                W, H = img.size
+                x0 = max(0.0, min(1000.0, float(bbox[0]))) / 1000.0 * W
+                y0 = max(0.0, min(1000.0, float(bbox[1]))) / 1000.0 * H
+                x1 = max(0.0, min(1000.0, float(bbox[2]))) / 1000.0 * W
+                y1 = max(0.0, min(1000.0, float(bbox[3]))) / 1000.0 * H
+                if x1 - x0 < 20 or y1 - y0 < 20:
+                    continue
+                crop = img.crop((int(x0), int(y0), int(x1), int(y1))).convert("RGB")
+                buf = io.BytesIO()
+                crop.save(buf, format="PNG")
+                data = buf.getvalue()
+                while len(data) > QUESTION_IMAGE_MAX_BYTES and crop.width > 240 and crop.height > 240:
+                    crop = crop.resize((crop.width // 2, crop.height // 2))
+                    buf = io.BytesIO()
+                    crop.save(buf, format="PNG")
+                    data = buf.getvalue()
+                if len(data) > QUESTION_IMAGE_MAX_BYTES:
+                    continue
+                meta = QuestionImageService.save_image_bytes(
+                    data, ext="png",
+                    original_name=f"question_{q.question_number}_page_{page_no}.png",
+                    content_type="image/png",
+                )
+                q.image_url = meta["url"]
+                q.image_metadata = meta
+            except Exception as e:
+                logger.warning(f"attach_question_images: failed for question {q.question_number}: {e}")
+
+    @staticmethod
+    def _collect_page_images_and_question_marks(file_bytes: bytes) -> List[Dict[str, Any]]:
+        """
+        Per-page embedded images (normalized bbox 0-1000) and 'Câu n' header positions,
+        used to assign figures to questions when the vision model returned no bboxes.
+        """
+        pages_info: List[Dict[str, Any]] = []
+        with pdfplumber.open(io.BytesIO(file_bytes)) as pdf:
+            for idx, page in enumerate(pdf.pages, 1):
+                W, H = float(page.width), float(page.height)
+                images = []
+                for im in page.images:
+                    try:
+                        bbox = [float(im["x0"]) / W * 1000, float(im["top"]) / H * 1000,
+                                float(im["x1"]) / W * 1000, float(im["bottom"]) / H * 1000]
+                    except Exception:
+                        continue
+                    if (bbox[2] - bbox[0]) >= 15 and (bbox[3] - bbox[1]) >= 15:
+                        images.append(bbox)
+                qmarks: List[Tuple[int, float]] = []
+                try:
+                    for hit in page.search(r"Câu\s*\d+\s*[:.]"):
+                        m = re.search(r"(\d+)", hit.get("text", "") or "")
+                        if m:
+                            qmarks.append((int(m.group(1)), float(hit["top"]) / H * 1000))
+                except Exception:
+                    pass
+                pages_info.append({"page": idx, "images": images, "qmarks": sorted(qmarks, key=lambda t: t[1])})
+        return pages_info
+
+    @staticmethod
+    def _find_fallback_bbox(pages_info: List[Dict[str, Any]], question: "ParsedQuestion",
+                            label_pages: Optional[Dict[Optional[str], List[int]]] = None
+                            ) -> Optional[Tuple[int, List[float]]]:
+        """Assign an embedded page image to a question by vertical proximity of 'Câu n' headers."""
+        allowed = None
+        if label_pages is not None and question.exam_label in label_pages:
+            allowed = set(label_pages[question.exam_label])
+        for pinfo in pages_info:
+            if allowed is not None and pinfo["page"] not in allowed:
+                continue
+            marks = pinfo["qmarks"]
+            if not marks or not pinfo["images"]:
+                continue
+            idx = next((i for i, (num, _) in enumerate(marks) if num == question.question_number), None)
+            if idx is None:
+                continue
+            q_top = marks[idx][1]
+            next_top = marks[idx + 1][1] if idx + 1 < len(marks) else 1000.0
+            candidates = []
+            for bbox in pinfo["images"]:
+                cy = (bbox[1] + bbox[3]) / 2
+                if q_top - 120 <= cy < next_top:
+                    candidates.append((cy, bbox))
+            if candidates:
+                candidates.sort(key=lambda t: abs(t[0] - q_top))
+                return pinfo["page"], candidates[0][1]
+        return None
 
     @staticmethod
     def get_ai_vision_providers() -> List[Tuple[str, Any]]:

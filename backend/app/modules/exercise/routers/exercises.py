@@ -6,7 +6,7 @@
 # Updated By: Tam Khang
 
 from uuid import UUID
-from typing import List, Optional
+from typing import List, Optional, Tuple
 from fastapi import APIRouter, Depends, Query, UploadFile, File, Form, HTTPException, Response, status
 from sqlalchemy.orm import Session
 
@@ -281,48 +281,83 @@ async def import_questions(
             }
         )
 
-    # 4. Clear old questions of this exercise before re-importing
-    existing_exercise = exercise_service.get_exercise_detail(current_user, exercise_id)
-    if existing_exercise and existing_exercise.questions:
-        for old_q in existing_exercise.questions:
-            old_q.status = "DELETED"
-        question_service.db.commit()
+    # 4. Group parsed questions by exam label: one file may contain multiple đề,
+    #    each đề becomes its own exercise record.
+    groups: List[Tuple[Optional[str], List]] = []
+    for parsed_q in parse_result.questions:
+        label = getattr(parsed_q, "exam_label", None)
+        for g_label, g_list in groups:
+            if g_label == label:
+                g_list.append(parsed_q)
+                break
+        else:
+            groups.append((label, [parsed_q]))
 
-    # 5. Sort questions strictly by Part and question_number before inserting into database
-    sorted_questions = sorted(
-        parse_result.questions,
-        key=lambda q: (
-            1 if q.part == "Part1" else 2 if q.part == "Part2" else 3 if q.part == "Part3" else 4,
-            q.question_number or 0
-        )
-    )
+    base_exercise = exercise_service.get_exercise_detail(current_user, exercise_id)
+    multiple_exams = len(groups) > 1
 
     created_questions = []
-    for idx, parsed_q in enumerate(sorted_questions, start=1):
-        options_create = [
-            AnswerOptionCreate(
-                content=opt.content,
-                is_correct=opt.is_correct,
-                display_order=opt.display_order
+    for g_idx, (label, group_questions) in enumerate(groups):
+        # 4a. Resolve the target exercise record for this exam (đề)
+        target_exercise_id = exercise_id
+        if multiple_exams:
+            suffix = label or f"Đề {g_idx + 1}"
+            new_title = f"{base_exercise.title} - {suffix}"
+            if g_idx == 0:
+                exercise_service.update_exercise(current_user, exercise_id, ExerciseUpdate(title=new_title))
+            else:
+                new_ex = exercise_service.create_exercise(
+                    current_user,
+                    ExerciseCreate(
+                        title=new_title,
+                        subject_id=base_exercise.subject_id,
+                        ai_metadata=base_exercise.ai_metadata,
+                    ),
+                )
+                target_exercise_id = new_ex.exercise_id
+
+        # 4b. Clear old questions of the target exercise before re-importing
+        existing_exercise = exercise_service.get_exercise_detail(current_user, target_exercise_id)
+        if existing_exercise and existing_exercise.questions:
+            for old_q in existing_exercise.questions:
+                old_q.status = "DELETED"
+            question_service.db.commit()
+
+        # 4c. Sort questions strictly by Part and question_number before inserting into database
+        sorted_questions = sorted(
+            group_questions,
+            key=lambda q: (
+                1 if q.part == "Part1" else 2 if q.part == "Part2" else 3 if q.part == "Part3" else 4,
+                q.question_number or 0
             )
-            for opt in parsed_q.answer_options
-        ]
-        payload = QuestionCreate(
-            content=parsed_q.content,
-            content_markdown=parsed_q.content_markdown,
-            content_latex=parsed_q.content_latex,
-            segments=parsed_q.segments,
-            confidence_score=parsed_q.confidence_score,
-            needs_review=parsed_q.needs_review,
-            question_type=parsed_q.question_type,
-            difficulty=parsed_q.difficulty,
-            correct_answer=parsed_q.correct_answer,
-            display_order=idx,
-            image_url=parsed_q.image_url,
-            answer_options=options_create if options_create else None
         )
-        created_q = question_service.add_question(current_user, exercise_id, payload)
-        created_questions.append(created_q)
+
+        for idx, parsed_q in enumerate(sorted_questions, start=1):
+            options_create = [
+                AnswerOptionCreate(
+                    content=opt.content,
+                    is_correct=opt.is_correct,
+                    display_order=opt.display_order
+                )
+                for opt in parsed_q.answer_options
+            ]
+            payload = QuestionCreate(
+                content=parsed_q.content,
+                content_markdown=parsed_q.content_markdown,
+                content_latex=parsed_q.content_latex,
+                segments=parsed_q.segments,
+                confidence_score=parsed_q.confidence_score,
+                needs_review=parsed_q.needs_review,
+                question_type=parsed_q.question_type,
+                difficulty=parsed_q.difficulty,
+                correct_answer=parsed_q.correct_answer,
+                display_order=idx,
+                image_url=parsed_q.image_url,
+                image_metadata=parsed_q.image_metadata,
+                answer_options=options_create if options_create else None
+            )
+            created_q = question_service.add_question(current_user, target_exercise_id, payload)
+            created_questions.append(created_q)
 
     return created_questions
 
