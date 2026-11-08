@@ -20,6 +20,9 @@ load_dotenv()
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
+
+from app.core.config import QUESTION_IMAGE_DIR, QUESTION_IMAGE_URL_PREFIX
 
 from app.modules.auth.routers.auth import router as auth_router
 from app.modules.academic.routers.subjects import router as subjects_router
@@ -64,6 +67,14 @@ app.include_router(admin_dashboard_router)
 app.include_router(student_dashboard_router)
 app.include_router(teacher_schedule_router)
 app.include_router(teacher_dashboard_router)
+
+# Serve question images from BE storage (path configurable via .env, see app/core/config.py)
+QUESTION_IMAGE_DIR.mkdir(parents=True, exist_ok=True)
+app.mount(
+    QUESTION_IMAGE_URL_PREFIX,
+    StaticFiles(directory=QUESTION_IMAGE_DIR),
+    name="question-images",
+)
 
 @app.get("/health")
 def health():

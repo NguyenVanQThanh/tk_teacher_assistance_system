@@ -230,6 +230,7 @@ class QuestionRepository:
         explanation: Optional[str] = None,
         display_order: Optional[int] = None,
         image_url: Optional[str] = None,
+        image_metadata: Optional[Any] = None,
         answer_options: Optional[List[AnswerOption]] = None
     ) -> Question:
         """Update Question fields and replace associated AnswerOptions if provided."""
@@ -257,6 +258,8 @@ class QuestionRepository:
             question.display_order = display_order
         if image_url is not None:
             question.image_url = image_url
+        if image_metadata is not None:
+            question.image_metadata = image_metadata
         
         if answer_options is not None:
             self.db.query(AnswerOption).filter(AnswerOption.question_id == question.question_id).delete()

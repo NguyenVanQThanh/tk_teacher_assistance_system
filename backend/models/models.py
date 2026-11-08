@@ -192,6 +192,7 @@ class Question(Base):
     explanation = Column(Text, nullable=True)
     display_order = Column(Integer, default=0)
     image_url = Column(String(500), nullable=True)
+    image_metadata = Column(JSON, nullable=True)
     is_ai_generated = Column(Boolean, default=False)
     status = Column(String(20), default='ACTIVE', nullable=False)
     created_at = Column(DateTime(timezone=True), server_default=func.now())

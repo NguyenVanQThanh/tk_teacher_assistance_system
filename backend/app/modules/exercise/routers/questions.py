@@ -6,13 +6,14 @@
 # Updated By: Tam Khang
 
 from uuid import UUID
-from fastapi import APIRouter, Depends, status
+from fastapi import APIRouter, Depends, File, UploadFile, status
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
 from models.models import User
 from app.modules.auth.dependencies import require_perm, get_current_user
-from app.modules.exercise.schemas import QuestionUpdate, QuestionOut
+from app.modules.exercise.schemas import QuestionImageUploadOut, QuestionUpdate, QuestionOut
+from app.modules.exercise.services.question_image_service import QuestionImageService
 from app.modules.exercise.services.question_service import QuestionService
 
 router = APIRouter(prefix="/api/v1/questions", tags=["exercise-bank"])
@@ -21,6 +22,24 @@ router = APIRouter(prefix="/api/v1/questions", tags=["exercise-bank"])
 def get_question_service(db: Session = Depends(get_db)) -> QuestionService:
     """Dependency provider for QuestionService."""
     return QuestionService(db)
+
+
+@router.post(
+    "/upload-image",
+    response_model=QuestionImageUploadOut,
+    status_code=status.HTTP_201_CREATED,
+    dependencies=[Depends(require_perm("EXE_EXERCISE_MANAGE"))]
+)
+def upload_question_image(
+    file: UploadFile = File(..., description="Image file attached to a question (png, jpg, gif, bmp, webp, svg)"),
+    current_user: User = Depends(get_current_user),
+):
+    """
+    Upload an image to BE storage (path configurable via QUESTION_IMAGE_DIR in .env).
+    Returns the public URL plus metadata to persist on the question record.
+    Requires EXE_EXERCISE_MANAGE permission.
+    """
+    return QuestionImageService.save_image(file)
 
 
 @router.put(
