@@ -2,8 +2,8 @@
 // Description: Teacher Exercise Repository Page connected to backend RESTful APIs with Cursor-based Keyset Pagination, centered delete confirmation modal, and toast notifications.
 // Created At: 2026-08-30
 // Created By: Tam Khang
-// Updated At: 2026-10-06
-// Updated By: Tam Khang
+// Updated At: 2026-11-11
+// Updated By: AI Agent
 
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { 
@@ -23,7 +23,7 @@ import ExerciseFilterBar from '../../components/exercises/ExerciseFilterBar';
 import ExerciseCard from '../../components/exercises/ExerciseCard';
 import CreateExerciseModal from '../../components/exercises/CreateExerciseModal';
 import ExercisePreviewModal from '../../components/exercises/ExercisePreviewModal';
-import EditExerciseModal from '../../components/documents/EditExerciseModal';
+const EditExerciseModal = React.lazy(() => import('../../components/documents/EditExerciseModal'));
 import AssignExerciseModal from '../../components/exercises/AssignExerciseModal';
 import { exercisesApi, subjectsApi } from '../../services/api';
 import './ExerciseRepositoryPage.css';
@@ -429,12 +429,14 @@ export default function ExerciseRepositoryPage() {
       />
 
       {/* Edit Exercise / Document Modal Matching Image 1 */}
-      <EditExerciseModal
+      <React.Suspense fallback={null}>
+        <EditExerciseModal
         isOpen={!!editingExercise}
         doc={editingExercise}
         onClose={() => setEditingExercise(null)}
         onSave={handleSaveEditedExercise}
       />
+      </React.Suspense>
 
       {/* Assign Exercise to Class Modal */}
       <AssignExerciseModal
