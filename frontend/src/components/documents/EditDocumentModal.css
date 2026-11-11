@@ -1,5 +1,5 @@
 /* File Name: EditDocumentModal.css */
-/* Description: Styles for the streamlined document metadata editing modal (Title, Subject, Document Type). */
+/* Description: Styles for the streamlined document metadata editing modal (Title, Document Type). */
 /* Created At: 2026-09-12 */
 /* Created By: Tam Khang */
 /* Updated At: 2026-11-03 */
@@ -170,7 +170,7 @@
 
 .edit-form-grid {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: 1fr;
   gap: 16px;
 }
 

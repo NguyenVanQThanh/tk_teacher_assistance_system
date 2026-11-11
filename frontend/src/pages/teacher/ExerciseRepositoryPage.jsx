@@ -2,7 +2,7 @@
 // Description: Teacher Exercise Repository Page connected to backend RESTful APIs with Cursor-based Keyset Pagination, centered delete confirmation modal, and toast notifications.
 // Created At: 2026-08-30
 // Created By: Tam Khang
-// Updated At: 2026-10-06
+// Updated At: 2026-11-11
 // Updated By: Tam Khang
 
 import React, { useState, useEffect, useCallback, useRef } from 'react';
@@ -33,7 +33,6 @@ const PAGE_SIZE = 6;
 export default function ExerciseRepositoryPage() {
   const [showSidebar, setShowSidebar] = useState(true);
   const [selectedGrade, setSelectedGrade] = useState('all');
-  const [selectedSubject, setSelectedSubject] = useState('all');
   const [selectedType, setSelectedType] = useState('all');
   const [searchQuery, setSearchQuery] = useState('');
 
@@ -115,20 +114,6 @@ export default function ExerciseRepositoryPage() {
         params.search = searchQuery.trim();
       }
 
-      if (selectedSubject !== 'all' && subjectsList.length > 0) {
-        const found = subjectsList.find(
-          (s) =>
-            s.subject_id === selectedSubject ||
-            (selectedSubject === 'math' && s.subject_name.toLowerCase().includes('toán')) ||
-            (selectedSubject === 'physics' && s.subject_name.toLowerCase().includes('vật')) ||
-            (selectedSubject === 'chemistry' && s.subject_name.toLowerCase().includes('hóa')) ||
-            (selectedSubject === 'english' && s.subject_name.toLowerCase().includes('anh'))
-        );
-        if (found) {
-          params.subject_id = found.subject_id;
-        }
-      }
-
       const res = await exercisesApi.getExercises(params);
 
       let rawItems = [];
@@ -203,13 +188,13 @@ export default function ExerciseRepositoryPage() {
     } finally {
       setLoading(false);
     }
-  }, [searchQuery, selectedSubject, subjectsList]);
+  }, [searchQuery, subjectsList]);
 
   // Initial and reactive load on filter change
   useEffect(() => {
     setCursorHistory([null]);
     loadExercises(null, 'next', 1);
-  }, [selectedGrade, selectedSubject, selectedType, searchQuery, loadExercises]);
+  }, [selectedGrade, selectedType, searchQuery, loadExercises]);
 
   const handleNextPage = () => {
     if (!nextCursor || !hasMore) return;
@@ -326,8 +311,6 @@ export default function ExerciseRepositoryPage() {
           <ExerciseFilterBar
             selectedGrade={selectedGrade}
             onChangeGrade={setSelectedGrade}
-            selectedSubject={selectedSubject}
-            onChangeSubject={setSelectedSubject}
             selectedType={selectedType}
             onChangeType={setSelectedType}
             searchQuery={searchQuery}

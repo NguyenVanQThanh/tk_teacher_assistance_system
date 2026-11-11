@@ -2,7 +2,7 @@
 // Description: Interactive Add Question modal with filter metadata row, comprehensive math symbol palette (Image 3), LaTeX editor, answer options, and live KaTeX preview matching Image 2.
 // Created At: 2026-09-13
 // Created By: Tam Khang
-// Updated At: 2026-09-13
+// Updated At: 2026-11-11
 // Updated By: Tam Khang
 
 import React, { useState, useEffect, useRef } from 'react';
@@ -219,15 +219,6 @@ export default function AddQuestionModal({
       key: String.fromCharCode(65 + idx)
     }));
     setOptions(reindexed);
-  };
-
-  const handleAddOption = () => {
-    if (options.length >= 6) return;
-    const nextKey = String.fromCharCode(65 + options.length);
-    setOptions([
-      ...options,
-      { key: nextKey, text: `Phương án ${nextKey}`, isCorrect: false }
-    ]);
   };
 
   const handleShuffleOptions = () => {
@@ -930,17 +921,6 @@ export default function AddQuestionModal({
                 })}
               </div>
 
-              {/* Add Option Button */}
-              {options.length < 6 && (
-                <button
-                  type="button"
-                  className="btn-add-new-option"
-                  onClick={handleAddOption}
-                >
-                  <Plus size={15} />
-                  <span>Thêm phương án lựa chọn</span>
-                </button>
-              )}
             </div>
           )}
 
