@@ -2,7 +2,7 @@ version: "3.9"
 
 services:
   postgres:
-    image: postgres:16
+    image: pgvector/pgvector:pg16
     container_name: postgres
     restart: always
     mem_limit: 1g
@@ -44,6 +44,7 @@ services:
       - postgres
     volumes:
       - ./backend:/app
+      - ./backend/uploads:/app/uploads
     command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
 
   frontend:

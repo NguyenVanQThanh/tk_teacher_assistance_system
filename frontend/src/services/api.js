@@ -257,6 +257,13 @@ export const documentsApi = {
     const response = await api.get('/api/v1/documents', { params });
     return response.data;
   },
+  // Teacher's own uploaded documents that finished RAG ingestion (usable as AI context)
+  getUsableDocuments: async (params = {}) => {
+    const response = await api.get('/api/v1/documents', {
+      params: { mine: true, status: 'Uploaded', ready_only: true, page_size: 100, ...params },
+    });
+    return response.data;
+  },
   getDocumentDashboard: async () => {
     const response = await api.get('/api/v1/documents/dashboard');
     return response.data;

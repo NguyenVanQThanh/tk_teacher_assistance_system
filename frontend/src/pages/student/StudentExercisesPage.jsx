@@ -40,6 +40,7 @@ import {
   Loader2,
   Search
 } from 'lucide-react';
+import AiSourcesList from '../../components/exercises/AiSourcesList';
 import { classesApi, assignmentsApi, attemptsApi, subjectsApi, exercisesApi } from '../../services/api';
 import './StudentExercisesPage.css';
 
@@ -764,7 +765,10 @@ export default function StudentExercisesPage() {
       clearTimeout(step2Timer);
       clearTimeout(step3Timer);
       console.error('Failed to generate AI exercise in DB:', err);
-      const errMsg = err.response?.data?.detail?.message || err.message || 'Có lỗi khi tạo bài tập trên máy chủ. Vui lòng thử lại.';
+      const detail = err.response?.data?.detail;
+      const errMsg = detail?.code === 'ERR-EXE-AI_GENERATION_FAILED'
+        ? 'AI chưa tạo được bài tập lúc này. Vui lòng bấm "Tạo bài tập" để thử lại.'
+        : (detail?.message || err.message || 'Có lỗi khi tạo bài tập trên máy chủ. Vui lòng thử lại.');
       alert(errMsg);
       setIsGenerating(false);
       setGenerationStep(0);
@@ -1235,6 +1239,8 @@ export default function StudentExercisesPage() {
                   Bài tập <strong>"{aiSubject} – {aiTopicPrompt.slice(0, 45)}"</strong> gồm <strong>{totalAiQuestions} câu hỏi</strong> đã được tạo xong và thêm vào Kho bài tập của bạn.
                 </p>
 
+                <AiSourcesList sources={generatedAiResult?.sources} />
+
                 <div className="ai-success-matrix-pill-row">
                   <span className="pill-item fill-know">Nhận biết: <strong>{totalKnow} câu</strong></span>
                   <span className="pill-item fill-comp">Thông hiểu: <strong>{totalComp} câu</strong></span>
@@ -1355,6 +1361,9 @@ export default function StudentExercisesPage() {
                       </select>
                     </div>
                   </div>
+                  <p style={{ fontSize: 12, color: '#6b7280', margin: '8px 0 0' }}>
+                    Nội dung được lấy từ SGK {aiSubject} {aiGrade.replace('Lớp', 'khối')} và tài liệu của giáo viên bộ môn (nếu có).
+                  </p>
                 </div>
 
                 {/* 2. Topic & Chatbox AI Prompt */}

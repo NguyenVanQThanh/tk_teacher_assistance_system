@@ -356,10 +356,15 @@ def db_session() -> Generator[Session, None, None]:
     connection.close()
 
 @pytest.fixture
-def client(db_session: Session) -> Generator[TestClient, None, None]:
+def client(db_session: Session, monkeypatch) -> Generator[TestClient, None, None]:
     """
     FastAPI TestClient with overridden get_db dependency.
+    Document ingestion (background task, needs Postgres + pgvector + VLM) is stubbed out.
     """
+    monkeypatch.setattr(
+        "app.modules.document.services.document_ingest_service.DocumentIngestService.ingest",
+        staticmethod(lambda *a, **kw: None),
+    )
     def override_get_db():
         try:
             yield db_session

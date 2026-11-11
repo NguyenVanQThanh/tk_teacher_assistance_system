@@ -37,6 +37,8 @@ const formatFileSize = (bytes) => {
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 };
 
+const API_BASE = import.meta.env.VITE_API_BASE_URL || '';
+
 // Normalize grade values coming from the API ('Lớp 10', '10', ...) to plain digits ('10')
 const normalizeGrade = (grade) => String(grade ?? '').replace(/\D/g, '');
 
@@ -89,6 +91,11 @@ export default function CreateExerciseModal({ isOpen, onClose, onCreateSuccess }
   const [docSearchQuery, setDocSearchQuery] = useState('');
   const [docGradeFilter, setDocGradeFilter] = useState('all');
   const docDropdownRef = useRef(null);
+  // Documents of the teacher still being ingested (hidden from the picker)
+  const [processingCount, setProcessingCount] = useState(0);
+  // AI result step state: created exercise + RAG sources used
+  const [aiResult, setAiResult] = useState(null);
+  const [aiFailed, setAiFailed] = useState(false);
 
   // Documents filtered by search text AND khối (grade block) filter (memoized)
   const filteredDocs = useMemo(() => availableDocuments.filter((doc) => {
@@ -119,11 +126,32 @@ export default function CreateExerciseModal({ isOpen, onClose, onCreateSuccess }
     }
     loadSubjects();
 
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => {
+      isMounted = false;
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [isOpen]);
+
+  // Load only documents the teacher can use for RAG: own, uploaded, ingested, matching grade/subject
+  useEffect(() => {
+    if (!isOpen) return undefined;
+    let isMounted = true;
     async function loadDocuments() {
       try {
-        const res = await documentsApi.getDocuments({ status: 'ALL', page_size: 100 });
+        const params = { grade };
+        if (subject) params.subject_id = subject;
+        const [res, all] = await Promise.all([
+          documentsApi.getUsableDocuments(params),
+          documentsApi.getDocuments({ mine: true, status: 'Uploaded', page_size: 1, ...params }),
+        ]);
         const items = Array.isArray(res) ? res : (res.items || []);
         if (isMounted) {
+          const readyTotal = Array.isArray(res) ? items.length : (res.total ?? items.length);
+          const allTotal = Array.isArray(all) ? all.length : (all.total ?? readyTotal);
+          setProcessingCount(Math.max(0, allTotal - readyTotal));
+          const readyIds = new Set(items.map((d) => d.document_id));
+          setSelectedDocIds((prev) => prev.filter((id) => readyIds.has(id)));
           setAvailableDocuments(items.map((d) => ({
             id: d.document_id,
             title: d.title,
@@ -138,13 +166,8 @@ export default function CreateExerciseModal({ isOpen, onClose, onCreateSuccess }
       }
     }
     loadDocuments();
-
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => {
-      isMounted = false;
-      document.removeEventListener('mousedown', handleClickOutside);
-    };
-  }, [isOpen]);
+    return () => { isMounted = false; };
+  }, [isOpen, grade, subject]);
 
   // Clear pending toast/close timers when the component unmounts
   useEffect(() => () => {
@@ -195,6 +218,8 @@ export default function CreateExerciseModal({ isOpen, onClose, onCreateSuccess }
       shortAnswer: { recognize: 0, understand: 0, apply: 0 }
     });
     setSelectedDocIds([]);
+    setAiResult(null);
+    setAiFailed(false);
     setIsDocDropdownOpen(false);
     setProgressPercent(0);
     setProgressStage('');
@@ -241,7 +266,8 @@ export default function CreateExerciseModal({ isOpen, onClose, onCreateSuccess }
   };
 
   const handleStartAiGeneration = async (e) => {
-    e.preventDefault();
+    if (e?.preventDefault) e.preventDefault();
+    setAiFailed(false);
 
     const totalQuestions = calculateTotalQuestions();
 
@@ -262,6 +288,7 @@ export default function CreateExerciseModal({ isOpen, onClose, onCreateSuccess }
         topic_prompt: aiPrompt.trim() || `Ôn tập kiến thức khối ${grade}`,
         duration_minutes: 45,
       };
+      if (selectedDocIds.length > 0) payload.document_ids = selectedDocIds;
       const p1 = questionCounts.mcq.recognize + questionCounts.mcq.understand + questionCounts.mcq.apply;
       const p2 = questionCounts.tf.recognize + questionCounts.tf.understand + questionCounts.tf.apply;
       const p3 = questionCounts.shortAnswer.recognize + questionCounts.shortAnswer.understand + questionCounts.shortAnswer.apply;
@@ -298,14 +325,16 @@ export default function CreateExerciseModal({ isOpen, onClose, onCreateSuccess }
 
       showToast(`Đã tạo thành công bài tập "${res.title}" (${res.total_questions} câu hỏi).`, 'success', 'Tạo bài tập AI thành công');
       if (onCreateSuccess) onCreateSuccess(createdExercise);
-      // Keep the modal mounted until the success toast has been seen, otherwise it unmounts instantly
-      closeTimerRef.current = setTimeout(() => {
-        closeTimerRef.current = null;
-        handleClose();
-      }, 4200);
+      // Stay open on a result step so the teacher can review the sources used
+      setAiResult({ title: res.title, total: res.total_questions || 0, sources: Array.isArray(res.sources) ? res.sources : [] });
+      setCurrentStep('ai_result');
     } catch (err) {
       const detail = err.response?.data?.detail;
-      const msg = (detail && typeof detail === 'object' ? detail.message : detail) || err.message || 'Tạo bài tập AI thất bại. Vui lòng thử lại.';
+      const isGenFailed = detail && typeof detail === 'object' && detail.code === 'ERR-EXE-AI_GENERATION_FAILED';
+      setAiFailed(Boolean(isGenFailed));
+      const msg = isGenFailed
+        ? 'AI không thể tạo bài tập từ nội dung đã chọn. Hệ thống không tự động thay thế bằng nội dung khác. Thầy/Cô vui lòng thử lại.'
+        : (detail && typeof detail === 'object' ? detail.message : detail) || err.message || 'Tạo bài tập AI thất bại. Vui lòng thử lại.';
       setErrorMsg(msg);
       showToast(msg, 'error', 'Bài tập tạo sinh gặp lỗi');
     } finally {
@@ -584,6 +613,11 @@ export default function CreateExerciseModal({ isOpen, onClose, onCreateSuccess }
                 <div className="form-alert-error">
                   <AlertCircle size={16} />
                   <span>{errorMsg}</span>
+                  {aiFailed && (
+                    <button type="button" className="btn-ai-retry" onClick={handleStartAiGeneration} disabled={isSubmitting}>
+                      Thử lại
+                    </button>
+                  )}
                 </div>
               )}
 
@@ -619,7 +653,7 @@ export default function CreateExerciseModal({ isOpen, onClose, onCreateSuccess }
                     <option value="11">Khối 11</option>
                     <option value="12">Khối 12</option>
                   </select>
-                  <span className="ai-grade-hint">Khối đã chọn sẽ tự động lọc các tài liệu tham khảo tương ứng ở bên dưới.</span>
+                  <span className="ai-grade-hint">SGK của khối và môn đã chọn luôn được tự động sử dụng làm nguồn tham khảo. Khối đã chọn cũng lọc các tài liệu của Thầy/Cô bên dưới.</span>
                 </div>
               </div>
 
@@ -840,6 +874,11 @@ export default function CreateExerciseModal({ isOpen, onClose, onCreateSuccess }
                           <div className="empty-docs-text">Không tìm thấy tài liệu phù hợp</div>
                         )}
                       </div>
+                      {processingCount > 0 && (
+                        <div className="empty-docs-text" role="status">
+                          {processingCount} tài liệu đang được xử lý, chưa thể sử dụng.
+                        </div>
+                      )}
                     </div>
                   )}
                 </div>
@@ -891,6 +930,56 @@ export default function CreateExerciseModal({ isOpen, onClose, onCreateSuccess }
                 onClick={handleClose}
               >
                 Hủy bỏ
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* ================= STEP 3: AI RESULT + SOURCES USED ================= */}
+        {currentStep === 'ai_result' && aiResult && (
+          <div className="ai-creation-view">
+            <div className="selection-modal-header">
+              <h2 className="selection-modal-title">Đã tạo bài tập thành công</h2>
+              <button type="button" className="btn-modal-close" onClick={handleClose} aria-label="Đóng">
+                <X size={20} />
+              </button>
+            </div>
+            <div className="ai-modal-content">
+              <p>
+                Bài tập <strong>{aiResult.title}</strong> ({aiResult.total} câu hỏi) đã được lưu.
+              </p>
+              <details className="ai-sources">
+                <summary>Nguồn tham khảo ({aiResult.sources.length})</summary>
+                {aiResult.sources.length === 0 ? (
+                  <p className="ai-grade-hint">Không có nguồn tham khảo nào được ghi nhận.</p>
+                ) : (
+                  <ul className="ai-sources-list">
+                    {aiResult.sources.map((s, i) => (
+                      <li key={`${s.document_id || 'src'}-${s.page}-${i}`} className="ai-source-item">
+                        <span className={`ai-source-badge ${s.source === 'sgk' ? 'sgk' : 'teacher'}`}>
+                          {s.source === 'sgk' ? 'SGK' : 'Tài liệu GV'}
+                        </span>
+                        <span className="ai-source-label">{s.label}</span>
+                        {s.page != null && <span className="ai-source-page">Trang {s.page}</span>}
+                        {s.image_url && (
+                          <a href={`${API_BASE}${s.image_url}`} target="_blank" rel="noopener noreferrer">
+                            <img
+                              className="ai-source-thumb"
+                              src={`${API_BASE}${s.image_url}`}
+                              alt={`Hình minh họa: ${s.label}${s.page != null ? `, trang ${s.page}` : ''}`}
+                              loading="lazy"
+                            />
+                          </a>
+                        )}
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </details>
+            </div>
+            <div className="ai-action-bar">
+              <button type="button" className="btn-create-exercise-gradient" onClick={handleClose}>
+                <span>Hoàn tất</span>
               </button>
             </div>
           </div>

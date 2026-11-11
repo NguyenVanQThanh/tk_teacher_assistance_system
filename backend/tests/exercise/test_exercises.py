@@ -166,7 +166,32 @@ class TestExerciseBankModule:
         assert fail_ex.status_code == status.HTTP_403_FORBIDDEN
         assert fail_ex.json()["detail"]["code"] == "ERR-EXE-INVALID_SUBJECT_SCOPE"
 
-    def test_ai_exercise_generation_and_taking_flow(self, client: TestClient):
+    def test_ai_exercise_generation_and_taking_flow(self, client: TestClient, monkeypatch):
+        # Stub the LLM: the generator no longer fabricates fallback questions.
+        def _fake(**kw):
+            qs = []
+            for i in range(kw["part1_count"]):
+                qs.append({"part": "Part1", "question_type": "MultipleChoice", "difficulty": "NhanBiet",
+                           "content": f"Q{i}", "answer_options": [
+                               {"content": c, "is_correct": c == "A", "display_order": n}
+                               for n, c in enumerate("ABCD")]})
+            for i in range(kw["part2_count"]):
+                qs.append({"part": "Part2", "question_type": "TrueFalse", "difficulty": "ThongHieu",
+                           "content": "TF", "segments": [{"key": k, "statement": k, "is_correct": True} for k in "abcd"]})
+            for i in range(kw["part3_count"]):
+                qs.append({"part": "Part3", "question_type": "ShortAnswer", "difficulty": "VanDung",
+                           "content": "SA", "correct_answer": "2"})
+            return qs
+        monkeypatch.setattr(
+            "app.modules.exercise.services.ai_generator_service.AiExerciseGeneratorService._call_gemini_generator",
+            lambda *a, **kw: _fake(**kw))
+        monkeypatch.setattr(
+            "app.modules.exercise.services.ai_generator_service.GeminiVisionParserService.get_api_key", lambda: "x")
+        src = [{"source": "sgk", "label": "Lich su 12, tr.3", "page": 3, "modality": "text",
+                "image_url": None, "document_id": None}]
+        monkeypatch.setattr(
+            "app.modules.exercise.services.exercise_service.RagContextService.build_context_with_sources",
+            lambda *a, **kw: ("ctx", src))
         # 1. Login as Student
         student_token = get_student_token(client)
         student_headers = {"Authorization": f"Bearer {student_token}"}
@@ -193,6 +218,9 @@ class TestExerciseBankModule:
         assignment_id = gen_data["assignment_id"]
         assert gen_data["total_questions"] == 6
         assert "Lịch sử" in gen_data["title"]
+        assert gen_data["sources"] == src
+        ex_meta = client.get(f"/api/v1/exercises/{exercise_id}", headers=student_headers).json()["ai_metadata"]
+        assert ex_meta["sources"] == src and ex_meta["document_ids"] == []
 
         # 3. Verify exercise details and questions exist in DB
         detail_resp = client.get(

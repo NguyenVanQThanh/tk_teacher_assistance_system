@@ -576,6 +576,7 @@ class AiExerciseGenerateRequest(BaseModel):
     part3_count: int = 1
     duration_minutes: int = 45
     class_id: Optional[UUID] = None
+    document_ids: List[UUID] = []
 
 
 class AiExerciseGenerateOut(BaseModel):
@@ -589,6 +590,7 @@ class AiExerciseGenerateOut(BaseModel):
     class_name: str
     due_at: Optional[datetime] = None
     created_at: datetime
+    sources: List[dict] = []
 
     model_config = {"from_attributes": True}
 

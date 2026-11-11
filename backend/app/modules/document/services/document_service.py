@@ -16,6 +16,7 @@ from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from models.models import Document, Subject, User, Role
+from app.modules.document.services.document_ingest_service import DocumentIngestService
 from app.modules.document.schemas import (
     DocumentOut, DocumentListOut, DocumentDashboardOut,
     DocumentSubjectStat, DocumentTypeStat, DocumentUpdate,
@@ -126,7 +127,9 @@ class DocumentService:
             download_count=doc.download_count or 0,
             status=doc.status,
             created_at=doc.created_at,
-            updated_at=doc.updated_at
+            updated_at=doc.updated_at,
+            ingest_status=getattr(doc, "ingest_status", None),
+            ingest_error=getattr(doc, "ingest_error", None)
         )
 
     @staticmethod
@@ -208,6 +211,9 @@ class DocumentService:
             raw_content=description or "",
             status="Uploaded"
         )
+        # ingest_status is added by a separate migration; guard so older schemas keep working.
+        if hasattr(Document, "ingest_status"):
+            doc.ingest_status = "PENDING"
         db.add(doc)
         db.commit()
         db.refresh(doc)
@@ -224,7 +230,9 @@ class DocumentService:
         search: Optional[str] = None,
         status_val: Optional[str] = "Uploaded",
         page: int = 1,
-        page_size: int = 12
+        page_size: int = 12,
+        mine: bool = False,
+        ready_only: bool = False,
     ) -> DocumentListOut:
         """List documents with filtering, search, and pagination."""
         # Soft-deleted documents are never listed; non-published ones are limited to their owner or an admin.
@@ -233,6 +241,12 @@ class DocumentService:
         # "ALL" (or empty) means every visible status.
         if status_val and status_val != "ALL":
             query = query.filter(Document.status == status_val)
+
+        if mine:
+            query = query.filter(Document.uploaded_by == current_user.user_id)
+
+        if ready_only:
+            query = query.filter(Document.ingest_status == "DONE")
 
         if subject_id:
             query = query.filter(Document.subject_id == subject_id)
@@ -355,6 +369,7 @@ class DocumentService:
         doc = DocumentService.get_document_by_id(db, document_id)
         DocumentService.check_document_access(db, doc, current_user, requires_ownership=True)
         doc.status = "DELETED"
+        DocumentService._sync_chunks(db, document_id, "DELETED")
         db.commit()
 
     @staticmethod
@@ -363,9 +378,30 @@ class DocumentService:
         doc = DocumentService.get_document_by_id(db, document_id)
         DocumentService.check_document_access(db, doc, current_user, requires_ownership=True, allow_deleted=True)
         doc.status = "Uploaded"
+        DocumentService._sync_chunks(db, document_id, "ACTIVE")
         db.commit()
         db.refresh(doc)
         return DocumentService.to_document_out(doc, db)
+
+    @staticmethod
+    def _sync_chunks(db: Session, document_id: UUID, chunk_status: str) -> None:
+        """Mirror a document soft delete/restore onto its chunks (PostgreSQL schema only)."""
+        if db.get_bind().dialect.name == "postgresql":
+            DocumentIngestService.set_chunks_status(db, document_id, chunk_status)
+
+    @staticmethod
+    def trigger_ingest(db: Session, document_id: UUID, current_user: User) -> Document:
+        """Validate ownership and mark the document PENDING for (re-)ingestion."""
+        doc = DocumentService.get_document_by_id(db, document_id)
+        DocumentService.check_document_access(db, doc, current_user, requires_ownership=True)
+        if getattr(doc, "ingest_status", None) == "PROCESSING":
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail={"code": "ERR-DOC-INGEST_RUNNING", "message": "Ingestion is already running."}
+            )
+        DocumentIngestService.mark_pending(db, document_id)
+        db.refresh(doc)
+        return doc
 
     @staticmethod
     def get_document_dashboard(db: Session, current_user: User) -> DocumentDashboardOut:

@@ -79,6 +79,8 @@ class DocumentOut(BaseModel):
     status: str = "ACTIVE"
     created_at: Optional[datetime] = None
     updated_at: Optional[datetime] = None
+    ingest_status: Optional[str] = Field(None, description="PENDING, PROCESSING, DONE or FAILED")
+    ingest_error: Optional[str] = None
 
 
 class DocumentListOut(BaseModel):

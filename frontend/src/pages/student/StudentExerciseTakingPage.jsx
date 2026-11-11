@@ -36,6 +36,7 @@ import { useNavigate, Link, useParams, useLocation } from 'react-router-dom';
 import { exercisesApi, attemptsApi } from '../../services/api';
 import MathRenderer from '../../components/common/MathRenderer';
 import QuestionMedia from '../../components/exercises/QuestionMedia';
+import AiSourcesList from '../../components/exercises/AiSourcesList';
 import './StudentExerciseTakingPage.css';
 
 export default function StudentExerciseTakingPage() {
@@ -1685,6 +1686,10 @@ export default function StudentExerciseTakingPage() {
 
         {/* Center Question Viewport */}
         <main className="exam-question-viewport">
+          {/* AI reference sources: shown only after submission to avoid leaking answers */}
+          {isExamSubmitted && backendExercise?.ai_metadata?.is_ai_generated && (
+            <AiSourcesList sources={backendExercise.ai_metadata.sources} />
+          )}
           {/* Readonly Review Banner */}
           {isExamSubmitted && isReadOnlyReview && (
             <div className={`exam-readonly-banner ${!exerciseInfo.isExam ? 'banner-practice' : ''}`}>

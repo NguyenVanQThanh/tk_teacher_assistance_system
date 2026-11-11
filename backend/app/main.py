@@ -51,7 +51,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 
-from app.core.config import QUESTION_IMAGE_DIR, QUESTION_IMAGE_URL_PREFIX
+from app.core.config import QUESTION_IMAGE_DIR, QUESTION_IMAGE_URL_PREFIX, SGK_IMAGE_DIR, SGK_IMAGE_URL_PREFIX
 
 from app.modules.auth.routers.auth import router as auth_router
 from app.modules.academic.routers.subjects import router as subjects_router
@@ -105,6 +105,10 @@ app.mount(
     StaticFiles(directory=QUESTION_IMAGE_DIR),
     name="question-images",
 )
+
+# Serve SGK textbook figures read-only (StaticFiles only handles GET/HEAD)
+SGK_IMAGE_DIR.mkdir(parents=True, exist_ok=True)
+app.mount(SGK_IMAGE_URL_PREFIX, StaticFiles(directory=SGK_IMAGE_DIR), name="sgk-images")
 
 @app.get("/health")
 def health():
