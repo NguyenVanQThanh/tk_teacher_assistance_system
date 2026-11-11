@@ -2,7 +2,7 @@
 // Description: Teacher Grading & Feedback management page with submission metrics, multi-criteria filtering, submission roster table, and interactive grading modal.
 // Created At: 2026-09-01
 // Created By: Tam Khang
-// Updated At: 2026-10-30
+// Updated At: 2026-11-11
 // Updated By: Tam Khang
 
 import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
@@ -44,7 +44,6 @@ export default function TeacherGradingPage() {
   const [showSidebar, setShowSidebar] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [gradeFilter, setGradeFilter] = useState('all');
-  const [subjectFilter, setSubjectFilter] = useState('all');
   const [statusFilter, setStatusFilter] = useState(searchParams.get('status') || 'all');
   const [typeFilter, setTypeFilter] = useState('all');
   const [currentPage, setCurrentPage] = useState(1);
@@ -381,10 +380,6 @@ export default function TeacherGradingPage() {
         return false;
       }
 
-      // Subject filter
-      if (subjectFilter !== 'all' && item.subject !== subjectFilter) {
-        return false;
-      }
 
       // Status filter
       if (statusFilter !== 'all') {
@@ -401,7 +396,7 @@ export default function TeacherGradingPage() {
 
       return true;
     });
-  }, [submissions, searchQuery, gradeFilter, subjectFilter, statusFilter, typeFilter]);
+  }, [submissions, searchQuery, gradeFilter, statusFilter, typeFilter]);
 
   // Paginated records
   const totalPages = Math.max(1, Math.ceil(filteredSubmissions.length / itemsPerPage));
@@ -584,26 +579,6 @@ export default function TeacherGradingPage() {
               <ChevronDown size={14} className="select-arrow" />
             </div>
 
-            {/* Subject Filter */}
-            <div className="select-container">
-              <select 
-                className="filter-select"
-                value={subjectFilter}
-                onChange={(e) => {
-                  setSubjectFilter(e.target.value);
-                  setCurrentPage(1);
-                }}
-              >
-                <option value="all">Môn học</option>
-                <option value="math">Toán học</option>
-                <option value="physics">Vật lý</option>
-                <option value="chemistry">Hóa học</option>
-                <option value="literature">Ngữ văn</option>
-                <option value="english">Tiếng Anh</option>
-              </select>
-              <ChevronDown size={14} className="select-arrow" />
-            </div>
-
             {/* Status Filter */}
             <div className="select-container">
               <select 
@@ -623,20 +598,23 @@ export default function TeacherGradingPage() {
             </div>
 
             {/* Assignment Type Filter */}
-            <div className="select-container">
-              <select 
-                className="filter-select"
-                value={typeFilter}
-                onChange={(e) => {
-                  setTypeFilter(e.target.value);
-                  setCurrentPage(1);
-                }}
-              >
-                <option value="all">Tất cả bài tập</option>
-                <option value="classroom">Bài tập trên lớp</option>
-                <option value="ai">Tạo sinh</option>
-              </select>
-              <ChevronDown size={14} className="select-arrow" />
+            <div className="filter-field-group">
+              <label className="filter-field-label">Loại bài tập</label>
+              <div className="select-container">
+                <select 
+                  className="filter-select"
+                  value={typeFilter}
+                  onChange={(e) => {
+                    setTypeFilter(e.target.value);
+                    setCurrentPage(1);
+                  }}
+                >
+                  <option value="all">Tất cả bài tập</option>
+                  <option value="classroom">Bài tập trên lớp</option>
+                  <option value="ai">Bài tập tạo sinh</option>
+                </select>
+                <ChevronDown size={14} className="select-arrow" />
+              </div>
             </div>
 
             {/* Search Input */}
