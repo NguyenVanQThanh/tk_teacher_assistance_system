@@ -6,6 +6,7 @@
 // Updated By: Tam Khang
 
 import React, { useState, useEffect } from 'react';
+import useUnsavedChangesGuard from '../../hooks/useUnsavedChangesGuard';
 import { X, Save, Check, CheckCircle2 } from 'lucide-react';
 import './EditStudentGradesModal.css';
 
@@ -25,6 +26,7 @@ export default function EditStudentGradesModal({ isOpen, onClose, student, onSav
 
   const [gradesTable, setGradesTable] = useState(defaultSubjectsGrades);
   const [savedSuccess, setSavedSuccess] = useState(false);
+  const guardedClose = useUnsavedChangesGuard(gradesTable, onClose);
 
   useEffect(() => {
     if (student) {
@@ -120,7 +122,7 @@ export default function EditStudentGradesModal({ isOpen, onClose, student, onSav
   };
 
   return (
-    <div className="edit-grades-overlay" onClick={onClose}>
+    <div className="edit-grades-overlay" onClick={guardedClose}>
       <div className="edit-grades-window" onClick={(e) => e.stopPropagation()}>
         {/* Header */}
         <div className="edit-grades-header">
@@ -130,7 +132,7 @@ export default function EditStudentGradesModal({ isOpen, onClose, student, onSav
               {student.name} • Mã HS: {student.code} • Lớp 12A1
             </span>
           </div>
-          <button type="button" className="btn-grades-close" onClick={onClose} title="Đóng">
+          <button type="button" className="btn-grades-close" onClick={guardedClose} title="Đóng">
             <X size={18} />
           </button>
         </div>
@@ -263,7 +265,7 @@ export default function EditStudentGradesModal({ isOpen, onClose, student, onSav
             <button
               type="button"
               className="btn-grades-cancel"
-              onClick={onClose}
+              onClick={guardedClose}
             >
               Hủy
             </button>

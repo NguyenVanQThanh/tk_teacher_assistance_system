@@ -5,6 +5,7 @@
 # Updated At: 2026-10-29
 # Updated By: AI Agent
 
+import hashlib
 import math
 import uuid
 from pathlib import Path
@@ -175,6 +176,20 @@ class DocumentService:
                 detail={"code": "ERR-DOC-FILE_TOO_LARGE", "message": "File exceeds maximum size of 50MB."}
             )
 
+        # Reject a file whose content was already uploaded (SHA-256 of the raw bytes)
+        file_hash = hashlib.sha256(file_bytes).hexdigest()
+        duplicate = db.query(Document).filter(
+            Document.file_hash == file_hash, Document.status != "DELETED"
+        ).first()
+        if duplicate:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail={
+                    "code": "ERR-DOC-DUPLICATE_FILE",
+                    "message": f"This file has already been uploaded as \"{duplicate.title}\"."
+                }
+            )
+
         with open(target_path, "wb") as f:
             f.write(file_bytes)
 
@@ -186,6 +201,7 @@ class DocumentService:
             file_url=f"/uploads/documents/{stored_filename}",
             file_type=file_ext.replace(".", "").lower(),
             file_size=file_size,
+            file_hash=file_hash,
             download_count=0,
             grade=grade or "12",
             document_type=document_type or "reference",

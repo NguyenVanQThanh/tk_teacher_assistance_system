@@ -149,6 +149,7 @@ class Document(Base):
     file_url = Column(String(500), nullable=True)
     file_type = Column(String(20), nullable=True)
     file_size = Column(Integer, default=0, nullable=True)
+    file_hash = Column(String(64), nullable=True, index=True)
     download_count = Column(Integer, default=0, nullable=False, server_default='0')
     grade = Column(String(20), nullable=True, default='12', server_default='12')
     document_type = Column(String(50), nullable=True, default='reference', server_default='reference')

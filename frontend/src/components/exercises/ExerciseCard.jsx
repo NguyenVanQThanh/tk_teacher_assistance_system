@@ -15,12 +15,11 @@ import {
   X, 
   Eye, 
   Edit3, 
-  Share2, 
   Download 
 } from 'lucide-react';
 import './ExerciseCard.css';
 
-export default function ExerciseCard({ exercise, onPreview, onEdit, onShare, onDownload, onMore, onDelete }) {
+export default function ExerciseCard({ exercise, onPreview, onEdit, onDownload, onMore, onDelete }) {
   const isQuiz = exercise.type === 'quiz' || exercise.type === 'test';
 
   return (
@@ -105,16 +104,7 @@ export default function ExerciseCard({ exercise, onPreview, onEdit, onShare, onD
             <Edit3 size={16} />
           </button>
 
-          {exercise.hasShare ? (
-            <button 
-              type="button" 
-              className="icon-action-btn share-btn"
-              onClick={() => onShare && onShare(exercise)}
-              title="Chia sẻ / Giao bài cho lớp"
-            >
-              <Share2 size={16} />
-            </button>
-          ) : (
+          {!exercise.hasShare && (
             <button 
               type="button" 
               className="icon-action-btn download-btn"

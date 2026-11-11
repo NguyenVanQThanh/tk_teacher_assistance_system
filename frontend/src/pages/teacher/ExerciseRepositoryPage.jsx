@@ -358,7 +358,6 @@ export default function ExerciseRepositoryPage() {
                     exercise={exercise}
                     onPreview={(item) => setPreviewExercise(item)}
                     onEdit={(item) => setEditingExercise(item)}
-                    onShare={(item) => setAssignModalExercise(item)}
                     onDownload={(item) => handleDownloadPdf(item)}
                     onDelete={(item) => requestDeleteExercise(item)}
                     onMore={(item) => requestDeleteExercise(item)}

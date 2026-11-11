@@ -6,6 +6,7 @@
 // Updated By: AI Agent
 
 import React, { useState, useEffect, useRef } from 'react';
+import useUnsavedChangesGuard from '../../hooks/useUnsavedChangesGuard';
 import { 
   X, 
   Save, 
@@ -453,6 +454,12 @@ Tam giác vuông SAB tại A: tan(∠SBA) = SA / AB = a√3 / a = √3 => ∠SBA
   const helpBtnRef = useRef(null);
   const imageInputRef = useRef(null);
   const [isUploadingImage, setIsUploadingImage] = useState(false);
+  // Warn before dismissing with unsaved edits (raw onClose is still used after a successful save)
+  const guardedClose = useUnsavedChangesGuard(
+    { docTitle, lessonTitle, difficultyLevel, durationMinutes, questions, deletedQuestionIds, currentLevel, currentScore, currentContent, currentOptions, currentCorrectOption, currentSolutionGuide },
+    onClose,
+    !isLoadingBackend
+  );
   const isSwitchingRef = useRef(false);
 
   // Select question handler with safety against race condition
@@ -1036,7 +1043,7 @@ Tam giác vuông SAB tại A: tan(∠SBA) = SA / AB = a√3 / a = √3 => ∠SBA
   };
 
   return (
-    <div className="edit-modal-backdrop" onClick={onClose}>
+    <div className="edit-modal-backdrop" onClick={guardedClose}>
       <div className="edit-modal-dialog" onClick={(e) => e.stopPropagation()}>
         {/* ============================================================ */}
         {/* 1. TOP HEADER */}
@@ -1078,7 +1085,7 @@ Tam giác vuông SAB tại A: tan(∠SBA) = SA / AB = a√3 / a = √3 => ∠SBA
             <button 
               type="button" 
               className="btn-header-close"
-              onClick={onClose}
+              onClick={guardedClose}
               disabled={isSaving}
             >
               <X size={15} />
@@ -1634,7 +1641,7 @@ Tam giác vuông SAB tại A: tan(∠SBA) = SA / AB = a√3 / a = √3 => ∠SBA
             <button 
               type="button" 
               className="btn-footer-cancel"
-              onClick={onClose}
+              onClick={guardedClose}
               disabled={isSaving}
             >
               Hủy bỏ
