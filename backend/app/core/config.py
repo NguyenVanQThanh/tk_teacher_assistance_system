@@ -23,3 +23,13 @@ QUESTION_IMAGE_MAX_BYTES = int(os.environ.get("QUESTION_IMAGE_MAX_BYTES", str(10
 
 # Allowed image file extensions.
 QUESTION_IMAGE_ALLOWED_EXTENSIONS = {"png", "jpg", "jpeg", "gif", "bmp", "webp", "svg"}
+
+# AI answer solver (fills the correct option for unkeyed MC / True-False questions).
+ANSWER_SOLVER_ENABLED = os.environ.get("ANSWER_SOLVER_ENABLED", "true").strip().lower() in ("1", "true", "yes")
+ANSWER_SOLVER_MODEL = os.environ.get("ANSWER_SOLVER_MODEL", "mistral-large-4-0")
+ANSWER_SOLVER_BATCH_SIZE = int(os.environ.get("ANSWER_SOLVER_BATCH_SIZE", "5"))
+
+# VLM figure detection (reconciled with PDF layout blocks) and its crop verification pass.
+FIGURE_VLM_ENABLED = os.environ.get("FIGURE_VLM_ENABLED", "true").strip().lower() in ("1", "true", "yes")
+FIGURE_VLM_VERIFY = os.environ.get("FIGURE_VLM_VERIFY", "true").strip().lower() in ("1", "true", "yes")
+FIGURE_VLM_MODEL = os.environ.get("FIGURE_VLM_MODEL", "")  # empty -> MISTRAL_MODEL_NAME

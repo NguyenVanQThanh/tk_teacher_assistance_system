@@ -2,12 +2,13 @@
 # Description: Service for extracting text/images and parsing question templates and answer keys (Docx/PDF).
 # Created At: 2026-08-09
 # Created By: Tam Khang
-# Updated At: 2026-09-02
-# Updated By: Tam Khang
+# Updated At: 2026-11-10
+# Updated By: AI Agent
 
 import os
 import re
 import io
+import unicodedata
 import uuid
 from typing import List, Optional, Dict, Any, Tuple
 from dataclasses import dataclass, field
@@ -49,6 +50,10 @@ class ParsedQuestion:
     image_bbox: Optional[List[float]] = None  # normalized [x0, y0, x1, y1] in 0-1000
     # Persisted onto Question.image_metadata once the cropped figure is stored
     image_metadata: Optional[Dict[str, Any]] = None
+    # Table block reported by the vision model (isolated from question content)
+    table_page: Optional[int] = None
+    table_bbox: Optional[List[float]] = None  # normalized [x0, y0, x1, y1] in 0-1000
+    table_markdown: Optional[str] = None
 
 
 @dataclass
@@ -342,8 +347,12 @@ class ImportParserService:
     EXAM_HEADER_PATTERNS = [
         re.compile(r"MÃ\s*ĐỀ\s*[:#]?\s*(\d[\w]{0,3})", re.IGNORECASE),
         re.compile(r"ĐỀ\s*SỐ\s*[:#]?\s*(\d[\w]{0,3})", re.IGNORECASE),
+        re.compile(r"ĐỀ\s*THI\s*[:#]?\s*(\d[\w]{0,3})", re.IGNORECASE),
         re.compile(r"\bĐỀ\s+(\d[\w]{0,3})", re.IGNORECASE),
     ]
+    # Page slices of one exam shorter than this (normalized 0-1000) are header-only slivers
+    # and are not sent to the vision model.
+    MIN_SLICE_HEIGHT = 60.0
 
     @classmethod
     def parse_document(
@@ -383,6 +392,12 @@ class ImportParserService:
                 page_images = GeminiVisionParserService.render_pdf_to_images(file_bytes)
             except Exception as e:
                 logger.warning(f"Could not render PDF pages for vision OCR: {e}")
+            sections = cls._scan_sections(file_bytes, page_images) or sections
+            try:
+                from app.modules.exercise.services import page_furniture_service as pfs
+                pfs.register_model_view(page_images, pfs.detect_furniture(file_bytes, page_images))
+            except Exception as e:
+                logger.warning(f"Page furniture masking skipped: {e}")
 
         all_questions: List[ParsedQuestion] = []
         all_errors: List[ParseError] = []
@@ -426,14 +441,21 @@ class ImportParserService:
             # section in one request gets its JSON truncated mid-string. Small chunks
             # (default 2 pages) keep responses within the output limit.
             max_pages = cls.get_max_pages_per_call()
-            chunks = [pages[i:i + max_pages] for i in range(0, len(pages), max_pages)] or [pages]
+            # Windows overlap by one page so a question spanning pages is whole in one call;
+            # duplicates from the overlap are removed by normalize_questions below.
+            from app.modules.exercise.services import exam_sequence_service as seq
+            chunks = seq.chunk_pages(pages, max_pages) or [pages]
 
             section_questions: List[ParsedQuestion] = []
             section_errors: List[ParseError] = []
+            # LLM pre-pass: read the exam outline first, then scan with that structure
+            structure = cls._analyze_section_structure(file_bytes, section, label, page_images)
             for chunk in chunks:
-                images = [page_images[p - 1] for p in chunk if 1 <= p <= len(page_images)]
+                images = cls._section_images(section, chunk, page_images)
                 if not images:
                     continue
+                chunk_pages = cls._slice_pages(section, chunk, page_images)
+                hint = structure.to_hint(chunk_pages) if structure and structure.parts else None
 
                 chunk_result: Optional[ParseResult] = None
 
@@ -441,7 +463,7 @@ class ImportParserService:
                 for provider_name, provider in cls.get_ai_vision_providers():
                     try:
                         logger.info(f"Using {provider_name} Vision API for PDF OCR (exam '{label or 'default'}', pages {chunk})...")
-                        ai_result = provider.parse_images(images, page_numbers=chunk, test_code=test_code)
+                        ai_result = cls._call_provider(provider, images, chunk_pages, test_code, hint)
                         if ai_result.questions:
                             merged = cls.merge_ai_result_with_answer_key(
                                 ai_result, answer_file_bytes, answer_filename, test_code
@@ -468,6 +490,12 @@ class ImportParserService:
                     section_questions.extend(chunk_result.questions)
                     section_errors.extend(chunk_result.errors)
 
+            section_questions = seq.normalize_questions(section_questions)
+            try:
+                cls._verify_sequence(section_questions, section_errors, file_bytes, section, label,
+                                     structure, page_images, test_code)
+            except Exception as e:
+                logger.warning(f"relabel_by_layout failed for exam '{label}': {e}")
             for q in section_questions:
                 q.exam_label = label
             all_questions.extend(section_questions)
@@ -516,56 +544,177 @@ class ImportParserService:
     @classmethod
     def detect_pdf_exam_sections(cls, file_bytes: bytes) -> List[Dict[str, Any]]:
         """
-        Split a PDF into exam sections by detecting exam headers (e.g. 'ĐỀ SỐ 1', 'MÃ ĐỀ 101')
-        near the top of pages. Returns [{'label': str|None, 'pages': [1-based pages]}];
-        falls back to a single section covering all pages when no header is found.
+        Split a PDF into exam sections by detecting exam headers (e.g. 'ĐỀ SỐ 1', 'MÃ ĐỀ 101').
+
+        Returns [{'label': str|None, 'pages': [1-based pages], 'start': (page, y)|None,
+        'end': (page, y)|None}]. ``start``/``end`` are the section boundaries in normalized
+        0-1000 page coordinates (a header can sit at the bottom of a page, so a page may
+        be shared by two exams); None means the document start/end. Falls back to a single
+        section covering all pages when no header is found, or to page-wise detection when
+        word positions are unavailable.
         """
-        sections: List[Dict[str, Any]] = []
         try:
             return cls._detect_pdf_exam_sections(file_bytes)
         except Exception as e:
             logger.warning(f"detect_pdf_exam_sections failed ({e}); treating file as a single exam.")
-            return [{"label": None, "pages": None}]
+            return [{"label": None, "pages": None, "start": None, "end": None}]
+
+    @classmethod
+    def _match_exam_label(cls, line: str) -> Optional[str]:
+        """Exam label for a header line, else None."""
+        line = unicodedata.normalize("NFC", line).strip()
+        if len(line.strip()) > 120 and "MÔN" not in line.upper() and "THI" not in line.upper():
+            return None
+        for pattern in cls.EXAM_HEADER_PATTERNS:
+            m = pattern.search(line)
+            if m and m.start() <= 25:  # header opens the line; ignores prose such as 'xem đề 2'
+                return re.sub(r"\s+", " ", m.group(0)).strip().upper()
+        return None
 
     @classmethod
     def _detect_pdf_exam_sections(cls, file_bytes: bytes) -> List[Dict[str, Any]]:
+        from app.modules.exercise.services.pdf_layout_service import PdfLayoutService, _lines
+
+        words_by_page = PdfLayoutService.extract_words(file_bytes)
+        if not words_by_page or not any(words_by_page.values()):
+            return cls._detect_pdf_exam_sections_by_page(file_bytes)
+        total_pages = max(words_by_page)
+
+        # (label, page, cut_y): cut_y is where the previous exam ends and this one begins.
+        headers: List[Tuple[str, int, float]] = []
+        for page in sorted(words_by_page):
+            words = words_by_page[page]
+            lines = sorted(_lines(words), key=lambda ln: min(w.y0 for w in ln))
+            for ln in lines:
+                label = cls._match_exam_label(" ".join(w.text for w in ln))
+                if not label or (headers and headers[-1][0] == label):
+                    continue
+                y = min(w.y0 for w in ln)
+                # The title block often has a line above the "ĐỀ SỐ n" line (course/exam title
+                # at the same height or just above): cut above every line that starts within
+                # a small band above the header, so no title fragment stays in the old exam.
+                cut = y
+                for other in lines:
+                    oy0 = min(w.y0 for w in other)
+                    if other is not ln and y - 30.0 <= oy0 < y:
+                        cut = min(cut, oy0)
+                headers.append((label, page, max(0.0, cut - 2.0)))
+        if not headers:
+            return [{"label": None, "pages": list(range(1, total_pages + 1)), "start": None, "end": None}]
+
+        sections: List[Dict[str, Any]] = []
+        first_page, first_cut = headers[0][1], headers[0][2]
+        if first_page > 1 or first_cut > 150:
+            # Content before the first header stays an unlabeled section.
+            sections.append({"label": None, "start": None, "end": (first_page, first_cut)})
+        for idx, (label, page, cut) in enumerate(headers):
+            nxt = headers[idx + 1] if idx + 1 < len(headers) else None
+            sections.append({
+                "label": label,
+                "start": None if (idx == 0 and not sections) else (page, cut),
+                "end": (nxt[1], nxt[2]) if nxt else None,
+            })
+        for sec in sections:
+            first = sec["start"][0] if sec["start"] else 1
+            last = sec["end"][0] if sec["end"] else total_pages
+            sec["pages"] = list(range(first, last + 1))
+        return sections
+
+    @classmethod
+    def _scan_sections(cls, file_bytes: bytes, page_images: List[Any]) -> Optional[List[Dict[str, Any]]]:
+        """Model-read sections (with synthetic skeleton) for a PDF without a text layer, else None. Never raises."""
+        try:
+            if not page_images:
+                return None
+            from app.modules.exercise.services import exam_structure_service as ess
+            from app.modules.exercise.services.pdf_layout_service import PdfLayoutService
+            from app.modules.exercise.services.scan_layout_service import synthesize_layout
+            words = PdfLayoutService.extract_words(file_bytes)
+            if words and any(words.values()):
+                return None
+            providers = cls.get_ai_vision_providers()
+            if not providers:
+                return None
+            layout = synthesize_layout(ess.file_hash(file_bytes), page_images, providers[0][1], cls._match_exam_label)
+            return layout.sections if layout else None
+        except Exception as e:
+            logger.warning(f"Scan layout skipped: {e}")
+            return None
+
+    @classmethod
+    def _detect_pdf_exam_sections_by_page(cls, file_bytes: bytes) -> List[Dict[str, Any]]:
+        """Page-wise fallback (pdfplumber text); sections cover whole pages."""
         sections: List[Dict[str, Any]] = []
         with pdfplumber.open(io.BytesIO(file_bytes)) as pdf:
             total_pages = len(pdf.pages)
             for idx, page in enumerate(pdf.pages, 1):
                 text = page.extract_text() or ""
                 label = None
-                # exam headers may sit anywhere on the page; only accept short lines or
-                # lines that also look like a title block ("MÔN THI", "ĐỀ THI ...")
                 for line in text.splitlines():
-                    if len(line.strip()) > 120 and "MÔN" not in line.upper() and "THI" not in line.upper():
-                        continue
-                    for pattern in cls.EXAM_HEADER_PATTERNS:
-                        m = pattern.search(line)
-                        if m:
-                            label = re.sub(r"\s+", " ", m.group(0)).strip().upper()
-                            break
+                    label = cls._match_exam_label(line)
                     if label:
                         break
                 if label and (not sections or sections[-1]["label"] != label):
-                    sections.append({"label": label, "pages": [idx]})
+                    sections.append({"label": label, "pages": [idx], "start": None, "end": None})
                 elif sections:
                     sections[-1]["pages"].append(idx)
                 else:
-                    sections.append({"label": None, "pages": [idx]})
+                    sections.append({"label": None, "pages": [idx], "start": None, "end": None})
         if not sections:
-            sections = [{"label": None, "pages": list(range(1, total_pages + 1))}]
+            sections = [{"label": None, "pages": list(range(1, total_pages + 1)), "start": None, "end": None}]
         return sections
+
+    @staticmethod
+    def _page_slice(section: Dict[str, Any], page: int) -> Tuple[float, float]:
+        """(top, bottom) of the section on a page, normalized 0-1000."""
+        start, end = section.get("start"), section.get("end")
+        top = start[1] if start and start[0] == page else 0.0
+        bottom = end[1] if end and end[0] == page else 1000.0
+        return top, bottom
+
+    @classmethod
+    def _section_images(cls, section: Dict[str, Any], chunk: List[int], page_images: List[Any]) -> List[Any]:
+        """Page images for a chunk, cropped by y on pages shared with a neighbouring exam.
+
+        Slivers shorter than MIN_SLICE_HEIGHT are skipped. The returned list may be
+        shorter than ``chunk``; callers pass the matching page numbers via _slice_pages.
+        """
+        from app.modules.exercise.services.page_furniture_service import model_view
+        page_images = model_view(page_images)  # header/footer masked copy; originals stay for crops
+        images = []
+        for p in chunk:
+            if not (1 <= p <= len(page_images)):
+                continue
+            top, bottom = cls._page_slice(section, p)
+            if (top, bottom) == (0.0, 1000.0):
+                images.append(page_images[p - 1])
+                continue
+            if bottom - top < cls.MIN_SLICE_HEIGHT:
+                continue
+            img = page_images[p - 1]
+            w, h = img.size
+            images.append(img.crop((0, int(top / 1000.0 * h), w, int(bottom / 1000.0 * h))))
+        return images
+
+    @classmethod
+    def _slice_pages(cls, section: Dict[str, Any], chunk: List[int], page_images: List[Any]) -> List[int]:
+        """Page numbers matching _section_images output."""
+        return [p for p in chunk if 1 <= p <= len(page_images)
+                and (cls._page_slice(section, p) == (0.0, 1000.0)
+                     or (lambda t, b: b - t >= cls.MIN_SLICE_HEIGHT)(*cls._page_slice(section, p)))]
 
     @classmethod
     def extract_pdf_content_pages(cls, file_bytes: bytes, pages: List[int]) -> Tuple[str, List[List[List[str]]], List[Dict[str, Any]]]:
         """Extract text and tables only from the given 1-based page numbers (pdfplumber)."""
         full_text_lines = []
         tables_data = []
+        from app.modules.exercise.services.page_furniture_service import detect_furniture, strip_page_text
+        furn = detect_furniture(file_bytes)  # header/footer lines are dropped from the text
         with pdfplumber.open(io.BytesIO(file_bytes)) as pdf:
             for p in pages:
                 if 1 <= p <= len(pdf.pages):
                     page = pdf.pages[p - 1]
+                    page = strip_page_text(page, furn[p - 1] if p - 1 < len(furn) else [])
                     text = page.extract_text()
                     if text:
                         full_text_lines.append(cls.normalize_extracted_text(text.strip()))
@@ -628,19 +777,482 @@ class ImportParserService:
 
         return ParseResult(questions=merged_questions, errors=[])
 
+    @staticmethod
+    def _call_provider(provider: Any, images: List[Any], page_numbers: List[int],
+                       test_code: Optional[str], hint: Optional[str]) -> ParseResult:
+        """provider.parse_images with the optional structure hint (kept compatible with providers lacking it)."""
+        if hint:
+            return provider.parse_images(images, page_numbers=page_numbers, test_code=test_code, structure_hint=hint)
+        return provider.parse_images(images, page_numbers=page_numbers, test_code=test_code)
+
+    @classmethod
+    def _analyze_section_structure(cls, file_bytes: bytes, section: Dict[str, Any], label: Optional[str],
+                                   page_images: List[Any]) -> Optional[Any]:
+        """LLM structure pre-pass for one exam section (cached per file hash + label). Never raises."""
+        try:
+            from app.modules.exercise.services import exam_structure_service as ess
+            from app.modules.exercise.services.pdf_layout_service import (
+                PdfLayoutService, clip_words, page_columns, find_anchors, find_part_headings, build_regions,
+            )
+            providers = cls.get_ai_vision_providers()
+            if not providers or not section.get("pages"):
+                return None
+            key = (ess.file_hash(file_bytes), f"{label}|{section.get('start')}|{section.get('end')}")
+            if key in ess._CACHE:
+                return ess.analyze_structure("", None, cache_key=key)
+            if section.get("scan_layout"):
+                from app.modules.exercise.services.scan_layout_service import build_scan_outline
+                regions, headings = section["scan_layout"]
+                return ess.analyze_structure(build_scan_outline(section), providers[0][1],
+                                             regions=regions, headings=headings, cache_key=key)
+            words_all = PdfLayoutService.extract_words(file_bytes)
+            pages = [p for p in section["pages"] if p in words_all]
+            words = clip_words({p: words_all[p] for p in pages}, section.get("start"), section.get("end"))
+            regions, headings, outline = [], {}, ""
+            if any(words.values()):
+                cols = {p: page_columns(words[p]) for p in pages}
+                regions = build_regions(find_anchors(words), cols, section_end=section.get("end"))
+                headings = find_part_headings(words)
+                outline = ess.build_outline(words)
+            source: Any = outline
+            if not outline and not any(words.values()):
+                # No text layer: low-res page images instead
+                source = cls._section_images(section, section["pages"][:3], page_images)
+                if not source:
+                    return None
+            elif not outline:
+                return None
+            return ess.analyze_structure(source, providers[0][1], regions=regions, headings=headings, cache_key=key)
+        except Exception as e:
+            logger.warning(f"Structure analysis skipped for exam '{label}': {e}")
+            return None
+
+    MAX_GAP_RETRIES = 3
+
+    @classmethod
+    def _verify_sequence(cls, questions: List[ParsedQuestion], errors: List[ParseError], file_bytes: bytes,
+                         section: Dict[str, Any], label: Optional[str], structure: Optional[Any],
+                         page_images: List[Any], test_code: Optional[str]) -> None:
+        """Relabel from the text layer, re-prompt the gap page span (max 3 times), then add review placeholders.
+
+        Without a text layer the numbering gaps of the model output itself are used.
+        """
+        from app.modules.exercise.services import exam_sequence_service as seq
+        missing = cls.relabel_by_layout(questions, file_bytes, section, label, structure=structure)
+        has_layout = any(isinstance(getattr(q, "part_index", None), int) for q in questions)
+        if not has_layout:
+            cls._fill_output_gaps(questions, errors, section, label, page_images, test_code)
+            return
+        for attempt in range(1, cls.MAX_GAP_RETRIES + 1):
+            if not missing or structure is None:
+                break
+            logger.info("Exam '%s': gap retry %d/%d for %d missing question(s)",
+                        label, attempt, cls.MAX_GAP_RETRIES, len(missing))
+            if cls._retry_missing(questions, missing, structure, section, label, page_images, test_code):
+                missing = cls.relabel_by_layout(questions, file_bytes, section, label, structure=structure)
+        if missing:
+            for r, _ in missing:
+                logger.warning("Exam '%s': question still missing after retries, part=%d number=%d; "
+                               "inserted review placeholder", label, r.part, r.number)
+                questions.append(seq.make_placeholder(r.number, r.part))
+                errors.append(ParseError(question_number=r.number, message=(
+                    f"Exam '{label}' part {r.part}: question {r.number} was not recognised; "
+                    "a placeholder was added for review.")))
+            cls.relabel_by_layout(questions, file_bytes, section, label, structure=structure)
+
+    @classmethod
+    def _fill_output_gaps(cls, questions: List[ParsedQuestion], errors: List[ParseError], section: Dict[str, Any],
+                          label: Optional[str], page_images: List[Any], test_code: Optional[str]) -> None:
+        """No-text-layer variant of the sequence check: numbering gaps in the model output."""
+        from app.modules.exercise.services import exam_sequence_service as seq
+        gaps = seq.find_output_gaps(questions)
+        pages = list(section.get("pages") or [])[: cls.get_max_pages_per_call() * 2]
+        for attempt in range(1, cls.MAX_GAP_RETRIES + 1):
+            if not gaps:
+                break
+            nums = sorted({n for _, n in gaps})
+            images = cls._section_images(section, pages, page_images)
+            chunk_pages = cls._slice_pages(section, pages, page_images)
+            if not images:
+                break
+            hint = ("LƯU Ý: lần quét trước bị THIẾU các câu số " + ", ".join(map(str, nums)) +
+                    ". Chỉ bóc tách ĐÚNG các câu thiếu này (giữ nguyên số câu), bỏ qua mọi câu khác.")
+            added = False
+            for _, provider in cls.get_ai_vision_providers():
+                try:
+                    res = cls._call_provider(provider, images, chunk_pages, test_code, hint)
+                except Exception as e:
+                    logger.warning(f"gap retry error: {e}")
+                    continue
+                wanted: Dict[int, Any] = {}
+                for q in seq.normalize_questions(res.questions):
+                    if q.question_number in nums:
+                        wanted.setdefault(q.question_number, q)
+                for idx, n in sorted(gaps, reverse=True):
+                    if n in wanted:
+                        questions.insert(idx + 1, wanted[n])
+                        added = True
+                if added:
+                    break
+            gaps = seq.find_output_gaps(questions)
+            if not added:
+                break
+        for idx, n in sorted(gaps, reverse=True):
+            logger.warning("Exam '%s': question still missing after retries, number=%d; inserted review placeholder",
+                           label, n)
+            questions.insert(idx + 1, seq.make_placeholder(n))
+            errors.append(ParseError(question_number=n, message=(
+                f"Exam '{label}': question {n} was not recognised; a placeholder was added for review.")))
+
+    @classmethod
+    def _retry_missing(cls, questions: List[ParsedQuestion], missing: List[Tuple[Any, Any]], structure: Any,
+                       section: Dict[str, Any], label: Optional[str], page_images: List[Any],
+                       test_code: Optional[str]) -> bool:
+        """Re-scan the pages holding missing question anchors once; merge without duplicates.
+
+        Each returned question fills one still-missing (part, number) region, so nothing
+        that already exists can be duplicated. Returns True when something was added.
+        """
+        # Gap span = anchor pages plus one neighbour page each side (the question may start or end there)
+        in_section = list(section.get("pages") or [])
+        span = {r.anchor.page + d for r, _ in missing for d in (-1, 0, 1)}
+        pages = sorted(p for p in span if p in in_section)[: cls.get_max_pages_per_call() * 2 + 2]
+        miss_by_heading: Dict[str, List[int]] = {}
+        for r, spec in missing:
+            miss_by_heading.setdefault((spec.heading if spec else "") or f"PHẦN {r.part}", []).append(r.number)
+        images = cls._section_images(section, pages, page_images)
+        chunk_pages = cls._slice_pages(section, pages, page_images)
+        if not images:
+            return False
+        hint = structure.to_hint(chunk_pages, missing=miss_by_heading)
+        logger.info("Exam '%s': retrying pages %s for missing questions %s", label, chunk_pages, miss_by_heading)
+        for provider_name, provider in cls.get_ai_vision_providers():
+            try:
+                res = cls._call_provider(provider, images, chunk_pages, test_code, hint)
+            except Exception as e:
+                logger.warning(f"{provider_name} retry error: {e}")
+                continue
+            if not res.questions:
+                continue
+            slots: Dict[int, List[Any]] = {}
+            for r, _ in missing:
+                slots.setdefault(r.number, []).append(r)
+            added = 0
+            for q in res.questions:
+                regs = slots.get(q.question_number)
+                if regs:
+                    if len(regs) == 1:
+                        q.part_index = regs.pop(0).part
+                    # Several slots share this number: leave part_index unset so the skeleton
+                    # matcher picks the slot by text similarity instead of by order.
+                    questions.append(q)
+                    added += 1
+            if added:
+                return True
+        return False
+
+    @classmethod
+    def relabel_by_layout(cls, questions: List[ParsedQuestion], file_bytes: bytes,
+                          section: Dict[str, Any], label: Optional[str] = None,
+                          structure: Optional[Any] = None) -> List[Tuple[Any, Any]]:
+        """Make part/type/order deterministic from the PDF text layer (model labels are not trusted).
+
+        Questions arrive in model stream order (= document order). Each is paired with a
+        layout region (PHẦN index, number); the PHẦN heading text decides the kind:
+        MC / TF keep their options, short answer and essay (PHẦN IV) become ShortAnswer
+        with a)/b) options merged back into the content. Unmatched questions keep the
+        model label and stay next to their stream neighbours. Logs a WARNING per PHẦN
+        when the question count differs from the anchor count.
+
+        ``structure`` (ExamStructure from the LLM pre-pass) is the source of truth for the
+        part type when given; the heading keyword heuristic is used otherwise. Questions
+        already carrying a ``part_index`` (from an earlier pass or a retry) keep their
+        region. Returns [(Region, PartSpec|None)] for regions that no question was paired
+        with in parts that came up short (candidates for a targeted retry).
+        """
+        from app.modules.exercise.services.exam_structure_service import (
+            TYPE_MC, TYPE_TF, TYPE_ESSAY, map_regions, heuristic_structure,
+        )
+        from app.modules.exercise.services.pdf_layout_service import (
+            PdfLayoutService, find_anchors, find_part_headings, page_columns, build_regions,
+            clip_words, classify_part, PART_MC, PART_TF,
+        )
+        if not questions or not section.get("pages"):
+            return []
+        if section.get("scan_layout"):
+            # Source switch: model-read skeleton for PDFs without a text layer
+            regions, headings = section["scan_layout"]
+        else:
+            words_all = PdfLayoutService.extract_words(file_bytes)
+            pages = [p for p in section["pages"] if p in words_all]
+            if not pages:
+                return []
+            words = clip_words({p: words_all[p] for p in pages}, section.get("start"), section.get("end"))
+            if not any(words.values()):
+                return []
+            cols = {p: page_columns(words[p]) for p in pages}
+            regions = build_regions(find_anchors(words), cols, section_end=section.get("end"))
+            headings = find_part_headings(words)
+        if not regions:
+            return []
+        specs = map_regions(structure or heuristic_structure(headings, regions), regions, headings)
+
+        # 1. Pair questions with skeleton regions (text-layer anchors per part). Pre-resolved
+        # questions (earlier pass / retry / placeholder) keep their (part, number) slot; the rest
+        # are matched by number + compatible type. Questions outside the skeleton are dropped.
+        from app.modules.exercise.services.exam_structure_service import match_to_skeleton
+        preset: Dict[int, int] = {}
+        used: set = set()
+        for qi, q in enumerate(questions):
+            pidx = getattr(q, "part_index", None)
+            if isinstance(pidx, int):
+                for ri, reg in enumerate(regions):
+                    if ri not in used and reg.part == pidx and reg.number == q.question_number:
+                        preset[qi] = ri
+                        used.add(ri)
+                        break
+        from app.modules.exercise.services.verbatim_guard_service import region_words
+        pairs = match_to_skeleton(questions, regions, specs, preset=preset, label=label,
+                                  region_text=region_words(regions, words) if not section.get("scan_layout") else None)
+        for qi, ri in pairs.items():
+            logger.info("Exam '%s': skeleton pair model#%s '%s' -> PHAN %s cau %s%s", label, questions[qi].question_number,
+                        (questions[qi].content or "")[:24].replace(chr(10), " "), regions[ri].part, regions[ri].number,
+                        " (preset)" if qi in preset else "")
+        questions[:] = [q for qi, q in enumerate(questions) if qi in pairs]
+        pairs = {new: ri for new, ri in enumerate(pairs[qi] for qi in sorted(pairs))}
+
+        # 2. Re-label matched questions from their PHẦN heading.
+        for qi, ri in pairs.items():
+            q, reg = questions[qi], regions[ri]
+            spec_type = specs[ri].type
+            q.part_index = reg.part
+            q.question_number = reg.number
+            if getattr(q, "is_placeholder", False):
+                continue  # keep the ShortAnswer review placeholder valid regardless of part type
+            if spec_type == TYPE_MC:
+                q.part, q.question_type = "Part1", QuestionTypeEnum.MultipleChoice
+            elif spec_type == TYPE_TF:
+                q.part, q.question_type = "Part2", QuestionTypeEnum.TrueFalse
+            else:
+                q.part = "Part4" if spec_type == TYPE_ESSAY else "Part3"
+                q.question_type = QuestionTypeEnum.ShortAnswer
+                if q.answer_options:
+                    # Sub-items a), b) belong to the stem of a short answer / essay question.
+                    extra = "\n".join(o.content for o in q.answer_options)
+                    q.content = f"{q.content}\n{extra}".strip()
+                    q.answer_options = []
+                    q.content_markdown = cls.convert_latex_to_markdown(q.content)
+                    q.content_latex = q.content
+                    segs, nr = cls.extract_segments(q.content)
+                    if q.table_markdown:
+                        segs.append({"type": "table", "content": q.table_markdown, "confidence": 0.9})
+                    q.segments = segs
+                    q.needs_review = q.needs_review or nr
+                q.correct_answer = None
+
+        # 3. Document order: matched questions by region position, others after their predecessor.
+        keys, last = [], -1
+        for qi in range(len(questions)):
+            if qi in pairs:
+                last = pairs[qi]
+                keys.append((last, 0, qi))
+            else:
+                keys.append((last, 1, qi))
+        order = sorted(range(len(questions)), key=lambda i: keys[i])
+        reordered = [questions[i] for i in order]
+        questions[:] = reordered
+        for q in questions:
+            q.doc_ordered = True
+
+        # 4. Count check per PHẦN.
+        short_parts = set()
+        for part in sorted({r.part for r in regions} - {0}):
+            expected = sum(1 for r in regions if r.part == part)
+            got = sum(1 for q in questions if getattr(q, "part_index", None) == part)
+            if expected != got:
+                heading = headings.get(part, "")
+                logger.warning("Exam '%s': expected %d questions in PHẦN %d, got %d (%s)",
+                               label, expected, part, got, heading[:60])
+            if got < expected:
+                short_parts.add(part)
+        orphans = sum(1 for r in regions if r.part == 0)
+        if orphans:
+            logger.warning("Exam '%s': %d question anchors found before any PHẦN heading", label, orphans)
+        if not section.get("scan_layout"):
+            from app.modules.exercise.services.verbatim_guard_service import flag_deviations
+            flag_deviations(questions, regions, words, label or "")
+        paired = set(pairs.values())
+        return [(regions[ri], specs[ri]) for ri in range(len(regions))
+                if ri not in paired and regions[ri].part in short_parts]
+
     @classmethod
     def attach_question_images(cls, file_bytes: bytes, questions: List[ParsedQuestion],
-                               sections: Optional[List[Dict[str, Any]]] = None, scale: float = 2.0) -> None:
+                               sections: Optional[List[Dict[str, Any]]] = None, scale: float = 3.0) -> None:
         """
-        Crop figure images for questions from the rendered PDF pages and store them via
-        QuestionImageService. Uses vision-provided bboxes (q.image_page/q.image_bbox,
-        normalized 0-1000) when available, otherwise assigns embedded PDF images to the
-        nearest question header by vertical position (pdfplumber fallback).
+        Attach figures/tables to questions. Primary path: PDF layout analysis (PyMuPDF)
+        finds figure/table blocks and question regions (column and page-break aware);
+        each block goes to the question whose region holds it and is rendered with
+        PdfLayoutService.render_clip. The vision model bbox (q.image_bbox) only breaks
+        ties between several figures, or is used as the crop itself when the layout has
+        no text/blocks (scanned PDFs) or the question cannot be located.
         """
-        from app.core.config import QUESTION_IMAGE_MAX_BYTES
-        from app.modules.exercise.services.gemini_vision_parser_service import GeminiVisionParserService
+        import pymupdf
+        from app.modules.exercise.services.pdf_layout_service import (
+            PdfLayoutService, find_anchors, page_columns, build_regions,
+            match_questions, assign_blocks, pick_primary, clip_words, _in_region, _union,
+        )
+        from app.modules.exercise.services import figure_detection_service as fds
         from app.modules.exercise.services.question_image_service import QuestionImageService
 
+        try:
+            layout = PdfLayoutService.analyze(file_bytes)
+        except Exception as e:
+            logger.warning(f"attach_question_images: layout analysis failed: {e}")
+            layout = None
+        try:
+            doc = pymupdf.open(stream=file_bytes, filetype="pdf")
+        except Exception as e:
+            logger.warning(f"attach_question_images: cannot open PDF: {e}")
+            return
+
+        try:
+            vlm = fds.detect_pdf_figures(file_bytes)
+        except Exception as e:
+            logger.warning(f"attach_question_images: VLM figure detection failed: {e}")
+            vlm = {}
+
+        def set_image(q: ParsedQuestion, meta) -> None:
+            # Merge: keys set earlier (solver: solved_by, ai_confidence, review_reason) must survive.
+            q.image_url, q.image_metadata = meta["url"], {**(q.image_metadata or {}), **meta}
+
+        def region_clamp(reg, page_no: int, box):
+            """Clamp a box to the region rect of that page holding the box centre."""
+            cx, cy = (box[0] + box[2]) / 2, (box[1] + box[3]) / 2
+            for p, x0, y0, x1, y1 in reg.rects:
+                if p == page_no and x0 <= cx <= x1 and y0 <= cy <= y1:
+                    return [max(box[0], x0), max(box[1], y0), min(box[2], x1), min(box[3], y1)], (x0, y0, x1, y1)
+            return list(box), None
+
+        def store(page_no: int, bbox, name: str, reg=None, use_vlm: bool = True):
+            box, lim = list(bbox), None
+            vf = fds.best_match(page_no, bbox, vlm) if (use_vlm and vlm) else None
+            if vf is not None:
+                # Layout box and VLM box agree: take the union (VLM adds labels the layout missed).
+                box = list(_union(bbox, vf["bbox"]))
+                if reg is not None:
+                    box, lim = region_clamp(reg, page_no, box)
+            data = None
+            if vf is not None:
+                # refine_bbox only grows the box over adjacent labels/ink, then the VLM box is re-united.
+                refined = PdfLayoutService.refine_bbox(doc, page_no, box)
+                refined = list(_union(refined, box))
+                if reg is not None:
+                    refined, lim = region_clamp(reg, page_no, refined)
+                refined = fds.verify_adjust(doc, page_no, refined, clamp=lim)
+                # Last step: drop body text / header bands that the union pulled onto the crop edges.
+                refined = PdfLayoutService.trim_body_text(doc, page_no, refined, bbox)
+                data = PdfLayoutService.render_clip(doc, page_no, refined, pad=0.0)
+            else:
+                data = PdfLayoutService.render_figure(doc, page_no, box)
+            if not data:
+                return None
+            return QuestionImageService.save_image_bytes(
+                data, ext="png", original_name=name, content_type="image/png")
+
+        def add_image_segment(q: ParsedQuestion, meta, bbox) -> None:
+            q.segments = (q.segments or []) + [{
+                "type": "image", "content": meta["url"], "bbox": list(bbox), "confidence": 0.9,
+            }]
+
+        matched_ids = set()
+        used_vlm = set()
+        try:
+            if layout is not None and layout.has_text:
+                secs = sections or [{"label": None, "pages": None}]
+                for sec in secs:
+                    pages = sec.get("pages") or sorted(layout.words_by_page)
+                    pages = [p for p in pages if p in layout.words_by_page]
+                    qs = [q for q in questions if q.exam_label == sec.get("label")]
+                    if not pages or not qs:
+                        continue
+                    # Words are clipped to the exam's (page, y) range so a page shared with
+                    # the neighbouring exam only contributes its own part.
+                    words = clip_words({p: layout.words_by_page[p] for p in pages},
+                                       sec.get("start"), sec.get("end"))
+                    cols = {p: page_columns(words[p]) for p in pages}
+                    regions = build_regions(find_anchors(words), cols, section_end=sec.get("end"))
+                    qmap = match_questions(regions, qs)
+                    blocks = [b for p in pages for b in layout.blocks_by_page.get(p, [])]
+                    assigned = assign_blocks(regions, blocks, words)
+                    for ri, reg in enumerate(regions):
+                        q = next((x for x in qs if qmap.get(id(x)) is reg), None)
+                        if q is None:
+                            continue
+                        matched_ids.add(id(q))
+                        asg = assigned[ri]
+                        figures = [b for b in asg.stem if b.kind != "table"]
+                        tables = [b for b in asg.stem if b.kind == "table"]
+                        primary = None if q.image_url else pick_primary(figures, q.image_page, q.image_bbox)
+                        for b in ([primary] if primary else []) + [f for f in figures if f is not primary]:
+                            try:
+                                meta = store(b.page, b.bbox, f"question_{q.question_number}_{b.id}.png", reg)
+                            except Exception as e:
+                                logger.warning(f"attach_question_images: crop failed for question {q.question_number}: {e}")
+                                continue
+                            if not meta:
+                                continue
+                            if b is primary:
+                                set_image(q, meta)
+                            else:
+                                add_image_segment(q, meta, b.bbox)
+                        if not q.table_markdown:
+                            for b in tables:
+                                try:
+                                    meta = store(b.page, b.bbox, f"question_{q.question_number}_{b.id}.png")
+                                except Exception as e:
+                                    logger.warning(f"attach_question_images: table crop failed for question {q.question_number}: {e}")
+                                    continue
+                                if meta:
+                                    add_image_segment(q, meta, b.bbox)
+                        # VLM-only figures: matched no layout block but sit inside this region.
+                        for pg_no, figs in vlm.items():
+                            for vf in figs:
+                                if any(blk.page == pg_no and fds.best_match(pg_no, blk.bbox, {pg_no: [vf]}) for blk in blocks):
+                                    continue
+                                vb = vf["bbox"]
+                                if id(vf) in used_vlm or not _in_region(reg, pg_no, (vb[0] + vb[2]) / 2, (vb[1] + vb[3]) / 2):
+                                    continue
+                                used_vlm.add(id(vf))
+                                padded, _lim = region_clamp(reg, pg_no, cls._pad_bbox(vb, 0.03))
+                                meta = None
+                                try:
+                                    data = PdfLayoutService.render_clip(doc, pg_no, padded, pad=0.0)
+                                    if data:
+                                        meta = QuestionImageService.save_image_bytes(
+                                            data, ext="png", original_name=f"question_{q.question_number}_vlm.png",
+                                            content_type="image/png")
+                                except Exception as e:
+                                    logger.warning(f"attach_question_images: VLM crop failed for question {q.question_number}: {e}")
+                                if not meta:
+                                    continue
+                                if not q.image_url:
+                                    set_image(q, meta)
+                                else:
+                                    add_image_segment(q, meta, padded)
+                        if asg.options:
+                            # ponytail: SegmentSchema has no option field, so option figures are
+                            # flagged for teacher review instead of stored; add a segment field when needed.
+                            q.needs_review = True
+        finally:
+            doc.close()
+
+        # LLM bbox path: scans (no text/blocks) or questions the layout could not locate.
+        pending = [q for q in questions if id(q) not in matched_ids
+                   and ((not q.image_url and q.image_bbox and q.image_page)
+                        or (q.table_bbox and q.table_page and not q.table_markdown))]
+        if not pending:
+            return
+        from app.modules.exercise.services.gemini_vision_parser_service import GeminiVisionParserService
         try:
             page_images = GeminiVisionParserService.render_pdf_to_images(file_bytes, scale=scale)
         except Exception as e:
@@ -648,117 +1260,184 @@ class ImportParserService:
             return
         if not page_images:
             return
-
-        fallback_pages = None
-        try:
-            fallback_pages = cls._collect_page_images_and_question_marks(file_bytes)
-        except Exception as e:
-            logger.warning(f"attach_question_images: pdfplumber fallback unavailable: {e}")
-
-        label_pages: Dict[Optional[str], List[int]] = {}
-        if sections:
-            for sec in sections:
-                label_pages.setdefault(sec["label"], []).extend(sec["pages"])
-
-        for q in questions:
-            if q.image_url:
-                continue
-            page_no, bbox = q.image_page, q.image_bbox
-            if not (bbox and page_no and 1 <= page_no <= len(page_images)):
-                if fallback_pages:
-                    cand = cls._find_fallback_bbox(fallback_pages, q, label_pages)
-                    if cand:
-                        page_no, bbox = cand
-            if not (bbox and page_no and 1 <= page_no <= len(page_images)):
-                continue
-            try:
-                img = page_images[page_no - 1]
-                W, H = img.size
-                x0 = max(0.0, min(1000.0, float(bbox[0]))) / 1000.0 * W
-                y0 = max(0.0, min(1000.0, float(bbox[1]))) / 1000.0 * H
-                x1 = max(0.0, min(1000.0, float(bbox[2]))) / 1000.0 * W
-                y1 = max(0.0, min(1000.0, float(bbox[3]))) / 1000.0 * H
-                if x1 - x0 < 20 or y1 - y0 < 20:
-                    continue
-                crop = img.crop((int(x0), int(y0), int(x1), int(y1))).convert("RGB")
-                buf = io.BytesIO()
-                crop.save(buf, format="PNG")
-                data = buf.getvalue()
-                while len(data) > QUESTION_IMAGE_MAX_BYTES and crop.width > 240 and crop.height > 240:
-                    crop = crop.resize((crop.width // 2, crop.height // 2))
-                    buf = io.BytesIO()
-                    crop.save(buf, format="PNG")
-                    data = buf.getvalue()
-                if len(data) > QUESTION_IMAGE_MAX_BYTES:
-                    continue
-                meta = QuestionImageService.save_image_bytes(
-                    data, ext="png",
-                    original_name=f"question_{q.question_number}_page_{page_no}.png",
-                    content_type="image/png",
-                )
-                q.image_url = meta["url"]
-                q.image_metadata = meta
-            except Exception as e:
-                logger.warning(f"attach_question_images: failed for question {q.question_number}: {e}")
-
-    @staticmethod
-    def _collect_page_images_and_question_marks(file_bytes: bytes) -> List[Dict[str, Any]]:
-        """
-        Per-page embedded images (normalized bbox 0-1000) and 'Câu n' header positions,
-        used to assign figures to questions when the vision model returned no bboxes.
-        """
-        pages_info: List[Dict[str, Any]] = []
-        with pdfplumber.open(io.BytesIO(file_bytes)) as pdf:
-            for idx, page in enumerate(pdf.pages, 1):
-                W, H = float(page.width), float(page.height)
-                images = []
-                for im in page.images:
-                    try:
-                        bbox = [float(im["x0"]) / W * 1000, float(im["top"]) / H * 1000,
-                                float(im["x1"]) / W * 1000, float(im["bottom"]) / H * 1000]
-                    except Exception:
-                        continue
-                    if (bbox[2] - bbox[0]) >= 15 and (bbox[3] - bbox[1]) >= 15:
-                        images.append(bbox)
-                qmarks: List[Tuple[int, float]] = []
+        seen_figs: List[tuple] = []  # (page, bbox, hash) of figures already attached: dedup
+        ocr_figs, furniture = None, []  # scan-only context, built lazily
+        for q in pending:
+            if not q.image_url and q.image_bbox and q.image_page and 1 <= q.image_page <= len(page_images):
                 try:
-                    for hit in page.search(r"Câu\s*\d+\s*[:.]"):
-                        m = re.search(r"(\d+)", hit.get("text", "") or "")
-                        if m:
-                            qmarks.append((int(m.group(1)), float(hit["top"]) / H * 1000))
-                except Exception:
-                    pass
-                pages_info.append({"page": idx, "images": images, "qmarks": sorted(qmarks, key=lambda t: t[1])})
-        return pages_info
+                    vf = fds.best_match(q.image_page, q.image_bbox, vlm) if vlm else None
+                    meta = None
+                    if layout is None or not layout.has_text:
+                        # Scan: raster refinement (axis titles in, body-text bands out) + dedup.
+                        base = vf["bbox"] if vf else q.image_bbox
+                        if ocr_figs is None:
+                            ocr_figs, furniture = cls._scan_ocr_context(file_bytes, page_images, pending)
+                        ob = max(ocr_figs.get(q.image_page, []), key=lambda o: fds.iou(o, base), default=None)
+                        ob = ob if ob is not None and fds.iou(ob, base) >= 0.3 else None
+                        fur = furniture[q.image_page - 1] if 0 < q.image_page <= len(furniture) else []
+                        sbox, sdata = cls._scan_figure_crop(file_bytes, q.image_page, base, ob, fur)
+                        if sdata is not None:
+                            h = fds.image_hash(sdata)
+                            if fds.is_duplicate_figure(q.image_page, sbox, h, seen_figs):
+                                logger.info("attach_question_images: duplicate figure skipped for question %s",
+                                            q.question_number)
+                                continue
+                            seen_figs.append((q.image_page, sbox, h))
+                            meta = QuestionImageService.save_image_bytes(
+                                sdata, ext="png", original_name=f"question_{q.question_number}_page_{q.image_page}.png",
+                                content_type="image/png")
+                    meta = meta or (cls._store_vlm_figure(file_bytes, vf["bbox"], q.image_page,
+                                                          f"question_{q.question_number}_page_{q.image_page}.png")
+                                    if vf and layout is not None and layout.has_text else None)
+                    meta = meta or cls._store_refined_figure(
+                        file_bytes, q.image_bbox, q.image_page,
+                        f"question_{q.question_number}_page_{q.image_page}.png",
+                    ) or cls._crop_bbox_and_store(
+                        page_images, q.image_page, cls._pad_bbox(q.image_bbox, 0.04),
+                        original_name=f"question_{q.question_number}_page_{q.image_page}.png",
+                    )
+                    if meta:
+                        set_image(q, meta)
+                except Exception as e:
+                    logger.warning(f"attach_question_images: failed for question {q.question_number}: {e}")
+            if q.table_bbox and q.table_page and not q.table_markdown and 1 <= q.table_page <= len(page_images):
+                tbbox = cls._pad_bbox(q.table_bbox, 0.02)
+                try:
+                    meta = cls._crop_bbox_and_store(
+                        page_images, q.table_page, tbbox,
+                        original_name=f"question_{q.question_number}_table_page_{q.table_page}.png",
+                    )
+                    if meta:
+                        q.segments = (q.segments or []) + [{
+                            "type": "image", "content": meta["url"],
+                            "bbox": list(tbbox), "confidence": 0.9,
+                        }]
+                except Exception as e:
+                    logger.warning(f"attach_question_images: table crop failed for question {q.question_number}: {e}")
 
     @staticmethod
-    def _find_fallback_bbox(pages_info: List[Dict[str, Any]], question: "ParsedQuestion",
-                            label_pages: Optional[Dict[Optional[str], List[int]]] = None
-                            ) -> Optional[Tuple[int, List[float]]]:
-        """Assign an embedded page image to a question by vertical proximity of 'Câu n' headers."""
-        allowed = None
-        if label_pages is not None and question.exam_label in label_pages:
-            allowed = set(label_pages[question.exam_label])
-        for pinfo in pages_info:
-            if allowed is not None and pinfo["page"] not in allowed:
-                continue
-            marks = pinfo["qmarks"]
-            if not marks or not pinfo["images"]:
-                continue
-            idx = next((i for i, (num, _) in enumerate(marks) if num == question.question_number), None)
-            if idx is None:
-                continue
-            q_top = marks[idx][1]
-            next_top = marks[idx + 1][1] if idx + 1 < len(marks) else 1000.0
-            candidates = []
-            for bbox in pinfo["images"]:
-                cy = (bbox[1] + bbox[3]) / 2
-                if q_top - 120 <= cy < next_top:
-                    candidates.append((cy, bbox))
-            if candidates:
-                candidates.sort(key=lambda t: abs(t[0] - q_top))
-                return pinfo["page"], candidates[0][1]
-        return None
+    def _scan_ocr_context(file_bytes: bytes, page_images, pending):
+        """(OCR figure boxes per page, page furniture rects per page); empty on any failure."""
+        from app.modules.exercise.services import figure_detection_service as fds
+        from app.modules.exercise.services.page_furniture_service import detect_furniture
+        try:
+            pages = sorted({q.image_page for q in pending if q.image_page})
+            ocr = fds.detect_pdf_ocr_figures(file_bytes, pages)
+        except Exception as e:
+            logger.warning("scan OCR figure detection failed: %s", e)
+            ocr = {}
+        try:
+            fur = detect_furniture(file_bytes, page_images)
+        except Exception as e:
+            logger.warning("scan furniture detection failed: %s", e)
+            fur = []
+        return ocr, fur
+
+    @staticmethod
+    def _scan_figure_crop(file_bytes: bytes, page_no: int, bbox: List[float],
+                          ocr_box: Optional[List[float]] = None, furniture=None):
+        """Fuse OCR/VLM boxes on a scanned page, verify once with the VLM. Returns (box, png) or (None, None)."""
+        import pymupdf
+        from app.modules.exercise.services import figure_detection_service as fds
+        from app.modules.exercise.services.pdf_layout_service import PdfLayoutService
+        try:
+            doc = pymupdf.open(stream=file_bytes, filetype="pdf")
+        except Exception:
+            return None, None
+        try:
+            gray = fds.render_gray(doc, page_no)
+            if ocr_box is not None:
+                box = fds.fuse_scan_box(gray, ocr_box, bbox, furniture)
+            else:
+                box = fds.refine_raster_box(gray, bbox)
+            box = fds.trim_scan_box(gray, fds.verify_adjust(doc, page_no, box), furniture)  # re-trim what verify grew
+            return box, PdfLayoutService.render_clip(doc, page_no, box, pad=0.0)
+        except Exception as e:
+            logger.warning("scan figure refine failed on page %s: %s", page_no, e)
+            return None, None
+        finally:
+            doc.close()
+
+    @classmethod
+    def _store_vlm_figure(cls, file_bytes: bytes, bbox: List[float], page_no: int, name: str):
+        """Crop a VLM-detected figure box (padded 3%) straight from the PDF page and store it."""
+        from app.modules.exercise.services.pdf_layout_service import PdfLayoutService
+        from app.modules.exercise.services.question_image_service import QuestionImageService
+        data = PdfLayoutService.render_clip(file_bytes, page_no, cls._pad_bbox(bbox, 0.03), pad=0.0)
+        if not data:
+            return None
+        return QuestionImageService.save_image_bytes(data, ext="png", original_name=name, content_type="image/png")
+
+    @staticmethod
+    def _store_refined_figure(file_bytes: bytes, bbox: List[float], page_no: int, name: str):
+        """Snap a (possibly shifted) LLM bbox onto the real figure, keep axis labels and
+        captions, render with PyMuPDF and store. None when refinement/render fails."""
+        import pymupdf
+        from app.modules.exercise.services.pdf_layout_service import PdfLayoutService
+        from app.modules.exercise.services.question_image_service import QuestionImageService
+        try:
+            doc = pymupdf.open(stream=file_bytes, filetype="pdf")
+        except Exception:
+            return None
+        try:
+            data = PdfLayoutService.render_figure(doc, page_no, bbox, snap=True)
+        finally:
+            doc.close()
+        if not data:
+            return None
+        return QuestionImageService.save_image_bytes(
+            data, ext="png", original_name=name, content_type="image/png")
+
+    @staticmethod
+    def _pad_bbox(bbox: List[float], ratio: float = 0.02) -> List[float]:
+        """Expand a normalized 0-1000 bbox by `ratio` of its size on each side so thin
+        border strokes of the figure are not cut off."""
+        x0, y0, x1, y1 = [float(v) for v in bbox]
+        w = max(1.0, x1 - x0)
+        h = max(1.0, y1 - y0)
+        return [
+            max(0.0, x0 - w * ratio),
+            max(0.0, y0 - h * ratio),
+            min(1000.0, x1 + w * ratio),
+            min(1000.0, y1 + h * ratio),
+        ]
+
+    @staticmethod
+    def _crop_bbox_and_store(page_images, page_no: int, bbox: List[float], original_name: str):
+        """Crop a normalized 0-1000 bbox from a rendered page and store it via
+        QuestionImageService. Returns the stored metadata dict, or None if the region
+        is too small / too large to store."""
+        from app.core.config import QUESTION_IMAGE_MAX_BYTES
+        from app.modules.exercise.services.question_image_service import QuestionImageService
+
+        img = page_images[page_no - 1]
+        W, H = img.size
+        x0 = max(0.0, min(1000.0, float(bbox[0]))) / 1000.0 * W
+        y0 = max(0.0, min(1000.0, float(bbox[1]))) / 1000.0 * H
+        x1 = max(0.0, min(1000.0, float(bbox[2]))) / 1000.0 * W
+        y1 = max(0.0, min(1000.0, float(bbox[3]))) / 1000.0 * H
+        if x1 - x0 < 20 or y1 - y0 < 20:
+            return None
+        # LLM path only: reject text-strip shaped crops (very wide or very tall thin bands)
+        w_px, h_px = x1 - x0, y1 - y0
+        if w_px / max(1.0, h_px) > 6 or h_px / max(1.0, w_px) > 6:
+            return None
+        crop = img.crop((int(x0), int(y0), int(x1), int(y1))).convert("RGB")
+        buf = io.BytesIO()
+        crop.save(buf, format="PNG")
+        data = buf.getvalue()
+        while len(data) > QUESTION_IMAGE_MAX_BYTES and crop.width > 240 and crop.height > 240:
+            crop = crop.resize((crop.width // 2, crop.height // 2))
+            buf = io.BytesIO()
+            crop.save(buf, format="PNG")
+            data = buf.getvalue()
+        if len(data) > QUESTION_IMAGE_MAX_BYTES:
+            return None
+        return QuestionImageService.save_image_bytes(
+            data, ext="png",
+            original_name=original_name,
+            content_type="image/png",
+        )
 
     @staticmethod
     def get_max_pages_per_call() -> int:
@@ -1064,6 +1743,33 @@ class ImportParserService:
             return False, f"Mismatched LaTeX environments: begins={begins}, ends={ends}."
 
         return True, None
+
+    @staticmethod
+    def strip_markdown_tables(text: str) -> str:
+        """
+        Remove embedded Markdown table blocks (header + separator + rows of |...| lines)
+        from question content so tables stay isolated in their own segment.
+        """
+        if not text:
+            return text
+        lines = text.splitlines()
+        out: List[str] = []
+        i = 0
+        while i < len(lines):
+            if re.match(r"^\s*\|.*\|\s*$", lines[i]):
+                # collect the whole consecutive table block
+                j = i
+                while j < len(lines) and re.match(r"^\s*\|.*\|\s*$", lines[j]):
+                    j += 1
+                block = lines[i:j]
+                # only treat as a table if it has a separator row (|---|---|) or >= 2 lines
+                is_table = len(block) >= 2 and any(re.match(r"^\s*\|?[\s:|-]+\|?\s*$", ln) and "-" in ln for ln in block)
+                if is_table:
+                    i = j
+                    continue
+            out.append(lines[i])
+            i += 1
+        return "\n".join(out).strip()
 
     @classmethod
     def extract_segments(cls, raw_text: str) -> Tuple[List[Dict[str, Any]], bool]:
@@ -1424,6 +2130,10 @@ class ImportParserService:
             if q.question_type == QuestionTypeEnum.MultipleChoice:
                 letter = str(ans).upper()
                 matched = False
+                # Reset any previously marked correct options first so a question
+                # never ends up with more than one correct answer.
+                for opt in q.answer_options:
+                    opt.is_correct = False
                 for opt in q.answer_options:
                     if opt.content.strip().upper().startswith(letter):
                         opt.is_correct = True

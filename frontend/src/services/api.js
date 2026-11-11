@@ -131,7 +131,13 @@ export const exercisesApi = {
         'Content-Type': 'multipart/form-data',
       },
     });
-    return response.data;
+    const data = response.data;
+    // Backend reports questions skipped during import via headers; attach them to
+    // the returned array so callers can warn the user without breaking `.length`.
+    if (Array.isArray(data)) {
+      data.skippedCount = parseInt(response.headers?.['x-import-skipped-count'] || '0', 10) || 0;
+    }
+    return data;
   },
   addQuestion: async (exerciseId, data) => {
     const response = await api.post(`/api/v1/exercises/${exerciseId}/questions`, data);

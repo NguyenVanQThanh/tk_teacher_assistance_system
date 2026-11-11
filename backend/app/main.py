@@ -2,7 +2,7 @@
 # Description: Main entry point of the FastAPI application.
 # Created At: 2026-07-17
 # Created By: Tam Khang
-# Updated At: 2026-10-04 17:27:00
+# Updated At: 2026-11-09
 # Updated By: Tam Khang
 
 import sys
@@ -20,6 +20,13 @@ from dotenv import load_dotenv
 
 # Load environment variables from .env file
 load_dotenv()
+
+# Configure root logging once so application loggers (INFO) are visible in console
+if not logging.getLogger().handlers:
+    logging.basicConfig(
+        level=logging.INFO,
+        format="%(asctime)s %(levelname)s %(name)s: %(message)s",
+    )
 
 logger = logging.getLogger("smartlms.startup")
 
@@ -71,6 +78,7 @@ app.add_middleware(
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
+    expose_headers=["X-Import-Skipped-Count", "X-Import-Skipped"],
 )
 
 # Register routers

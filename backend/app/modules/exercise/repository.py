@@ -88,7 +88,14 @@ class ExerciseRepository:
         if search:
             search_clean = search.strip()
             if search_clean:
-                base_query = base_query.filter(Exercise.title.ilike(f"%{search_clean}%"))
+                # unaccent both sides so Vietnamese searches work with or without diacritics
+                # (e.g. "de thi" matches "Đề thi"). Requires the unaccent extension.
+                try:
+                    base_query = base_query.filter(
+                        func.unaccent(Exercise.title).ilike(func.unaccent(f"%{search_clean}%"))
+                    )
+                except Exception:
+                    base_query = base_query.filter(Exercise.title.ilike(f"%{search_clean}%"))
 
         total = base_query.count()
 

@@ -2,14 +2,14 @@
 # Description: Pydantic schemas for Exercise, Question, AnswerOption, and Assignment CRUD & validation.
 # Created At: 2026-07-31
 # Created By: Tam Khang
-# Updated At: 2026-10-06
+# Updated At: 2026-11-09
 # Updated By: Tam Khang
 
 from enum import Enum
 from uuid import UUID
 from datetime import datetime
 from typing import Optional, List, Any
-from pydantic import BaseModel, Field, field_validator, model_validator
+from pydantic import BaseModel, Field, ValidationInfo, field_validator, model_validator
 
 
 class QuestionTypeEnum(str, Enum):
@@ -105,13 +105,16 @@ class QuestionCreate(BaseModel):
         return v
 
     @model_validator(mode="after")
-    def validate_answer_options_for_type(self):
+    def validate_answer_options_for_type(self, info: ValidationInfo):
         if self.question_type == QuestionTypeEnum.MultipleChoice:
             options = self.answer_options or []
             if len(options) < 2:
                 raise ValueError("MultipleChoice questions must have at least 2 answer options.")
             correct_count = sum(1 for opt in options if opt.is_correct)
-            if correct_count != 1:
+            # Imports without an answer key may legitimately have 0 correct options; the
+            # importer opts in via validation context (not settable through the API body).
+            allow_unkeyed = bool(info.context and info.context.get("allow_no_correct"))
+            if correct_count != 1 and not (allow_unkeyed and correct_count == 0):
                 raise ValueError(f"MultipleChoice questions must have exactly 1 correct answer (found {correct_count}).")
         elif self.question_type == QuestionTypeEnum.TrueFalse:
             options = self.answer_options or []

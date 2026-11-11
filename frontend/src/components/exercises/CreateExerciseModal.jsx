@@ -326,6 +326,17 @@ export default function CreateExerciseModal({ isOpen, onClose, onCreateSuccess }
       return;
     }
 
+    // Keep files <= 1MB so the vision OCR provider stays stable and fast
+    const MAX_IMPORT_BYTES = 1 * 1024 * 1024;
+    if (uploadedFile.size > MAX_IMPORT_BYTES) {
+      setErrorMsg('File đề bài vượt quá 1MB. Vui lòng nén hoặc tách nhỏ file trước khi tải lên.');
+      return;
+    }
+    if (answerFile && answerFile.size > MAX_IMPORT_BYTES) {
+      setErrorMsg('File đáp án vượt quá 1MB. Vui lòng nén hoặc tách nhỏ file trước khi tải lên.');
+      return;
+    }
+
     let progressTimer = null;
     try {
       setIsSubmitting(true);
@@ -378,6 +389,14 @@ export default function CreateExerciseModal({ isOpen, onClose, onCreateSuccess }
       }
 
       const importedQuestions = await exercisesApi.importQuestions(newEx.exercise_id, formData);
+
+      if (importedQuestions.skippedCount > 0) {
+        showToast?.(
+          `Đã bóc tách ${importedQuestions.length} câu hỏi, nhưng có ${importedQuestions.skippedCount} câu bị bỏ qua do lỗi dữ liệu (xem log backend để biết chi tiết).`,
+          'warning',
+          'Cảnh báo import'
+        );
+      }
 
       if (progressTimer) clearInterval(progressTimer);
       setProgressPercent(100);
@@ -949,7 +968,7 @@ export default function CreateExerciseModal({ isOpen, onClose, onCreateSuccess }
                     ) : (
                       <>
                         <span className="dropzone-title">1. File Đề bài (Bắt buộc) *</span>
-                        <span className="dropzone-sub">Hỗ trợ .DOCX, .PDF (chứa câu hỏi & đáp án)</span>
+                        <span className="dropzone-sub">Hỗ trợ .DOCX, .PDF (tối đa 1MB)</span>
                       </>
                     )}
                   </label>
@@ -990,7 +1009,7 @@ export default function CreateExerciseModal({ isOpen, onClose, onCreateSuccess }
                     ) : (
                       <>
                         <span className="dropzone-title">2. File Đáp án riêng (Tùy chọn)</span>
-                        <span className="dropzone-sub">Hỗ trợ .DOCX, .PDF nếu có file đáp án tách rời</span>
+                        <span className="dropzone-sub">Hỗ trợ .DOCX, .PDF (tối đa 1MB) nếu có file đáp án tách rời</span>
                       </>
                     )}
                   </label>
