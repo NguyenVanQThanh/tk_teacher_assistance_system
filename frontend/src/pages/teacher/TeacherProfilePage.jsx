@@ -2,7 +2,7 @@
 // Description: Teacher Profile and Security Settings page with tabs for Personal Information and Password/Security Management.
 // Created At: 2026-09-01
 // Created By: Tam Khang
-// Updated At: 2026-09-01
+// Updated At: 2026-11-11
 // Updated By: Tam Khang
 
 import React, { useState, useEffect } from 'react';
@@ -394,17 +394,6 @@ export default function TeacherProfilePage() {
                 </div>
 
                 <div className="profile-form-grid-3">
-                  <div className="profile-field-item">
-                    <label className="field-title">Email công vụ</label>
-                    <input
-                      type="email"
-                      disabled={!isEditingProfile}
-                      value={profileForm.email}
-                      onChange={(e) => setProfileForm({ ...profileForm, email: e.target.value })}
-                      className="profile-input-control"
-                    />
-                  </div>
-
                   <div className="profile-field-item">
                     <label className="field-title">Số điện thoại</label>
                     <input

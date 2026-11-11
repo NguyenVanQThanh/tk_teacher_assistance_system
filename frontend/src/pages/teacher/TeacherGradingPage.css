@@ -2,7 +2,7 @@
 /* Description: Styles for the Teacher Grading & Feedback management page, metric summaries, filtering bar, and submissions roster table. */
 /* Created At: 2026-09-01 */
 /* Created By: Tam Khang */
-/* Updated At: 2026-09-01 */
+/* Updated At: 2026-11-11 */
 /* Updated By: Tam Khang */
 
 .teacher-grading-layout {
@@ -374,14 +374,14 @@
   border-radius: 9999px;
 }
 
-/* Filter Toolbar - 5 Columns on 1 Row */
+/* Filter Toolbar - 4 Columns on 1 Row */
 .grading-filter-toolbar {
   background-color: #FFFFFF;
   border: 1px solid #E2E8F0;
   border-radius: 12px;
   padding: 10px 14px;
   display: grid;
-  grid-template-columns: minmax(110px, 1fr) minmax(110px, 1fr) minmax(135px, 1.1fr) minmax(135px, 1.1fr) minmax(180px, 1.5fr);
+  grid-template-columns: minmax(110px, 1fr) minmax(135px, 1.1fr) minmax(135px, 1.1fr) minmax(180px, 1.5fr);
   gap: 10px;
   align-items: center;
   box-sizing: border-box;
@@ -392,6 +392,20 @@
   width: 100%;
   display: flex;
   align-items: center;
+}
+
+.filter-field-group {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+}
+
+.filter-field-label {
+  font-size: 11.5px;
+  font-weight: 500;
+  color: #494551;
+  margin-bottom: 3px;
+  line-height: 14px;
 }
 
 .filter-select {

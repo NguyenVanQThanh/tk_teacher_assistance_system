@@ -2,7 +2,7 @@
 // Description: Interactive Modal for Teacher Profile Information and Security / Password Management.
 // Created At: 2026-09-01
 // Created By: Tam Khang
-// Updated At: 2026-09-30
+// Updated At: 2026-11-11
 // Updated By: Tam Khang
 
 import React, { useState, useEffect } from 'react';
@@ -334,17 +334,6 @@ export default function TeacherProfileModal({
                 </div>
 
                 <div className="modal-form-grid-3">
-                  <div className="form-item-field">
-                    <label className="item-label">Email công vụ</label>
-                    <input
-                      type="email"
-                      disabled={!isEditingProfile}
-                      value={profileForm.email}
-                      onChange={(e) => setProfileForm({ ...profileForm, email: e.target.value })}
-                      className="modal-text-input"
-                    />
-                  </div>
-
                   <div className="form-item-field">
                     <label className="item-label">Số điện thoại</label>
                     <input

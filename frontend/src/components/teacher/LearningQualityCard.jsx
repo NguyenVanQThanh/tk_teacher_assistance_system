@@ -2,11 +2,10 @@
 // Description: Learning quality analytics card featuring multi-axis radar chart and detailed teacher qualitative feedback notes matching Image.
 // Created At: 2026-08-30
 // Created By: Tam Khang
-// Updated At: 2026-10-29
+// Updated At: 2026-11-11
 // Updated By: Tam Khang
 
 import React from 'react';
-import { MoreHorizontal } from 'lucide-react';
 import RadarChart from './RadarChart';
 import { useAuth } from '../../context/AuthContext';
 import { getTeacherProfileDefaults } from '../../utils/teacherSubjectHelper';
@@ -39,9 +38,6 @@ export default function LearningQualityCard({
     <div className="learning-quality-card">
       <div className="card-header">
         <h2 className="card-title">Chất lượng học tập trung bình</h2>
-        <button className="icon-more-btn" aria-label="More options" type="button">
-          <MoreHorizontal size={18} />
-        </button>
       </div>
 
       <div className="quality-content-layout">
