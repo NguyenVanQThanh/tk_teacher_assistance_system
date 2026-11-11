@@ -21,6 +21,7 @@ import {
 import { exercisesApi, classesApi, assignmentsApi } from '../../services/api';
 import MathRenderer from '../common/MathRenderer';
 import { getQuestionItems } from '../../utils/questionItems';
+import QuestionMedia from './QuestionMedia';
 import './ExercisePreviewModal.css';
 
 export default function ExercisePreviewModal({ exercise, isOpen, onClose }) {
@@ -207,6 +208,7 @@ export default function ExercisePreviewModal({ exercise, isOpen, onClose }) {
   };
 
   const questions = (exerciseDetail?.questions || [])
+    .filter((q) => q.status !== 'DELETED')
     .slice()
     .sort((a, b) => (a.display_order || 0) - (b.display_order || 0));
   const questionCountText = `${questions.length || exercise.total_questions || 0} câu hỏi`;
@@ -272,7 +274,8 @@ export default function ExercisePreviewModal({ exercise, isOpen, onClose }) {
                       <div className="q-text">
                         <MathRenderer text={q.content || q.content_latex} />
                       </div>
-                      
+                      <QuestionMedia question={q} />
+ 
                       <div style={{ display: 'flex', gap: '6px', marginTop: '6px', alignItems: 'center' }}>
                         {isTrueFalse && (
                           <span style={{ fontSize: '11px', padding: '2px 8px', borderRadius: '4px', background: '#FDF2F8', color: '#DB2777', fontWeight: 600 }}>

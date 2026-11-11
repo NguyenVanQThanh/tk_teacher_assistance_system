@@ -1165,3 +1165,24 @@ Updated By: Tam Khang
     transform: translateX(0);
   }
 }
+
+/* RAG sources (AI result step) */
+.btn-ai-retry {
+  margin-left: auto;
+  border: 1px solid currentColor;
+  background: transparent;
+  color: inherit;
+  border-radius: 6px;
+  padding: 4px 10px;
+  font-size: 12px;
+  cursor: pointer;
+}
+.ai-sources summary { cursor: pointer; font-weight: 600; font-size: 13px; }
+.ai-sources summary:focus-visible, .btn-ai-retry:focus-visible { outline: 2px solid #7C3AED; outline-offset: 2px; }
+.ai-sources-list { list-style: none; margin: 8px 0 0; padding: 0; display: flex; flex-direction: column; gap: 8px; max-height: 280px; overflow-y: auto; }
+.ai-source-item { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; font-size: 12.5px; color: #0F172A; }
+.ai-source-badge { border-radius: 999px; padding: 2px 8px; font-size: 11px; font-weight: 600; }
+.ai-source-badge.sgk { background: #DBEAFE; color: #1D4ED8; }
+.ai-source-badge.teacher { background: #EDE9FE; color: #6D28D9; }
+.ai-source-page { color: #64748B; }
+.ai-source-thumb { height: 48px; border: 1px solid #E2E8F0; border-radius: 6px; display: block; }

@@ -6,6 +6,7 @@
 // Updated By: Tam Khang
 
 import React, { useState, useEffect } from 'react';
+import useUnsavedChangesGuard from '../../hooks/useUnsavedChangesGuard';
 import { X, Save, Check } from 'lucide-react';
 import './EditStudentInfoModal.css';
 
@@ -23,6 +24,7 @@ export default function EditStudentInfoModal({ isOpen, onClose, student, onSave 
 
   const [savedSuccess, setSavedSuccess] = useState(false);
   const [errors, setErrors] = useState({});
+  const guardedClose = useUnsavedChangesGuard(formData, onClose);
 
   const validatePhoneNumber = (phone) => {
     if (!phone || !phone.trim()) return '';
@@ -126,7 +128,7 @@ export default function EditStudentInfoModal({ isOpen, onClose, student, onSave 
   };
 
   return (
-    <div className="edit-info-overlay" onClick={onClose}>
+    <div className="edit-info-overlay" onClick={guardedClose}>
       <div className="edit-info-window" onClick={(e) => e.stopPropagation()}>
         {/* Header */}
         <div className="edit-info-header">
@@ -136,7 +138,7 @@ export default function EditStudentInfoModal({ isOpen, onClose, student, onSave 
               {student.name} • Mã HS: {student.code}
             </span>
           </div>
-          <button type="button" className="btn-info-close" onClick={onClose} title="Đóng">
+          <button type="button" className="btn-info-close" onClick={guardedClose} title="Đóng">
             <X size={18} />
           </button>
         </div>
@@ -238,7 +240,7 @@ export default function EditStudentInfoModal({ isOpen, onClose, student, onSave 
             <button
               type="button"
               className="btn-cancel-action"
-              onClick={onClose}
+              onClick={guardedClose}
             >
               Hủy
             </button>

@@ -17,6 +17,7 @@ from app.modules.exercise.schemas import ExerciseCreate, ExerciseUpdate, AiExerc
 from app.modules.exercise.repository import ExerciseRepository
 from app.modules.academic.scoping import get_user_role_name
 from app.modules.exercise.services.ai_generator_service import AiExerciseGeneratorService
+from app.modules.exercise.services.rag_context_service import RagContextService
 
 
 class ExerciseService:
@@ -255,14 +256,32 @@ class ExerciseService:
             self.db.flush()
 
         # 3. Generate Questions using AiExerciseGeneratorService
-        raw_questions = AiExerciseGeneratorService.generate_questions(
-            subject_name=payload.subject_name,
-            grade_name=payload.grade_name or "Lớp 12",
+        grade_name = payload.grade_name or "Lớp 12"
+        context, sources = RagContextService.build_context_with_sources(
+            self.db,
             topic_prompt=payload.topic_prompt,
-            part1_count=payload.part1_count,
-            part2_count=payload.part2_count,
-            part3_count=payload.part3_count
+            subject_name=payload.subject_name,
+            grade_name=grade_name,
+            subject_id=subject.subject_id,
+            role_name=get_user_role_name(self.db, current_user),
+            class_id=class_obj.class_id,
+            document_ids=payload.document_ids,
         )
+        try:
+            raw_questions = AiExerciseGeneratorService.generate_questions(
+                subject_name=payload.subject_name,
+                grade_name=grade_name,
+                topic_prompt=payload.topic_prompt,
+                part1_count=payload.part1_count,
+                part2_count=payload.part2_count,
+                part3_count=payload.part3_count,
+                context=context,
+            )
+        except RuntimeError as e:
+            raise HTTPException(
+                status_code=status.HTTP_502_BAD_GATEWAY,
+                detail={"code": "ERR-EXE-AI_GENERATION_FAILED", "message": str(e)}
+            )
 
         total_questions = len(raw_questions)
         clean_topic = payload.topic_prompt.strip()
@@ -282,7 +301,9 @@ class ExerciseService:
                 "duration_minutes": payload.duration_minutes,
                 "part1_count": payload.part1_count,
                 "part2_count": payload.part2_count,
-                "part3_count": payload.part3_count
+                "part3_count": payload.part3_count,
+                "sources": sources,
+                "document_ids": [str(d) for d in (payload.document_ids or [])],
             },
             status="ACTIVE"
         )
@@ -351,5 +372,6 @@ class ExerciseService:
             class_id=class_obj.class_id,
             class_name=class_obj.class_name,
             due_at=assignment.due_at,
-            created_at=exercise.created_at
+            created_at=exercise.created_at,
+            sources=sources,
         )

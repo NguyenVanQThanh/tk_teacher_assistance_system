@@ -9,7 +9,8 @@ Updated By: Tam Khang
 import uuid
 from datetime import datetime
 from sqlalchemy import Column, Integer, String, Text, Date, ForeignKey, DateTime, CheckConstraint, PrimaryKeyConstraint, Boolean, JSON, Numeric
-from sqlalchemy.dialects.postgresql import UUID
+from sqlalchemy.dialects.postgresql import UUID, JSONB, TSVECTOR
+from pgvector.sqlalchemy import Vector
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 from models.base import Base
@@ -149,13 +150,59 @@ class Document(Base):
     file_url = Column(String(500), nullable=True)
     file_type = Column(String(20), nullable=True)
     file_size = Column(Integer, default=0, nullable=True)
+    file_hash = Column(String(64), nullable=True, index=True)
     download_count = Column(Integer, default=0, nullable=False, server_default='0')
     grade = Column(String(20), nullable=True, default='12', server_default='12')
     document_type = Column(String(50), nullable=True, default='reference', server_default='reference')
     raw_content = Column(Text, nullable=True)
     status = Column(String(20), default='Uploaded')
+    ingest_status = Column(Text, default='PENDING', server_default='PENDING')
+    ingest_error = Column(Text, nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+
+
+class SgkChunk(Base):
+    """Textbook (SGK) RAG chunk; data loaded by app/scripts/load_sgk_rag.py."""
+    __tablename__ = 'chunks'
+
+    id = Column(Text, primary_key=True)
+    doc_id = Column(Text, nullable=False, index=True)
+    page = Column(Integer, nullable=False)
+    chuong = Column(Text, nullable=True)
+    bai = Column(Text, nullable=True)
+    modality = Column(Text, nullable=False)
+    content = Column(Text, nullable=False)
+    embedding = Column(Text().with_variant(Vector(1024), 'postgresql'), nullable=False)
+    meta = Column(JSON().with_variant(JSONB(), 'postgresql'), nullable=True)
+    tsv = Column(Text().with_variant(TSVECTOR(), 'postgresql'), nullable=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+
+
+class SgkDoc(Base):
+    __tablename__ = 'sgk_docs'
+
+    doc_id = Column(Text, primary_key=True)
+    grade = Column(Integer, nullable=False)
+    subject_key = Column(Text, nullable=False)
+    title = Column(Text, nullable=False)
+    status = Column(Text, default='ACTIVE', server_default='ACTIVE')
+
+
+class DocumentChunk(Base):
+    """Chunk of a teacher-uploaded document (soft delete via status)."""
+    __tablename__ = 'document_chunks'
+
+    chunk_id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    document_id = Column(UUID(as_uuid=True), ForeignKey('documents.document_id'), nullable=False, index=True)
+    page = Column(Integer, nullable=True)
+    modality = Column(Text, nullable=False)
+    content = Column(Text, nullable=False)
+    embedding = Column(Text().with_variant(Vector(1024), 'postgresql'), nullable=False)
+    meta = Column(JSON().with_variant(JSONB(), 'postgresql'), nullable=True)
+    tsv = Column(Text().with_variant(TSVECTOR(), 'postgresql'), nullable=True)
+    status = Column(Text, nullable=False, default='ACTIVE', server_default='ACTIVE')
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
 
 
 class Exercise(Base):

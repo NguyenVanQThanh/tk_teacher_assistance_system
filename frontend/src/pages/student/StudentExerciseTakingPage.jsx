@@ -36,6 +36,8 @@ import {
 import { useNavigate, Link, useParams, useLocation } from 'react-router-dom';
 import { exercisesApi, attemptsApi } from '../../services/api';
 import MathRenderer from '../../components/common/MathRenderer';
+import QuestionMedia from '../../components/exercises/QuestionMedia';
+import AiSourcesList from '../../components/exercises/AiSourcesList';
 import './StudentExerciseTakingPage.css';
 
 export default function StudentExerciseTakingPage() {
@@ -911,6 +913,8 @@ export default function StudentExerciseTakingPage() {
           explanation: bQ.explanation,
           correctAnswer: bQ.correct_answer,
           isCorrect: qRes ? qRes.is_correct : (options.find(o => o.key === answers[currentQuestionIdx])?.isCorrect ?? null),
+          image_url: bQ.image_url,
+          segments: bQ.segments,
           qRes
         };
       } else if (qType === 'true_false') {
@@ -945,6 +949,8 @@ export default function StudentExerciseTakingPage() {
           explanation: bQ.explanation,
           correctAnswer: bQ.correct_answer,
           isCorrect: qRes ? qRes.is_correct : null,
+          image_url: bQ.image_url,
+          segments: bQ.segments,
           qRes
         };
       } else {
@@ -957,6 +963,8 @@ export default function StudentExerciseTakingPage() {
           explanation: bQ.explanation,
           correctAnswer: bQ.correct_answer,
           isCorrect: qRes ? qRes.is_correct : null,
+          image_url: bQ.image_url,
+          segments: bQ.segments,
           qRes
         };
       }
@@ -1679,6 +1687,10 @@ export default function StudentExerciseTakingPage() {
 
         {/* Center Question Viewport */}
         <main className="exam-question-viewport">
+          {/* AI reference sources: shown only after submission to avoid leaking answers */}
+          {isExamSubmitted && backendExercise?.ai_metadata?.is_ai_generated && (
+            <AiSourcesList sources={backendExercise.ai_metadata.sources} />
+          )}
           {/* Readonly Review Banner */}
           {isExamSubmitted && isReadOnlyReview && (
             <div className={`exam-readonly-banner ${!exerciseInfo.isExam ? 'banner-practice' : ''}`}>
@@ -1773,6 +1785,7 @@ export default function StudentExerciseTakingPage() {
             {/* Question Statement */}
             <div className="question-statement-text">
               <MathRenderer text={questionData.statement} />
+              <QuestionMedia question={questionData} compact />
             </div>
 
             {/* Dynamic Diagram */}

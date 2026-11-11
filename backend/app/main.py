@@ -2,7 +2,7 @@
 # Description: Main entry point of the FastAPI application.
 # Created At: 2026-07-17
 # Created By: Tam Khang
-# Updated At: 2026-10-04 17:27:00
+# Updated At: 2026-11-09
 # Updated By: Tam Khang
 
 import sys
@@ -13,16 +13,45 @@ backend_root = str(Path(__file__).resolve().parent.parent)
 if backend_root not in sys.path:
     sys.path.insert(0, backend_root)
 
+import logging
+import os
+
 from dotenv import load_dotenv
 
 # Load environment variables from .env file
 load_dotenv()
 
+# Configure root logging once so application loggers (INFO) are visible in console
+if not logging.getLogger().handlers:
+    logging.basicConfig(
+        level=logging.INFO,
+        format="%(asctime)s %(levelname)s %(name)s: %(message)s",
+    )
+
+logger = logging.getLogger("smartlms.startup")
+
+
+def _mask_key(value: str) -> str:
+    """Mask an API key for logs: show only length, never the secret itself."""
+    if not value:
+        return "MISSING"
+    return f"set({len(value)} chars)"
+
+
+# Log scan OCR provider config at startup (masked) so Docker/env issues are visible in logs
+logger.warning(
+    "Scan OCR config: SCAN_AI_PROVIDER=%s | MISTRAL_API_KEY=%s | GEMINI_API_KEY=%s | ENABLE_MARKER_PDF=%s",
+    os.environ.get("SCAN_AI_PROVIDER", "mistral"),
+    _mask_key(os.environ.get("MISTRAL_API_KEY") or os.environ.get("MISTRAL_KEY")),
+    _mask_key(os.environ.get("GEMINI_API_KEY") or os.environ.get("GOOGLE_API_KEY") or os.environ.get("GEMINI_KEY")),
+    os.environ.get("ENABLE_MARKER_PDF", "1"),
+)
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 
-from app.core.config import QUESTION_IMAGE_DIR, QUESTION_IMAGE_URL_PREFIX
+from app.core.config import QUESTION_IMAGE_DIR, QUESTION_IMAGE_URL_PREFIX, SGK_IMAGE_DIR, SGK_IMAGE_URL_PREFIX
 
 from app.modules.auth.routers.auth import router as auth_router
 from app.modules.academic.routers.subjects import router as subjects_router
@@ -49,6 +78,7 @@ app.add_middleware(
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
+    expose_headers=["X-Import-Skipped-Count", "X-Import-Skipped"],
 )
 
 # Register routers
@@ -75,6 +105,10 @@ app.mount(
     StaticFiles(directory=QUESTION_IMAGE_DIR),
     name="question-images",
 )
+
+# Serve SGK textbook figures read-only (StaticFiles only handles GET/HEAD)
+SGK_IMAGE_DIR.mkdir(parents=True, exist_ok=True)
+app.mount(SGK_IMAGE_URL_PREFIX, StaticFiles(directory=SGK_IMAGE_DIR), name="sgk-images")
 
 @app.get("/health")
 def health():

@@ -131,7 +131,13 @@ export const exercisesApi = {
         'Content-Type': 'multipart/form-data',
       },
     });
-    return response.data;
+    const data = response.data;
+    // Backend reports questions skipped during import via headers; attach them to
+    // the returned array so callers can warn the user without breaking `.length`.
+    if (Array.isArray(data)) {
+      data.skippedCount = parseInt(response.headers?.['x-import-skipped-count'] || '0', 10) || 0;
+    }
+    return data;
   },
   addQuestion: async (exerciseId, data) => {
     const response = await api.post(`/api/v1/exercises/${exerciseId}/questions`, data);
@@ -249,6 +255,13 @@ export const attemptsApi = {
 export const documentsApi = {
   getDocuments: async (params = {}) => {
     const response = await api.get('/api/v1/documents', { params });
+    return response.data;
+  },
+  // Teacher's own uploaded documents that finished RAG ingestion (usable as AI context)
+  getUsableDocuments: async (params = {}) => {
+    const response = await api.get('/api/v1/documents', {
+      params: { mine: true, status: 'Uploaded', ready_only: true, page_size: 100, ...params },
+    });
     return response.data;
   },
   getDocumentDashboard: async () => {

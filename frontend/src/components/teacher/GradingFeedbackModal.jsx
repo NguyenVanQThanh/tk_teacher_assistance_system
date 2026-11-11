@@ -26,6 +26,7 @@ import {
 } from 'lucide-react';
 import { attemptsApi, exercisesApi } from '../../services/api';
 import MathRenderer from '../common/MathRenderer';
+import QuestionMedia from '../exercises/QuestionMedia';
 import './GradingFeedbackModal.css';
 
 export default function GradingFeedbackModal({ 
@@ -163,7 +164,9 @@ export default function GradingFeedbackModal({
               needsReview: q.needs_review || (!correctOptKey && isMC),
               stem: q.content,
               options: formattedOptions,
-              subResults: res.sub_results || {}
+              subResults: res.sub_results || {},
+              image_url: q.image_url,
+              segments: q.segments
             };
           });
 
@@ -434,6 +437,8 @@ export default function GradingFeedbackModal({
                       <p className="question-stem-text">
                         <MathRenderer text={q.stem} />
                       </p>
+
+                      <QuestionMedia question={q} compact />
 
                       {isAnswerUndefined && (
                         <div className="undefined-key-notice-box">

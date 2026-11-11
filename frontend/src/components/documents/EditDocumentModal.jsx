@@ -6,6 +6,7 @@
 // Updated By: Tam Khang
 
 import React, { useState, useEffect } from 'react';
+import useUnsavedChangesGuard from '../../hooks/useUnsavedChangesGuard';
 import { X, Edit3, Save, ChevronDown, BookOpen, Layers, Check } from 'lucide-react';
 import { subjectsApi } from '../../services/api';
 import './EditDocumentModal.css';
@@ -36,6 +37,7 @@ export default function EditDocumentModal({ isOpen, doc, onClose, onSave }) {
   const [availableSubjects, setAvailableSubjects] = useState(DEFAULT_SUBJECTS);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
+  const guardedClose = useUnsavedChangesGuard({ title, selectedSubjectKey, selectedSubjectId, docType }, onClose, !isSubmitting);
 
   // Fetch subjects from backend if available
   useEffect(() => {
@@ -131,7 +133,7 @@ export default function EditDocumentModal({ isOpen, doc, onClose, onSave }) {
   };
 
   return (
-    <div className="modal-backdrop-overlay" onClick={onClose}>
+    <div className="modal-backdrop-overlay" onClick={guardedClose}>
       <div className="edit-doc-modal-container" onClick={(e) => e.stopPropagation()}>
         {/* Header */}
         <header className="edit-doc-modal-header">
@@ -147,7 +149,7 @@ export default function EditDocumentModal({ isOpen, doc, onClose, onSave }) {
           <button
             type="button"
             className="btn-modal-close"
-            onClick={onClose}
+            onClick={guardedClose}
             aria-label="Đóng"
           >
             <X size={18} />
@@ -230,7 +232,7 @@ export default function EditDocumentModal({ isOpen, doc, onClose, onSave }) {
             <button
               type="button"
               className="btn-modal-cancel"
-              onClick={onClose}
+              onClick={guardedClose}
               disabled={isSubmitting}
             >
               Hủy bỏ

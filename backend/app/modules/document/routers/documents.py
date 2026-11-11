@@ -7,7 +7,7 @@
 
 from typing import Optional
 from uuid import UUID
-from fastapi import APIRouter, Depends, Query, UploadFile, File, Form, status, HTTPException
+from fastapi import BackgroundTasks, APIRouter, Depends, Query, UploadFile, File, Form, status, HTTPException
 from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session
 from pathlib import Path
@@ -17,6 +17,7 @@ from models.models import User
 from app.modules.auth.dependencies import require_roles
 from app.modules.document.schemas import DocumentOut, DocumentListOut, DocumentDashboardOut, DocumentUpdate
 from app.modules.document.services import document_service
+from app.modules.document.services.document_ingest_service import DocumentIngestService
 from app.modules.document.services.document_service import DocumentService, UPLOAD_DIR
 
 # The repository is a teacher resource; students are rejected on every route.
@@ -38,6 +39,7 @@ def get_document_dashboard(
 
 @router.post("/upload", response_model=DocumentOut, status_code=status.HTTP_201_CREATED)
 def upload_document(
+    background_tasks: BackgroundTasks,
     file: UploadFile = File(..., description="Uploaded document file (.pdf, .docx, .xlsx)"),
     title: str = Form(..., description="Document title"),
     subject_id: Optional[UUID] = Form(None, description="Subject UUID"),
@@ -51,7 +53,7 @@ def upload_document(
     """
     Upload a new teaching document with metadata.
     """
-    return DocumentService.upload_document(
+    out = DocumentService.upload_document(
         db=db,
         current_user=current_user,
         file=file,
@@ -62,6 +64,24 @@ def upload_document(
         description=description,
         is_public=is_public
     )
+    # Ingestion runs after the response with its own DB session.
+    background_tasks.add_task(DocumentIngestService.ingest, out.document_id)
+    return out
+
+
+@router.post("/{document_id}/ingest", response_model=DocumentOut, status_code=status.HTTP_202_ACCEPTED)
+def reingest_document(
+    document_id: UUID,
+    background_tasks: BackgroundTasks,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """
+    Re-trigger content ingestion (owner or admin only).
+    """
+    doc = DocumentService.trigger_ingest(db, document_id, current_user)
+    background_tasks.add_task(DocumentIngestService.ingest, document_id)
+    return DocumentService.to_document_out(doc, db)
 
 
 @router.get("", response_model=DocumentListOut)
@@ -71,6 +91,8 @@ def list_documents(
     document_type: Optional[str] = Query(None, description="Filter by document type"),
     search: Optional[str] = Query(None, description="Search query"),
     status: Optional[str] = Query("Uploaded", description="Filter by status, or ALL for every non-deleted status"),
+    mine: bool = Query(False, description="Only documents uploaded by the current user"),
+    ready_only: bool = Query(False, description="Only documents whose ingest_status is DONE"),
     page: int = Query(1, ge=1, description="Page number"),
     page_size: int = Query(12, ge=1, le=100, description="Items per page"),
     db: Session = Depends(get_db),
@@ -87,6 +109,8 @@ def list_documents(
         document_type=document_type,
         search=search,
         status_val=status,
+        mine=mine,
+        ready_only=ready_only,
         page=page,
         page_size=page_size
     )
