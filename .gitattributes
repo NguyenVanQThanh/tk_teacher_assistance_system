@@ -1,0 +1,4 @@
+
+# Backend container entrypoint scripts are bind-mounted into the container; keep LF so sh can run them
+backend/docker/*.sh text eol=lf
+
