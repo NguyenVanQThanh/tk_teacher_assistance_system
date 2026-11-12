@@ -1,9 +1,22 @@
+# Dev/demo stack for SmartLMS.
+#
+# RAM budget (hard target: <= 5 GB total for all containers):
+#   postgres  1.5 GB  (shared_buffers + 30 pooled connections + pgvector)
+#   backend   2.5 GB  (Python/uvicorn + reportlab PDF export + pypdfium2 ETL)
+#   frontend  1.0 GB  (Node/Vite preview; actual usage is much lower)
+#   ---------------------------------------------------------------
+#   total     5.0 GB  (leave ~1 GB headroom for the host OS/Docker itself)
+#
+# If you raise one limit, lower another: Docker OOM-kills the container that
+# exceeds its limit, and a backend OOM-kill also drops in-flight SSE streams
+# and document ingestion jobs. See docs/performance.md for the sizing model.
+
 services:
   postgres:
     image: pgvector/pgvector:pg16
     container_name: postgres
     restart: always
-    mem_limit: 1g
+    mem_limit: 1536m
     environment:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: 123456
@@ -13,6 +26,11 @@ services:
     volumes:
       - postgres_data:/var/lib/postgresql/data
       - ./postgres-init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d teacher_assistance"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
   backend:
     build:
@@ -20,7 +38,7 @@ services:
       dockerfile: Dockerfile
     container_name: smartlms_backend
     restart: always
-    mem_limit: 1g
+    mem_limit: 2560m
     # Load AI keys / storage config from backend/.env (compose `environment`
     # below still overrides individual values, e.g. DB_HOST=postgres)
     env_file:
@@ -34,16 +52,41 @@ services:
       SECRET_KEY: dev_secret_key_jwt_token_change_in_production
       ACCESS_TOKEN_EXPIRE_MINUTES: 60
       TZ: Asia/Ho_Chi_Minh
-      # marker-pdf pulls in torch (~GBs of RAM); keep it off in the 1g container
+      # marker-pdf pulls in torch (~GBs of RAM); keep it off in this stack
       ENABLE_MARKER_PDF: "0"
+      # Connection pool: 20 + 30 overflow = at most 50 physical connections.
+      # Code defaults are 20 + 30; the extra headroom covers the X-Data-Version
+      # middleware's short-lived session while 30 requests hold their own.
+      # Per uvicorn worker; keep workers * 50 below Postgres max_connections.
+      DB_POOL_SIZE: "20"
+      DB_MAX_OVERFLOW: "30"
+      DB_POOL_TIMEOUT: "10"
+      DB_POOL_RECYCLE: "1800"
+      DB_STATEMENT_TIMEOUT_MS: "30000"
+      # Heavy-work guards (see backend/app/core/resource_limits.py).
+      PDF_EXPORT_CONCURRENCY: "2"
+      IMPORT_CONCURRENCY: "2"
+      ETL_CONCURRENCY: "1"
+      # 50 MB: reject oversized documents before read_bytes() allocates them.
+      MAX_INGEST_BYTES: "52428800"
     ports:
       - "8000:8000"
     depends_on:
-      - postgres
+      postgres:
+        condition: service_healthy
     volumes:
       - ./backend:/app
       - ./backend/uploads:/app/uploads
-    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+    # --reload stays on for dev. --limit-concurrency is a safety valve: 30
+    # users may hold ~30 SSE streams plus normal API calls, so 128 leaves
+    # headroom while still bounding runaway connection counts.
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload --limit-concurrency 128
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://127.0.0.1:8000/health || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 60s
 
   frontend:
     build:
@@ -51,11 +94,12 @@ services:
       dockerfile: Dockerfile
     container_name: smartlms_frontend
     restart: always
-    mem_limit: 1g
+    mem_limit: 1024m
     ports:
       - "3000:3000"
     depends_on:
-      - backend
+      backend:
+        condition: service_healthy
     volumes:
       - ./frontend:/app
       - /app/node_modules

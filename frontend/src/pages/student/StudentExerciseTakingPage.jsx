@@ -43,11 +43,17 @@ import QuestionContentView from '../../components/common/QuestionContentView';
 import MathTextEditor from '../../components/common/MathTextEditor';
 import MathSymbolToolbar from '../../components/common/MathSymbolToolbar';
 import useExamLockdown from '../../hooks/useExamLockdown';
+import usePageMeta from '../../hooks/usePageMeta';
 import '../../components/documents/EditExerciseModal.css';
 import QuestionMedia from '../../components/exercises/QuestionMedia';
 import AiSourcesList from '../../components/exercises/AiSourcesList';
 import './StudentExerciseTakingPage.css';
 import toast from '../../components/common/toast';
+
+// Aborted requests (component unmount / React StrictMode double-mount) are expected
+// control flow — they must never be surfaced to the student as an error.
+const isAbortError = (err) =>
+  err?.code === 'ERR_CANCELED' || err?.name === 'CanceledError' || err?.name === 'AbortError';
 
 export default function StudentExerciseTakingPage() {
   const navigate = useNavigate();
@@ -66,6 +72,10 @@ export default function StudentExerciseTakingPage() {
   const [isLoadingBackend, setIsLoadingBackend] = useState(false);
   const [backendError, setBackendError] = useState(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // Mirror of the `answers` state for async init logic: the post-start refetch must
+  // never replace the paper once the student has already answered something.
+  const answersRef = useRef({});
 
   // UUID check: distinguishes real backend targets from local AI/mock exercises
   const isUuid = (id) => typeof id === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id);
@@ -121,6 +131,7 @@ export default function StudentExerciseTakingPage() {
   // Initialize Backend Exam and Attempt
   useEffect(() => {
     let isMounted = true;
+    const abortController = new AbortController();
     async function initExam() {
       const targetExerciseId = stateExerciseId || exerciseId;
       let targetAssignmentId = stateAssignmentId;
@@ -154,7 +165,9 @@ export default function StudentExerciseTakingPage() {
           //    GET /api/v1/assignments/{assignmentId}/taking -> { assignment, exercise, questions (sanitized), open_attempt }
           if (isUuid(targetAssignmentId)) {
             try {
-              const taking = await studentTakingApi.getAssignmentTaking(targetAssignmentId);
+              const taking = await studentTakingApi.getAssignmentTaking(targetAssignmentId, {
+                signal: abortController.signal,
+              });
               if (isMounted && taking) {
                 const assignment = taking.assignment || null;
                 exerciseData = taking.exercise || null;
@@ -171,6 +184,8 @@ export default function StudentExerciseTakingPage() {
                 }
               }
             } catch (takingErr) {
+              // Unmount/StrictMode abort: stop initializing, nothing to report.
+              if (isAbortError(takingErr)) return;
               const status = takingErr?.response?.status;
               if (status === 404 || status === 405) {
                 console.warn('Taking endpoint not deployed yet (404/405), falling back to exercise detail:', takingErr?.message);
@@ -208,6 +223,43 @@ export default function StudentExerciseTakingPage() {
               setBackendQuestions(sortedQ);
             }
           }
+
+          // 2b. Re-fetch the taking payload once an attempt exists so the paper follows
+          //     that attempt's shuffle seed. The BE shuffles questions/options from
+          //     attempt.detailed_results["shuffle_seed"]; before the attempt is started it
+          //     serves a stable preview seed, so the order may change right after start.
+          //     Runs only during init, while the student has not answered anything yet.
+          const refetchTakingForAttempt = async () => {
+            if (!isMounted || !isUuid(targetAssignmentId)) return;
+            if (Object.keys(answersRef.current || {}).length > 0) return;
+            try {
+              const taking = await studentTakingApi.getAssignmentTaking(targetAssignmentId, {
+                signal: abortController.signal,
+                // Bypass in-flight de-dupe: a cached preview response would defeat the refetch.
+                force: true,
+              });
+              if (!isMounted || !taking) return;
+              const assignment = taking.assignment || null;
+              const exercise = taking.exercise || null;
+              const rawQuestions = Array.isArray(taking.questions)
+                ? taking.questions
+                : (Array.isArray(exercise?.questions) ? exercise.questions : []);
+              if (rawQuestions.length === 0) return;
+              // Same sanitize + sort pipeline as the initial load: display_order is the
+              // already-shuffled alias, so sorting by it preserves the seeded order.
+              const seededQuestions = sortBackendQuestions(sanitizeQuestionsForStudent(rawQuestions));
+              if (exercise) setBackendExercise({ ...exercise, questions: seededQuestions });
+              setBackendQuestions(seededQuestions);
+              if (assignment) setBackendAssignment(assignment);
+            } catch (refetchErr) {
+              if (isAbortError(refetchErr)) return;
+              // Keep the current paper instead of blocking the exam on a refresh hiccup.
+              console.warn('Could not refresh taking payload for the started attempt:', refetchErr);
+            }
+          };
+
+          // Unmounted while loading: never create an attempt from a dead effect.
+          if (!isMounted) return;
 
           // 2. Fetch existing attempt from DB (matching assignmentId or exerciseId) or start attempt
           try {
@@ -353,6 +405,10 @@ export default function StudentExerciseTakingPage() {
                 if (targetAssignmentId) localStorage.removeItem(`tk_exam_submitted_${targetAssignmentId}`);
               } catch (e) {}
 
+              // The effect may have been torn down while attempts were loading: never
+              // start/resume an attempt from a dead effect (StrictMode / fast navigation).
+              if (!isMounted) return;
+
               if (openAttempt) {
                 // Seamlessly resume open attempt
                 if (isMounted) {
@@ -363,6 +419,8 @@ export default function StudentExerciseTakingPage() {
                   const startRes = await attemptsApi.startAttempt(targetAssignmentId);
                   if (isMounted && startRes?.attempt_id) {
                     setAttemptId(startRes.attempt_id);
+                    // A fresh attempt gets a fresh shuffle seed → reload the seeded paper.
+                    await refetchTakingForAttempt();
                   }
                 } catch (startErr) {
                   console.warn('Could not start new attempt, looking for open attempt:', startErr);
@@ -372,6 +430,8 @@ export default function StudentExerciseTakingPage() {
                   );
                   if (isMounted && foundOpen) {
                     setAttemptId(foundOpen.attempt_id);
+                    // Resuming an existing attempt: make sure the paper matches its seed.
+                    await refetchTakingForAttempt();
                   }
                 }
               }
@@ -395,6 +455,7 @@ export default function StudentExerciseTakingPage() {
     initExam();
     return () => {
       isMounted = false;
+      abortController.abort();
     };
   }, [exerciseId, stateAssignmentId, stateExerciseId]);
 
@@ -510,6 +571,13 @@ export default function StudentExerciseTakingPage() {
     };
   }, [isBackendTarget, backendExercise, backendQuestions, backendAssignment, savedAiExercise, isChemistry, location.state, currentExamId]);
 
+  // Private exam screen: never index it. Title is still set so the browser tab is clear.
+  usePageMeta({
+    title: exerciseInfo?.title ? `${exerciseInfo.title} — Làm bài — SmartLMS` : 'Làm bài — SmartLMS',
+    robots: 'noindex,nofollow',
+    ogType: 'website',
+  });
+
   const totalQuestions = exerciseInfo.totalQuestions;
 
   // Active question index (0-indexed, default is Question 1)
@@ -517,6 +585,11 @@ export default function StudentExerciseTakingPage() {
   
   // Dynamic answers dictionary
   const [answers, setAnswers] = useState({});
+
+  // Keep the async-init guard in sync with the latest answers.
+  useEffect(() => {
+    answersRef.current = answers;
+  }, [answers]);
 
   const [flaggedQuestions, setFlaggedQuestions] = useState({});
   const [timeLeft, setTimeLeft] = useState(exerciseInfo.durationMinutes * 60);

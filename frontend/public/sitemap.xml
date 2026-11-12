@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- SmartLMS sitemap - placeholder production domain: smartlms.example.com
+     Replace it with the real domain before deploying to production.
+     Only the public login page is listed: "/" redirects by role and every
+     authenticated route is disallowed in robots.txt. -->
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+  <url>
+    <loc>https://smartlms.example.com/login</loc>
+    <lastmod>2026-11-13</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>1.0</priority>
+  </url>
+</urlset>

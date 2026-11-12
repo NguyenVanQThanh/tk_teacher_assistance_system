@@ -3,12 +3,12 @@ File Name: models.py
 Description: Database models definition for tables (User, Role, Permission, Exercise, Question, ScheduleNote, etc.).
 Created At: 2026-07-04
 Created By: Tam Khang
-Updated At: 2026-10-28
-Updated By: Tam Khang
+Updated At: 2026-11-13
+Updated By: AI Agent
 """
 import uuid
 from datetime import datetime
-from sqlalchemy import Column, Integer, String, Text, Date, ForeignKey, DateTime, CheckConstraint, PrimaryKeyConstraint, Boolean, JSON, Numeric
+from sqlalchemy import Column, Integer, String, Text, Date, ForeignKey, DateTime, CheckConstraint, PrimaryKeyConstraint, Boolean, JSON, Numeric, Float, Index
 from sqlalchemy.dialects.postgresql import UUID, JSONB, TSVECTOR
 from pgvector.sqlalchemy import Vector
 from sqlalchemy.orm import relationship
@@ -422,4 +422,34 @@ class ScheduleNote(Base):
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
 
     user = relationship("User", backref="schedule_notes")
+
+
+class ApiRequestMetric(Base):
+    """One recorded API request (in-memory collector -> periodic bulk insert).
+
+    Deliberately uses portable column types (no JSONB/pgvector) so the table can also be
+    created on the SQLite test database. user_ref/ip_ref are anonymized hashes, never raw
+    user ids or IP addresses.
+    """
+    __tablename__ = 'api_request_metrics'
+
+    metric_id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    request_id = Column(String(64), nullable=False)
+    method = Column(String(10), nullable=False)
+    route = Column(String(255), nullable=False)
+    path = Column(String(512), nullable=False)
+    status_code = Column(Integer, nullable=False)
+    duration_ms = Column(Float, nullable=False, default=0.0)
+    request_bytes = Column(Integer, nullable=False, default=0)
+    response_bytes = Column(Integer, nullable=False, default=0)
+    user_ref = Column(String(64), nullable=False, default='anonymous')
+    ip_ref = Column(String(64), nullable=False, default='anonymous')
+    is_error = Column(Boolean, nullable=False, default=False)
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+
+    __table_args__ = (
+        Index('ix_api_request_metrics_created_at', 'created_at'),
+        Index('ix_api_request_metrics_route', 'route'),
+        Index('ix_api_request_metrics_status_code', 'status_code'),
+    )
 

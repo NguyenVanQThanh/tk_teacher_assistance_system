@@ -19,6 +19,7 @@ from PIL import Image
 from sqlalchemy import text
 
 from app.core import config
+from app.core.resource_limits import ETL_SEMAPHORE
 from app.modules.exercise.services.mistral_vision_parser_service import (
     MistralVisionParserService,
     flatten_content,
@@ -30,8 +31,17 @@ logger = logging.getLogger("smartlms.document.ingest")
 UPLOAD_DIR = Path("uploads/documents")
 MIN_TOK, MAX_TOK = 300, 500
 MAX_RETRIES = 3
+CHUNK_INSERT_BATCH_SIZE = 100
 _MATH = re.compile(r"\$\$.+?\$\$|\$[^$\n]+?\$", re.S)
 _FIGURE_LINE = re.compile(r"^\s*>?\s*\[(?:HINH|HÌNH|FIGURE)\s*:\s*(.+?)\]\s*$", re.I | re.M)
+
+# One executemany-style INSERT for a whole batch of chunks (instead of one
+# round-trip per chunk). Keeps the same columns/casts as the old per-row SQL.
+_CHUNK_INSERT_SQL = text(
+    "INSERT INTO document_chunks (chunk_id, document_id, page, modality, content, embedding, meta, tsv, status) "
+    "VALUES (:cid, :did, :page, :mod, :content, CAST(:emb AS vector), CAST(:meta AS jsonb), "
+    "to_tsvector('simple', :content), 'ACTIVE')"
+)
 
 VLM_SYSTEM_PROMPT = (
     "Bạn là công cụ chép lại tài liệu giảng dạy từ ảnh trang. Hãy chép NGUYÊN VĂN toàn bộ nội dung trang "
@@ -159,12 +169,33 @@ def chunk_page(page: int, markdown: str, figures: Optional[List[Dict[str, Any]]]
 
 
 # ---------------------------------------------------------------- extraction
-def render_pdf_pages(file_bytes: bytes, dpi: int) -> List[Image.Image]:
-    """Render every PDF page to a PIL image at the given DPI (pypdfium2, already a dependency)."""
+def iter_pages_from_pdf(file_bytes: bytes, dpi: int):
+    """Yield one rendered PIL image per PDF page.
+
+    Unlike the old ``render_pdf_pages`` list, only one page/bitmap is alive at a
+    time, so peak RSS stays close to one rendered page instead of the whole
+    document. ``to_pil().copy()`` is intentional: for some bitmap formats PIL
+    shares memory with the pdfium buffer, and the bitmap is closed as soon as
+    the page has been consumed.
+    """
     import pypdfium2 as pdfium
 
     pdf = pdfium.PdfDocument(file_bytes)
-    return [page.render(scale=dpi / 72.0).to_pil() for page in pdf]
+    try:
+        for page in pdf:
+            bitmap = page.render(scale=dpi / 72.0)
+            try:
+                yield bitmap.to_pil().copy()
+            finally:
+                bitmap.close()
+                page.close()
+    finally:
+        pdf.close()
+
+
+def render_pdf_pages(file_bytes: bytes, dpi: int) -> List[Image.Image]:
+    """Compatibility helper: materialise every page. Prefer ``iter_pages_from_pdf``."""
+    return list(iter_pages_from_pdf(file_bytes, dpi))
 
 
 def vlm_transcribe(img: Image.Image, page_no: int, post: Optional[Callable[[dict, dict], str]] = None) -> str:
@@ -218,17 +249,22 @@ def save_figure(img: Image.Image, document_id: str, page: int) -> str:
     return str(path).replace("\\", "/")
 
 
-def pages_from_pdf(file_bytes: bytes, document_id: str, vlm: Callable = vlm_transcribe) -> List[Dict[str, Any]]:
-    """VLM every PDF page -> [{page, markdown, figures}]."""
-    pages = []
-    for i, img in enumerate(render_pdf_pages(file_bytes, config.DOCUMENT_RENDER_DPI), 1):
+def iter_pages_from_pdf_docs(
+    file_bytes: bytes, document_id: str, vlm: Callable = vlm_transcribe
+):
+    """VLM every PDF page lazily -> yields {page, markdown, figures} one page at a time."""
+    for i, img in enumerate(iter_pages_from_pdf(file_bytes, config.DOCUMENT_RENDER_DPI), 1):
         md, caps = extract_figures(vlm(img, i))
         figures = []
         if caps:
             fpath = save_figure(img, document_id, i)
             figures = [{"caption": c, "path": fpath} for c in caps]
-        pages.append({"page": i, "markdown": md, "figures": figures})
-    return pages
+        yield {"page": i, "markdown": md, "figures": figures}
+
+
+def pages_from_pdf(file_bytes: bytes, document_id: str, vlm: Callable = vlm_transcribe) -> List[Dict[str, Any]]:
+    """VLM every PDF page -> [{page, markdown, figures}] (compatibility list wrapper)."""
+    return list(iter_pages_from_pdf_docs(file_bytes, document_id, vlm))
 
 
 def pages_from_docx(file_bytes: bytes, document_id: str, vlm: Callable = vlm_transcribe) -> List[Dict[str, Any]]:
@@ -337,28 +373,46 @@ class DocumentIngestService:
         """Extract pages by file type and chunk them."""
         ft = (file_type or "").lower()
         if ft == "pdf":
-            pages = pages_from_pdf(file_bytes, document_id, vlm)
-        elif ft == "docx":
+            # Stream page-by-page: do not keep every rendered page + markdown in
+            # memory before chunking (the old pages_from_pdf(...) list did).
+            chunks: List[Dict[str, Any]] = []
+            for p in iter_pages_from_pdf_docs(file_bytes, document_id, vlm):
+                chunks += chunk_page(p["page"], p["markdown"], p["figures"])
+            return chunks
+        if ft == "docx":
             pages = pages_from_docx(file_bytes, document_id, vlm)
         elif ft == "xlsx":
             pages = pages_from_xlsx(file_bytes)
         else:
             raise ValueError(f"Unsupported file type for ingestion: .{ft}")
-        chunks: List[Dict[str, Any]] = []
+        chunks = []
         for p in sorted(pages, key=lambda x: x["page"]):
             chunks += chunk_page(p["page"], p["markdown"], p["figures"])
         return chunks
 
     @staticmethod
     def ingest(document_id, session_factory: Optional[Callable] = None) -> None:
-        """Run full ingestion with its own DB session (FastAPI BackgroundTask entry point)."""
+        """Run full ingestion with its own DB session (FastAPI BackgroundTask entry point).
+
+        ETL is serialised per process by ``ETL_SEMAPHORE``. Background tasks run in
+        the threadpool, so waiting here does not block the event loop; it only
+        queues this document behind the currently running one. There is no
+        timeout: a document waits as long as needed instead of running in
+        parallel and exhausting RAM.
+        """
         if session_factory is None:
             from app.core.database import SessionLocal as session_factory
-        db = session_factory()
-        try:
-            DocumentIngestService._run(db, document_id)
-        finally:
-            db.close()
+        logger.info("Ingest queued for ETL slot: document=%s", document_id)
+        wait_started = time.monotonic()
+        with ETL_SEMAPHORE:
+            waited = time.monotonic() - wait_started
+            if waited >= 1.0:
+                logger.info("Ingest acquired ETL slot after %.1fs: document=%s", waited, document_id)
+            db = session_factory()
+            try:
+                DocumentIngestService._run(db, document_id)
+            finally:
+                db.close()
 
     @staticmethod
     def _run(db, document_id) -> None:
@@ -373,6 +427,14 @@ class DocumentIngestService:
             path = UPLOAD_DIR / Path(row[0] or "").name
             if not path.exists():
                 raise FileNotFoundError(f"Stored file missing: {path.name}")
+            # Check the on-disk size BEFORE read_bytes() so an oversized upload
+            # cannot allocate a huge bytes object and OOM the container.
+            file_size = path.stat().st_size
+            if file_size > config.MAX_INGEST_BYTES:
+                raise ValueError(
+                    f"Document too large: {file_size} bytes exceeds "
+                    f"MAX_INGEST_BYTES={config.MAX_INGEST_BYTES} bytes."
+                )
             chunks = DocumentIngestService.build_chunks(row[1], path.read_bytes(), str(document_id))
             if not chunks:
                 raise ValueError("No content could be extracted from the document.")
@@ -385,16 +447,22 @@ class DocumentIngestService:
                 text("UPDATE document_chunks SET status = 'DELETED' WHERE document_id = :id AND status <> 'DELETED'"),
                 {"id": str(document_id)},
             )
-            for c, v in zip(chunks, vectors):
-                db.execute(
-                    text(
-                        "INSERT INTO document_chunks (chunk_id, document_id, page, modality, content, embedding, meta, tsv, status) "
-                        "VALUES (:cid, :did, :page, :mod, :content, CAST(:emb AS vector), CAST(:meta AS jsonb), "
-                        "to_tsvector('simple', :content), 'ACTIVE')"
-                    ),
-                    {"cid": str(uuid.uuid4()), "did": str(document_id), "page": c["page"], "mod": c["modality"],
-                     "content": c["content"], "emb": _vec_literal(v), "meta": json.dumps(c["meta"], ensure_ascii=False)},
-                )
+            # Bulk insert in batches: one DB round-trip per 100 chunks instead of
+            # one per chunk (a 200-page PDF can produce thousands of chunks).
+            params = [
+                {
+                    "cid": str(uuid.uuid4()),
+                    "did": str(document_id),
+                    "page": c["page"],
+                    "mod": c["modality"],
+                    "content": c["content"],
+                    "emb": _vec_literal(v),
+                    "meta": json.dumps(c["meta"], ensure_ascii=False),
+                }
+                for c, v in zip(chunks, vectors)
+            ]
+            for start in range(0, len(params), CHUNK_INSERT_BATCH_SIZE):
+                db.execute(_CHUNK_INSERT_SQL, params[start:start + CHUNK_INSERT_BATCH_SIZE])
             db.commit()
             DocumentIngestService._set_status(db, document_id, "DONE")
             logger.info("Ingest done: document=%s chunks=%d", document_id, len(chunks))

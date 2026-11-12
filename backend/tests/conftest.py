@@ -20,6 +20,9 @@ os.environ["ACCESS_TOKEN_EXPIRE_MINUTES"] = "10"
 os.environ["DB_USERNAME"] = "dummy"
 os.environ["DB_PASSWORD"] = "dummy"
 os.environ["DB_NAME"] = "dummy"
+# Monitoring persistence would open real DB sessions from the background flush loop; the tests
+# use an in-memory SQLite override, so keep the collector purely in-memory.
+os.environ["MONITORING_PERSIST_ENABLED"] = "0"
 
 # Monkeypatch bcrypt.hashpw to avoid passlib bug check ValueError on Python 3.13 / bcrypt >= 4.0
 import bcrypt

@@ -1,0 +1,16 @@
+# robots.txt - SmartLMS
+# Placeholder production domain: smartlms.example.com
+# Replace it with the real domain before deploying to production.
+#
+# Only the public login page is crawlable; every authenticated area
+# (admin / teacher / student), the API and uploaded files stay private.
+
+User-agent: *
+Allow: /login
+Disallow: /admin
+Disallow: /teacher
+Disallow: /student
+Disallow: /api
+Disallow: /uploads
+
+Sitemap: https://smartlms.example.com/sitemap.xml

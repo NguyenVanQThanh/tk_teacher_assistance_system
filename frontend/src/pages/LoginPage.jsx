@@ -20,6 +20,7 @@ import {
 } from 'lucide-react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import usePageMeta from '../hooks/usePageMeta';
 import './LoginPage.css';
 
 export default function LoginPage() {
@@ -35,6 +36,18 @@ export default function LoginPage() {
   const { login, isAuthenticated, user } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
+
+  // Public entry point: indexable, canonical /login, route-specific title/description.
+  usePageMeta({
+    title: 'Đăng nhập — SmartLMS',
+    description:
+      'Đăng nhập SmartLMS để quản lý lớp học, giao bài tập, tổ chức thi trực tuyến và theo dõi tiến độ học tập của học sinh.',
+    canonicalPath: '/login',
+    robots: 'index,follow',
+    ogTitle: 'Đăng nhập — SmartLMS',
+    ogDescription:
+      'Nền tảng quản lý học tập thông minh giúp giáo viên tạo đề, giao bài và chấm điểm tự động.',
+  });
 
   // If already authenticated, redirect to target or home
   useEffect(() => {

@@ -14,6 +14,7 @@ from fastapi import APIRouter, Depends, Query, HTTPException, UploadFile, File, 
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
+from app.core.resource_limits import IMPORT_SEMAPHORE
 from models.models import User, Role
 from app.modules.auth.dependencies import get_current_user
 from app.modules.auth.services.permission_service import PermissionService
@@ -132,59 +133,65 @@ def export_users_csv(
 
 
 @router.post("/import-excel", dependencies=[Depends(require_admin_privilege)])
-async def import_users_excel(
+def import_users_excel(
     file: UploadFile = File(...),
     db: Session = Depends(get_db)
 ):
     """
     Imports users from a CSV file with line-by-line validation.
     Generates default passwords and dispatches notifications for all valid entries.
+
+    Plain ``def`` on purpose: CSV parsing and the per-row ``create_user`` DB
+    commits are synchronous. FastAPI runs this in the threadpool, and
+    IMPORT_SEMAPHORE bounds concurrent imports so they cannot block the event
+    loop or exhaust the connection pool.
     """
-    contents = await file.read()
-    try:
-        decoded = contents.decode("utf-8-sig")
-    except UnicodeDecodeError:
-        decoded = contents.decode("latin-1")
-
-    reader = csv.reader(io.StringIO(decoded))
-    rows = list(reader)
-    if not rows:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail={"code": "ERR-ADMIN-EMPTY_FILE", "message": "Uploaded file is empty."}
-        )
-
-    # Expect header in row 0
-    header = [h.strip().lower() for h in rows[0]]
-    successful = 0
-    errors = []
-
-    for idx, row in enumerate(rows[1:], start=2):
-        if not any(row):
-            continue
+    contents = file.file.read()
+    with IMPORT_SEMAPHORE:
         try:
-            full_name = row[0].strip() if len(row) > 0 else ""
-            role_name = row[1].strip() if len(row) > 1 else "Student"
-            phone = row[2].strip() if len(row) > 2 else None
-            email = row[3].strip() if len(row) > 3 else None
+            decoded = contents.decode("utf-8-sig")
+        except UnicodeDecodeError:
+            decoded = contents.decode("latin-1")
 
-            payload = AdminUserCreateRequest(
-                full_name=full_name,
-                role=role_name,
-                phone=phone,
-                email=email,
-                is_active_immediately=True
+        reader = csv.reader(io.StringIO(decoded))
+        rows = list(reader)
+        if not rows:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail={"code": "ERR-ADMIN-EMPTY_FILE", "message": "Uploaded file is empty."}
             )
-            AdminUserService.create_user(db=db, payload=payload)
-            successful += 1
-        except Exception as e:
-            errors.append({"row": idx, "error": str(e)})
 
-    return {
-        "total_processed": len(rows) - 1,
-        "successful_count": successful,
-        "errors": errors
-    }
+        # Expect header in row 0
+        header = [h.strip().lower() for h in rows[0]]
+        successful = 0
+        errors = []
+
+        for idx, row in enumerate(rows[1:], start=2):
+            if not any(row):
+                continue
+            try:
+                full_name = row[0].strip() if len(row) > 0 else ""
+                role_name = row[1].strip() if len(row) > 1 else "Student"
+                phone = row[2].strip() if len(row) > 2 else None
+                email = row[3].strip() if len(row) > 3 else None
+
+                payload = AdminUserCreateRequest(
+                    full_name=full_name,
+                    role=role_name,
+                    phone=phone,
+                    email=email,
+                    is_active_immediately=True
+                )
+                AdminUserService.create_user(db=db, payload=payload)
+                successful += 1
+            except Exception as e:
+                errors.append({"row": idx, "error": str(e)})
+
+        return {
+            "total_processed": len(rows) - 1,
+            "successful_count": successful,
+            "errors": errors
+        }
 
 
 @router.get("/generate-code", dependencies=[Depends(require_admin_privilege)])

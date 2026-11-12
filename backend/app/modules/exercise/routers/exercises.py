@@ -29,6 +29,11 @@ from app.modules.exercise.services.question_service import QuestionService
 from app.modules.exercise.services.import_parser_service import ImportParserService
 from app.modules.exercise.services.answer_solver_service import AnswerSolverService
 from app.modules.exercise.services.pdf_export_service import PdfExportService
+from app.core.resource_limits import (
+    IMPORT_SEMAPHORE,
+    PDF_EXPORT_ACQUIRE_TIMEOUT_SECONDS,
+    PDF_EXPORT_SEMAPHORE,
+)
 
 
 logger = logging.getLogger("smartlms.exercise.router")
@@ -235,7 +240,7 @@ def add_question(
     status_code=status.HTTP_201_CREATED,
     dependencies=[Depends(require_perm("EXE_QUESTION_IMPORT"))]
 )
-async def import_questions(
+def import_questions(
     exercise_id: UUID,
     question_file: UploadFile = File(..., description="Docx or PDF question file"),
     answer_file: Optional[UploadFile] = File(None, description="Optional separate answer key file"),
@@ -250,7 +255,37 @@ async def import_questions(
     When some questions fail validation they are skipped; their count is exposed via
     the X-Import-Skipped-Count response header.
     Requires EXE_QUESTION_IMPORT permission.
+
+    This is a plain ``def`` endpoint on purpose: document parsing, AI answer
+    solving and the per-question DB commits are synchronous and CPU/IO heavy.
+    FastAPI runs sync endpoints in its threadpool, so they never block the event
+    loop (the old ``async def`` handler did, which is why one import could stall
+    every other user). IMPORT_SEMAPHORE bounds how many imports run at once.
     """
+    with IMPORT_SEMAPHORE:
+        return _import_questions_impl(
+            exercise_id=exercise_id,
+            question_file=question_file,
+            answer_file=answer_file,
+            test_code=test_code,
+            exercise_service=exercise_service,
+            question_service=question_service,
+            current_user=current_user,
+            response=response,
+        )
+
+
+def _import_questions_impl(
+    exercise_id: UUID,
+    question_file: UploadFile,
+    answer_file: Optional[UploadFile],
+    test_code: Optional[str],
+    exercise_service: ExerciseService,
+    question_service: QuestionService,
+    current_user: User,
+    response: Optional[Response],
+):
+    """Heavy import body; the public endpoint holds IMPORT_SEMAPHORE while calling it."""
     # 1. Verify access to exercise
     exercise_service.get_exercise_detail(current_user, exercise_id)
 
@@ -265,7 +300,7 @@ async def import_questions(
             }
         )
 
-    q_bytes = await question_file.read()
+    q_bytes = question_file.file.read()
     # 1MB cap keeps the vision OCR provider stable (page rendering + token budget per chunk)
     if len(q_bytes) > 1 * 1024 * 1024:
         raise HTTPException(
@@ -305,7 +340,7 @@ async def import_questions(
                     "message": "Answer file must be .docx or .pdf."
                 }
             )
-        ans_bytes = await answer_file.read()
+        ans_bytes = answer_file.file.read()
         if len(ans_bytes) > 1 * 1024 * 1024:
             raise HTTPException(
                 status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
@@ -534,7 +569,27 @@ def export_exercise_pdf(
     Requires EXE_EXERCISE_VIEW permission.
     """
     exercise = exercise_service.get_exercise_detail(current_user, exercise_id)
-    pdf_bytes = PdfExportService.generate_exercise_pdf(exercise)
+
+    # PDF generation is CPU/memory heavy (reportlab + embedded images). Cap the
+    # number of concurrent exports per process; wait up to 30s for a slot, then
+    # fail fast with a stable error code instead of queueing forever / OOMing.
+    acquired = PDF_EXPORT_SEMAPHORE.acquire(timeout=PDF_EXPORT_ACQUIRE_TIMEOUT_SECONDS)
+    if not acquired:
+        logger.warning(
+            "PDF export busy: exercise=%s user=%s (waited %ss)",
+            exercise_id, current_user.user_id, PDF_EXPORT_ACQUIRE_TIMEOUT_SECONDS,
+        )
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail={
+                "code": "ERR-EXE-PDF_BUSY",
+                "message": "PDF export is busy. Please retry in a few seconds.",
+            },
+        )
+    try:
+        pdf_bytes = PdfExportService.generate_exercise_pdf(exercise)
+    finally:
+        PDF_EXPORT_SEMAPHORE.release()
     filename = f"exercise_{exercise_id}.pdf"
 
     return Response(

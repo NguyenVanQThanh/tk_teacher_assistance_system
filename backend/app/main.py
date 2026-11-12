@@ -13,12 +13,17 @@ backend_root = str(Path(__file__).resolve().parent.parent)
 if backend_root not in sys.path:
     sys.path.insert(0, backend_root)
 
+import asyncio
 import logging
 import os
 import re
-from typing import Optional
+import time
+from contextlib import asynccontextmanager, suppress
+from datetime import datetime, timedelta, timezone
+from typing import Any, Dict, List, Optional
 
 from dotenv import load_dotenv
+from sqlalchemy import delete, insert
 from starlette.concurrency import run_in_threadpool
 
 # Load environment variables from .env file
@@ -68,10 +73,12 @@ logger.warning(
 
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.staticfiles import StaticFiles
 
 from app.core.config import QUESTION_IMAGE_DIR, QUESTION_IMAGE_URL_PREFIX, SGK_IMAGE_DIR, SGK_IMAGE_URL_PREFIX
-from app.core.database import get_db
+from app.core.database import SessionLocal, get_db
+from models.models import ApiRequestMetric
 from app.modules.exercise.services.sync_service import get_cached_version_snapshot
 
 from app.modules.auth.routers.auth import router as auth_router
@@ -90,8 +97,149 @@ from app.modules.admin.routers.dashboard import router as admin_dashboard_router
 from app.modules.exercise.routers.student_dashboard import router as student_dashboard_router
 from app.modules.exercise.routers.teacher_schedule import router as teacher_schedule_router
 from app.modules.exercise.routers.teacher_dashboard import router as teacher_dashboard_router
+from app.modules.monitoring.collector import collector
+from app.modules.monitoring.middleware import monitoring_middleware, static_cache_middleware
+from app.modules.monitoring.router import router as monitoring_router
 
-app = FastAPI(title="SmartLMS API", version="1.0.0")
+
+# ---------------------------------------------------------------------------
+# Realtime API monitoring persistence
+# ---------------------------------------------------------------------------
+# The in-memory collector is always active; DB persistence is opt-out so tests and dev
+# environments without a reachable database can still serve the realtime dashboard.
+def _env_float(name: str, default: float) -> float:
+    try:
+        return float(os.environ.get(name, str(default)))
+    except (TypeError, ValueError):
+        return float(default)
+
+
+def _env_int(name: str, default: int) -> int:
+    try:
+        return int(os.environ.get(name, str(default)))
+    except (TypeError, ValueError):
+        return int(default)
+
+
+MONITORING_FLUSH_INTERVAL_SECONDS = max(1.0, _env_float("MONITORING_FLUSH_INTERVAL_SECONDS", 5.0))
+MONITORING_RETENTION_DAYS = max(1, _env_int("MONITORING_RETENTION_DAYS", 7))
+MONITORING_PURGE_INTERVAL_SECONDS = max(60.0, _env_float("MONITORING_PURGE_INTERVAL_SECONDS", 3600.0))
+
+
+def _metric_row(metric: Dict[str, Any]) -> Dict[str, Any]:
+    """Map one collector metric dict onto api_request_metrics columns."""
+    timestamp = metric.get("timestamp")
+    if isinstance(timestamp, (int, float)):
+        created_at = datetime.fromtimestamp(float(timestamp), tz=timezone.utc)
+    else:
+        created_at = datetime.now(timezone.utc)
+    return {
+        "request_id": str(metric.get("request_id") or "unknown")[:64],
+        "method": str(metric.get("method") or "GET")[:10],
+        "route": str(metric.get("route") or "")[:255],
+        "path": str(metric.get("path") or "")[:512],
+        "status_code": int(metric.get("status_code") or 0),
+        "duration_ms": float(metric.get("duration_ms") or 0.0),
+        "request_bytes": max(0, int(metric.get("request_bytes") or 0)),
+        "response_bytes": max(0, int(metric.get("response_bytes") or 0)),
+        "user_ref": str(metric.get("user_ref") or "anonymous")[:64],
+        "ip_ref": str(metric.get("ip_ref") or "anonymous")[:64],
+        "is_error": bool(metric.get("is_error")),
+        "created_at": created_at,
+    }
+
+
+def _persist_metrics(batch: List[Dict[str, Any]]) -> None:
+    """Bulk-insert a flushed batch. On any DB error the batch is requeued (bounded) and the
+    application keeps running; monitoring must never take the API down."""
+    rows: List[Dict[str, Any]] = []
+    for metric in batch:
+        try:
+            rows.append(_metric_row(metric))
+        except Exception:
+            logger.debug("Skipping malformed API metric row", exc_info=True)
+    if not rows:
+        return
+
+    db = SessionLocal()
+    try:
+        db.execute(insert(ApiRequestMetric), rows)
+        db.commit()
+    except Exception:
+        db.rollback()
+        collector.requeue(batch)
+        logger.warning("Failed to persist %d API request metrics; requeued", len(batch), exc_info=True)
+    finally:
+        db.close()
+
+
+def purge_old_metrics(days: int = MONITORING_RETENTION_DAYS) -> int:
+    """Delete metrics older than the retention window. Returns the number of deleted rows."""
+    cutoff = datetime.now(timezone.utc) - timedelta(days=max(1, int(days)))
+    db = SessionLocal()
+    try:
+        result = db.execute(delete(ApiRequestMetric).where(ApiRequestMetric.created_at < cutoff))
+        db.commit()
+        return int(result.rowcount or 0)
+    except Exception:
+        db.rollback()
+        logger.debug("API request metric retention purge failed", exc_info=True)
+        return 0
+    finally:
+        db.close()
+
+
+async def flush_metrics_loop() -> None:
+    """Flush buffered metrics every few seconds and purge old rows hourly."""
+    last_purge = 0.0
+    while True:
+        try:
+            batch = collector.flush_batch()
+            if batch:
+                await asyncio.to_thread(_persist_metrics, batch)
+
+            now = time.monotonic()
+            if now - last_purge >= MONITORING_PURGE_INTERVAL_SECONDS:
+                last_purge = now
+                await asyncio.to_thread(purge_old_metrics, MONITORING_RETENTION_DAYS)
+        except asyncio.CancelledError:
+            raise
+        except Exception:
+            logger.warning("Monitoring flush loop iteration failed", exc_info=True)
+        await asyncio.sleep(MONITORING_FLUSH_INTERVAL_SECONDS)
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """Start/stop the background metrics flush task with the application."""
+    flush_task: Optional[asyncio.Task] = None
+    if collector.persist_enabled():
+        flush_task = asyncio.create_task(flush_metrics_loop(), name="monitoring-flush")
+        logger.info(
+            "API monitoring persistence enabled (flush every %ss, retention %s days)",
+            MONITORING_FLUSH_INTERVAL_SECONDS,
+            MONITORING_RETENTION_DAYS,
+        )
+    else:
+        logger.info("API monitoring persistence disabled (MONITORING_PERSIST_ENABLED=0)")
+
+    try:
+        yield
+    finally:
+        if flush_task is not None:
+            flush_task.cancel()
+            with suppress(asyncio.CancelledError):
+                await flush_task
+            # Best-effort final flush so a graceful shutdown does not lose the last batch.
+            try:
+                remaining = collector.flush_batch()
+                if remaining:
+                    await asyncio.to_thread(_persist_metrics, remaining)
+            except Exception:
+                logger.debug("Final API metric flush failed", exc_info=True)
+
+
+app = FastAPI(title="SmartLMS API", version="1.0.0", lifespan=lifespan)
 
 # Enable CORS for Frontend communication
 app.add_middleware(
@@ -100,8 +248,16 @@ app.add_middleware(
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
-    expose_headers=["X-Import-Skipped-Count", "X-Import-Skipped", "X-Data-Version"],
+    expose_headers=["X-Import-Skipped-Count", "X-Import-Skipped", "X-Data-Version", "X-Request-ID"],
 )
+
+# Middleware order matters: the last registered HTTP middleware is the outermost one.
+# add_data_version_header is registered below (outermost) -> monitoring -> static cache ->
+# gzip -> CORS -> app. GZip skips text/event-stream (Starlette default exclusions), so SSE
+# is unaffected.
+app.add_middleware(GZipMiddleware, minimum_size=1024)
+app.middleware("http")(static_cache_middleware)
+app.middleware("http")(monitoring_middleware)
 
 
 def _version_snapshot_sync() -> Optional[dict]:
@@ -139,6 +295,7 @@ async def add_data_version_header(request: Request, call_next):
         and request.headers.get("authorization")
         and path.startswith("/api")
         and not path.startswith("/api/v1/sync/stream")
+        and not path.startswith("/api/v1/admin/monitoring/stream")
     ):
         try:
             snapshot = await run_in_threadpool(_version_snapshot_sync)
@@ -165,6 +322,7 @@ app.include_router(admin_dashboard_router)
 app.include_router(student_dashboard_router)
 app.include_router(teacher_schedule_router)
 app.include_router(teacher_dashboard_router)
+app.include_router(monitoring_router)
 
 # Serve question images from BE storage (path configurable via .env, see app/core/config.py)
 QUESTION_IMAGE_DIR.mkdir(parents=True, exist_ok=True)

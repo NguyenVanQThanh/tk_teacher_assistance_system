@@ -6,6 +6,8 @@
 # Updated At: 2026-11-13
 # Updated By: AI Agent
 
+import hashlib
+import random
 from datetime import datetime, timedelta, timezone
 from typing import List, Optional, Dict, Any
 from uuid import UUID
@@ -38,6 +40,77 @@ def open_attempt_deadline(assignment: ClassAssignment, exercise: Optional[Exerci
         due_at = due_at.replace(tzinfo=timezone.utc)
     minutes = int(((exercise.ai_metadata or {}) if exercise else {}).get("duration_minutes", 45) or 45)
     return due_at + timedelta(minutes=minutes)
+
+
+def _seed_to_int(seed: str) -> int:
+    """Deterministic 64-bit integer seed from a string (stable across processes and restarts)."""
+    return int.from_bytes(hashlib.sha256(seed.encode("utf-8")).digest()[:8], "big")
+
+
+def _shuffle_seed_for_attempt(
+    assignment_id: UUID,
+    student_id: UUID,
+    attempt: Optional[StudentExerciseAttempt],
+) -> str:
+    """Resolve the display-shuffle seed used for a student's paper.
+
+    - A started attempt stores its own random seed in the existing JSON column
+      `student_exercise_attempts.detailed_results["shuffle_seed"]`, so reloading, resuming or
+      reviewing THAT attempt always reproduces the same question/option order (no schema change).
+    - Legacy attempts created before display shuffling existed have no seed; derive a stable one
+      from the attempt id so their paper does not jump between reloads either.
+    - Before any attempt exists, derive a stable preview seed from assignment + student so the
+      pre-start preview keeps the same order on every request.
+    """
+    if attempt is not None:
+        detailed = attempt.detailed_results
+        if isinstance(detailed, dict):
+            seed = detailed.get("shuffle_seed")
+            if isinstance(seed, str) and seed.strip():
+                return seed
+        return f"{assignment_id}:{student_id}:attempt:{attempt.attempt_id}"
+    return f"{assignment_id}:{student_id}:preview"
+
+
+def _shuffle_student_questions(
+    questions: List[StudentQuestionOut],
+    seed: str,
+) -> List[StudentQuestionOut]:
+    """Shuffle the student-visible question/option order WITHOUT touching the ORM or the DB.
+
+    Only the Pydantic display copies are reordered and their `display_order` is rewritten as a
+    1-based display alias; the persisted `questions.display_order` /
+    `answer_options.display_order` values stay untouched. Every question/option appears exactly
+    once (random.shuffle only permutes the list), so nothing is lost or duplicated.
+
+    - MultipleChoice: options are shuffled too. Grading matches the submitted answer by
+      option_id, so the displayed order cannot change the score.
+    - TrueFalse / ShortAnswer / Other: options are deliberately LEFT IN DB ORDER. TrueFalse
+      grading maps the student's "a:true;b:false;..." labels to the option position (or to the
+      a/b/c/d content prefix), so shuffling would silently change which statement a label refers
+      to and corrupt the score. ShortAnswer has no options and Other's options are ordered
+      sub-questions, which must keep their order for the same reason.
+    """
+    rng = random.Random(_seed_to_int(seed))
+
+    # Sort first so the shuffle input is deterministic even when DB rows tie on display_order.
+    ordered = sorted(questions, key=lambda q: (q.display_order, str(q.question_id)))
+    rng.shuffle(ordered)
+
+    shuffled: List[StudentQuestionOut] = []
+    for index, question in enumerate(ordered, start=1):
+        options = list(question.answer_options or [])
+        if question.question_type == "MultipleChoice":
+            options.sort(key=lambda o: (o.display_order, str(o.option_id)))
+            rng.shuffle(options)
+            options = [
+                option.model_copy(update={"display_order": option_index})
+                for option_index, option in enumerate(options, start=1)
+            ]
+        shuffled.append(
+            question.model_copy(update={"display_order": index, "answer_options": options})
+        )
+    return shuffled
 
 
 class AssignmentService:
@@ -369,8 +442,19 @@ class AssignmentService:
                 }
             )
 
-    def build_student_paper(self, assignment: ClassAssignment, student_id: UUID) -> AssignmentTakingOut:
-        """Build the sanitized AssignmentTakingOut payload for an already-access-checked assignment."""
+    def build_student_paper(
+        self,
+        assignment: ClassAssignment,
+        student_id: UUID,
+        attempt: Optional[StudentExerciseAttempt] = None,
+    ) -> AssignmentTakingOut:
+        """Build the sanitized AssignmentTakingOut payload for an already-access-checked assignment.
+
+        Question and MultipleChoice option order are shuffled per attempt (display-only alias; the
+        DB order is never modified). `attempt` pins the paper to a specific attempt (used when
+        reviewing an owned attempt); when omitted, the student's latest attempt (open or finished)
+        decides the order, falling back to a deterministic pre-start preview order.
+        """
         exercise = self.db.query(Exercise).filter(
             Exercise.exercise_id == assignment.exercise_id,
             Exercise.status != 'DELETED'
@@ -405,7 +489,8 @@ class AssignmentService:
         max_attempts = ai_meta.get("max_attempts", 1 if is_exam else 3)
 
         # The student's own in-progress attempt for this assignment (if any).
-        open_attempt = AttemptRepository(self.db).find_open_attempt(student_id, assignment.assignment_id)
+        attempt_repo = AttemptRepository(self.db)
+        open_attempt = attempt_repo.find_open_attempt(student_id, assignment.assignment_id)
         open_attempt_out: Optional[StudentOpenAttemptOut] = None
         if open_attempt:
             saved_answers = None
@@ -419,8 +504,15 @@ class AssignmentService:
                 answers=saved_answers
             )
 
+        # Resolve the per-attempt shuffle seed (explicit attempt for review, else latest attempt).
+        shuffle_attempt = attempt or attempt_repo.find_latest_attempt(student_id, assignment.assignment_id)
+        shuffle_seed = _shuffle_seed_for_attempt(assignment.assignment_id, student_id, shuffle_attempt)
+
         # StudentQuestionOut omits correct_answer/explanation; its segments/options sanitize themselves.
         student_questions = [StudentQuestionOut.model_validate(q) for q in questions]
+        # Display-only shuffle: reorders the Pydantic copies and rewrites display_order as an
+        # alias; questions/answer_options rows in the DB keep their original order.
+        student_questions = _shuffle_student_questions(student_questions, shuffle_seed)
 
         return AssignmentTakingOut(
             assignment=AssignmentTakingInfoOut(
