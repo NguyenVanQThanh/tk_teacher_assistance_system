@@ -4,7 +4,7 @@
 #              and the sync/version APIs (GET /api/v1/sync/version, GET /api/v1/sync/stream, X-Data-Version).
 # Created At: 2026-11-12
 # Created By: AI Agent
-# Updated At: 2026-11-12
+# Updated At: 2026-11-13
 # Updated By: AI Agent
 
 import json
@@ -370,7 +370,8 @@ class TestSyncVersion:
             resp = await sync_stream(request=request, token=None)
             assert isinstance(resp, StreamingResponse)
             assert resp.media_type == "text/event-stream"
-            assert resp.headers.get("cache-control") == "no-cache"
+            assert resp.headers.get("cache-control") == "no-cache, no-store"
+            assert resp.headers.get("referrer-policy") == "no-referrer"
             iterator = resp.body_iterator
             chunk = await iterator.__anext__()
             await iterator.aclose()

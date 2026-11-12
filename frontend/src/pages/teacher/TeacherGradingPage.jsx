@@ -23,6 +23,7 @@ import {
   Check,
   Loader2
 } from 'lucide-react';
+import AnswerReleaseButton from '../../components/teacher/AnswerReleaseButton';
 import { useSearchParams } from 'react-router-dom';
 import GradingFeedbackModal from '../../components/teacher/GradingFeedbackModal';
 import { attemptsApi, classesApi, subjectsApi } from '../../services/api';
@@ -134,6 +135,8 @@ export default function TeacherGradingPage() {
             id: att.attempt_id,
             attempt_id: att.attempt_id,
             assignment_id: att.assignment_id,
+            is_exam: Boolean(att.is_exam),
+            answers_released: Boolean(att.answers_released),
             exercise_id: att.exercise_id,
             student_id: att.student_id,
             studentName: att.student_name || 'Học sinh',
@@ -214,6 +217,8 @@ export default function TeacherGradingPage() {
               id: att.attempt_id,
               attempt_id: att.attempt_id,
               assignment_id: att.assignment_id,
+              is_exam: Boolean(att.is_exam),
+              answers_released: Boolean(att.answers_released),
               exercise_id: att.exercise_id,
               student_id: att.student_id,
               studentName: att.student_name || 'Học sinh',
@@ -783,6 +788,17 @@ export default function TeacherGradingPage() {
 
                         {/* Actions */}
                         <td className="text-center">
+                          {item.is_exam && (
+                            <div style={{ marginBottom: 4 }}>
+                              <AnswerReleaseButton
+                                assignmentId={item.assignment_id}
+                                released={item.answers_released}
+                                onChanged={(aid, v) => setSubmissions((prev) => prev.map((s) => (
+                                  s.assignment_id === aid ? { ...s, answers_released: v } : s
+                                )))}
+                              />
+                            </div>
+                          )}
                           {item.status === 'approved' ? (
                             <div className="graded-action-box">
                               <span className="score-badge-pill">{item.score}</span>

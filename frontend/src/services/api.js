@@ -136,6 +136,10 @@ export const exercisesApi = {
     const response = await api.put(`/api/v1/exercises/${exerciseId}`, data);
     return response.data;
   },
+  setAnswerRelease: async (exerciseId, released) => {
+    const response = await api.put(`/api/v1/exercises/${exerciseId}/answer-release`, { released });
+    return response.data;
+  },
   deleteExercise: async (exerciseId) => {
     await api.delete(`/api/v1/exercises/${exerciseId}`);
   },
@@ -226,6 +230,10 @@ export const assignmentsApi = {
   },
   deleteAssignment: async (assignmentId) => {
     await api.delete(`/api/v1/assignments/${assignmentId}`);
+  },
+  setAnswerRelease: async (assignmentId, released) => {
+    const response = await api.put(`/api/v1/assignments/${assignmentId}/answer-release`, { released });
+    return response.data;
   },
   restoreAssignment: async (assignmentId) => {
     const response = await api.post(`/api/v1/assignments/${assignmentId}/restore`);

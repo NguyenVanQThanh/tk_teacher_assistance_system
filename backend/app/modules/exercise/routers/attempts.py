@@ -105,7 +105,7 @@ def submit_attempt(
     """
     Submit an exercise attempt and trigger auto-grading. Requires EXE_ATTEMPT_SUBMIT permission.
     """
-    return service.submit_attempt(attempt_id, payload, current_user)
+    return service.redact_for_owner(service.submit_attempt(attempt_id, payload, current_user), current_user)
 
 
 @router.get(
@@ -191,7 +191,7 @@ def get_attempt(
     """
     Retrieve attempt result details. Requires EXE_ATTEMPT_VIEW permission.
     """
-    return service.get_attempt(attempt_id, current_user)
+    return service.redact_for_owner(service.get_attempt(attempt_id, current_user), current_user)
 
 
 @router.put(

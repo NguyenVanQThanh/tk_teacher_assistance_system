@@ -2,7 +2,7 @@
 # Description: Main entry point of the FastAPI application.
 # Created At: 2026-07-17
 # Created By: Tam Khang
-# Updated At: 2026-11-12
+# Updated At: 2026-11-13
 # Updated By: AI Agent
 
 import sys
@@ -15,6 +15,7 @@ if backend_root not in sys.path:
 
 import logging
 import os
+import re
 from typing import Optional
 
 from dotenv import load_dotenv
@@ -31,6 +32,22 @@ if not logging.getLogger().handlers:
     )
 
 logger = logging.getLogger("smartlms.startup")
+
+_TOKEN_QUERY_RE = re.compile(r"([?&]token=)[^&\s\"]*")
+
+class _MaskTokenQueryFilter(logging.Filter):
+    """Redact ?token=<JWT> (SSE EventSource auth) from uvicorn access-log lines."""
+
+    def filter(self, record: logging.LogRecord) -> bool:
+        if isinstance(record.args, tuple):
+            record.args = tuple(
+                _TOKEN_QUERY_RE.sub(r"\1***", a) if isinstance(a, str) else a for a in record.args
+            )
+        return True
+
+# ponytail: masks only the in-process uvicorn access log; reverse proxies must mask/disable
+# query logging themselves. Upgrade path: short-lived single-purpose stream ticket endpoint.
+logging.getLogger("uvicorn.access").addFilter(_MaskTokenQueryFilter())
 
 
 def _mask_key(value: str) -> str:

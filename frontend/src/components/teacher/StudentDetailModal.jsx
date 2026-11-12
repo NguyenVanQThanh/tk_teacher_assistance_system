@@ -25,6 +25,7 @@ import { getSubjectIdByName } from '../../utils/teacherSubjectHelper';
 import { attemptsApi } from '../../services/api';
 import { downloadGradebookCsv } from '../../utils/gradebookExport';
 import './StudentDetailModal.css';
+import toast from '../../components/common/toast';
 
 // Dynamic N-axis SVG Radar Chart Component (supports 3-criteria or 8-subject radar)
 function DynamicRadarChart({
@@ -1252,7 +1253,7 @@ export default function StudentDetailModal({
                       const res = await attemptsApi.getAttempts({ student_id: student.id });
                       downloadGradebookCsv(Array.isArray(res) ? res : res?.items || [], `gradebook_${student.code || student.id}.csv`);
                     } catch (e) {
-                      alert('Could not export the gradebook.');
+                      toast.error('Could not export the gradebook.');
                     }
                   }}
                   title="Export gradebook (all subjects) as CSV"

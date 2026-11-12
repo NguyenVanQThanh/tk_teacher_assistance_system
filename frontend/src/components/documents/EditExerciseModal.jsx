@@ -39,6 +39,7 @@ import AddQuestionModal from './AddQuestionModal';
 import QuestionMedia from '../exercises/QuestionMedia';
 import confirmDialog from '../common/confirmDialog';
 import './EditExerciseModal.css';
+import toast from '../../components/common/toast';
 
 const isUuid = (val) =>
   typeof val === 'string' &&
@@ -186,6 +187,7 @@ export default function EditExerciseModal(props) {
 function EditExerciseModalInner({ isOpen, doc, onClose, onSave }) {
 
   // Header Data
+  const [exerciseKind, setExerciseKind] = useState(doc.exercise_kind || 'PRACTICE');
   const [docTitle, setDocTitle] = useState(doc.title || 'Đề cương ôn tập Toán 12 - Học kì 1 (Nâng cao)');
   const docCode = doc.code || '#TL-TOAN12-HK1';
   const subjectLabel = doc.subjectName || doc.subject;
@@ -435,6 +437,7 @@ Tam giác vuông SAB tại A: tan(∠SBA) = SA / AB = a√3 / a = √3 => ∠SBA
         .then((detail) => {
           if (!isMounted || !detail) return;
           if (detail.title) setDocTitle(detail.title);
+          if (detail.exercise_kind) setExerciseKind(detail.exercise_kind);
           if (Array.isArray(detail.questions) && detail.questions.length > 0) {
             const mapped = detail.questions.filter((q) => q.status !== 'DELETED').map((q, idx) => {
               const letters = ['A', 'B', 'C', 'D', 'E', 'F'];
@@ -821,7 +824,7 @@ Tam giác vuông SAB tại A: tan(∠SBA) = SA / AB = a√3 / a = √3 => ∠SBA
   // Delete question handler
   const handleDeleteQuestion = async (qId) => {
     if (questions.length <= 1) {
-      alert('Đề thi cần có ít nhất 1 câu hỏi.');
+      toast.error('Đề thi cần có ít nhất 1 câu hỏi.');
       return;
     }
     const targetId = doc.id || doc.exercise_id;
@@ -887,6 +890,15 @@ Tam giác vuông SAB tại A: tan(∠SBA) = SA / AB = a√3 / a = √3 => ∠SBA
 
     if (isUuid(targetId)) {
       try {
+        // 0. Persist exercise kind (PRACTICE | EXAM)
+        if (exerciseKind !== (doc.exercise_kind || 'PRACTICE')) {
+          try {
+            await exercisesApi.updateExercise(targetId, { exercise_kind: exerciseKind });
+          } catch (e) {
+            console.warn('Could not update exercise kind in backend:', e);
+          }
+        }
+
         // 1. Update document/exercise title if modified
         if (docTitle.trim() && docTitle.trim() !== doc.title) {
           try {
@@ -1005,6 +1017,16 @@ Tam giác vuông SAB tại A: tan(∠SBA) = SA / AB = a√3 / a = √3 => ∠SBA
                   />
                   <FileEdit size={13} className="doc-rename-icon" />
                 </div>
+                <span className="doc-rename-divider">•</span>
+                <select
+                  className="doc-grade-filter"
+                  value={exerciseKind}
+                  onChange={(e) => setExerciseKind(e.target.value)}
+                  title="Đề thi sẽ ẩn đáp án với học sinh cho đến khi giáo viên công bố"
+                >
+                  <option value="PRACTICE">Bài tập luyện tập</option>
+                  <option value="EXAM">Đề thi / kiểm tra</option>
+                </select>
                 <span className="doc-rename-divider">•</span>
                 <span className="doc-code-badge">Mã TL: {docCode}</span>
               </div>

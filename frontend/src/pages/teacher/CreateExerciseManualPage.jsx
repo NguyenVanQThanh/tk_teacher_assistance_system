@@ -19,6 +19,7 @@ import {
 import { Link, useNavigate } from 'react-router-dom';
 import { exercisesApi, subjectsApi } from '../../services/api';
 import './CreateExerciseManualPage.css';
+import toast from '../../components/common/toast';
 
 export default function CreateExerciseManualPage() {
   const [showSidebar, setShowSidebar] = useState(true);
@@ -236,6 +237,7 @@ export default function CreateExerciseManualPage() {
       const newExercise = await exercisesApi.createExercise({
         title: title.trim(),
         subject_id: targetSubjectId,
+        exercise_kind: exerciseType === 'exam' ? 'EXAM' : 'PRACTICE',
         total_questions: totalValidQuestions,
         ai_metadata: {
           grade: grade || '12',
@@ -298,7 +300,7 @@ export default function CreateExerciseManualPage() {
         });
       }
 
-      alert(`Đã tạo thành công bài tập "${title}" với ${totalValidQuestions} câu hỏi!`);
+      toast.success(`Đã tạo thành công bài tập "${title}" với ${totalValidQuestions} câu hỏi!`);
       navigate('/teacher/exercises');
     } catch (err) {
       setErrorMsg(err.response?.data?.detail?.message || 'Có lỗi xảy ra khi lưu bài tập.');

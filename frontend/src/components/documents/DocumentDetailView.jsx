@@ -18,6 +18,7 @@ import {
   Check
 } from 'lucide-react';
 import './DocumentDetailView.css';
+import toast from '../../components/common/toast';
 
 export default function DocumentDetailView({ 
   doc, 
@@ -106,7 +107,7 @@ export default function DocumentDetailView({
           <button 
             type="button" 
             className="btn-action-primary"
-            onClick={() => onViewDocument ? onViewDocument(doc) : alert(`Đang mở xem tài liệu: ${doc.title}`)}
+            onClick={() => onViewDocument ? onViewDocument(doc) : toast.info(`Đang mở xem tài liệu: ${doc.title}`)}
           >
             <Eye size={16} />
             <span>Xem tài liệu</span>

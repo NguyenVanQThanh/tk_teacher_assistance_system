@@ -14,7 +14,7 @@ from app.core.database import get_db
 from models.models import User
 from app.modules.auth.dependencies import require_perm, get_current_user
 from app.modules.exercise.schemas import (
-    AssignmentCreate, AssignmentOut, AssignmentResultSummaryOut, AssignmentTakingOut
+    AnswerReleaseRequest, AssignmentCreate, AssignmentOut, AssignmentResultSummaryOut, AssignmentTakingOut
 )
 from app.modules.exercise.services.assignment_service import AssignmentService
 
@@ -100,6 +100,28 @@ def delete_class_assignment(
     """
     service.delete_assignment(assignment_id, current_user)
 
+
+@router.put(
+    "/api/v1/assignments/{assignment_id}/answer-release",
+    response_model=AssignmentOut,
+    dependencies=[Depends(require_perm("EXE_ASSIGNMENT_MANAGE"))]
+)
+def set_answer_release(
+    assignment_id: UUID,
+    payload: AnswerReleaseRequest,
+    service: AssignmentService = Depends(get_assignment_service),
+    current_user: User = Depends(get_current_user)
+):
+    """
+    Reveal (released=true) or hide (released=false) exam answers/results for students of this
+    assignment. Requires EXE_ASSIGNMENT_MANAGE permission.
+    """
+    a = service.set_answers_released(assignment_id, payload.released, current_user)
+    return AssignmentOut(
+        assignment_id=a.assignment_id, class_id=a.class_id, exercise_id=a.exercise_id,
+        assigned_by=a.assigned_by, assigned_at=a.assigned_at, due_at=a.due_at, status=a.status,
+        answers_released=a.answers_released_at is not None,
+    )
 
 @router.post(
     "/api/v1/assignments/{assignment_id}/restore",

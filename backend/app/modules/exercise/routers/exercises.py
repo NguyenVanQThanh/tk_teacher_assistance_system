@@ -19,7 +19,7 @@ from app.core.database import get_db
 from models.models import User, Exercise
 from app.modules.auth.dependencies import require_perm, get_current_user
 from app.modules.exercise.schemas import (
-    ExerciseCreate, ExerciseUpdate, ExerciseOut,
+    AnswerReleaseRequest, ExerciseCreate, ExerciseUpdate, ExerciseOut,
     PaginatedExerciseOut, CursorPaginatedExerciseOut,
     QuestionCreate, QuestionOut, AnswerOptionCreate, QuestionTypeEnum,
     AiExerciseGenerateRequest, AiExerciseGenerateOut
@@ -161,6 +161,23 @@ def update_exercise(
     """
     return service.update_exercise(current_user, exercise_id, payload)
 
+
+@router.put(
+    "/{exercise_id}/answer-release",
+    response_model=ExerciseOut,
+    dependencies=[Depends(require_perm("EXE_EXERCISE_MANAGE"))]
+)
+def set_exercise_answer_release(
+    exercise_id: UUID,
+    payload: AnswerReleaseRequest,
+    service: ExerciseService = Depends(get_exercise_service),
+    current_user: User = Depends(get_current_user)
+):
+    """
+    Reveal (released=true) or hide answers of an EXAM exercise for students of all classes it was
+    assigned to. Requires EXE_EXERCISE_MANAGE permission.
+    """
+    return service.set_answers_released(current_user, exercise_id, payload.released)
 
 @router.delete(
     "/{exercise_id}",

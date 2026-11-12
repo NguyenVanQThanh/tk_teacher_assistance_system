@@ -227,7 +227,7 @@ class AssignmentService:
             # Teacher name and AI metadata
             is_ai_gen = bool(a.exercise and (a.exercise.ai_metadata or {}).get("is_ai_generated"))
             teacher_name = "Trợ lý AI Tam Khang" if is_ai_gen else (a.assigner.full_name if a.assigner else "Giáo viên bộ môn")
-            category = "ai_generated" if is_ai_gen else ("exam" if "đề thi" in (a.exercise.title or '').lower() else "class_exercise")
+            category = "ai_generated" if is_ai_gen else ("exam" if a.exercise.exercise_kind == "EXAM" else "class_exercise")
             category_label = "Bài tập tạo sinh AI" if is_ai_gen else ("Bài thi" if category == "exam" else "Bài tập trên lớp")
 
             results.append({
@@ -239,6 +239,7 @@ class AssignmentService:
                 "due_at": a.due_at,
                 "status": a.status,
                 "exercise_title": a.exercise.title if a.exercise else "Bài tập",
+                "answers_released": a.answers_released_at is not None,
                 "total_questions": a.exercise.total_questions if a.exercise else 0,
                 "class_name": a.class_obj.class_name if a.class_obj else "Lớp học",
                 "subject_id": a.exercise.subject_id if a.exercise else None,
@@ -338,7 +339,7 @@ class AssignmentService:
             Exercise.status != 'DELETED'
         ).first()
         ai_meta = (exercise.ai_metadata or {}) if exercise else {}
-        is_exam = "đề thi" in (exercise.title or "").lower() if exercise else False
+        is_exam = (exercise.exercise_kind == "EXAM") if exercise else False
         max_attempts = ai_meta.get("max_attempts", 1 if is_exam else 3)
         if len(attempts) >= int(max_attempts):
             raise HTTPException(
@@ -380,7 +381,7 @@ class AssignmentService:
 
         # duration_minutes / max_attempts live in exercise.ai_metadata (same rule as the feed).
         ai_meta = exercise.ai_metadata or {}
-        is_exam = "đề thi" in (exercise.title or "").lower()
+        is_exam = exercise.exercise_kind == "EXAM"
         duration_minutes = ai_meta.get("duration_minutes", 45)
         max_attempts = ai_meta.get("max_attempts", 1 if is_exam else 3)
 
@@ -447,6 +448,20 @@ class AssignmentService:
             )
 
         return self.repo.soft_delete(assignment)
+
+    def set_answers_released(self, assignment_id: UUID, released: bool, current_user: User) -> ClassAssignment:
+        """Teacher/admin toggles whether students may see per-question results of an exam."""
+        assignment = self.repo.get_by_id(assignment_id)
+        if not assignment:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail={"code": "ERR-EXE-ASSIGNMENT_NOT_FOUND", "message": "Class assignment record not found."}
+            )
+        check_class_access(self.db, current_user, assignment.class_id)
+        assignment.answers_released_at = datetime.now(timezone.utc) if released else None
+        self.db.commit()
+        self.db.refresh(assignment)
+        return assignment
 
     def restore_assignment(self, assignment_id: UUID, current_user: User) -> ClassAssignment:
         assignment = self.repo.get_by_id(assignment_id, include_deleted=True)

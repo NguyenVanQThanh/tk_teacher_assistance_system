@@ -2,7 +2,7 @@
 # Description: Internal auto-grading engine for exercise attempts (F-EXE-04) with per-part score weights, True/False partial credit, numeric short answers and exercise-wide regrading.
 # Created At: 2026-08-05
 # Created By: Tam Khang
-# Updated At: 2026-11-12
+# Updated At: 2026-11-13
 # Updated By: AI Agent
 
 from types import SimpleNamespace
@@ -191,14 +191,19 @@ class GradingService:
                     result["manual_override"] = True
                 question_results.append(result)
             elif q.question_type == 'Other':
-                # Multi-part free-form answer (JSON array string); always manual grading.
-                question_results.append({
+                # Multi-part free-form answer (JSON array string); manual grading only. A teacher
+                # verdict survives regrades (Other carries no auto points on the 10-point scale).
+                manual = manual_overrides.get(q_id_str)
+                result = {
                     "question_id": str(q.question_id),
                     "question_type": "Other",
                     "student_answer_text": getattr(ans, 'answer_text', None) if ans else None,
-                    "is_correct": None,
-                    "pending_manual_grade": True
-                })
+                    "is_correct": manual,
+                    "pending_manual_grade": manual is None
+                }
+                if manual is not None:
+                    result["manual_override"] = True
+                question_results.append(result)
         has_pending = any(qr.get("pending_manual_grade") for qr in question_results)
         final_score = round(earned_points, 2) if (auto_count > 0 or not has_pending) else None
 

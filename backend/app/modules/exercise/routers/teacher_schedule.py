@@ -2,7 +2,7 @@
 # Description: Router providing the teaching timetable and schedule notes/reminders for teachers.
 # Created At: 2026-10-07
 # Created By: Tam Khang
-# Updated At: 2026-10-29
+# Updated At: 2026-11-13
 # Updated By: AI Agent
 
 from typing import List, Optional
@@ -120,12 +120,14 @@ class ScheduleNotesResponse(BaseModel):
     total: int
 
 
-def get_synced_schedule_items(start_date: Optional[date] = None) -> List[TeacherScheduleItemOut]:
-    """Generate timetable sessions for SCHEDULE_WINDOW_DAYS days starting from start_date (default: this Monday)."""
+def get_synced_schedule_items(
+    start_date: Optional[date] = None, days: int = SCHEDULE_WINDOW_DAYS
+) -> List[TeacherScheduleItemOut]:
+    """Generate timetable sessions for `days` days starting from start_date (default: this Monday)."""
     start = start_date or week_start()
     items: List[TeacherScheduleItemOut] = []
     next_id = 1
-    for offset in range(SCHEDULE_WINDOW_DAYS):
+    for offset in range(days):
         current = start + timedelta(days=offset)
         weekday = current.weekday()
         for session in WEEKLY_TEMPLATE.get(weekday, []):

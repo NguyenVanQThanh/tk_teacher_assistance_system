@@ -17,6 +17,7 @@ import {
   Edit3, 
   Download 
 } from 'lucide-react';
+import AnswerReleaseButton from '../teacher/AnswerReleaseButton';
 import './ExerciseCard.css';
 
 export default function ExerciseCard({ exercise, onPreview, onEdit, onDownload, onMore, onDelete }) {
@@ -33,6 +34,14 @@ export default function ExerciseCard({ exercise, onPreview, onEdit, onDownload, 
             <FileText size={20} strokeWidth={2.2} />
           )}
         </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginLeft: 'auto' }}>
+        {exercise.raw?.exercise_kind === 'EXAM' && (
+          <AnswerReleaseButton
+            exerciseId={exercise.id}
+            released={exercise.raw?.answers_released}
+            compact
+          />
+        )}
         <button 
           type="button" 
           className="exercise-more-btn exercise-close-btn"
@@ -45,12 +54,23 @@ export default function ExerciseCard({ exercise, onPreview, onEdit, onDownload, 
         >
           <X size={17} strokeWidth={2.2} />
         </button>
+        </div>
       </div>
 
       {/* Exercise Title */}
       <h3 className="exercise-title" title={exercise.title}>
         {exercise.title}
       </h3>
+      <span
+        className="badge-tag"
+        style={{
+          alignSelf: 'flex-start', fontSize: 11, fontWeight: 600, padding: '2px 8px', borderRadius: 6,
+          background: exercise.raw?.exercise_kind === 'EXAM' ? '#FEE2E2' : '#E0E7FF',
+          color: exercise.raw?.exercise_kind === 'EXAM' ? '#B91C1C' : '#4338CA',
+        }}
+      >
+        {exercise.raw?.exercise_kind === 'EXAM' ? 'Đề thi' : 'Luyện tập'}
+      </span>
 
       {/* Meta items */}
       <div className="exercise-meta-list">

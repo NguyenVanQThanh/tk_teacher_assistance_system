@@ -65,6 +65,7 @@ class ExerciseService:
             created_by=current_user.user_id,
             total_questions=0,
             ai_metadata=payload.ai_metadata,
+            exercise_kind=payload.exercise_kind,
             status='ACTIVE'
         )
         return self.repo.create(exercise)
@@ -159,7 +160,24 @@ class ExerciseService:
 
     def update_exercise(self, current_user: User, exercise_id: UUID, payload: ExerciseUpdate) -> Exercise:
         exercise = self.get_exercise_detail(current_user, exercise_id)
-        return self.repo.update(exercise, title=payload.title, ai_metadata=payload.ai_metadata)
+        return self.repo.update(exercise, title=payload.title, ai_metadata=payload.ai_metadata,
+                                exercise_kind=payload.exercise_kind)
+
+    def set_answers_released(self, current_user: User, exercise_id: UUID, released: bool) -> Exercise:
+        """Release/hide answers for every active assignment of an EXAM exercise (all classes)."""
+        exercise = self.get_exercise_detail(current_user, exercise_id)
+        if exercise.exercise_kind != 'EXAM':
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail={"code": "ERR-EXE-NOT_AN_EXAM", "message": "Only exam exercises have releasable answers."}
+            )
+        stamp = datetime.now(timezone.utc) if released else None
+        for a in exercise.assignments:
+            if a.status != 'DELETED':
+                a.answers_released_at = stamp
+        self.db.commit()
+        self.db.refresh(exercise)
+        return exercise
 
     def delete_exercise(self, current_user: User, exercise_id: UUID) -> None:
         exercise = self.get_exercise_detail(current_user, exercise_id)

@@ -24,6 +24,7 @@ import {
 } from 'lucide-react';
 import { Link, useParams, useNavigate } from 'react-router-dom';
 import StudentDetailModal from '../../components/teacher/StudentDetailModal';
+import AnswerReleaseButton from '../../components/teacher/AnswerReleaseButton';
 import { classesApi, subjectsApi, assignmentsApi, attemptsApi } from '../../services/api';
 import { useAuth } from '../../context/AuthContext';
 import { getTeacherSubjectInfo, getSubjectIdByName } from '../../utils/teacherSubjectHelper';
@@ -31,6 +32,7 @@ import './TeacherClassDetailPage.css';
 import confirmDialog from '../../components/common/confirmDialog';
 import AssignExercisesDialog from '../../components/teacher/AssignExercisesDialog';
 import { downloadGradebookCsv } from '../../utils/gradebookExport';
+import toast from '../../components/common/toast';
 
 export default function TeacherClassDetailPage() {
   const { classId } = useParams();
@@ -60,7 +62,7 @@ export default function TeacherClassDetailPage() {
       );
       downloadGradebookCsv(items, `gradebook_${classInfo?.name || classId}.csv`);
     } catch (err) {
-      alert('Could not export the gradebook.');
+      toast.error('Could not export the gradebook.');
     }
   };
 
@@ -200,7 +202,7 @@ export default function TeacherClassDetailPage() {
     } catch (err) {
       const detail = err.response?.data?.detail;
       const msg = typeof detail === 'string' ? detail : detail?.message || 'Không thể hủy bài tập.';
-      alert(msg);
+      toast.error(msg);
     } finally {
       setDeletingId(null);
     }
@@ -444,6 +446,12 @@ export default function TeacherClassDetailPage() {
                           </span>
                         </td>
                         <td style={{ textAlign: 'center' }}>
+                          {assign.category === 'exam' && (
+                            <AnswerReleaseButton
+                              assignmentId={assign.assignment_id}
+                              released={assign.answers_released}
+                            />
+                          )}
                           <button
                             type="button"
                             className="btn-cancel-assignment"

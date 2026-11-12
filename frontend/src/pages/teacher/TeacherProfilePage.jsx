@@ -35,6 +35,7 @@ import { useAuth } from '../../context/AuthContext';
 import { getTeacherProfileDefaults } from '../../utils/teacherSubjectHelper';
 import { authApi } from '../../services/api';
 import './TeacherProfilePage.css';
+import toast from '../../components/common/toast';
 
 export default function TeacherProfilePage() {
   const { user } = useAuth();
@@ -250,7 +251,7 @@ export default function TeacherProfilePage() {
                 type="button" 
                 className="btn-camera-upload" 
                 title="Thay đổi ảnh đại diện"
-                onClick={() => alert('Chọn ảnh mới từ thiết bị của bạn')}
+                onClick={() => toast.info('Chọn ảnh mới từ thiết bị của bạn')}
               >
                 <Camera size={15} />
               </button>

@@ -47,6 +47,7 @@ import '../../components/documents/EditExerciseModal.css';
 import QuestionMedia from '../../components/exercises/QuestionMedia';
 import AiSourcesList from '../../components/exercises/AiSourcesList';
 import './StudentExerciseTakingPage.css';
+import toast from '../../components/common/toast';
 
 export default function StudentExerciseTakingPage() {
   const navigate = useNavigate();
@@ -885,8 +886,8 @@ export default function StudentExerciseTakingPage() {
           try {
             sessionStorage.setItem(`tk_exam_draft_${currentExamId}`, JSON.stringify(answers));
           } catch (e) {}
-          alert('Phiên đăng nhập của bạn đã hết hạn. Các câu trả lời đã được lưu tạm, vui lòng đăng nhập lại để nộp bài.');
-          window.location.href = '/login';
+          toast.error('Phiên đăng nhập của bạn đã hết hạn. Các câu trả lời đã được lưu tạm, vui lòng đăng nhập lại để nộp bài.');
+          setTimeout(() => { window.location.href = '/login'; }, 2500);
           return;
         }
 
@@ -911,7 +912,7 @@ export default function StudentExerciseTakingPage() {
         }
 
         if (!targetAttemptId) {
-          alert('Không tìm thấy phiên làm bài hợp lệ. Vui lòng tải lại trang.');
+          toast.error('Không tìm thấy phiên làm bài hợp lệ. Vui lòng tải lại trang.');
           return;
         }
 
@@ -963,10 +964,10 @@ export default function StudentExerciseTakingPage() {
           try {
             sessionStorage.setItem(`tk_exam_draft_${currentExamId}`, JSON.stringify(answers));
           } catch (e) {}
-          alert('Phiên làm việc đã hết hạn. Các câu trả lời của bạn đã được lưu tạm, vui lòng đăng nhập lại để nộp bài.');
-          window.location.href = '/login';
+          toast.error('Phiên làm việc đã hết hạn. Các câu trả lời của bạn đã được lưu tạm, vui lòng đăng nhập lại để nộp bài.');
+          setTimeout(() => { window.location.href = '/login'; }, 2500);
         } else {
-          alert(msg || 'Có lỗi xảy ra khi nộp bài. Vui lòng thử lại.');
+          toast.error(msg || 'Có lỗi xảy ra khi nộp bài. Vui lòng thử lại.');
         }
       } finally {
         setIsSubmitting(false);

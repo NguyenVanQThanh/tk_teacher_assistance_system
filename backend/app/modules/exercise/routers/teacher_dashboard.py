@@ -2,7 +2,7 @@
 # Description: API Router for Teacher and Homeroom Teacher Dashboard metrics, learning quality radar analytics, recent submissions, and weekly schedule.
 # Created At: 2026-10-25
 # Created By: Tam Khang
-# Updated At: 2026-11-12
+# Updated At: 2026-11-13
 # Updated By: AI Agent
 
 from typing import List, Optional, Dict, Any
@@ -58,6 +58,9 @@ class RecentSubmissionItem(BaseModel):
     status: str
     status_label: str
     score: Optional[float] = None
+    assignment_id: Optional[str] = None
+    is_exam: bool = False
+    answers_released: bool = False
 
 
 class WeeklyScheduleItem(BaseModel):
@@ -262,11 +265,15 @@ def get_teacher_dashboard(
             submitted_time=time_str,
             status=status_code,
             status_label=status_label,
-            score=float(att.score) if att.score is not None else None
+            score=float(att.score) if att.score is not None else None,
+            assignment_id=str(att.assignment_id),
+            is_exam=ex.exercise_kind == "EXAM",
+            answers_released=bool(att.assignment and att.assignment.answers_released_at),
         ))
 
-    # 5. Build synchronized weekly timetable schedule for upcoming week
-    synced_items = get_synced_schedule_items(week_start())
+    # 5. Build synchronized weekly timetable schedule for the current week only (Mon-Sun);
+    #    the full schedule page covers two weeks, the dashboard card is "this week".
+    synced_items = get_synced_schedule_items(week_start(), days=7)
     weekly_schedule: List[WeeklyScheduleItem] = []
     for item in synced_items:
         theme = "purple" if "12A1" in item.class_name or "11B2" in item.class_name else "blue"

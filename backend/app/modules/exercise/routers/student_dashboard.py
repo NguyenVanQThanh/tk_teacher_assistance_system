@@ -198,7 +198,7 @@ def get_student_dashboard(
                     is_overdue=is_overdue,
                     is_completed=is_finished,
                     is_ai_generated=is_ai,
-                    category="ai_generated" if is_ai else ("exam" if "đề thi" in (a.exercise.title or "").lower() else "class_exercise")
+                    category="ai_generated" if is_ai else ("exam" if a.exercise.exercise_kind == "EXAM" else "class_exercise")
                 )
             )
 

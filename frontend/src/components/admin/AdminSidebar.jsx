@@ -19,6 +19,7 @@ import {
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import './AdminSidebar.css';
+import toast from '../../components/common/toast';
 
 export default function AdminSidebar({ isMobileOpen, onCloseMobile }) {
   const navigate = useNavigate();
@@ -117,7 +118,7 @@ export default function AdminSidebar({ isMobileOpen, onCloseMobile }) {
         <button
           type="button"
           className="admin-footer-btn"
-          onClick={() => alert('Trung tâm Trợ giúp & Hỗ trợ kỹ thuật LMS')}
+          onClick={() => toast.info('Trung tâm Trợ giúp & Hỗ trợ kỹ thuật LMS')}
         >
           <HelpCircle size={19} strokeWidth={1.8} />
           <span>Trợ giúp & Hỗ trợ</span>

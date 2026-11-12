@@ -10,7 +10,7 @@
 from enum import Enum
 from uuid import UUID
 from datetime import datetime
-from typing import Optional, List, Any, Dict
+from typing import Optional, List, Any, Dict, Literal
 from pydantic import BaseModel, Field, ValidationInfo, field_validator, model_validator
 
 
@@ -242,6 +242,7 @@ class ExerciseCreate(BaseModel):
     title: str = Field(..., min_length=1, max_length=255, description="Exercise title")
     subject_id: UUID = Field(..., description="Subject UUID")
     ai_metadata: Optional[Any] = Field(None, description="Metadata for AI generation")
+    exercise_kind: Literal["PRACTICE", "EXAM"] = Field("PRACTICE", description="PRACTICE or EXAM")
 
     @field_validator("title")
     @classmethod
@@ -255,6 +256,7 @@ class ExerciseCreate(BaseModel):
 class ExerciseUpdate(BaseModel):
     title: Optional[str] = Field(None, min_length=1, max_length=255, description="New exercise title")
     ai_metadata: Optional[Any] = Field(None, description="New AI metadata")
+    exercise_kind: Optional[Literal["PRACTICE", "EXAM"]] = Field(None, description="New exercise kind")
 
     @field_validator("title")
     @classmethod
@@ -274,6 +276,8 @@ class ExerciseOut(BaseModel):
     created_by: UUID
     total_questions: int
     ai_metadata: Optional[Any] = None
+    exercise_kind: str = "PRACTICE"
+    answers_released: bool = False
     status: str
     created_at: datetime
     updated_at: datetime
@@ -318,6 +322,10 @@ class AssignmentCreate(BaseModel):
         return v
 
 
+class AnswerReleaseRequest(BaseModel):
+    released: bool
+
+
 class AssignmentOut(BaseModel):
     assignment_id: UUID
     class_id: UUID
@@ -327,6 +335,7 @@ class AssignmentOut(BaseModel):
     due_at: datetime
     status: str
     exercise_title: Optional[str] = None
+    answers_released: Optional[bool] = False
     total_questions: Optional[int] = None
     class_name: Optional[str] = None
     subject_id: Optional[UUID] = None
@@ -355,7 +364,7 @@ class AssignmentOut(BaseModel):
             class_name = getattr(data.class_obj, "class_name", None) if hasattr(data, "class_obj") and data.class_obj else None
             teacher_name = getattr(data.assigner, "full_name", None) if hasattr(data, "assigner") and data.assigner else None
             subject_id = getattr(data.exercise, "subject_id", None)
-            is_exam = "đề thi" in (data.exercise.title or "").lower()
+            is_exam = getattr(data.exercise, "exercise_kind", "PRACTICE") == "EXAM"
             ai_meta = getattr(data.exercise, "ai_metadata", {}) or {}
             custom_duration = ai_meta.get("duration_minutes", 45)
             custom_attempts = ai_meta.get("max_attempts", 1 if is_exam else 3)
@@ -368,6 +377,7 @@ class AssignmentOut(BaseModel):
                 "due_at": data.due_at,
                 "status": data.status,
                 "exercise_title": data.exercise.title if hasattr(data.exercise, "title") else None,
+                "answers_released": getattr(data, "answers_released_at", None) is not None,
                 "total_questions": data.exercise.total_questions if hasattr(data.exercise, "total_questions") else None,
                 "class_name": class_name,
                 "subject_id": subject_id,
@@ -497,6 +507,9 @@ class AttemptListItemOut(BaseModel):
     end_time: Optional[datetime] = None
     total_time_seconds: Optional[int] = None
     status: str
+    # Exam answer release flag of the attempt's assignment (teacher-controlled; exams only).
+    is_exam: bool = False
+    answers_released: bool = False
 
     model_config = {"from_attributes": True}
 

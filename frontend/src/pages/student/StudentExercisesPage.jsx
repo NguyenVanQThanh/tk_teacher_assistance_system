@@ -44,6 +44,7 @@ import AiSourcesList from '../../components/exercises/AiSourcesList';
 import { classesApi, assignmentsApi, attemptsApi, subjectsApi, exercisesApi } from '../../services/api';
 import useDataSync from '../../hooks/useDataSync';
 import './StudentExercisesPage.css';
+import toast from '../../components/common/toast';
 
 // Helper to format deadline preserving exact date & time without unwanted UTC shifts
 export const formatDeadline = (dueAtStr) => {
@@ -315,9 +316,7 @@ export default function StudentExercisesPage() {
     return Boolean(
       selectedExerciseDetail.category === 'exam' ||
       detailSummary?.category === 'exam' ||
-      (selectedExerciseDetail.categoryLabel || '').toLowerCase().includes('bài thi') ||
-      (selectedExerciseDetail.title || '').toLowerCase().includes('đề thi') ||
-      (detailSummary?.title || '').toLowerCase().includes('đề thi')
+      (selectedExerciseDetail.categoryLabel || '').toLowerCase().includes('bài thi')
     );
   }, [selectedExerciseDetail, detailSummary]);
 
@@ -458,8 +457,8 @@ export default function StudentExercisesPage() {
             class_id: a.class_id,
             className: a.class_name || 'Lớp học',
             type: 'quiz',
-            category: a.category || (isAi ? 'ai_generated' : ((a.exercise_title || '').toLowerCase().includes('đề thi') ? 'exam' : 'class_exercise')),
-            categoryLabel: a.categoryLabel || (isAi ? 'Bài tập tạo sinh AI' : ((a.exercise_title || '').toLowerCase().includes('đề thi') ? 'Bài thi' : 'Bài tập trên lớp')),
+            category: a.category || (isAi ? 'ai_generated' : 'class_exercise'),
+            categoryLabel: a.categoryLabel || (isAi ? 'Bài tập tạo sinh AI' : 'Bài tập trên lớp'),
             title: a.exercise_title || 'Bài tập được giao',
             teacher: a.teacher_name || (isAi ? 'Trợ lý AI Tam Khang' : 'Giáo viên bộ môn'),
             subject: a.subject_name || (a.class_name?.includes('Lý') ? 'Vật lý' : a.class_name?.includes('Hóa') ? 'Hóa học' : 'Toán học'),
@@ -471,7 +470,7 @@ export default function StudentExercisesPage() {
             isToday,
             status: feedStatus,
             statusLabel,
-            maxAttempts: (((a.category || '').toLowerCase() === 'exam' || (a.exercise_title || '').toLowerCase().includes('đề thi')) ? 1 : null),
+            maxAttempts: (((a.category || '').toLowerCase() === 'exam') ? 1 : null),
             completedAttemptsCount: finalCompletedCount,
             attempt: finishedAttempt || myAttempts[0],
             score: a.latest_score ?? (finishedAttempt?.score ?? null),
@@ -730,7 +729,7 @@ export default function StudentExercisesPage() {
   // Submit AI Generation Handler (Persisted to Database)
   const handleGenerateAiExercise = async () => {
     if (totalAiQuestions === 0) {
-      alert('Vui lòng chọn số lượng câu hỏi lớn hơn 0.');
+      toast.error('Vui lòng chọn số lượng câu hỏi lớn hơn 0.');
       return;
     }
 
@@ -805,7 +804,7 @@ export default function StudentExercisesPage() {
       const errMsg = detail?.code === 'ERR-EXE-AI_GENERATION_FAILED'
         ? 'AI chưa tạo được bài tập lúc này. Vui lòng bấm "Tạo bài tập" để thử lại.'
         : (detail?.message || err.message || 'Có lỗi khi tạo bài tập trên máy chủ. Vui lòng thử lại.');
-      alert(errMsg);
+      toast.error(errMsg);
       setIsGenerating(false);
       setGenerationStep(0);
     }

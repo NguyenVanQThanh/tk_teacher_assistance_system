@@ -23,6 +23,7 @@ import MathRenderer from '../common/MathRenderer';
 import { getQuestionItems } from '../../utils/questionItems';
 import QuestionMedia from './QuestionMedia';
 import './ExercisePreviewModal.css';
+import toast from '../../components/common/toast';
 
 export default function ExercisePreviewModal({ exercise, isOpen, onClose }) {
   const [exerciseDetail, setExerciseDetail] = useState(null);
@@ -119,7 +120,7 @@ export default function ExercisePreviewModal({ exercise, isOpen, onClose }) {
       link.remove();
       window.URL.revokeObjectURL(url);
     } catch (err) {
-      alert('Không thể xuất file PDF cho bài tập này.');
+      toast.error('Không thể xuất file PDF cho bài tập này.');
     } finally {
       setDownloadingPdf(false);
     }
@@ -222,6 +223,12 @@ export default function ExercisePreviewModal({ exercise, isOpen, onClose }) {
           <div className="preview-info-box">
             <h3 className="preview-heading">{exercise.title}</h3>
             <div className="preview-sub-badges">
+              <span
+                className="badge-tag"
+                style={{ fontWeight: 700, color: (exerciseDetail?.exercise_kind || exercise.raw?.exercise_kind) === 'EXAM' ? '#B91C1C' : '#4338CA' }}
+              >
+                {(exerciseDetail?.exercise_kind || exercise.raw?.exercise_kind) === 'EXAM' ? 'Đề thi' : 'Luyện tập'}
+              </span>
               <span className="badge-tag">{questionCountText}</span>
               {durationText && <span className="badge-tag">{durationText}</span>}
               <span className="badge-tag">Tác giả: {exercise.authorName || 'Giáo viên'}</span>

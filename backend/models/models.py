@@ -214,11 +214,19 @@ class Exercise(Base):
     created_by = Column(UUID(as_uuid=True), ForeignKey('users.user_id', ondelete='CASCADE'), nullable=False)
     total_questions = Column(Integer, default=0)
     ai_metadata = Column(JSON, nullable=True)
+    # PRACTICE (default, answers always visible) or EXAM (answers hidden until the teacher releases them).
+    exercise_kind = Column(String(20), default='PRACTICE', server_default='PRACTICE', nullable=False)
     status = Column(String(20), default='ACTIVE', nullable=False)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
 
     questions = relationship("Question", back_populates="exercise", cascade="all, delete-orphan")
+
+    @property
+    def answers_released(self) -> bool:
+        """True when the exercise has active assignments and all of them have released answers."""
+        active = [a for a in (self.assignments or []) if a.status != 'DELETED']
+        return bool(active) and all(a.answers_released_at is not None for a in active)
 
 
 class Question(Base):
@@ -274,6 +282,8 @@ class ClassAssignment(Base):
     # Added 2026-11-12 so updates (incl. soft delete/restore) are visible to the data-version
     # sync endpoint; previously only assigned_at existed and cancellations were invisible.
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+    # Set by the teacher to reveal per-question results/answers of an exam to students; NULL = hidden.
+    answers_released_at = Column(DateTime(timezone=True), nullable=True)
 
     class_obj = relationship("Class", backref="assignments")
     exercise = relationship("Exercise", backref="assignments")

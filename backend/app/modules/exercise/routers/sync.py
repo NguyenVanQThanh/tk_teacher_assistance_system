@@ -110,7 +110,9 @@ async def sync_stream(
         event_generator(),
         media_type="text/event-stream",
         headers={
-            "Cache-Control": "no-cache",
+            "Cache-Control": "no-cache, no-store",
+            # The JWT may sit in the URL (?token=): never forward it via Referer.
+            "Referrer-Policy": "no-referrer",
             "X-Accel-Buffering": "no",
             "Connection": "keep-alive",
         },

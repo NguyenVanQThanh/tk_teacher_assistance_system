@@ -14,7 +14,7 @@ from sqlalchemy.orm import Session
 
 from models.models import User, Subject, Exercise, ClassAssignment, StudentClass, StudentExerciseAttempt
 from app.modules.exercise.schemas import (
-    AttemptSubmitRequest, AttemptListItemOut, AttemptGradeUpdateRequest, AssignmentTakingOut
+    AttemptSubmitRequest, AttemptListItemOut, AttemptGradeUpdateRequest, AssignmentTakingOut, AttemptOut
 )
 from app.modules.exercise.repository import AttemptRepository, AssignmentRepository
 from app.modules.exercise.services.assignment_service import AssignmentService
@@ -91,7 +91,7 @@ class AttemptService:
             Exercise.status != 'DELETED'
         ).first()
         ai_meta = (exercise.ai_metadata or {}) if exercise else {}
-        is_exam = "đề thi" in (exercise.title or "").lower() if exercise else False
+        is_exam = (exercise.exercise_kind == "EXAM") if exercise else False
         max_attempts = int(ai_meta.get("max_attempts", 1 if is_exam else 3))
         attempt_count = self.db.query(StudentExerciseAttempt).filter(
             StudentExerciseAttempt.student_id == current_user.user_id,
@@ -199,6 +199,25 @@ class AttemptService:
 
         return attempt
 
+    @staticmethod
+    def redact_for_owner(attempt: StudentExerciseAttempt, current_user: User) -> AttemptOut:
+        """Serialize an attempt; for the owning student of an EXAM exercise (exercise_kind) strip
+        per-question verdicts until the teacher releases answers (assignment.answers_released_at).
+        The total score and the student's own answers stay. Works on a copy: nothing is persisted."""
+        out = AttemptOut.model_validate(attempt)
+        ex = getattr(getattr(attempt, "assignment", None), "exercise", None)
+        is_exam = getattr(ex, "exercise_kind", "PRACTICE") == "EXAM"
+        released = getattr(getattr(attempt, "assignment", None), "answers_released_at", None) is not None
+        if attempt.student_id == current_user.user_id and is_exam and not released and out.detailed_results:
+            keep = ("question_id", "question_type", "student_answer_option_id", "student_answer_text")
+            out.detailed_results = {
+                "questions": [
+                    {k: r[k] for k in keep if k in r}
+                    for r in (out.detailed_results.get("questions") or [])
+                ]
+            }
+        return out
+
     def get_attempt_paper(self, attempt_id: UUID, current_user: User) -> AssignmentTakingOut:
         """
         Return the sanitized paper (questions without answer key) of an attempt owned by the
@@ -297,6 +316,7 @@ class AttemptService:
             class_name = att.assignment.class_obj.class_name if (att.assignment and att.assignment.class_obj) else "Lớp"
             exercise_id = att.assignment.exercise_id if att.assignment else att.attempt_id
             exercise_title = att.assignment.exercise.title if (att.assignment and att.assignment.exercise) else "Bài tập"
+            is_exam_kind = bool(att.assignment and att.assignment.exercise and att.assignment.exercise.exercise_kind == "EXAM")
             subject_id = att.assignment.exercise.subject_id if (att.assignment and att.assignment.exercise) else None
 
             items.append(
@@ -318,7 +338,9 @@ class AttemptService:
                     start_time=att.start_time,
                     end_time=att.end_time,
                     total_time_seconds=att.total_time_seconds,
-                    status=att.status
+                    status=att.status,
+                    is_exam=is_exam_kind,
+                    answers_released=bool(att.assignment and att.assignment.answers_released_at)
                 )
             )
 

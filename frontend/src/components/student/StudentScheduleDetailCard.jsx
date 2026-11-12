@@ -18,6 +18,7 @@ import {
   Check
 } from 'lucide-react';
 import './StudentScheduleDetailCard.css';
+import toast from '../../components/common/toast';
 
 // Selectable types for student-created schedules
 const SCHEDULE_TYPES = ['Tự học', 'Kiểm tra', 'Thi', 'Ôn tập', 'Khác'];
@@ -220,7 +221,7 @@ export default function StudentScheduleDetailCard({
     e.preventDefault();
     if (!newScheduleTitle.trim()) return;
     if (newScheduleEnd <= newScheduleStart) {
-      window.alert('End time must be after start time.');
+      toast.error('End time must be after start time.');
       return;
     }
 
