@@ -70,6 +70,8 @@ out/
 
 # Environment variables (Sensitive secrets)
 .env
+.env.prod
+deploy/.env.prod
 .env.local
 .env.*.local
 .env.development.local

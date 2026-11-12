@@ -1,0 +1,20 @@
+# Giữ image nhỏ và build nhanh: không copy rác vào build context
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+
+# Secret thật không bao giờ vào image
+.env
+.env.*
+!.env.example
+
+# Không cần trong production image
+tests/
+*.log
+.git/
+.dockerignore
+Dockerfile

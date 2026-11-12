@@ -1,0 +1,71 @@
+# CD deploy tự động — copy file này vào .github/workflows/deploy.yml
+#
+# Pipeline: push lên main -> build & push 2 image lên GHCR -> SSH vào server chạy compose pull/up.
+#
+# Secrets cần tạo trong GitHub repo (Settings > Secrets and variables > Actions):
+#   - GITHUB_TOKEN: có sẵn, tự cấp quyền `packages: write` ở permissions bên dưới
+#   - DEPLOY_HOST: IP/hostname của server
+#   - DEPLOY_USER: user SSH trên server (vd: ubuntu)
+#   - DEPLOY_SSH_KEY: private key tương ứng với public key đã add vào server
+#   - DEPLOY_PATH: đường dẫn thư mục project trên server (vd: /opt/smartlms)
+name: deploy
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  packages: write
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_OWNER: ${{ github.repository_owner }}
+  BACKEND_IMAGE: ghcr.io/${{ github.repository_owner }}/smartlms-backend
+  FRONTEND_IMAGE: ghcr.io/${{ github.repository_owner }}/smartlms-frontend
+
+jobs:
+  build-and-push:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Login to GHCR
+        run: echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u "${{ github.actor }}" --password-stdin
+
+      - name: Build and push images
+        run: |
+          TAG=${GITHUB_SHA::7}
+          # Backend: image prod dùng đúng backend/Dockerfile (đã gọn, không torch)
+          docker build -t $BACKEND_IMAGE:$TAG -t $BACKEND_IMAGE:latest ./backend
+          docker push $BACKEND_IMAGE:$TAG
+          docker push $BACKEND_IMAGE:latest
+          # Frontend: dùng Dockerfile prod trong deploy/
+          docker build -f deploy/docker/Dockerfile.frontend.prod \
+            --build-arg VITE_API_BASE_URL=/api \
+            -t $FRONTEND_IMAGE:$TAG -t $FRONTEND_IMAGE:latest ./frontend
+          docker push $FRONTEND_IMAGE:$TAG
+          docker push $FRONTEND_IMAGE:latest
+
+  deploy:
+    needs: build-and-push
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Deploy qua SSH (pull image mới + up -d)
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.DEPLOY_HOST }}
+          username: ${{ secrets.DEPLOY_USER }}
+          key: ${{ secrets.DEPLOY_SSH_KEY }}
+          script: |
+            cd ${{ secrets.DEPLOY_PATH }}
+            git pull --ff-only
+            # cần .env.prod đã có sẵn trên server (không nằm trong git)
+            docker login ghcr.io -u "${{ github.actor }}" --password-stdin <<< "${{ secrets.GITHUB_TOKEN }}"
+            docker compose --project-directory . --env-file deploy/.env.prod -f deploy/docker-compose.prod.yml pull
+            docker compose --project-directory . --env-file deploy/.env.prod -f deploy/docker-compose.prod.yml --profile proxy up -d
+            docker image prune -f

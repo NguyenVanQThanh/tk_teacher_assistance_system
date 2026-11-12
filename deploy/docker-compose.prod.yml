@@ -1,0 +1,98 @@
+# Production compose — KHÔNG dùng cho dev local (dev dùng docker-compose.yml ở repo root)
+#
+# Chạy từ repo root:
+#   docker compose --project-directory . --env-file deploy/.env.prod \
+#     -f deploy/docker-compose.prod.yml up -d --build
+# hoặc dùng script:  bash deploy/scripts/deploy.sh
+#
+# Yêu cầu trước khi chạy: đã tạo deploy/.env.prod từ deploy/.env.prod.example
+#
+# Khác bản dev:
+#  - không mount source code vào container (dùng code đã build sẵn trong image)
+#  - backend chạy không --reload
+#  - không publish port Postgres/Backend ra ngoài (chỉ nginx publish 80 khi bật profile proxy)
+#  - secret đọc từ deploy/.env.prod thay vì hardcode
+
+services:
+  postgres:
+    image: pgvector/pgvector:pg16
+    container_name: smartlms_postgres
+    restart: unless-stopped
+    env_file:
+      - ./deploy/.env.prod
+    expose:
+      - "5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: smartlms_backend
+    restart: unless-stopped
+    env_file:
+      - ./deploy/.env.prod
+    environment:
+      # override giá trị theo môi trường container (còn lại đọc từ .env.prod)
+      DB_HOST: postgres
+      DB_PORT: "5432"
+      TZ: Asia/Ho_Chi_Minh
+      # marker-pdf (torch) đã bị loại khỏi requirements.txt; khoá cứng ở trạng thái tắt
+      ENABLE_MARKER_PDF: "0"
+    expose:
+      - "8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    volumes:
+      - backend_uploads:/app/uploads
+    # prod: không --reload (dev override bằng command ở docker-compose.yml gốc)
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health', timeout=3)\""]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+  frontend:
+    build:
+      context: ./frontend
+      # Dockerfile prod nằm trong deploy/, tham chiếu tương đối từ context ./frontend
+      dockerfile: ../deploy/docker/Dockerfile.frontend.prod
+      args:
+        VITE_API_BASE_URL: ${VITE_API_BASE_URL:-/api}
+    container_name: smartlms_frontend
+    restart: unless-stopped
+    expose:
+      - "3000"
+    depends_on:
+      backend:
+        condition: service_healthy
+
+  # Reverse proxy tuỳ chọn — chỉ chạy khi truyền --profile proxy:
+  #   docker compose --project-directory . --env-file deploy/.env.prod \
+  #     -f deploy/docker-compose.prod.yml --profile proxy up -d
+  # Khi đó chỉ cần mở đúng port 80 (và 443 nếu thêm TLS) trên server.
+  nginx:
+    image: nginx:alpine
+    container_name: smartlms_nginx
+    restart: unless-stopped
+    profiles: ["proxy"]
+    ports:
+      - "80:80"
+    volumes:
+      - ./deploy/nginx/nginx.conf:/etc/nginx/conf.d/default.conf:ro
+    depends_on:
+      - frontend
+      - backend
+
+volumes:
+  postgres_data:
+  backend_uploads:

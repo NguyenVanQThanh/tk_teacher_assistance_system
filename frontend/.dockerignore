@@ -1,0 +1,16 @@
+# Giữ build context của frontend nhẹ (node_modules có thể hàng trăm MB)
+node_modules/
+dist/
+build/
+
+# Secret thật không bao giờ vào image
+.env
+.env.*
+!.env.example
+
+playwright-report/
+test-results/
+*.log
+.git/
+.dockerignore
+Dockerfile
