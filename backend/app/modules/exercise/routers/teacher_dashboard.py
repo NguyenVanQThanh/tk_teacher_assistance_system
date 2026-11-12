@@ -393,14 +393,17 @@ def get_teacher_notifications(
     submissions, and today's timetable sessions. No separate notification storage is required.
     """
     items: List[TeacherNotificationItem] = []
-    stats = AttemptService(db).get_grading_dashboard(current_user)
+    service = AttemptService(db)
+    # ponytail: still loads every scoped attempt once per request; switch to SQL aggregates if slow.
+    attempts = service.list_attempts(current_user=current_user)
+    stats = service.get_grading_dashboard(current_user, attempts)
     if stats.pending_grading_count:
         items.append(TeacherNotificationItem(
             id="pending-grading", type="activity", title="Submissions waiting for grading",
             content=f"{stats.pending_grading_count} submission(s) need grading.",
             link="/teacher/grading?status=pending_grading"
         ))
-    recent = [a for a in AttemptService(db).list_attempts(current_user=current_user)
+    recent = [a for a in attempts
               if a.is_finished and a.score is None and a.status != "approved"]
     recent.sort(key=lambda a: a.end_time or a.start_time or datetime.min.replace(tzinfo=timezone.utc), reverse=True)
     for a in recent[:5]:

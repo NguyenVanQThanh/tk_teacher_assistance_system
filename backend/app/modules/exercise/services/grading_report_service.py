@@ -2,7 +2,7 @@
 # Description: Builds CSV and PDF grading result reports from attempt list items.
 # Created At: 2026-11-12
 # Created By: AI Agent
-# Updated At: 2026-11-12
+# Updated At: 2026-11-13
 # Updated By: AI Agent
 
 import csv
@@ -37,7 +37,7 @@ def _rows(items: List[AttemptListItemOut]) -> List[list]:
 
 def _csv_safe(v: str) -> str:
     """Neutralise spreadsheet formula injection."""
-    return "'" + v if v[:1] in ("=", "+", "-", "@") else v
+    return "'" + v if v[:1] in ("=", "+", "-", "@", "\t", "\r") else v
 
 
 def build_csv(items: List[AttemptListItemOut]) -> bytes:
@@ -50,7 +50,7 @@ def build_csv(items: List[AttemptListItemOut]) -> bytes:
 
 
 def build_pdf(items: List[AttemptListItemOut]) -> bytes:
-    PdfExportService._register_fonts()
+    PdfExportService.register_fonts()
     styles = getSampleStyleSheet()
     for name in ("Title", "Normal"):
         styles[name].fontName = "VietnameseFont"

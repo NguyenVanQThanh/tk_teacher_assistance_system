@@ -229,9 +229,9 @@ class GradingService:
         self.db.commit()
         return updated
 
-    def regrade_exercise(self, exercise_id: UUID, class_ids: Optional[List[UUID]] = None) -> int:
-        """Recompute and persist scores of finished attempts of an exercise (optionally limited to
-        the given classes; None = all classes); returns the count."""
+    def regrade_exercise(self, exercise_id: UUID) -> int:
+        """Recompute and persist scores of ALL finished attempts of an exercise (the answer key is
+        shared by every class it is assigned to); returns the count."""
         from models.models import ClassAssignment, StudentExerciseAttempt
         exercise = self.exercise_repo.get_by_id(exercise_id)
         if not exercise:
@@ -243,28 +243,32 @@ class GradingService:
             StudentExerciseAttempt.is_finished.is_(True),
             StudentExerciseAttempt.status != 'DELETED'
         )
-        if class_ids is not None:
-            q = q.filter(ClassAssignment.class_id.in_(class_ids))
         attempts = q.all()
         for att in attempts:
-            old = dict(att.detailed_results or {})
-            answers_map: Dict[str, Any] = {}
-            overrides: Dict[str, bool] = {}
-            for r in old.get("questions", []):
-                qid = str(r.get("question_id", "")).lower()
-                answers_map[qid] = SimpleNamespace(
-                    answer_option_id=r.get("student_answer_option_id"),
-                    answer_text=r.get("student_answer_text"),
-                )
-                if r.get("manual_override") and r.get("is_correct") is not None:
-                    overrides[qid] = bool(r["is_correct"])
-            score, results = self._grade(exercise, answers_map, overrides)
-            for k, v in old.items():
-                if k != "questions":
-                    results[k] = v
+            score, results = self.rescore(exercise, att.detailed_results)
             # Never overwrite a teacher-set total score (manual grading decision).
-            teacher_total = old.get("teacher_total_score")
+            teacher_total = results.get("teacher_total_score")
             att.score = float(teacher_total) if teacher_total is not None else score
             att.detailed_results = results
         self.db.commit()
         return len(attempts)
+
+    def rescore(self, exercise, detailed_results) -> Tuple[Optional[float], Dict[str, Any]]:
+        """Re-grade stored per-question answers against the current key, keeping teacher verdicts
+        (manual_override) and every non-question key (feedback, teacher_total_score, ...)."""
+        old = dict(detailed_results or {})
+        answers_map: Dict[str, Any] = {}
+        overrides: Dict[str, bool] = {}
+        for r in old.get("questions", []):
+            qid = str(r.get("question_id", "")).lower()
+            answers_map[qid] = SimpleNamespace(
+                answer_option_id=r.get("student_answer_option_id"),
+                answer_text=r.get("student_answer_text"),
+            )
+            if r.get("manual_override") and r.get("is_correct") is not None:
+                overrides[qid] = bool(r["is_correct"])
+        score, results = self._grade(exercise, answers_map, overrides)
+        for k, v in old.items():
+            if k != "questions":
+                results[k] = v
+        return score, results

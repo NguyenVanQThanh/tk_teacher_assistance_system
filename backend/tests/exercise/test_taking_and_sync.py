@@ -620,8 +620,9 @@ class TestReviewHardening:
         assert miss.status_code == status.HTTP_200_OK, miss.text
         assert miss.json() == []
 
-    def test_regrade_scoped_to_teacher_classes(self, client: TestClient, exam_setup: dict):
-        # Answer-key regrade must not touch attempts from classes the teacher cannot access.
+    def test_answer_key_owner_only_and_regrades_all_classes(self, client: TestClient, exam_setup: dict):
+        # The answer key is shared across classes: the owner's change rescores EVERY class's
+        # attempts (no stale scores elsewhere); a non-owner teacher may not change it.
         ah, th = exam_setup["admin_headers"], exam_setup["teacher_headers"]
         ex = client.get(f"/api/v1/exercises/{exam_setup['exercise_id']}", headers=th).json()
         q = next(q for q in ex["questions"] if q["question_type"] == "MultipleChoice")
@@ -653,14 +654,71 @@ class TestReviewHardening:
         att2 = client.post(f"/api/v1/assignments/{a2.json()['assignment_id']}/attempts", headers=s2h).json()["attempt_id"]
         assert client.put(f"/api/v1/attempts/{att2}/submit", json=answers, headers=s2h).status_code == 200
 
+        assert client.get(f"/api/v1/attempts/{att2}", headers=ah).json()["score"] == 0
+
+        # Owner flips the key to the previously wrong option -> both classes rescored.
         url = f"/api/v1/exercises/{exam_setup['exercise_id']}/answer-key"
-        body = {"keys": {q["question_id"]: right["option_id"]}}
-        r = client.put(url, json=body, headers=th)
+        r = client.put(url, json={"keys": {q["question_id"]: wrong["option_id"]}}, headers=th)
         assert r.status_code == 200, r.text
-        assert r.json()["regraded_attempts"] == 1  # only the teacher's class
-        r_admin = client.put(url, json=body, headers=ah)
-        assert r_admin.status_code == 200, r_admin.text
-        assert r_admin.json()["regraded_attempts"] == 2  # admin sees every class
+        assert r.json()["regraded_attempts"] == 2
+        assert client.get(f"/api/v1/attempts/{att2}", headers=ah).json()["score"] > 0
+
+        # A teacher who can see but does not own an exercise cannot change its key.
+        admin_ex = client.post(
+            "/api/v1/exercises", json={"title": "Admin exam", "subject_id": exam_setup["subject_id"]}, headers=ah
+        ).json()["exercise_id"]
+        denied = client.put(f"/api/v1/exercises/{admin_ex}/answer-key", json={"keys": {}}, headers=th)
+        assert denied.status_code == status.HTTP_403_FORBIDDEN, denied.text
+        assert denied.json()["detail"]["code"] == "ERR-EXE-ANSWER_KEY_OWNER_ONLY"
+        assert client.put(url, json={"keys": {q["question_id"]: right["option_id"]}}, headers=ah).status_code == 200
+
+    def test_grade_save_with_auto_total_does_not_pin_score(self, client: TestClient, exam_setup: dict):
+        # The grading UI resends the auto total on every save; that must not freeze the score
+        # against a later answer-key regrade. Only a differing total is a teacher override.
+        aid = _create_assignment(client, exam_setup)
+        sh, th = exam_setup["student_headers"], exam_setup["teacher_headers"]
+        ex = client.get(f"/api/v1/exercises/{exam_setup['exercise_id']}", headers=th).json()
+        q = next(q for q in ex["questions"] if q["question_type"] == "MultipleChoice")
+        wrong = next(o for o in q["answer_options"] if not o["is_correct"])
+        att = client.post(f"/api/v1/assignments/{aid}/attempts", headers=sh).json()["attempt_id"]
+        sub = client.put(
+            f"/api/v1/attempts/{att}/submit",
+            json={"answers": [{"question_id": q["question_id"], "answer_option_id": wrong["option_id"]}]}, headers=sh
+        )
+        assert sub.status_code == 200, sub.text
+        g = client.put(f"/api/v1/attempts/{att}/grade", json={"score": sub.json()["score"], "feedback": "ok"}, headers=th)
+        assert g.status_code == 200, g.text
+        assert "teacher_total_score" not in g.json()["detailed_results"]
+        assert g.json()["detailed_results"]["teacher_feedback"] == "ok"
+        ak = client.put(
+            f"/api/v1/exercises/{exam_setup['exercise_id']}/answer-key",
+            json={"keys": {q["question_id"]: wrong["option_id"]}}, headers=th
+        )
+        assert ak.status_code == 200, ak.text
+        assert client.get(f"/api/v1/attempts/{att}", headers=th).json()["score"] > sub.json()["score"]
+
+    def test_open_attempt_window_closes_after_due_plus_duration(self, client: TestClient, db_session, exam_setup: dict):
+        # An open attempt may be resumed/submitted until due_at + duration (45 min default), not forever.
+        from sqlalchemy import update
+        from models.models import ClassAssignment
+        aid = _create_assignment(client, exam_setup)
+        sh = exam_setup["student_headers"]
+        att = client.post(f"/api/v1/assignments/{aid}/attempts", headers=sh).json()["attempt_id"]
+
+        def set_due(delta):
+            db_session.execute(update(ClassAssignment).where(ClassAssignment.assignment_id == uuid.UUID(aid))
+                               .values(due_at=datetime.now(timezone.utc) + delta))
+            db_session.commit()
+
+        set_due(timedelta(minutes=-10))  # past due, still inside the duration grace
+        assert client.get(f"/api/v1/assignments/{aid}/taking", headers=sh).status_code == 200
+        set_due(timedelta(minutes=-60))  # past due_at + 45 min
+        resp = client.get(f"/api/v1/assignments/{aid}/taking", headers=sh)
+        assert resp.status_code == 403 and resp.json()["detail"]["code"] == "ERR-EXE-ASSIGNMENT_EXPIRED"
+        sub = client.put(f"/api/v1/attempts/{att}/submit", json={"answers": []}, headers=sh)
+        assert sub.status_code == 403 and sub.json()["detail"]["code"] == "ERR-EXE-ASSIGNMENT_EXPIRED"
+        set_due(timedelta(minutes=-10))
+        assert client.put(f"/api/v1/attempts/{att}/submit", json={"answers": []}, headers=sh).status_code == 200
 
     def test_taking_ai_metadata_whitelisted(self, client: TestClient, db_session, exam_setup: dict):
         from models.models import Exercise

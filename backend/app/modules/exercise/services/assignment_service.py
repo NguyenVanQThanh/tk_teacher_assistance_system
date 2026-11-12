@@ -3,10 +3,10 @@
 #              plus the student-safe "taking" paper builder (sanitized questions, no answer key).
 # Created At: 2026-07-31
 # Created By: Tam Khang
-# Updated At: 2026-11-12
+# Updated At: 2026-11-13
 # Updated By: AI Agent
 
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from typing import List, Optional, Dict, Any
 from uuid import UUID
 from fastapi import HTTPException, status
@@ -26,6 +26,18 @@ from app.modules.academic.scoping import get_user_role_name, check_class_access,
 # ai_metadata keys that may be shown to students (display only; no generation context).
 _STUDENT_SAFE_META_KEYS = {"type", "grade", "grade_name", "level", "duration", "duration_minutes",
                            "max_attempts", "is_ai_generated", "sources"}
+
+
+def open_attempt_deadline(assignment: ClassAssignment, exercise: Optional[Exercise]) -> Optional[datetime]:
+    """Latest moment an open attempt may be resumed or submitted: due_at plus the paper duration
+    (an attempt started right before the due date still gets its full time). None = no due date."""
+    due_at = assignment.due_at
+    if due_at is None:
+        return None
+    if due_at.tzinfo is None:
+        due_at = due_at.replace(tzinfo=timezone.utc)
+    minutes = int(((exercise.ai_metadata or {}) if exercise else {}).get("duration_minutes", 45) or 45)
+    return due_at + timedelta(minutes=minutes)
 
 
 class AssignmentService:
@@ -311,11 +323,18 @@ class AssignmentService:
 
     def _check_student_taking_allowed(self, assignment: ClassAssignment, student_id: UUID) -> None:
         """403 when a student without any attempt tries to read a paper past its due date or
-        after exhausting max_attempts. Open/finished attempts are always allowed (resume/review)."""
+        after exhausting max_attempts. Finished attempts are always allowed (review); an open attempt
+        may be resumed only until open_attempt_deadline (due_at + duration)."""
+        exercise = self.db.query(Exercise).filter(
+            Exercise.exercise_id == assignment.exercise_id,
+            Exercise.status != 'DELETED'
+        ).first()
         attempt_repo = AttemptRepository(self.db)
         open_attempt = attempt_repo.find_open_attempt(student_id, assignment.assignment_id)
         if open_attempt:
-            return
+            deadline = open_attempt_deadline(assignment, exercise)
+            if deadline is None or datetime.now(timezone.utc) <= deadline:
+                return
 
         attempts = self.db.query(StudentExerciseAttempt).filter(
             StudentExerciseAttempt.student_id == student_id,
@@ -338,10 +357,6 @@ class AssignmentService:
                     }
                 )
 
-        exercise = self.db.query(Exercise).filter(
-            Exercise.exercise_id == assignment.exercise_id,
-            Exercise.status != 'DELETED'
-        ).first()
         ai_meta = (exercise.ai_metadata or {}) if exercise else {}
         is_exam = (exercise.exercise_kind == "EXAM") if exercise else False
         max_attempts = ai_meta.get("max_attempts", 1 if is_exam else 3)

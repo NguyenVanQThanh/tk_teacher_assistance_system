@@ -134,6 +134,9 @@ async def add_data_version_header(request: Request, call_next):
     if (
         request.method.upper() == "GET"
         and 200 <= response.status_code < 300  # no version leak on 401/403/errors
+        # Defense in depth: never stamp a response that was not requested with credentials
+        # (every /api GET requires auth today; a future public endpoint must not leak it).
+        and request.headers.get("authorization")
         and path.startswith("/api")
         and not path.startswith("/api/v1/sync/stream")
     ):

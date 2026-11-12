@@ -24,3 +24,13 @@ Fixed code-review findings: SSE auth leak, regrade scoping, attempt listing filt
 - `grading_service.regrade_exercise(class_ids)`, `attempt_service.update_answer_key_and_regrade`, `assignment_service._STUDENT_SAFE_META_KEYS`.
 - Font: `backend/tests/exercise/unit/_font.py` cross-platform resolver.
 - Tests: `tests/exercise/test_taking_and_sync.py` (ticket flow, `TestReviewHardening`).
+
+### Round 2 review fixes (2026-11-13)
+- Answer key: only exercise owner or Admin may change it (403 `ERR-EXE-ANSWER_KEY_OWNER_ONLY`). The key is shared by all classes, so `GradingService.regrade_exercise(exercise_id)` rescores finished attempts of every class (no `class_ids` param anymore); per-attempt logic in `GradingService.rescore()`.
+- Late window (confirmed by user): an open attempt can be resumed/submitted until `due_at` + exercise duration (`duration_minutes`, default 45); afterwards 403 `ERR-EXE-ASSIGNMENT_EXPIRED`. Helper `open_attempt_deadline()` in `assignment_service.py`.
+- `update_attempt_grade`: `teacher_total_score` stored only when the submitted score differs from the auto-computed total (tolerance 0.05); otherwise cleared so answer-key regrade still applies. Known edge: attempts with only manual questions and UI fallback score 0 still pin 0.
+- `X-Data-Version` middleware skips requests without `Authorization`.
+- `/notifications` loads attempts once and passes them to `get_grading_dashboard(attempts=...)`.
+- `PdfExportService.register_fonts` is now public; CSV formula-injection guard covers tab/CR.
+- Tests: `test_answer_key_owner_only_and_regrades_all_classes`, `test_open_attempt_window_closes_after_due_plus_duration`, `test_grade_save_with_auto_total_does_not_pin_score`, `tests/exercise/unit/test_grading_report_service.py`.
+- False positives: list endpoint answer leak, migration chain/Postgres-only SQL (single head, DB is Postgres/pgvector).

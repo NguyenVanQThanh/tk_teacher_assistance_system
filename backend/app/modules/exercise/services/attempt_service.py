@@ -3,7 +3,7 @@
 #              plus the student-safe sanitized "paper" of an owned attempt.
 # Created At: 2026-08-05
 # Created By: Tam Khang
-# Updated At: 2026-11-12
+# Updated At: 2026-11-13
 # Updated By: AI Agent
 
 from datetime import datetime, timezone
@@ -17,7 +17,7 @@ from app.modules.exercise.schemas import (
     AttemptSubmitRequest, AttemptListItemOut, AttemptGradeUpdateRequest, AssignmentTakingOut, AttemptOut
 )
 from app.modules.exercise.repository import AttemptRepository, AssignmentRepository
-from app.modules.exercise.services.assignment_service import AssignmentService
+from app.modules.exercise.services.assignment_service import AssignmentService, open_attempt_deadline
 from app.modules.exercise.services.grading_service import GradingService
 from app.modules.academic.scoping import get_user_role_name, check_class_access, get_accessible_class_ids
 
@@ -148,6 +148,17 @@ class AttemptService:
                 detail={
                     "code": "ERR-EXE-ASSIGNMENT_NOT_FOUND",
                     "message": "Associated assignment record not found."
+                }
+            )
+
+        # 3b. Same window as resuming: no submission after due_at + paper duration.
+        deadline = open_attempt_deadline(assignment, getattr(assignment, "exercise", None))
+        if deadline is not None and datetime.now(timezone.utc) > deadline:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail={
+                    "code": "ERR-EXE-ASSIGNMENT_EXPIRED",
+                    "message": "The submission window for this assignment has closed."
                 }
             )
 
@@ -393,16 +404,27 @@ class AttemptService:
                 base["teacher_feedback"] = payload.feedback
             detailed_results = base
 
-        # Mark a teacher-set TOTAL score so a later answer-key regrade does not silently
-        # overwrite it (regrade_exercise preserves detailed_results['teacher_total_score']).
-        if payload.score is not None:
-            if not isinstance(detailed_results, dict):
-                detailed_results = dict(attempt.detailed_results or {})
-            detailed_results["teacher_total_score"] = float(payload.score)
+        # The grading UI sends the (auto-recomputed) total on every save, so only a total that
+        # differs from the server's own rescore is a real teacher override. Only overrides are
+        # pinned in detailed_results['teacher_total_score'] (preserved by regrade_exercise).
+        score = float(payload.score)
+        grader = GradingService(self.db)
+        exercise = grader.exercise_repo.get_by_id(assignment.exercise_id)
+        base = detailed_results if isinstance(detailed_results, dict) else attempt.detailed_results
+        if exercise and isinstance(base, dict):
+            auto_score, detailed_results = grader.rescore(exercise, base)
+            # 0.05 tolerance: the UI rounds the total to one decimal.
+            if auto_score is not None and abs(auto_score - score) <= 0.051:
+                score = auto_score
+                detailed_results.pop("teacher_total_score", None)
+            else:
+                detailed_results["teacher_total_score"] = score
+            if payload.feedback is not None:
+                detailed_results["teacher_feedback"] = payload.feedback
 
         return self.repo.update_grade(
             attempt=attempt,
-            score=payload.score,
+            score=score,
             feedback=payload.feedback,
             detailed_results=detailed_results,
             status=payload.status
@@ -412,21 +434,33 @@ class AttemptService:
         """Apply a new MultipleChoice answer key and persist recomputed scores for ALL submissions of the exercise."""
         from app.modules.exercise.services.exercise_service import ExerciseService
         # Scoping check (raises 404 when the teacher cannot access the exercise)
-        ExerciseService(self.db).get_exercise_detail(current_user, exercise_id)
+        exercise = ExerciseService(self.db).get_exercise_detail(current_user, exercise_id)
+        # The answer key is shared by every class the exercise is assigned to, so only its owner
+        # (or an Admin) may change it, and then ALL submissions are rescored to stay consistent.
+        if get_user_role_name(self.db, current_user) != "Admin" and exercise.created_by != current_user.user_id:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail={
+                    "code": "ERR-EXE-ANSWER_KEY_OWNER_ONLY",
+                    "message": "Only the exercise owner or an administrator can change the answer key."
+                }
+            )
         grader = GradingService(self.db)
         updated = grader.apply_answer_key(exercise_id, list(keys.items()))
-        # A teacher only rescores submissions from classes they can access (Admin: all classes).
-        role_name = get_user_role_name(self.db, current_user)
-        regraded = grader.regrade_exercise(exercise_id, get_accessible_class_ids(self.db, current_user, role_name))
+        regraded = grader.regrade_exercise(exercise_id)
         return {"updated_questions": updated, "regraded_attempts": regraded}
 
-    def get_grading_dashboard(self, current_user: User) -> "GradingDashboardOut":
-        """Compute aggregate metrics and breakdown statistics for grading dashboard."""
+    def get_grading_dashboard(
+        self, current_user: User, attempts: Optional[List[AttemptListItemOut]] = None
+    ) -> "GradingDashboardOut":
+        """Compute aggregate metrics and breakdown statistics for grading dashboard.
+        Callers that already hold the scoped attempt list pass it to avoid a second load."""
         from app.modules.exercise.schemas import (
             GradingDashboardOut, GradingScoreDistribution, GradingClassSummary
         )
 
-        attempts = self.list_attempts(current_user=current_user)
+        if attempts is None:
+            attempts = self.list_attempts(current_user=current_user)
 
         total_submissions = len(attempts)
         known_statuses = ("pending_grading", "pending_review", "approved")

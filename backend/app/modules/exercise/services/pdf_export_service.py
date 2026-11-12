@@ -2,7 +2,7 @@
 # Description: Service for generating formatted PDF documents from exercise data including LaTeX math rendering.
 # Created At: 2026-08-12
 # Created By: Tam Khang
-# Updated At: 2026-11-12
+# Updated At: 2026-11-13
 # Updated By: AI Agent
 
 import io
@@ -36,7 +36,7 @@ class PdfExportService:
     _font_registered = False
 
     @classmethod
-    def _register_fonts(cls):
+    def register_fonts(cls):
         """Register Vietnamese UTF-8 compatible Times New Roman TrueType fonts for ReportLab."""
         if cls._font_registered:
             return
@@ -249,7 +249,7 @@ class PdfExportService:
         """
         Generates a PDF byte stream for an Exercise containing questions and answer key table.
         """
-        cls._register_fonts()
+        cls.register_fonts()
 
         buffer = io.BytesIO()
         doc = SimpleDocTemplate(
