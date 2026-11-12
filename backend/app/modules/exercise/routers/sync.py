@@ -12,7 +12,7 @@ import asyncio
 import json
 from typing import AsyncGenerator, Optional
 
-from fastapi import APIRouter, Depends, Query, Request
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
 
@@ -60,10 +60,13 @@ def _authenticate_stream(request: Request, token_query: Optional[str]) -> User:
         db.close()
 
 
-def _poll_version_snapshot() -> dict:
-    """One DB poll with a fresh short-lived session (closed right after the query)."""
+def _poll_version_snapshot(raw_token: Optional[str]) -> dict:
+    """One DB poll with a fresh short-lived session (closed right after the query).
+    Re-validates the token each tick so expired/blocked/revoked users are cut off
+    (raises HTTPException, which ends the stream)."""
     db = database.SessionLocal()
     try:
+        resolve_user_from_token(raw_token, db)
         return SyncService(db).get_version_snapshot()
     finally:
         db.close()
@@ -81,19 +84,24 @@ async def sync_stream(
     Any authenticated user may subscribe.
     """
     _authenticate_stream(request, token)  # raises 401/403 on bad credentials
+    header = request.headers.get("authorization", "")
+    raw_token = (header[7:].strip() if header.lower().startswith("bearer ") else None) or token
 
     async def event_generator() -> AsyncGenerator[str, None]:
         last_version = None
         try:
-            while True:
+            while not await request.is_disconnected():
                 # No cache here: every connection tracks its own last emitted version.
                 # Run the blocking aggregate queries in a worker thread, never on the event loop.
-                snapshot = await asyncio.to_thread(_poll_version_snapshot)
+                snapshot = await asyncio.to_thread(_poll_version_snapshot, raw_token)
                 version = snapshot.get("version")
                 if version != last_version:
                     last_version = version
                     yield f"data: {json.dumps(snapshot, ensure_ascii=False)}\n\n"
                 await asyncio.sleep(SSE_POLL_INTERVAL_SECONDS)
+        except HTTPException:
+            # Token expired or user blocked/deactivated mid-stream: close the stream.
+            return
         except (asyncio.CancelledError, GeneratorExit):
             # Client disconnected (or server shutdown): stop the generator quietly.
             return

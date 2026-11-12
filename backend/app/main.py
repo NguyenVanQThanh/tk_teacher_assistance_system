@@ -116,6 +116,7 @@ async def add_data_version_header(request: Request, call_next):
     path = request.url.path
     if (
         request.method.upper() == "GET"
+        and 200 <= response.status_code < 300  # no version leak on 401/403/errors
         and path.startswith("/api")
         and not path.startswith("/api/v1/sync/stream")
     ):

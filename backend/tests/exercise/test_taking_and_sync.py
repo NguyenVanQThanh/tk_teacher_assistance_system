@@ -310,6 +310,10 @@ class TestStudentSafeTaking:
         assert resp2.status_code == status.HTTP_403_FORBIDDEN
 
 
+async def _receive_empty():
+    return {"type": "http.request", "body": b"", "more_body": False}
+
+
 class TestSyncVersion:
     def test_version_endpoint_200_and_shape(self, client: TestClient, exam_setup: dict):
         student_headers = exam_setup["student_headers"]
@@ -357,7 +361,10 @@ class TestSyncVersion:
             "headers": [(b"authorization", f"Bearer {token}".encode())],
             "query_string": b"",
         }
-        request = Request(scope)
+        async def _receive():
+            return {"type": "http.request", "body": b"", "more_body": False}
+
+        request = Request(scope, _receive)
 
         async def run():
             resp = await sync_stream(request=request, token=None)
@@ -392,7 +399,7 @@ class TestSyncVersion:
         scope = {"type": "http", "method": "GET", "path": "/api/v1/sync/stream", "headers": [], "query_string": b""}
 
         async def run():
-            resp = await sync_stream(request=Request(scope), token=token)
+            resp = await sync_stream(request=Request(scope, _receive_empty), token=token)
             it = resp.body_iterator
             chunk = await it.__anext__()
             await it.aclose()
