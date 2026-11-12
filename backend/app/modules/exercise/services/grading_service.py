@@ -229,19 +229,23 @@ class GradingService:
         self.db.commit()
         return updated
 
-    def regrade_exercise(self, exercise_id: UUID) -> int:
-        """Recompute and persist scores of every finished attempt of an exercise; returns the count."""
+    def regrade_exercise(self, exercise_id: UUID, class_ids: Optional[List[UUID]] = None) -> int:
+        """Recompute and persist scores of finished attempts of an exercise (optionally limited to
+        the given classes; None = all classes); returns the count."""
         from models.models import ClassAssignment, StudentExerciseAttempt
         exercise = self.exercise_repo.get_by_id(exercise_id)
         if not exercise:
             return 0
-        attempts = self.db.query(StudentExerciseAttempt).join(
+        q = self.db.query(StudentExerciseAttempt).join(
             ClassAssignment, StudentExerciseAttempt.assignment_id == ClassAssignment.assignment_id
         ).filter(
             ClassAssignment.exercise_id == exercise_id,
             StudentExerciseAttempt.is_finished.is_(True),
             StudentExerciseAttempt.status != 'DELETED'
-        ).all()
+        )
+        if class_ids is not None:
+            q = q.filter(ClassAssignment.class_id.in_(class_ids))
+        attempts = q.all()
         for att in attempts:
             old = dict(att.detailed_results or {})
             answers_map: Dict[str, Any] = {}

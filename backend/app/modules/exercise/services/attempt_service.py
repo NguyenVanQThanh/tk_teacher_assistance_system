@@ -415,7 +415,9 @@ class AttemptService:
         ExerciseService(self.db).get_exercise_detail(current_user, exercise_id)
         grader = GradingService(self.db)
         updated = grader.apply_answer_key(exercise_id, list(keys.items()))
-        regraded = grader.regrade_exercise(exercise_id)
+        # A teacher only rescores submissions from classes they can access (Admin: all classes).
+        role_name = get_user_role_name(self.db, current_user)
+        regraded = grader.regrade_exercise(exercise_id, get_accessible_class_ids(self.db, current_user, role_name))
         return {"updated_questions": updated, "regraded_attempts": regraded}
 
     def get_grading_dashboard(self, current_user: User) -> "GradingDashboardOut":

@@ -11,6 +11,7 @@
 import asyncio
 import json
 from typing import AsyncGenerator, Optional
+from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from fastapi.responses import StreamingResponse
@@ -19,7 +20,8 @@ from sqlalchemy.orm import Session
 from app.core import database
 from app.core.database import get_db
 from models.models import User
-from app.modules.auth.dependencies import get_current_user, resolve_user_from_token
+from app.core.security import create_stream_ticket
+from app.modules.auth.dependencies import ensure_active_user, get_current_user, resolve_user_from_token
 from app.modules.exercise.schemas import SyncVersionOut
 from app.modules.exercise.services.sync_service import SyncService, get_cached_version_snapshot
 
@@ -37,36 +39,43 @@ def get_sync_version(
     """
     Return the current data-version snapshot: {"version": <ISO8601 UTC>, "tables": {...}}.
     Any authenticated user may call this (no special permission required).
-    Auth is header-only here (Authorization: Bearer ...) — the ?token= query variant is
-    reserved for the SSE stream, because EventSource cannot set request headers and JWTs
-    in URLs would leak into access logs.
+    Auth is header-only (Authorization: Bearer ...); access tokens never travel in URLs.
     """
     # Uses the process-wide 2s cache to stay light on the DB.
     return get_cached_version_snapshot(db=db)
 
 
-def _authenticate_stream(request: Request, token_query: Optional[str]) -> User:
+@router.post("/api/v1/sync/stream-ticket")
+def create_sync_stream_ticket(current_user: User = Depends(get_current_user)):
     """
-    Authenticate an SSE connection. Accepts the JWT from the Authorization header OR the
-    ?token= query param (EventSource cannot set headers). Uses a short-lived session that
-    is closed immediately — the stream itself never holds a request-scoped DB session.
+    Issue a 30-second, single-purpose ticket for GET /api/v1/sync/stream?ticket=...
+    EventSource cannot set headers and the access token must not sit in a URL (logs,
+    history, proxies). The ticket is rejected by every other endpoint.
     """
+    return {"ticket": create_stream_ticket(current_user.user_id), "expires_in": 30}
+
+
+def _authenticate_stream(request: Request, ticket: Optional[str]) -> UUID:
+    """Authenticate an SSE connection once at connect: Bearer header or ?ticket=.
+    Returns the user id. Uses a short-lived session closed immediately."""
     header = request.headers.get("authorization", "")
     bearer = header[7:].strip() if header.lower().startswith("bearer ") else None
     db = database.SessionLocal()
     try:
-        return resolve_user_from_token(bearer or token_query, db)
+        if bearer:
+            return resolve_user_from_token(bearer, db).user_id
+        return resolve_user_from_token(ticket, db, expect_ticket=True).user_id
     finally:
         db.close()
 
 
-def _poll_version_snapshot(raw_token: Optional[str]) -> dict:
-    """One DB poll with a fresh short-lived session (closed right after the query).
-    Re-validates the token each tick so expired/blocked/revoked users are cut off
-    (raises HTTPException, which ends the stream)."""
+def _poll_version_snapshot(user_id: UUID) -> dict:
+    """One DB poll with a fresh short-lived session. Re-checks the account each tick so
+    blocked/inactive/deleted users are cut off (raises HTTPException, ending the stream).
+    The ticket itself is only valid for connecting; the open stream is bound to the user."""
     db = database.SessionLocal()
     try:
-        resolve_user_from_token(raw_token, db)
+        ensure_active_user(db, user_id)
         return SyncService(db).get_version_snapshot()
     finally:
         db.close()
@@ -75,7 +84,7 @@ def _poll_version_snapshot(raw_token: Optional[str]) -> dict:
 @router.get("/api/v1/sync/stream")
 async def sync_stream(
     request: Request,
-    token: Optional[str] = Query(None, description="JWT for EventSource clients that cannot set headers"),
+    ticket: Optional[str] = Query(None, description="Short-lived ticket from POST /sync/stream-ticket"),
 ):
     """
     Server-Sent Events stream. Each connection polls the DB every 2 seconds (in a worker
@@ -83,9 +92,7 @@ async def sync_stream(
     `data: {"version": ..., "tables": {...}}\n\n` whenever the version changes for that connection.
     Any authenticated user may subscribe.
     """
-    _authenticate_stream(request, token)  # raises 401/403 on bad credentials
-    header = request.headers.get("authorization", "")
-    raw_token = (header[7:].strip() if header.lower().startswith("bearer ") else None) or token
+    user_id = _authenticate_stream(request, ticket)  # raises 401/403 on bad credentials
 
     async def event_generator() -> AsyncGenerator[str, None]:
         last_version = None
@@ -93,14 +100,14 @@ async def sync_stream(
             while not await request.is_disconnected():
                 # No cache here: every connection tracks its own last emitted version.
                 # Run the blocking aggregate queries in a worker thread, never on the event loop.
-                snapshot = await asyncio.to_thread(_poll_version_snapshot, raw_token)
+                snapshot = await asyncio.to_thread(_poll_version_snapshot, user_id)
                 version = snapshot.get("version")
                 if version != last_version:
                     last_version = version
                     yield f"data: {json.dumps(snapshot, ensure_ascii=False)}\n\n"
                 await asyncio.sleep(SSE_POLL_INTERVAL_SECONDS)
         except HTTPException:
-            # Token expired or user blocked/deactivated mid-stream: close the stream.
+            # User blocked/deactivated mid-stream: close the stream.
             return
         except (asyncio.CancelledError, GeneratorExit):
             # Client disconnected (or server shutdown): stop the generator quietly.
@@ -111,7 +118,7 @@ async def sync_stream(
         media_type="text/event-stream",
         headers={
             "Cache-Control": "no-cache, no-store",
-            # The JWT may sit in the URL (?token=): never forward it via Referer.
+            # The ticket sits in the URL: never forward it via Referer.
             "Referrer-Policy": "no-referrer",
             "X-Accel-Buffering": "no",
             "Connection": "keep-alive",

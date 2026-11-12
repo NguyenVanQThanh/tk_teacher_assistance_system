@@ -13,7 +13,7 @@ from sqlalchemy.orm import Session
 from jose import jwt, JWTError
 from uuid import UUID
 
-from app.core.security import SECRET_KEY, ALGORITHM
+from app.core.security import SECRET_KEY, ALGORITHM, STREAM_TICKET_TYPE
 from app.core.database import get_db
 from models.models import User, Role
 from app.modules.auth.services.permission_service import PermissionService
@@ -21,7 +21,7 @@ from app.modules.auth.services.permission_service import PermissionService
 # Configure OAuth2PasswordBearer, auto_error=False to allow custom error envelopes for missing tokens
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="api/v1/auth/login", auto_error=False)
 
-def resolve_user_from_token(token: Optional[str], db: Session) -> User:
+def resolve_user_from_token(token: Optional[str], db: Session, expect_ticket: bool = False) -> User:
     """
     Resolve the active user from a raw JWT string. Shared by get_current_user (header)
     and get_current_user_query_ok (header or ?token= query, used by SSE/EventSource).
@@ -38,7 +38,7 @@ def resolve_user_from_token(token: Optional[str], db: Session) -> User:
     try:
         payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
         user_id = payload.get("sub")
-        if user_id is None:
+        if user_id is None or (payload.get("typ") == STREAM_TICKET_TYPE) != expect_ticket:
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 detail={
@@ -65,7 +65,11 @@ def resolve_user_from_token(token: Optional[str], db: Session) -> User:
                 "message": "Invalid authentication token."
             }
         )
-        
+    return ensure_active_user(db, user_uuid)
+
+
+def ensure_active_user(db: Session, user_uuid: UUID) -> User:
+    """Load the user and reject missing, blocked, or inactive accounts (401/403)."""
     user = db.query(User).filter(User.user_id == user_uuid).first()
     if not user:
         raise HTTPException(

@@ -33,10 +33,10 @@ if not logging.getLogger().handlers:
 
 logger = logging.getLogger("smartlms.startup")
 
-_TOKEN_QUERY_RE = re.compile(r"([?&]token=)[^&\s\"]*")
+_TOKEN_QUERY_RE = re.compile(r"([?&](?:token|ticket)=)[^&\s\"]*")
 
 class _MaskTokenQueryFilter(logging.Filter):
-    """Redact ?token=<JWT> (SSE EventSource auth) from uvicorn access-log lines."""
+    """Redact ?token=/?ticket= (defense in depth; SSE now uses a 30s ticket) from uvicorn access-log lines."""
 
     def filter(self, record: logging.LogRecord) -> bool:
         if isinstance(record.args, tuple):
@@ -45,8 +45,8 @@ class _MaskTokenQueryFilter(logging.Filter):
             )
         return True
 
-# ponytail: masks only the in-process uvicorn access log; reverse proxies must mask/disable
-# query logging themselves. Upgrade path: short-lived single-purpose stream ticket endpoint.
+# ponytail: masks only the in-process uvicorn access log; reverse proxies may still log the
+# 30s single-use-purpose ticket, which is harmless once expired.
 logging.getLogger("uvicorn.access").addFilter(_MaskTokenQueryFilter())
 
 

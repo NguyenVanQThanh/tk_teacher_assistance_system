@@ -23,6 +23,10 @@ from app.modules.exercise.schemas import (
 from app.modules.exercise.repository import AssignmentRepository, ExerciseRepository, AttemptRepository
 from app.modules.academic.scoping import get_user_role_name, check_class_access, get_accessible_class_ids
 
+# ai_metadata keys that may be shown to students (display only; no generation context).
+_STUDENT_SAFE_META_KEYS = {"type", "grade", "grade_name", "level", "duration", "duration_minutes",
+                           "max_attempts", "is_ai_generated", "sources"}
+
 
 class AssignmentService:
     def __init__(self, db: Session):
@@ -421,7 +425,8 @@ class AssignmentService:
                 title=exercise.title,
                 subject_id=exercise.subject_id,
                 subject_name=subject_obj.subject_name if subject_obj else None,
-                ai_metadata=exercise.ai_metadata
+                # Whitelist: generation context (prompts, matrices, document ids) stays server-side.
+                ai_metadata={k: v for k, v in (exercise.ai_metadata or {}).items() if k in _STUDENT_SAFE_META_KEYS}
             ),
             questions=student_questions,
             open_attempt=open_attempt_out

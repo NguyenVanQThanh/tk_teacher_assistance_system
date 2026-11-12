@@ -445,28 +445,43 @@ export const syncApi = {
     const response = await api.get('/api/v1/sync/version');
     return response.data;
   },
-  // Optional SSE subscription. EventSource cannot set the Authorization header,
-  // so the token is passed as a query param (best-effort). Returns a close() function.
-  // Primary mechanism remains polling in dataSync.js; use this only if the BE stream works.
+  // Optional SSE subscription. EventSource cannot set the Authorization header, so a
+  // 30s single-purpose ticket (never the access token) goes in the query string.
+  // The ticket is fetched per (re)connect. Returns a close() function.
+  // Primary mechanism remains polling in dataSync.js; this is best-effort.
   subscribeVersionStream: (onVersion) => {
     if (typeof EventSource === 'undefined') return () => {};
-    const token = localStorage.getItem('access_token');
     const base = api.defaults.baseURL || '';
-    const url = `${base}/api/v1/sync/stream${token ? `?token=${encodeURIComponent(token)}` : ''}`;
-    let es;
-    try {
-      es = new EventSource(url);
-    } catch (e) {
-      return () => {};
-    }
-    es.onmessage = (ev) => {
+    let es = null;
+    let closed = false;
+    let retryTimer = null;
+    const connect = async () => {
+      if (closed) return;
       try {
-        const data = JSON.parse(ev.data);
-        if (data?.version && typeof onVersion === 'function') onVersion(data.version);
-      } catch (e) {}
+        const { data } = await api.post('/api/v1/sync/stream-ticket');
+        if (closed) return;
+        es = new EventSource(`${base}/api/v1/sync/stream?ticket=${encodeURIComponent(data.ticket)}`);
+      } catch (e) {
+        retryTimer = setTimeout(connect, 10000);
+        return;
+      }
+      es.onmessage = (ev) => {
+        try {
+          const d = JSON.parse(ev.data);
+          if (d?.version && typeof onVersion === 'function') onVersion(d.version);
+        } catch (e) {}
+      };
+      // Native auto-reconnect would reuse the expired ticket: close and fetch a new one.
+      es.onerror = () => {
+        try { es.close(); } catch (e) {}
+        if (!closed) retryTimer = setTimeout(connect, 5000);
+      };
     };
+    connect();
     return () => {
-      try { es.close(); } catch (e) {}
+      closed = true;
+      clearTimeout(retryTimer);
+      try { es && es.close(); } catch (e) {}
     };
   },
 };

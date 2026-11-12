@@ -367,7 +367,7 @@ class TestSyncVersion:
         request = Request(scope, _receive)
 
         async def run():
-            resp = await sync_stream(request=request, token=None)
+            resp = await sync_stream(request=request, ticket=None)
             assert isinstance(resp, StreamingResponse)
             assert resp.media_type == "text/event-stream"
             assert resp.headers.get("cache-control") == "no-cache, no-store"
@@ -387,35 +387,63 @@ class TestSyncVersion:
             "student_exercise_attempts", "subjects", "classes"
         }.issubset(set(payload["tables"].keys()))
 
-    def test_sync_stream_accepts_query_token(self, client: TestClient, db_session, monkeypatch, exam_setup: dict):
-        # EventSource cannot set headers, so the SSE route accepts ?token= (only here).
+    def _stream_first_chunk(self, db_session, monkeypatch, ticket):
         import asyncio
         from sqlalchemy.orm import sessionmaker
         from starlette.requests import Request
         from app.modules.exercise.routers.sync import sync_stream
 
-        factory = sessionmaker(bind=db_session.bind)
-        monkeypatch.setattr("app.core.database.SessionLocal", factory)
-        token = exam_setup["student_headers"]["Authorization"].replace("Bearer ", "")
+        monkeypatch.setattr("app.core.database.SessionLocal", sessionmaker(bind=db_session.bind))
         scope = {"type": "http", "method": "GET", "path": "/api/v1/sync/stream", "headers": [], "query_string": b""}
 
         async def run():
-            resp = await sync_stream(request=Request(scope, _receive_empty), token=token)
+            resp = await sync_stream(request=Request(scope, _receive_empty), ticket=ticket)
             it = resp.body_iterator
             chunk = await it.__anext__()
             await it.aclose()
             return chunk
 
-        chunk = asyncio.run(run())
-        assert chunk.startswith("data: ")
+        return asyncio.run(run())
+
+    def test_stream_ticket_flow(self, client: TestClient, db_session, monkeypatch, exam_setup: dict):
+        headers = exam_setup["student_headers"]
+        resp = client.post("/api/v1/sync/stream-ticket", headers=headers)
+        assert resp.status_code == status.HTTP_200_OK
+        ticket = resp.json()["ticket"]
+        assert self._stream_first_chunk(db_session, monkeypatch, ticket).startswith("data: ")
+        # The ticket is not an access token anywhere else.
+        assert client.get("/api/v1/sync/version", headers={"Authorization": f"Bearer {ticket}"}).status_code == 401
+        # Ticket endpoint itself needs a real access token.
+        assert client.post("/api/v1/sync/stream-ticket").status_code == 401
+
+    def test_stream_rejects_access_jwt_and_bad_ticket_in_query(self, db_session, monkeypatch, exam_setup: dict):
+        from fastapi import HTTPException
+        token = exam_setup["student_headers"]["Authorization"].replace("Bearer ", "")
+        for bad in (token, "garbage", None):
+            with pytest.raises(HTTPException) as exc:
+                self._stream_first_chunk(db_session, monkeypatch, bad)
+            assert exc.value.status_code == 401
+
+    def test_stream_rejects_expired_ticket(self, db_session, monkeypatch, exam_setup: dict):
+        from datetime import datetime, timedelta, timezone
+        from fastapi import HTTPException
+        from jose import jwt
+        from app.core.security import SECRET_KEY, ALGORITHM
+        from app.core.security import create_stream_ticket
+        valid = create_stream_ticket("00000000-0000-0000-0000-000000000000")
+        sub = jwt.get_unverified_claims(valid)["sub"]
+        expired = jwt.encode(
+            {"sub": sub, "typ": "sse", "exp": datetime.now(timezone.utc) - timedelta(seconds=5)},
+            SECRET_KEY, algorithm=ALGORITHM)
+        with pytest.raises(HTTPException) as exc:
+            self._stream_first_chunk(db_session, monkeypatch, expired)
+        assert exc.value.status_code == 401
 
     def test_version_endpoint_rejects_query_token(self, client: TestClient, exam_setup: dict):
         # JWTs must only travel in the Authorization header (query strings leak into logs).
-        # The ?token= variant is reserved for the SSE stream only.
         token = exam_setup["student_headers"]["Authorization"].replace("Bearer ", "")
         resp = client.get(f"/api/v1/sync/version?token={token}")
         assert resp.status_code == status.HTTP_401_UNAUTHORIZED
-        # header auth still works
         resp2 = client.get("/api/v1/sync/version", headers=exam_setup["student_headers"])
         assert resp2.status_code == status.HTTP_200_OK
         assert resp2.json()["version"]
@@ -576,3 +604,77 @@ class TestTakingWindowAndScoping:
         assert ak.json()["regraded_attempts"] >= 1
         det = client.get(f"/api/v1/attempts/{att}", headers=sh).json()
         assert det["score"] == 9.5  # teacher's manual total score preserved
+
+
+class TestReviewHardening:
+    def test_teacher_attempts_student_id_filter(self, client: TestClient, exam_setup: dict):
+        # A teacher filtering by student_id gets only that student's attempts.
+        aid = _create_assignment(client, exam_setup)
+        sh, th = exam_setup["student_headers"], exam_setup["teacher_headers"]
+        client.post(f"/api/v1/assignments/{aid}/attempts", headers=sh)
+        me = client.get("/api/v1/auth/me", headers=sh).json()["user_id"]
+        hit = client.get(f"/api/v1/attempts?student_id={me}", headers=th)
+        assert hit.status_code == status.HTTP_200_OK, hit.text
+        assert len(hit.json()) >= 1 and all(i["student_id"] == me for i in hit.json())
+        miss = client.get(f"/api/v1/attempts?student_id={uuid.uuid4()}", headers=th)
+        assert miss.status_code == status.HTTP_200_OK, miss.text
+        assert miss.json() == []
+
+    def test_regrade_scoped_to_teacher_classes(self, client: TestClient, exam_setup: dict):
+        # Answer-key regrade must not touch attempts from classes the teacher cannot access.
+        ah, th = exam_setup["admin_headers"], exam_setup["teacher_headers"]
+        ex = client.get(f"/api/v1/exercises/{exam_setup['exercise_id']}", headers=th).json()
+        q = next(q for q in ex["questions"] if q["question_type"] == "MultipleChoice")
+        right = next(o for o in q["answer_options"] if o["is_correct"])
+        wrong = next(o for o in q["answer_options"] if not o["is_correct"])
+        answers = {"answers": [{"question_id": q["question_id"], "answer_option_id": wrong["option_id"]}]}
+
+        # Teacher's own class attempt.
+        aid = _create_assignment(client, exam_setup)
+        att1 = client.post(f"/api/v1/assignments/{aid}/attempts", headers=exam_setup["student_headers"]).json()["attempt_id"]
+        assert client.put(f"/api/v1/attempts/{att1}/submit", json=answers, headers=exam_setup["student_headers"]).status_code == 200
+
+        # Another class the teacher is NOT assigned to, same exercise, other student.
+        other_class = client.post(
+            "/api/v1/classes", json={"class_name": f"Lop X{uuid.uuid4().hex[:4]}", "school_year": "2025-2026"}, headers=ah
+        ).json()["class_id"]
+        s2h = {"Authorization": f"Bearer {get_student2_token(client)}"}
+        s2id = client.get("/api/v1/auth/me", headers=s2h).json()["user_id"]
+        assert client.post(
+            f"/api/v1/classes/{other_class}/students",
+            json={"student_id": s2id, "student_code": f"STU_{uuid.uuid4().hex[:4]}"}, headers=ah
+        ).status_code == 201
+        due = (datetime.now(timezone.utc) + timedelta(days=7)).isoformat()
+        a2 = client.post(
+            f"/api/v1/classes/{other_class}/assignments",
+            json={"exercise_id": exam_setup["exercise_id"], "due_at": due}, headers=ah
+        )
+        assert a2.status_code == 201, a2.text
+        att2 = client.post(f"/api/v1/assignments/{a2.json()['assignment_id']}/attempts", headers=s2h).json()["attempt_id"]
+        assert client.put(f"/api/v1/attempts/{att2}/submit", json=answers, headers=s2h).status_code == 200
+
+        url = f"/api/v1/exercises/{exam_setup['exercise_id']}/answer-key"
+        body = {"keys": {q["question_id"]: right["option_id"]}}
+        r = client.put(url, json=body, headers=th)
+        assert r.status_code == 200, r.text
+        assert r.json()["regraded_attempts"] == 1  # only the teacher's class
+        r_admin = client.put(url, json=body, headers=ah)
+        assert r_admin.status_code == 200, r_admin.text
+        assert r_admin.json()["regraded_attempts"] == 2  # admin sees every class
+
+    def test_taking_ai_metadata_whitelisted(self, client: TestClient, db_session, exam_setup: dict):
+        from models.models import Exercise
+        ex = db_session.query(Exercise).filter(Exercise.exercise_id == uuid.UUID(exam_setup["exercise_id"])).one()
+        ex.ai_metadata = {
+            "type": "exam", "grade": 12, "duration_minutes": 30, "is_ai_generated": True,
+            "topic_prompt": "SECRET PROMPT", "document_ids": ["d1"], "part1_count": 5,
+        }
+        db_session.commit()
+        aid = _create_assignment(client, exam_setup)
+        resp = client.get(f"/api/v1/assignments/{aid}/taking", headers=exam_setup["student_headers"])
+        assert resp.status_code == 200, resp.text
+        meta = resp.json()["exercise"].get("ai_metadata") or {}
+        assert meta.get("type") == "exam" and meta.get("grade") == 12
+        for leaked in ("topic_prompt", "document_ids", "part1_count"):
+            assert leaked not in meta
+        assert "SECRET PROMPT" not in resp.text

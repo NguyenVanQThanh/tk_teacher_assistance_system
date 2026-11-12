@@ -130,6 +130,7 @@ def list_attempts(
         current_user=current_user,
         class_id=class_id,
         assignment_id=assignment_id,
+        student_id=student_id,
         is_finished=is_finished,
         search=search
     )
