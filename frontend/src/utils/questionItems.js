@@ -4,6 +4,8 @@
 // `answer_options` empty, so consumers must fall back to segments.
 // Created At: 2026-11-08
 // Created By: Tam Khang
+// Updated At: 2026-11-12
+// Updated By: AI Agent
 
 /**
  * Return the selectable items of a question: answer_options when present,
@@ -13,8 +15,13 @@ export function getQuestionItems(q) {
   const options = Array.isArray(q?.answer_options) ? q.answer_options : [];
   if (options.length > 0) return options;
 
+  // Only TrueFalse statements live in segments. Content segments of any other type
+  // (text/math pieces of a short answer stem) must never become selectable items.
+  if (q?.question_type !== 'TrueFalse' && q?.part !== 'Part2') return options;
+
   const segments = Array.isArray(q?.segments) ? q.segments : [];
   if (segments.length === 0) return options;
+  if (!segments.some((s) => s && (s.statement !== undefined || s.is_correct !== undefined))) return options;
 
   return segments.map((s, i) => ({
     option_id: s.segment_id || `seg-${i}`,

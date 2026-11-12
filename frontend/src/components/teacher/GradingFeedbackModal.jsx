@@ -2,8 +2,8 @@
 // Description: Interactive grading and feedback modal with question result overrides, warning confirmation popup on answer key changes, and automatic batch cascade regrading.
 // Created At: 2026-09-01
 // Created By: Tam Khang
-// Updated At: 2026-10-30
-// Updated By: Tam Khang
+// Updated At: 2026-11-12
+// Updated By: AI Agent
 
 import React, { useState, useEffect } from 'react';
 import { 
@@ -28,6 +28,18 @@ import { attemptsApi, exercisesApi } from '../../services/api';
 import MathRenderer from '../common/MathRenderer';
 import QuestionMedia from '../exercises/QuestionMedia';
 import './GradingFeedbackModal.css';
+
+// "Other" answers are a JSON array of strings (one per sub-question); render as numbered lines.
+const formatOtherAnswer = (text, subs) => {
+  if (!text) return '';
+  try {
+    const arr = JSON.parse(text);
+    if (Array.isArray(arr)) {
+      return arr.map((v, i) => `${i + 1}) ${(subs && subs[i] && subs[i].content) ? `(${subs[i].content}) ` : ''}${v || '--'}`).join('\n');
+    }
+  } catch (e) { /* fall through to raw text */ }
+  return text;
+};
 
 export default function GradingFeedbackModal({ 
   isOpen, 
@@ -105,7 +117,8 @@ export default function GradingFeedbackModal({
             const res = resultsMap[q.question_id] || {};
             const isMC = q.question_type === 'MultipleChoice';
             const isTF = q.question_type === 'TrueFalse';
-            const isShort = q.question_type === 'ShortAnswer';
+            const isOther = q.question_type === 'Other';
+            const isShort = q.question_type === 'ShortAnswer' || isOther;
             
             let studentOptKey = null;
             let correctOptKey = null;
@@ -147,7 +160,7 @@ export default function GradingFeedbackModal({
             const type = isMC ? 'multiple_choice' : (isTF ? 'true_false' : 'short_answer');
             const typeName = isMC 
               ? `CÂU ${idx + 1} (TRẮC NGHIỆM)` 
-              : (isTF ? `CÂU ${idx + 1} (ĐÚNG / SAI)` : `CÂU ${idx + 1} (TRẢ LỜI NGẮN)`);
+              : (isTF ? `CÂU ${idx + 1} (ĐÚNG / SAI)` : (isOther ? `CÂU ${idx + 1} (KHÁC)` : `CÂU ${idx + 1} (TRẢ LỜI NGẮN)`));
 
             return {
               id: q.question_id,
@@ -156,8 +169,8 @@ export default function GradingFeedbackModal({
               maxPoints: pointsPerQ,
               studentOption: studentOptKey,
               correctOption: correctOptKey,
-              studentAnswer: res.student_answer_text || studentOptKey,
-              correctAnswer: q.correct_answer || correctOptKey,
+              studentAnswer: isOther ? formatOtherAnswer(res.student_answer_text, q.answer_options) : (res.student_answer_text || studentOptKey),
+              correctAnswer: isOther ? null : (q.correct_answer || correctOptKey),
               currentPoints: currentPoints,
               isCorrect: isCorrect,
               needsManualGrading: isShort && (res.pending_manual_grade !== false),
@@ -547,7 +560,7 @@ export default function GradingFeedbackModal({
                             </div>
                           </div>
                           <div className="written-content-row">
-                            <span className="short-answer-val">
+                            <span className="short-answer-val" style={{ whiteSpace: 'pre-wrap' }}>
                               <MathRenderer text={q.studentAnswer || '--'} />
                             </span>
                             {q.correctAnswer && (

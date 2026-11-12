@@ -27,6 +27,7 @@ import { classesApi, subjectsApi, assignmentsApi } from '../../services/api';
 import { useAuth } from '../../context/AuthContext';
 import { getTeacherSubjectInfo, getSubjectIdByName } from '../../utils/teacherSubjectHelper';
 import './TeacherClassDetailPage.css';
+import confirmDialog from '../../components/common/confirmDialog';
 
 export default function TeacherClassDetailPage() {
   const { classId } = useParams();
@@ -169,7 +170,7 @@ export default function TeacherClassDetailPage() {
   }, [assignments, searchAssignment]);
 
   const handleDeleteAssignment = async (assignmentId, title) => {
-    if (!window.confirm(`Bạn có chắc chắn muốn hủy giao bài tập "${title || 'này'}" không?`)) {
+    if (!(await confirmDialog(`Bạn có chắc chắn muốn hủy giao bài tập "${title || 'này'}" không?`))) {
       return;
     }
 

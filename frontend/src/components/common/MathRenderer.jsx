@@ -8,6 +8,8 @@
 import React, { useMemo } from 'react';
 import katex from 'katex';
 import 'katex/dist/katex.min.css';
+import MarkdownTable from './MarkdownTable';
+import { splitTableBlocks } from './tableMarkdown';
 
 /**
  * Safely render a LaTeX math string to HTML using KaTeX.
@@ -107,6 +109,16 @@ function preprocessMathText(text) {
 export default function MathRenderer({ text, className = '' }) {
   const content = useMemo(() => {
     if (!text || typeof text !== 'string') return text || '';
+
+    // Markdown tables inside the text render as real tables (cells call back into MathRenderer)
+    if (text.includes('|') && text.includes('---')) {
+      const blocks = splitTableBlocks(text);
+      if (blocks.some((b) => b.type === 'table')) {
+        return blocks.map((b, i) => (b.type === 'table'
+          ? <MarkdownTable key={i} markdown={b.value} />
+          : <MathRenderer key={i} text={b.value} />));
+      }
+    }
 
     const formattedText = preprocessMathText(text);
 

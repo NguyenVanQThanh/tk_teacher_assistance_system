@@ -7,6 +7,7 @@ import React, { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { X, ZoomIn } from 'lucide-react';
 import { resolveMediaUrl } from '../common/MathRenderer';
+import MarkdownTable from '../common/MarkdownTable';
 
 /**
  * Collect media blocks of a question: the cropped figure (image_url) plus any
@@ -118,16 +119,7 @@ export default function QuestionMedia({ question, compact = false }) {
         </button>
       ))}
       {tables.map((md, i) => (
-        <pre
-          key={`tbl-${i}`}
-          style={{
-            margin: 0, padding: '8px 10px', fontSize: 12, overflowX: 'auto',
-            background: '#F8FAFC', border: '1px solid #E2E8F0', borderRadius: 8,
-            whiteSpace: 'pre-wrap', wordBreak: 'break-word',
-          }}
-        >
-          {md}
-        </pre>
+        <MarkdownTable key={`tbl-${i}`} markdown={md} />
       ))}
       {lightboxSrc && <Lightbox src={lightboxSrc} alt="Hình ảnh câu hỏi" onClose={() => setLightboxSrc(null)} />}
     </div>

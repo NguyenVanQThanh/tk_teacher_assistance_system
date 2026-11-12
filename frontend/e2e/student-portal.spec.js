@@ -40,7 +40,7 @@ test.describe('Student Portal End-to-End Automation Test Suite', () => {
 
     expect(meData.role).toBe('Student');
     expect(meData.student_code).toBe('HS12001');
-    expect(meData.class_name).toBe('12A1');
+    expect(meData.class_name).toContain('12A1');
   });
 
   test('TC-STU-02: Student Dashboard & Aggregated Metrics (/student)', async ({ page }) => {

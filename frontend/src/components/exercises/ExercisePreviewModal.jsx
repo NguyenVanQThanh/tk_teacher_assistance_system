@@ -2,8 +2,8 @@
 // Description: Interactive modal for previewing exercise content, real questions, options, and assigning to classes.
 // Created At: 2026-08-30
 // Created By: Tam Khang
-// Updated At: 2026-09-27
-// Updated By: Tam Khang
+// Updated At: 2026-11-12
+// Updated By: AI Agent
 
 import React, { useState, useEffect, useRef } from 'react';
 import { 
@@ -263,8 +263,9 @@ export default function ExercisePreviewModal({ exercise, isOpen, onClose }) {
             questions.map((q, idx) => {
               const optionLabels = ['A', 'B', 'C', 'D', 'E', 'F'];
               const options = getQuestionItems(q);
-              const isTrueFalse = q.question_type === 'TrueFalse' || q.part === 'Part2' || (options.length > 0 && /^[a-d]\)/i.test(options[0]?.content || ''));
-              const isShortAnswer = q.question_type === 'ShortAnswer' || q.part === 'Part3' || (options.length === 0 && Boolean(q.correct_answer));
+              const isTrueFalse = q.question_type !== 'Other' && (q.question_type === 'TrueFalse' || q.part === 'Part2' || (options.length > 0 && /^[a-d]\)/i.test(options[0]?.content || '')));
+              const isOther = q.question_type === 'Other';
+              const isShortAnswer = !isOther && (q.question_type === 'ShortAnswer' || q.part === 'Part3' || (options.length === 0 && Boolean(q.correct_answer)));
 
               return (
                 <div key={q.question_id || idx} className="question-item-card">
@@ -282,6 +283,11 @@ export default function ExercisePreviewModal({ exercise, isOpen, onClose }) {
                             Trắc nghiệm Đúng/Sai
                           </span>
                         )}
+                        {isOther && (
+                          <span style={{ fontSize: '11px', padding: '2px 8px', borderRadius: '4px', background: '#FFF7ED', color: '#C2410C', fontWeight: 600 }}>
+                            Khác
+                          </span>
+                        )}
                         {isShortAnswer && (
                           <span style={{ fontSize: '11px', padding: '2px 8px', borderRadius: '4px', background: '#F0FDF4', color: '#16A34A', fontWeight: 600 }}>
                             Trả lời ngắn
@@ -297,7 +303,13 @@ export default function ExercisePreviewModal({ exercise, isOpen, onClose }) {
                   </div>
 
                   {/* Part 1: Multiple Choice Options */}
-                  {!isTrueFalse && !isShortAnswer && options.length > 0 && (
+                  {isOther && options.length > 0 && (
+                    <ol style={{ marginTop: '10px', paddingLeft: '22px' }}>
+                      {options.map((o, i) => (<li key={o.option_id || i}><MathRenderer text={o.content} /></li>))}
+                    </ol>
+                  )}
+
+                  {!isTrueFalse && !isShortAnswer && !isOther && options.length > 0 && (
                     <div className="options-grid">
                       {options.map((opt, optIdx) => {
                         const isCorrect = opt.is_correct || q.correct_answer === optionLabels[optIdx];

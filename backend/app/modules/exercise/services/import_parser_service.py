@@ -2,7 +2,7 @@
 # Description: Service for extracting text/images and parsing question templates and answer keys (Docx/PDF).
 # Created At: 2026-08-09
 # Created By: Tam Khang
-# Updated At: 2026-11-10
+# Updated At: 2026-11-12
 # Updated By: AI Agent
 
 import os
@@ -1029,6 +1029,8 @@ class ImportParserService:
             q.question_number = reg.number
             if getattr(q, "is_placeholder", False):
                 continue  # keep the ShortAnswer review placeholder valid regardless of part type
+            if spec_type in (TYPE_MC, TYPE_TF) and len(q.answer_options or []) < 2 and cls.is_short_answer_stem(q.content or ""):
+                spec_type = "ShortAnswer"  # numeric-answer stem without options: never keep a choice label
             if spec_type == TYPE_MC:
                 q.part, q.question_type = "Part1", QuestionTypeEnum.MultipleChoice
             elif spec_type == TYPE_TF:
@@ -1830,13 +1832,50 @@ class ImportParserService:
 
         return segments, needs_review
 
+    @staticmethod
+    def split_option_run(block_text: str) -> List[str]:
+        """Split a block into [stem, label, content, label, content, ...].
+
+        Only a sequential run of markers a,b,c,d (or A,B,C,D) counts, each at line start or after
+        whitespace, followed by whitespace/end and not preceded by a digit. Prose such as
+        "... 5 d. ..." or tails like "5)" never become options.
+        """
+        found: List[re.Match] = []
+        expect = None
+        for m in re.finditer(r"(?:^|(?<=\s))([A-Da-d])[\.:/\)](?=\s|$)", block_text, re.M):
+            before = block_text[:m.start()].rstrip(" 	")
+            if before and before[-1].isdigit():
+                continue
+            want = expect or ("a" if m.group(1).lower() == "a" else None)
+            if want is None or m.group(1).lower() != want:
+                continue
+            if found and m.group(1).isupper() != found[0].group(1).isupper():
+                continue
+            found.append(m)
+            expect = chr(ord(want) + 1)
+            if expect > "d":
+                break
+        if not found:
+            return [block_text]
+        out = [block_text[:found[0].start()]]
+        for k, m in enumerate(found):
+            end = found[k + 1].start() if k + 1 < len(found) else len(block_text)
+            out += [m.group(0), block_text[m.end():end]]
+        return out
+
+    @staticmethod
+    def is_short_answer_stem(block_text: str) -> bool:
+        """True when the stem asks for a numeric result (no option list expected)."""
+        t = block_text.lower()
+        return bool(re.search(r"bao nhiêu|làm tròn|tính |xác định |\?\s*(\(.*\))?\.?\s*$", t))
+
     @classmethod
     def parse_part1_question(cls, q_num: int, block_text: str, difficulty: Optional[DifficultyEnum], image_url: Optional[str]) -> Tuple[Optional[ParsedQuestion], Optional[ParseError]]:
         """Parse Part 1 (Multiple Choice 4 options)."""
-        opt_pattern = r"(?im)(^[A-Da-d][\.:/\)]\s*|\s+[A-Da-d][\.:/\)]\s*)"
-        parts = re.split(opt_pattern, block_text)
-
-        if len(parts) < 3:
+        parts = cls.split_option_run(block_text)
+        if len(parts) < 5:
+            if cls.is_short_answer_stem(block_text):
+                return cls.parse_part3_question(q_num, block_text, difficulty, image_url)
             return None, ParseError(question_number=q_num, message=f"Question {q_num} does not contain option choices A, B, C, D.")
 
         stem_match = re.match(r"(?i)^Câu\s+\d+[\.:/]?\s*", parts[0])
@@ -1892,10 +1931,10 @@ class ImportParserService:
     @classmethod
     def parse_part2_question(cls, q_num: int, block_text: str, difficulty: Optional[DifficultyEnum], image_url: Optional[str]) -> Tuple[Optional[ParsedQuestion], Optional[ParseError]]:
         """Parse Part 2 (True/False 4 items a, b, c, d)."""
-        opt_pattern = r"(?im)(^[A-Da-d][\.:/\)]\s*|\s+[A-Da-d][\.:/\)]\s*)"
-        parts = re.split(opt_pattern, block_text)
-
+        parts = cls.split_option_run(block_text)
         if len(parts) < 3:
+            if cls.is_short_answer_stem(block_text):
+                return cls.parse_part3_question(q_num, block_text, difficulty, image_url)
             return None, ParseError(question_number=q_num, message=f"Question {q_num} (Part II True/False) does not contain items a, b, c, d.")
 
         stem_match = re.match(r"(?i)^Câu\s+\d+[\.:/]?\s*", parts[0])

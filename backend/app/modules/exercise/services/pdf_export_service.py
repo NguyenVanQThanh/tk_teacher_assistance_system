@@ -2,8 +2,8 @@
 # Description: Service for generating formatted PDF documents from exercise data including LaTeX math rendering.
 # Created At: 2026-08-12
 # Created By: Tam Khang
-# Updated At: 2026-09-27
-# Updated By: Tam Khang
+# Updated At: 2026-11-12
+# Updated By: AI Agent
 
 import io
 import os
@@ -373,6 +373,8 @@ class PdfExportService:
             part2_questions = [q for q in questions if q.question_type in (QuestionTypeEnum.TrueFalse.value, "TrueFalse")]
             part3_questions = [q for q in questions if q.question_type in (QuestionTypeEnum.ShortAnswer.value, "ShortAnswer")]
 
+            other_questions = [q for q in questions if q.question_type == "Other"]
+
             def clean_option_text(text: str) -> str:
                 """Strip leading duplicate option labels like 'A. ', 'B. ', 'a) ', etc."""
                 clean = re.sub(r"^[A-Da-d][\.:/\)]\s*", "", text.strip())
@@ -490,6 +492,19 @@ class PdfExportService:
                     q_text = q.content_latex if q.content_latex else q.content
                     q_head = f"Câu {q.display_order}. {diff_str}{q_text}"
                     q_elements.extend(format_content_with_latex(q_head, question_text_style))
+                    q_elements.append(Spacer(1, 6))
+                    story.append(KeepTogether(q_elements))
+
+            # Part IV (Other): stem followed by numbered sub-questions; no answer key rows
+            if other_questions:
+                story.append(Spacer(1, 6))
+                story.append(Paragraph("<b>PHẦN IV. Câu hỏi khác.</b>", section_style))
+                for q in other_questions:
+                    q_elements = []
+                    q_text = q.content_latex if q.content_latex else q.content
+                    q_elements.extend(format_content_with_latex(f"Câu {q.display_order}. {q_text}", question_text_style))
+                    for idx, opt in enumerate(sorted(q.answer_options, key=lambda o: o.display_order), 1):
+                        q_elements.extend(format_content_with_latex(f"{idx}) {opt.content}", option_style))
                     q_elements.append(Spacer(1, 6))
                     story.append(KeepTogether(q_elements))
 

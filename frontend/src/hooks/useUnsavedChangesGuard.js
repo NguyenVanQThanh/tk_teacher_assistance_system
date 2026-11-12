@@ -7,6 +7,7 @@ Updated At: 2026-11-11
 Updated By: AI Agent
 */
 import { useCallback, useEffect, useRef } from 'react';
+import confirmDialog from '../components/common/confirmDialog';
 
 const CONFIRM_MESSAGE = 'Bạn có thay đổi chưa lưu. Thoát và bỏ các thay đổi này?';
 
@@ -29,9 +30,9 @@ export default function useUnsavedChangesGuard(state, onClose, ready = true) {
     return () => clearTimeout(t);
   }, [ready]);
 
-  return useCallback(() => {
+  return useCallback(async () => {
     const dirty = baseline.current !== null && baseline.current !== currentRef.current;
-    if (dirty && !window.confirm(CONFIRM_MESSAGE)) return;
+    if (dirty && !(await confirmDialog(CONFIRM_MESSAGE, { title: 'Thay đổi chưa lưu', confirmText: 'Thoát', cancelText: 'Ở lại' }))) return;
     onClose();
   }, [onClose]);
 }

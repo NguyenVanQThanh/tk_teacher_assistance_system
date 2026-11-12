@@ -182,7 +182,9 @@ class DocumentService:
         # Reject a file whose content was already uploaded (SHA-256 of the raw bytes)
         file_hash = hashlib.sha256(file_bytes).hexdigest()
         duplicate = db.query(Document).filter(
-            Document.file_hash == file_hash, Document.status != "DELETED"
+            Document.file_hash == file_hash,
+            Document.uploaded_by == current_user.user_id,
+            Document.status != "DELETED",
         ).first()
         if duplicate:
             raise HTTPException(

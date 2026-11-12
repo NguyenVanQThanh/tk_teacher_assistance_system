@@ -1,0 +1,54 @@
+/* File Name: QuestionMedia.css */
+/* Description: Table styling for question media (markdown tables from scan import). */
+/* Created At: 2026-11-12 */
+/* Created By: AI Agent */
+/* Updated At: 2026-11-12 */
+/* Updated By: AI Agent */
+
+.qm-table-wrap {
+  overflow-x: auto;
+  max-width: 100%;
+  border: 1px solid #E2E8F0;
+  border-radius: 8px;
+  background: #FFFFFF;
+}
+
+.qm-table {
+  border-collapse: collapse;
+  width: 100%;
+  font-size: 13px;
+}
+
+.qm-table th,
+.qm-table td {
+  padding: 6px 12px;
+  border-bottom: 1px solid #E2E8F0;
+  border-right: 1px solid #F1F5F9;
+  text-align: left;
+  white-space: nowrap;
+}
+
+.qm-table th:last-child,
+.qm-table td:last-child { border-right: none; }
+.qm-table tbody tr:last-child td { border-bottom: none; }
+
+.qm-table th {
+  background: #F1F5F9;
+  color: #334155;
+  font-weight: 600;
+}
+
+.qm-table tbody tr:nth-child(even) { background: #F8FAFC; }
+.qm-table td.qm-num { text-align: right; font-variant-numeric: tabular-nums; }
+
+.qm-table-raw {
+  margin: 0;
+  padding: 8px 10px;
+  font-size: 12px;
+  overflow-x: auto;
+  background: #F8FAFC;
+  border: 1px solid #E2E8F0;
+  border-radius: 8px;
+  white-space: pre-wrap;
+  word-break: break-word;
+}

@@ -2,12 +2,12 @@
 // Description: Modal dialog for editing document title and document type.
 // Created At: 2026-09-12
 // Created By: Tam Khang
-// Updated At: 2026-11-11
-// Updated By: Tam Khang
+// Updated At: 2026-11-12
+// Updated By: AI Agent
 
 import React, { useState, useEffect } from 'react';
 import useUnsavedChangesGuard from '../../hooks/useUnsavedChangesGuard';
-import { X, Edit3, Save, ChevronDown, BookOpen, Layers, Check } from 'lucide-react';
+import { X, Edit3, Save, ChevronDown } from 'lucide-react';
 import './EditDocumentModal.css';
 
 const DOCUMENT_TYPES = [
@@ -23,7 +23,7 @@ export default function EditDocumentModal({ isOpen, doc, onClose, onSave }) {
   const [docType, setDocType] = useState(doc.document_type || doc.documentType || 'reference');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
-  const guardedClose = useUnsavedChangesGuard({ title, selectedSubjectKey, selectedSubjectId, docType }, onClose, !isSubmitting);
+  const guardedClose = useUnsavedChangesGuard({ title, docType }, onClose, !isSubmitting);
 
   // Sync state whenever doc prop updates
   useEffect(() => {

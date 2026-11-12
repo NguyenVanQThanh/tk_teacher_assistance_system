@@ -16,6 +16,7 @@ import { UndoRedo, Placeholder } from '@tiptap/extensions';
 import { Extension } from '@tiptap/core';
 import MathFieldNode from './MathFieldNode';
 import { parseToDoc, serializeDoc } from './mathDocSerializer';
+import { buildTableTemplate } from './tableMarkdown';
 import { resolveMediaUrl } from './MathRenderer';
 import './MathTextEditor.css';
 
@@ -103,6 +104,17 @@ const MathTextEditor = forwardRef(function MathTextEditor(
     () => ({
       focus: () => editorRef.current?.commands.focus(),
       insertImage: (alt, src) => editorRef.current?.chain().focus().setImage({ src, alt }).run(),
+      insertTable: (rows, cols) => {
+        const ed = editorRef.current;
+        if (!ed || singleLine) return;
+        // One paragraph per markdown row; start on a fresh line when the cursor sits in text
+        const { $from } = ed.state.selection;
+        const chain = ed.chain().focus();
+        if ($from.parent.content.size > 0) chain.splitBlock();
+        chain.insertContent(buildTableTemplate(rows, cols).map((line) => ({
+          type: 'paragraph', content: [{ type: 'text', text: line }],
+        }))).run();
+      },
       insertMath: (template, { display = false } = {}) => {
         const ed = editorRef.current;
         if (!ed) return;

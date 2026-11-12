@@ -38,6 +38,7 @@ import {
 } from 'lucide-react';
 import { adminUsersApi } from '../../services/api';
 import './AdminUsersPage.css';
+import confirmDialog from '../../components/common/confirmDialog';
 
 // Strict Calendar Date Validation (e.g. rejects 31/02/2020)
 const validateCalendarDate = (dateStr) => {
@@ -732,7 +733,7 @@ export default function AdminUsersPage() {
   // Soft delete user (updates status to 'DELETED')
   const handleSoftDeleteUser = async (user) => {
     setActiveMenuUserId(null);
-    if (window.confirm(`Bạn có chắc chắn muốn xóa mềm (Soft Delete) tài khoản ${user.fullName}? Tài khoản sẽ chuyển sang trạng thái DELETED và bảo toàn lịch sử dữ liệu.`)) {
+    if (await confirmDialog(`Bạn có chắc chắn muốn xóa mềm (Soft Delete) tài khoản ${user.fullName}? Tài khoản sẽ chuyển sang trạng thái DELETED và bảo toàn lịch sử dữ liệu.`)) {
       try {
         await adminUsersApi.deleteUser(user.id);
         showToast(`Đã chuyển tài khoản ${user.fullName} sang trạng thái Xóa mềm (DELETED).`);
@@ -758,7 +759,7 @@ export default function AdminUsersPage() {
   // Reset password
   const handleResetPassword = async (user) => {
     setActiveMenuUserId(null);
-    if (window.confirm(`Bạn có chắc muốn đặt lại mật khẩu cho ${user.fullName}? Mật khẩu mặc định mới sẽ tự động tạo và gửi thông báo qua SMS/hệ thống.`)) {
+    if (await confirmDialog(`Bạn có chắc muốn đặt lại mật khẩu cho ${user.fullName}? Mật khẩu mặc định mới sẽ tự động tạo và gửi thông báo qua SMS/hệ thống.`)) {
       setLoading(true);
       try {
         const res = await adminUsersApi.resetPassword(user.id);

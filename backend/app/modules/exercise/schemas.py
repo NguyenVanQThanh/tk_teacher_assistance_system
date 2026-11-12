@@ -2,8 +2,8 @@
 # Description: Pydantic schemas for Exercise, Question, AnswerOption, and Assignment CRUD & validation.
 # Created At: 2026-07-31
 # Created By: Tam Khang
-# Updated At: 2026-11-09
-# Updated By: Tam Khang
+# Updated At: 2026-11-12
+# Updated By: AI Agent
 
 from enum import Enum
 from uuid import UUID
@@ -16,6 +16,8 @@ class QuestionTypeEnum(str, Enum):
     MultipleChoice = "MultipleChoice"
     TrueFalse = "TrueFalse"
     ShortAnswer = "ShortAnswer"
+    # Free-form question: stem + ordered sub-questions stored as answer_options rows (is_correct=False).
+    Other = "Other"
 
 
 class DifficultyEnum(str, Enum):
@@ -54,6 +56,8 @@ class AnswerOptionOut(BaseModel):
 
 
 class SegmentSchema(BaseModel):
+    # Keep extra keys (e.g. statement/is_correct, table content) when segments round-trip through an edit.
+    model_config = {"extra": "allow"}
     type: str = Field("text", description="Segment type: text, math, or image")
     content: Optional[str] = Field(None, description="Text content if type=text")
     latex: Optional[str] = Field(None, description="LaTeX string if type=math")
@@ -130,6 +134,11 @@ class QuestionCreate(BaseModel):
                     ]
                 else:
                     raise ValueError("TrueFalse questions must have at least 1 option item.")
+        elif self.question_type == QuestionTypeEnum.Other:
+            if not (self.answer_options or []):
+                raise ValueError("Other questions must have at least 1 sub-question.")
+            for opt in self.answer_options:
+                opt.is_correct = False
         return self
 
 
@@ -178,13 +187,26 @@ class QuestionUpdate(BaseModel):
 
     @model_validator(mode="after")
     def validate_answer_options_if_provided(self):
-        if self.question_type == QuestionTypeEnum.MultipleChoice and self.answer_options is not None:
-            options = self.answer_options
+        if self.answer_options is None:
+            return self
+        options = self.answer_options
+        if self.question_type == QuestionTypeEnum.MultipleChoice:
             if len(options) < 2:
                 raise ValueError("MultipleChoice questions must have at least 2 answer options.")
             correct_count = sum(1 for opt in options if opt.is_correct)
             if correct_count != 1:
                 raise ValueError(f"MultipleChoice questions must have exactly 1 correct answer (found {correct_count}).")
+        elif self.question_type == QuestionTypeEnum.TrueFalse:
+            if len(options) != 4:
+                raise ValueError("TrueFalse questions must have exactly 4 statements.")
+        elif self.question_type == QuestionTypeEnum.ShortAnswer:
+            if options:
+                raise ValueError("ShortAnswer questions must not have answer options.")
+        elif self.question_type == QuestionTypeEnum.Other:
+            if not options:
+                raise ValueError("Other questions must have at least 1 sub-question.")
+            for opt in options:
+                opt.is_correct = False
         return self
 
 

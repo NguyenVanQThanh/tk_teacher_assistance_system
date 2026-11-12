@@ -372,14 +372,18 @@ async def import_questions(
             if g_idx == 0:
                 exercise_service.update_exercise(current_user, exercise_id, ExerciseUpdate(title=new_title))
             else:
-                existing_ex = (
-                    exercise_service.db.query(Exercise)
-                    .filter(
-                        Exercise.created_by == current_user.user_id,
-                        Exercise.title == new_title,
-                        Exercise.status != "DELETED",
-                    )
-                    .first()
+                # Reuse only siblings created by an earlier import of this same base
+                # exercise; a same-titled unrelated exercise must never be overwritten.
+                existing_ex = next(
+                    (
+                        ex for ex in exercise_service.db.query(Exercise).filter(
+                            Exercise.created_by == current_user.user_id,
+                            Exercise.title == new_title,
+                            Exercise.status != "DELETED",
+                        )
+                        if (ex.ai_metadata or {}).get("import_source_exercise_id") == str(exercise_id)
+                    ),
+                    None,
                 )
                 if existing_ex is not None:
                     target_exercise_id = existing_ex.exercise_id
@@ -389,7 +393,8 @@ async def import_questions(
                         ExerciseCreate(
                             title=new_title,
                             subject_id=base_exercise.subject_id,
-                            ai_metadata={k: v for k, v in (base_exercise.ai_metadata or {}).items() if k != "source_file_hash"},
+                            ai_metadata={k: v for k, v in (base_exercise.ai_metadata or {}).items() if k != "source_file_hash"}
+                            | {"import_source_exercise_id": str(exercise_id)},
                         ),
                     )
                     target_exercise_id = new_ex.exercise_id
@@ -486,6 +491,11 @@ async def import_questions(
             },
         )
 
+    # Surface parser-level failures (e.g. OCR chunks that failed) alongside skipped questions
+    import_warnings += [
+        {"question_number": err.question_number, "message": err.message}
+        for err in parse_result.errors
+    ]
     if response is not None and import_warnings:
         response.headers["X-Import-Skipped-Count"] = str(len(import_warnings))
         response.headers["X-Import-Skipped"] = json.dumps(import_warnings, ensure_ascii=False)

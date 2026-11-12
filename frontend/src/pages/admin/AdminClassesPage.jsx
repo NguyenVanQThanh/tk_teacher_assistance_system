@@ -39,6 +39,7 @@ import {
   FileText
 } from 'lucide-react';
 import './AdminClassesPage.css';
+import confirmDialog from '../../components/common/confirmDialog';
 
 export default function AdminClassesPage() {
   // State for tabs & filters
@@ -2154,8 +2155,8 @@ export default function AdminClassesPage() {
                             type="button" 
                             className="table-action-icon-btn" 
                             title="Tùy chọn khác"
-                            onClick={() => {
-                              if (window.confirm(`Bạn có chắc chắn muốn lưu trữ hoặc vô hiệu hóa lớp ${cls.name}?`)) {
+                            onClick={async () => {
+                              if (await confirmDialog(`Bạn có chắc chắn muốn lưu trữ hoặc vô hiệu hóa lớp ${cls.name}?`)) {
                                 showToast(`Lớp ${cls.name} đã được lưu trữ (Soft Delete).`);
                               }
                             }}

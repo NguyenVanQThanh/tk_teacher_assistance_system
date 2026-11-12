@@ -90,7 +90,9 @@ test.describe('Teacher Portal End-to-End Automation Test Suite', () => {
     if (await searchInput.isVisible()) {
       await searchInput.fill('Toán');
       await page.waitForTimeout(500);
-      expect(await page.textContent('body')).toContain('Toán');
+      // Input values are not part of body text; assert the field and the filtered list instead
+      await expect(searchInput).toHaveValue('Toán');
+      await expect(exerciseItems.first()).toBeVisible();
     }
   });
 
@@ -109,6 +111,33 @@ test.describe('Teacher Portal End-to-End Automation Test Suite', () => {
     expect(pageText.toLowerCase()).toMatch(/(tạo bài tập|thêm bài tập|thủ công|tiêu đề)/i);
   });
 
+  test('TC-05b: Edit modal switches question type and answer section (no save)', async ({ page }) => {
+    // Themed data-loss confirm is accepted below; nothing is saved in this test
+    await page.fill('#identifier-input', TEACHER_PHONE);
+    await page.fill('#password-input', TEACHER_PASS);
+    await page.click('button[type="submit"]');
+    await page.waitForURL('**/teacher');
+
+    await page.goto('/teacher/exercises');
+    await page.waitForLoadState('networkidle');
+    await page.locator('button[title="Chỉnh sửa bài tập"]').first().click();
+
+    const group = page.locator('.question-type-selector');
+    await expect(group).toBeVisible({ timeout: 15000 });
+    const hints = {
+      'Trắc nghiệm 4 lựa chọn': 'Chọn 1 đáp án chính xác',
+      'Đúng/Sai': 'Chọn Đúng/Sai cho từng mệnh đề',
+      'Trả lời ngắn': 'Nhập đáp án',
+      'Khác': 'Danh sách các ý của câu hỏi',
+    };
+    for (const [label, hint] of Object.entries(hints)) {
+      await group.getByRole('radio', { name: label, exact: true }).click();
+      const ok = page.getByRole('alertdialog').getByRole('button', { name: 'Tiếp tục' });
+      if (await ok.isVisible({ timeout: 500 }).catch(() => false)) await ok.click();
+      await expect(page.locator('.solution-header-hint')).toHaveText(hint);
+    }
+  });
+
   test('TC-06: Class Management & Teaching Assignment (/teacher/classes)', async ({ page }) => {
     // Login & navigate
     await page.fill('#identifier-input', TEACHER_PHONE);
@@ -117,6 +146,10 @@ test.describe('Teacher Portal End-to-End Automation Test Suite', () => {
     await page.waitForURL('**/teacher');
 
     await page.goto('/teacher/classes');
+    await page.waitForLoadState('networkidle');
+
+    // Seed classes may belong to a past school year; show all years first
+    await page.locator('select').first().selectOption('all');
     await page.waitForLoadState('networkidle');
 
     // Verify class list page

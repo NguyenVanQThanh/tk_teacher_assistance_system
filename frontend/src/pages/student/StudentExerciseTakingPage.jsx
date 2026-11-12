@@ -2,10 +2,10 @@
 // Description: Interactive student examination interface supporting 3 question types: Multiple Choice (4 options), True/False (4 sub-items), and Short Answer (with on-screen numpad helper).
 // Created At: 2026-09-07
 // Created By: Tam Khang
-// Updated At: 2026-10-11
-// Updated By: Tam Khang
+// Updated At: 2026-11-12
+// Updated By: AI Agent
 
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { getQuestionItems } from '../../utils/questionItems';
 import { 
   Clock, 
@@ -36,6 +36,9 @@ import {
 import { useNavigate, Link, useParams, useLocation } from 'react-router-dom';
 import { exercisesApi, attemptsApi } from '../../services/api';
 import MathRenderer from '../../components/common/MathRenderer';
+import MathTextEditor from '../../components/common/MathTextEditor';
+import MathSymbolToolbar from '../../components/common/MathSymbolToolbar';
+import '../../components/documents/EditExerciseModal.css';
 import QuestionMedia from '../../components/exercises/QuestionMedia';
 import AiSourcesList from '../../components/exercises/AiSourcesList';
 import './StudentExerciseTakingPage.css';
@@ -79,9 +82,22 @@ export default function StudentExerciseTakingPage() {
   // Helper to normalize any backend question_type (MultipleChoice, TrueFalse, ShortAnswer, etc.)
   const normalizeQType = (typeStr) => {
     const clean = String(typeStr || '').replace(/[^a-zA-Z]/g, '').toUpperCase();
+    if (clean === 'OTHER') return 'OTHER';
     if (clean.includes('TRUEFALSE') || clean.includes('DUNGSAI')) return 'TRUE_FALSE';
     if (clean.includes('SHORTANSWER') || clean.includes('TRALOI') || clean.includes('NGAN') || clean.includes('FILL') || clean.includes('NUMERIC')) return 'SHORT_ANSWER';
     return 'MULTIPLE_CHOICE';
+  };
+
+  // "Other" answers are stored as a JSON array of strings (one per sub-question) in answer_text.
+  const parseOtherAnswer = (text) => {
+    try {
+      const arr = JSON.parse(text || '[]');
+      const obj = {};
+      if (Array.isArray(arr)) arr.forEach((v, i) => { if (String(v || '').trim()) obj[i] = String(v); });
+      return obj;
+    } catch (e) {
+      return text ? { 0: String(text) } : {};
+    }
   };
 
   // Initialize Backend Exam and Attempt
@@ -230,6 +246,8 @@ export default function StudentExerciseTakingPage() {
                         restored[qIdx] = (qRes.student_answer_text !== null && qRes.student_answer_text !== undefined) 
                           ? String(qRes.student_answer_text).replace(/\./g, ',') 
                           : '';
+                      } else if (normType === 'OTHER') {
+                        restored[qIdx] = parseOtherAnswer(qRes.student_answer_text);
                       } else if (normType === 'TRUE_FALSE') {
                         if (qRes.student_answer_text) {
                           const tfObj = {};
@@ -341,6 +359,7 @@ export default function StudentExerciseTakingPage() {
       const p1 = qList.filter(q => normalizeQType(q.question_type) === 'MULTIPLE_CHOICE').length;
       const p2 = qList.filter(q => normalizeQType(q.question_type) === 'TRUE_FALSE').length;
       const p3 = qList.filter(q => normalizeQType(q.question_type) === 'SHORT_ANSWER').length;
+      const p4 = qList.filter(q => normalizeQType(q.question_type) === 'OTHER').length;
       const isMath = (backendExercise.title || '').toLowerCase().includes('toán');
       return {
         id: backendExercise.exercise_id,
@@ -353,6 +372,7 @@ export default function StudentExerciseTakingPage() {
         part1Count: p1,
         part2Count: p2,
         part3Count: p3,
+        part4Count: p4,
         durationMinutes: 45,
         isExam: true,
         isBackend: true
@@ -691,6 +711,14 @@ export default function StudentExerciseTakingPage() {
                   answer_text: String(userAns).trim().replace(/,/g, '.')
                 });
               }
+            } else if (qType === 'OTHER') {
+              if (typeof userAns === 'object') {
+                const subCount = Math.max((q.answer_options || []).length, ...Object.keys(userAns).map(k => Number(k) + 1), 0);
+                const arr = Array.from({ length: subCount }, (_, i) => userAns[i] || '');
+                if (arr.some(v => String(v).trim())) {
+                  submitAnswers.push({ question_id: q.question_id, answer_text: JSON.stringify(arr) });
+                }
+              }
             } else if (qType === 'TRUE_FALSE') {
               if (typeof userAns === 'object') {
                 const tfSummary = Object.entries(userAns).map(([k, v]) => `${k}:${v}`).join(';');
@@ -876,6 +904,9 @@ export default function StudentExerciseTakingPage() {
       } else if (normalizedType === 'SHORT_ANSWER') {
         qType = 'short_answer';
         partLabel = 'Phần III: Trả lời ngắn';
+      } else if (normalizedType === 'OTHER') {
+        qType = 'other';
+        partLabel = 'Phần IV: Câu hỏi khác';
       }
 
       const qRes = attemptDetailedResults?.questions?.find(
@@ -949,6 +980,21 @@ export default function StudentExerciseTakingPage() {
           explanation: bQ.explanation,
           correctAnswer: bQ.correct_answer,
           isCorrect: qRes ? qRes.is_correct : null,
+          image_url: bQ.image_url,
+          segments: bQ.segments,
+          qRes
+        };
+      } else if (qType === 'other') {
+        return {
+          id: bQ.question_id,
+          part: partLabel,
+          number: qNum,
+          type: 'other',
+          statement: bQ.content || 'Nội dung câu hỏi',
+          subQuestions: getQuestionItems(bQ).map((opt) => opt.content || ''),
+          explanation: bQ.explanation,
+          correctAnswer: null,
+          isCorrect: null,
           image_url: bQ.image_url,
           segments: bQ.segments,
           qRes
@@ -1387,6 +1433,16 @@ export default function StudentExerciseTakingPage() {
     };
   }, [currentQuestionIdx, isChemistry, exerciseInfo, backendQuestions, attemptDetailedResults, answers]);
 
+  const otherEditorRefs = useRef({});
+  const otherActiveRef = useRef(null);
+  const handleOtherChange = (qIdx, subIdx, val) => {
+    setAnswers(prev => {
+      const cur = prev[qIdx] && typeof prev[qIdx] === 'object' ? { ...prev[qIdx] } : {};
+      if (String(val || '').trim()) cur[subIdx] = val; else delete cur[subIdx];
+      return { ...prev, [qIdx]: cur };
+    });
+  };
+
   const getQuestionReviewStatus = (qIdx) => {
     if (!isReadOnlyReview) return null;
     if (backendQuestions.length > 0 && backendQuestions[qIdx]) {
@@ -1398,6 +1454,7 @@ export default function StudentExerciseTakingPage() {
         return qRes.is_correct ? 'correct' : 'wrong';
       }
       const normType = normalizeQType(bQ.question_type);
+      if (normType === 'OTHER') return null; // manual grading: no auto verdict
       if (normType === 'MULTIPLE_CHOICE') {
         const userKey = answers[qIdx];
         if (!userKey) return 'wrong';
@@ -1652,6 +1709,32 @@ export default function StudentExerciseTakingPage() {
                     </div>
                   </div>
                 )}
+                {/* Group 4: Khác */}
+                {exerciseInfo.part4Count > 0 && (
+                  <div className="palette-section-group">
+                    <span className="palette-section-label">Khác ({exerciseInfo.part4Count})</span>
+                    <div className="palette-buttons-grid">
+                      {Array.from({ length: exerciseInfo.part4Count }, (_, i) => {
+                        const qIdx = i + exerciseInfo.part1Count + exerciseInfo.part2Count + exerciseInfo.part3Count;
+                        const isAns = isQuestionAnswered(qIdx);
+                        const isActive = currentQuestionIdx === qIdx;
+                        return (
+                          <button
+                            key={qIdx}
+                            type="button"
+                            className={`palette-num-btn ${isActive ? 'active' : ''} ${isAns ? 'answered' : ''}`}
+                            onClick={() => setCurrentQuestionIdx(qIdx)}
+                            title={`Câu ${qIdx + 1}`}
+                          >
+                            {qIdx + 1}
+                            {isAns && !isActive && <span className="answered-dot" />}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+
               </div>
             )}
           </div>
@@ -1938,6 +2021,41 @@ export default function StudentExerciseTakingPage() {
                     );
                   })}
                 </div>
+              </div>
+            )}
+
+            {/* TYPE 4: OTHER (stem + one rich math input per sub-question) */}
+            {questionData.type === 'other' && (
+              <div className="question-other-wrapper">
+                {!isReadOnlyReview && (
+                  <MathSymbolToolbar onInsert={(tpl) => (otherActiveRef.current || otherEditorRefs.current[0])?.insertMath(tpl)} />
+                )}
+                {questionData.subQuestions.map((sub, sIdx) => {
+                  const val = (answers[currentQuestionIdx] && answers[currentQuestionIdx][sIdx]) || '';
+                  return (
+                    <div key={`${currentQuestionIdx}-${sIdx}`} className="other-sub-question" style={{ margin: '14px 0' }}>
+                      <div style={{ fontWeight: 600, marginBottom: '6px' }}>
+                        <span>{sIdx + 1}) </span><MathRenderer text={sub} />
+                      </div>
+                      {isReadOnlyReview ? (
+                        <div className="comparison-box student-ans-box">
+                          <span className="comparison-label">Câu trả lời của bạn:</span>
+                          <span className="comparison-value">{val ? <MathRenderer text={val} /> : '(Chưa trả lời)'}</span>
+                        </div>
+                      ) : (
+                        <MathTextEditor
+                          ref={(r) => { otherEditorRefs.current[sIdx] = r; }}
+                          className="question-latex-textarea"
+                          value={val}
+                          onChange={(v) => handleOtherChange(currentQuestionIdx, sIdx, v)}
+                          onFocus={() => { otherActiveRef.current = otherEditorRefs.current[sIdx]; }}
+                          placeholder={`Nhập câu trả lời cho ý ${sIdx + 1}...`}
+                          ariaLabel={`Answer for sub-question ${sIdx + 1}`}
+                        />
+                      )}
+                    </div>
+                  );
+                })}
               </div>
             )}
 

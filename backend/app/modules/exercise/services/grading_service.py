@@ -2,8 +2,8 @@
 # Description: Internal auto-grading engine for exercise attempts (F-EXE-04).
 # Created At: 2026-08-05
 # Created By: Tam Khang
-# Updated At: 2026-10-04
-# Updated By: Tam Khang
+# Updated At: 2026-11-12
+# Updated By: AI Agent
 
 from typing import List, Tuple, Optional, Dict, Any
 from uuid import UUID
@@ -130,6 +130,15 @@ class GradingService:
                     "question_type": "ShortAnswer",
                     "student_answer_text": student_text,
                     "is_correct": is_correct,
+                    "pending_manual_grade": True
+                })
+            elif q.question_type == 'Other':
+                # Multi-part free-form answer (JSON array string); always manual grading.
+                question_results.append({
+                    "question_id": str(q.question_id),
+                    "question_type": "Other",
+                    "student_answer_text": ans.answer_text if ans else None,
+                    "is_correct": None,
                     "pending_manual_grade": True
                 })
         has_pending = any(qr.get("pending_manual_grade") for qr in question_results)

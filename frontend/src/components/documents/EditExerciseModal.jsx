@@ -2,8 +2,8 @@
 // Description: Full-featured interactive modal dialog matching Image 1 exactly with left question list, right selected question LaTeX editor, live KaTeX preview, Desmos SVG attachment, formula toolbar, and save synchronization.
 // Created At: 2026-09-12
 // Created By: Tam Khang
-// Updated At: 2026-11-11
-// Updated By: Tam Khang
+// Updated At: 2026-11-12
+// Updated By: AI Agent
 
 import React, { useState, useEffect, useRef } from 'react';
 import useUnsavedChangesGuard from '../../hooks/useUnsavedChangesGuard';
@@ -25,19 +25,82 @@ import {
   Trash2,
   Loader2,
   Sigma,
+  Table2,
   HelpCircle
 } from 'lucide-react';
 import { exercisesApi, questionsApi, documentsApi } from '../../services/api';
 import MathRenderer, { resolveMediaUrl } from '../common/MathRenderer';
+import MarkdownTable from '../common/MarkdownTable';
+import { splitTableBlocks } from '../common/tableMarkdown';
 import MathTextEditor from '../common/MathTextEditor';
 import MathShortcutsHelp from '../common/MathShortcutsHelp';
+import { symbolCategoriesBySubject } from '../common/mathSymbols';
 import AddQuestionModal from './AddQuestionModal';
 import QuestionMedia from '../exercises/QuestionMedia';
+import confirmDialog from '../common/confirmDialog';
 import './EditExerciseModal.css';
 
 const isUuid = (val) =>
   typeof val === 'string' &&
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(val);
+
+const QUESTION_TYPES = [
+  { value: 'MultipleChoice', label: 'Trắc nghiệm 4 lựa chọn' },
+  { value: 'TrueFalse', label: 'Đúng/Sai' },
+  { value: 'ShortAnswer', label: 'Trả lời ngắn' },
+  { value: 'Other', label: 'Khác' }
+];
+
+const normalizeQType = (raw) => {
+  const t = String(raw || '').toLowerCase();
+  if (t.includes('true_false') || t.includes('truefalse')) return 'TrueFalse';
+  if (t.includes('short_answer') || t.includes('shortanswer')) return 'ShortAnswer';
+  if (t === 'other') return 'Other';
+  return 'MultipleChoice';
+};
+
+// Remove a leading "a) " / "A." style label so statements can be re-labelled per type.
+const stripLabel = (t) => String(t || '').replace(/^\s*[A-Da-d][.):]\s*/, '');
+
+const OPTION_LETTERS = ['A', 'B', 'C', 'D'];
+const fourSlots = (texts, correctIdx) =>
+  OPTION_LETTERS.map((k, i) => ({ key: k, text: texts[i] || '', isCorrect: i === correctIdx }));
+
+/**
+ * Convert the answer setup between question types, reusing texts where possible.
+ * Returns { options, correctOption, lost } where lost = data the user would not see anymore.
+ */
+const convertAnswerSetup = (from, to, options, correctOption) => {
+  const texts = from === 'ShortAnswer'
+    ? []
+    : options.map((o) => (from === 'TrueFalse' ? stripLabel(o.text) : o.text || ''));
+  const filled = texts.filter((t) => t.trim());
+  const shortValue = from === 'ShortAnswer' ? String(correctOption || '').trim() : '';
+  const correctIdx = options.findIndex((o) => o.isCorrect);
+  const trueCount = options.filter((o) => o.isCorrect).length;
+
+  if (to === 'ShortAnswer') {
+    return { options: [], correctOption: '', lost: filled.length > 0 };
+  }
+  let lost = Boolean(shortValue);
+  if (to === 'MultipleChoice') {
+    if (filled.length > 4) lost = true;
+    if (from === 'TrueFalse' && trueCount > 1) lost = true;
+    const safe = from === 'MultipleChoice' || from === 'TrueFalse' ? Math.max(0, correctIdx) : 0;
+    return { options: fourSlots(texts, safe), correctOption: OPTION_LETTERS[safe], lost };
+  }
+  if (to === 'TrueFalse') {
+    if (filled.length > 4) lost = true;
+    const slots = fourSlots(texts, -1).map((o, i) => ({
+      ...o,
+      isCorrect: from === 'MultipleChoice' ? Boolean(options[i]?.isCorrect) : false
+    }));
+    return { options: slots, correctOption: 'A', lost };
+  }
+  // Other: one sub-question per non-empty text
+  const subs = (filled.length ? filled : ['']).map((t, i) => ({ key: String(i + 1), text: t, isCorrect: false }));
+  return { options: subs, correctOption: 'A', lost };
+};
 
 const buildQuestionPayload = (q, displayOrder) => {
   let difficulty = 'NhanBiet';
@@ -48,13 +111,7 @@ const buildQuestionPayload = (q, displayOrder) => {
     difficulty = 'VanDung';
   }
 
-  let qType = 'MultipleChoice';
-  const rawType = String(q.questionType || '').toLowerCase();
-  if (rawType.includes('true_false') || rawType.includes('truefalse')) {
-    qType = 'TrueFalse';
-  } else if (rawType.includes('short_answer') || rawType.includes('shortanswer')) {
-    qType = 'ShortAnswer';
-  }
+  const qType = normalizeQType(q.questionType);
 
   let optionsPayload = [];
   if (qType === 'MultipleChoice') {
@@ -79,7 +136,7 @@ const buildQuestionPayload = (q, displayOrder) => {
       }));
     } else if (Array.isArray(q.options) && q.options.length > 0) {
       optionsPayload = q.options.map((opt, idx) => ({
-        content: opt.text?.trim() || `Mệnh đề ${opt.key || idx + 1}`,
+        content: `${String.fromCharCode(97 + idx)}) ${stripLabel(opt.text).trim() || `Mệnh đề ${idx + 1}`}`,
         is_correct: Boolean(opt.isCorrect),
         display_order: idx + 1
       }));
@@ -93,6 +150,13 @@ const buildQuestionPayload = (q, displayOrder) => {
         }
       ];
     }
+  } else if (qType === 'Other') {
+    optionsPayload = (q.options || [])
+      .filter((opt) => opt.text?.trim())
+      .map((opt, idx) => ({ content: opt.text.trim(), is_correct: false, display_order: idx + 1 }));
+    if (optionsPayload.length === 0) {
+      optionsPayload = [{ content: 'Ý 1', is_correct: false, display_order: 1 }];
+    }
   }
 
   return {
@@ -101,12 +165,15 @@ const buildQuestionPayload = (q, displayOrder) => {
     content_markdown: (q.content || '').trim(),
     question_type: qType,
     difficulty: difficulty,
-    correct_answer: q.correctOption || q.shortAnswerExpected || (qType === 'TrueFalse' ? 'Đúng' : 'A'),
+    correct_answer: qType === 'Other' ? null : (q.correctOption || q.shortAnswerExpected || (qType === 'TrueFalse' ? 'Đúng' : 'A')),
     explanation: q.solutionGuide?.trim() || null,
     image_url: q.imageUrl || null,
     image_metadata: q.imageMeta || null,
+    // Segments are sent only after a table edit so untouched questions keep their original structure.
+    ...(q.segmentsEdited ? { segments: q.segments } : {}),
     display_order: displayOrder,
-    answer_options: optionsPayload.length > 0 ? optionsPayload : undefined
+    // Always send the list (even empty) so a type change replaces stale option rows.
+    answer_options: optionsPayload
   };
 };
 
@@ -304,7 +371,18 @@ Tam giác vuông SAB tại A: tan(∠SBA) = SA / AB = a√3 / a = √3 => ∠SBA
 
   const renderLiveContent = (rawText) => {
     if (!rawText) return <p className="preview-empty-text">(Chưa có nội dung câu hỏi)</p>;
+    // Markdown tables render as real tables; remaining text keeps the per-line rendering
+    const parts = splitTableBlocks(rawText);
+    if (parts.some((p) => p.type === 'table')) {
+      return parts.map((p, i) => (p.type === 'table'
+        ? <MarkdownTable key={`t${i}`} markdown={p.value} />
+        : <React.Fragment key={`x${i}`}>{renderLiveText(p.value)}</React.Fragment>));
+    }
+    return renderLiveText(rawText);
+  };
 
+  const renderLiveText = (rawText) => {
+    if (!rawText.trim()) return null;
     const blocks = rawText.split(/\n\s*\n/);
     return blocks.map((block, bIdx) => {
       const trimmed = block.trim();
@@ -360,13 +438,23 @@ Tam giác vuông SAB tại A: tan(∠SBA) = SA / AB = a√3 / a = √3 => ∠SBA
           if (Array.isArray(detail.questions) && detail.questions.length > 0) {
             const mapped = detail.questions.filter((q) => q.status !== 'DELETED').map((q, idx) => {
               const letters = ['A', 'B', 'C', 'D', 'E', 'F'];
-              const options = (q.answer_options || []).map((opt, oIdx) => ({
-                id: opt.option_id,
-                key: letters[oIdx] || String(oIdx + 1),
-                text: opt.content,
-                isCorrect: Boolean(opt.is_correct)
-              }));
-              const correctOpt = options.find(o => o.isCorrect)?.key || q.correct_answer || 'A';
+              const loadedType = normalizeQType(q.question_type);
+              let options = (q.answer_options || [])
+                .slice()
+                .sort((a, b) => (a.display_order || 0) - (b.display_order || 0))
+                .map((opt, oIdx) => ({
+                  id: opt.option_id,
+                  key: loadedType === 'Other' ? String(oIdx + 1) : (letters[oIdx] || String(oIdx + 1)),
+                  text: loadedType === 'TrueFalse' ? stripLabel(opt.content) : opt.content,
+                  isCorrect: Boolean(opt.is_correct)
+                }));
+              if (loadedType === 'TrueFalse') {
+                // Pad legacy statements to the 4 slots a-d
+                options = OPTION_LETTERS.map((k, i) => ({ ...(options[i] || { text: '', isCorrect: false }), key: k }));
+              } else if (loadedType === 'Other' && options.length === 0) {
+                options = [{ key: '1', text: '', isCorrect: false }];
+              }
+              const correctOpt = loadedType === 'ShortAnswer' ? (q.correct_answer || '') : (options.find(o => o.isCorrect)?.key || q.correct_answer || 'A');
               let levelText = 'Nhận biết';
               if (q.difficulty === 'ThongHieu') levelText = 'Thông hiểu';
               else if (q.difficulty === 'VanDung') levelText = 'Vận dụng';
@@ -383,9 +471,9 @@ Tam giác vuông SAB tại A: tan(∠SBA) = SA / AB = a√3 / a = √3 => ∠SBA
                 formulaMeta: q.content?.includes('$') ? 'Chứa công thức LaTeX' : 'Văn bản thường',
                 answersMeta: `${options.length} đáp án (${correctOpt}*)`,
                 content: q.content || q.content_latex || '',
-                questionType: q.question_type || 'MultipleChoice',
+                questionType: loadedType,
                 correctOption: correctOpt,
-                options: options.length > 0 ? options : [
+                options: (options.length > 0 || loadedType === 'ShortAnswer') ? options : [
                   { key: 'A', text: '', isCorrect: true },
                   { key: 'B', text: '', isCorrect: false },
                   { key: 'C', text: '', isCorrect: false },
@@ -393,7 +481,8 @@ Tam giác vuông SAB tại A: tan(∠SBA) = SA / AB = a√3 / a = √3 => ∠SBA
                 ],
                 solutionGuide: q.explanation || '',
                 imageUrl: q.image_url || null,
-                imageMeta: q.image_metadata || null
+                imageMeta: q.image_metadata || null,
+                segments: Array.isArray(q.segments) ? q.segments : []
               };
             }).sort((a, b) => a.number - b.number);
             setQuestions(mapped);
@@ -450,6 +539,7 @@ Tam giác vuông SAB tại A: tan(∠SBA) = SA / AB = a√3 / a = √3 => ∠SBA
   const activeFieldRef = useRef('content');
   const setActive = (key) => { activeFieldRef.current = key; activeEditorRef.current = editorRefs.current[key]; };
   const [isHelpOpen, setIsHelpOpen] = useState(false);
+  const [tableDims, setTableDims] = useState({ open: false, rows: 3, cols: 3 });
   const [editorFontSize, setEditorFontSize] = useState(14);
   const helpBtnRef = useRef(null);
   const imageInputRef = useRef(null);
@@ -510,6 +600,46 @@ Tam giác vuông SAB tại A: tan(∠SBA) = SA / AB = a√3 / a = √3 => ∠SBA
     }));
   }, [currentLevel, currentScore, currentContent, currentOptions, currentCorrectOption, currentSolutionGuide, selectedQuestionId]);
 
+  const activeType = normalizeQType(activeQuestion?.questionType);
+
+  // Switch question type: keep content, convert only the answer setup (confirm before dropping data).
+  // Replace the markdown of the table segment at `segIdx`; null removes it.
+  const updateTableSegment = (segIdx, md) => {
+    setQuestions(prev => prev.map(q => {
+      if (q.id !== selectedQuestionId) return q;
+      const segs = (q.segments || []).map((sg, i) => (i === segIdx ? { ...sg, content: md } : sg))
+        .filter((sg, i) => !(i === segIdx && md === null));
+      return { ...q, segments: segs, segmentsEdited: true };
+    }));
+  };
+
+  const handleChangeType = async (nextType) => {
+    if (nextType === activeType) return;
+    const conv = convertAnswerSetup(activeType, nextType, currentOptions || [], currentCorrectOption);
+    if (conv.lost && !(await confirmDialog('Đổi loại câu hỏi sẽ bỏ một phần dữ liệu đáp án hiện tại (không còn chỗ chứa). Tiếp tục?', { title: 'Đổi loại câu hỏi', confirmText: 'Tiếp tục' }))) {
+      return;
+    }
+    setQuestions(prev => prev.map(q => (q.id === selectedQuestionId ? { ...q, questionType: nextType } : q)));
+    setCurrentOptions(conv.options);
+    setCurrentCorrectOption(conv.correctOption);
+  };
+
+  const handleToggleTf = (key) => {
+    setCurrentOptions(prev => prev.map(o => (o.key === key ? { ...o, isCorrect: !o.isCorrect } : o)));
+  };
+
+  const handleAddSubQuestion = () => {
+    setCurrentOptions(prev => [...prev, { key: String(prev.length + 1), text: '', isCorrect: false }]);
+  };
+
+  const handleRemoveSubQuestion = (key) => {
+    setCurrentOptions(prev => {
+      const rest = prev.filter(o => o.key !== key);
+      const next = rest.length ? rest : [{ key: '1', text: '', isCorrect: false }];
+      return next.map((o, i) => ({ ...o, key: String(i + 1) }));
+    });
+  };
+
   // Option text change handler
   const handleOptionTextChange = (key, val) => {
     setCurrentOptions(prev => prev.map(o => o.key === key ? { ...o, text: val } : o));
@@ -518,214 +648,13 @@ Tam giác vuông SAB tại A: tan(∠SBA) = SA / AB = a√3 / a = √3 => ∠SBA
   // Symbol Categories for Math, Physics, Chemistry & Greek like Word Equation Ribbon
   const [activeSubjectTab, setActiveSubjectTab] = useState('math');
 
-  const symbolCategoriesBySubject = {
-    math: {
-      name: 'Toán học',
-      icon: '📐',
-      groups: [
-        {
-          group: 'Đại số:',
-          items: [
-            { label: '\\frac{a}{b}', code: '\\frac{a}{b}', tpl: '\\frac{#?}{#?}', display: '\\frac{a}{b}', tip: 'Phân số a/b' },
-            { label: 'x^n', code: 'x^{n}', tpl: '#@^{#?}', display: 'x^{n}', tip: 'Lũy thừa x^n' },
-            { label: 'x_k', code: 'x_{k}', tpl: '#@_{#?}', display: 'x_{k}', tip: 'Chỉ số dưới x_k' },
-            { label: '\\sqrt{x}', code: '\\sqrt{x}', tpl: '\\sqrt{#?}', display: '\\sqrt{x}', tip: 'Căn bậc 2' },
-            { label: '\\sqrt[n]{x}', code: '\\sqrt[n]{x}', tpl: '\\sqrt[#?]{#?}', display: '\\sqrt[n]{x}', tip: 'Căn bậc n' },
-            { label: '|x|', code: '|x|', tpl: '\\left\\lvert #? \\right\\rvert', display: '|x|', tip: 'Giá trị tuyệt đối' },
-            { label: '\\pm', code: '\\pm', display: '\\pm', tip: 'Cộng trừ' },
-            { label: '\\times', code: '\\times', display: '\\times', tip: 'Phép nhân' },
-            { label: '\\div', code: '\\div', display: '\\div', tip: 'Phép chia' },
-            { label: '\\log_a b', code: '\\log_{a} b', tpl: '\\log_{#?}{#?}', display: '\\log_{a} b', tip: 'Logarit cơ số a của b' },
-            { label: '\\ln x', code: '\\ln x', display: '\\ln x', tip: 'Logarit tự nhiên' }
-          ]
-        },
-        {
-          group: 'Giải tích:',
-          items: [
-            { label: '\\int_{a}^{b}', code: '\\int_{a}^{b} f(x)\\,dx', tpl: '\\int_{#?}^{#?} #? \\,dx', display: '\\int_{a}^{b}', tip: 'Tích phân xác định' },
-            { label: '\\int', code: '\\int f(x)\\,dx', tpl: '\\int #? \\,dx', display: '\\int', tip: 'Nguyên hàm' },
-            { label: '\\frac{dy}{dx}', code: '\\frac{dy}{dx}', display: '\\frac{dy}{dx}', tip: 'Đạo hàm dy/dx' },
-            { label: "f'(x)", code: "f'(x)", display: "f'(x)", tip: 'Đạo hàm f(x)' },
-            { label: '\\sum_{i=1}^{n}', code: '\\sum_{i=1}^{n}', tpl: '\\sum_{#?}^{#?}', display: '\\sum_{i=1}^{n}', tip: 'Tổng sigma' },
-            { label: '\\lim_{x \\to x_0}', code: '\\lim_{x \\to x_0}', tpl: '\\lim_{#? \\to #?}', display: '\\lim_{x \\to x_0}', tip: 'Giới hạn lim' },
-            { label: '\\infty', code: '\\infty', display: '\\infty', tip: 'Vô cực' }
-          ]
-        },
-        {
-          group: 'Hình học:',
-          items: [
-            { label: '\\vec{u}', code: '\\vec{u}', tpl: '\\vec{#?}', display: '\\vec{u}', tip: 'Véc-tơ u' },
-            { label: '\\overrightarrow{AB}', code: '\\overrightarrow{AB}', tpl: '\\overrightarrow{#?}', display: '\\overrightarrow{AB}', tip: 'Véc-tơ AB' },
-            { label: '\\widehat{ABC}', code: '\\widehat{ABC}', tpl: '\\widehat{#?}', display: '\\widehat{ABC}', tip: 'Góc ABC' },
-            { label: '\\perp', code: '\\perp', display: '\\perp', tip: 'Vuông góc' },
-            { label: '\\parallel', code: '\\parallel', display: '\\parallel', tip: 'Song song' },
-            { label: '\\Delta', code: '\\Delta', display: '\\Delta', tip: 'Tam giác / Delta' },
-            { label: '\\angle', code: '\\angle', display: '\\angle', tip: 'Ký hiệu góc' },
-            { label: '^{\\circ}', code: '^{\\circ}', display: '^{\\circ}', tip: 'Độ' }
-          ]
-        },
-        {
-          group: 'Tập hợp & Quan hệ:',
-          items: [
-            { label: '\\in', code: '\\in', display: '\\in', tip: 'Thuộc' },
-            { label: '\\notin', code: '\\notin', display: '\\notin', tip: 'Không thuộc' },
-            { label: '\\subset', code: '\\subset', display: '\\subset', tip: 'Tập con' },
-            { label: '\\cup', code: '\\cup', display: '\\cup', tip: 'Hợp' },
-            { label: '\\cap', code: '\\cap', display: '\\cap', tip: 'Giao' },
-            { label: '\\setminus', code: '\\setminus', display: '\\setminus', tip: 'Hiệu' },
-            { label: '\\emptyset', code: '\\emptyset', display: '\\emptyset', tip: 'Tập rỗng' },
-            { label: '\\le', code: '\\le', display: '\\le', tip: 'Nhỏ hơn hoặc bằng' },
-            { label: '\\ge', code: '\\ge', display: '\\ge', tip: 'Lớn hơn hoặc bằng' },
-            { label: '\\neq', code: '\\neq', display: '\\neq', tip: 'Khác' },
-            { label: '\\approx', code: '\\approx', display: '\\approx', tip: 'Xấp xỉ' },
-            { label: '\\Rightarrow', code: '\\Rightarrow', display: '\\Rightarrow', tip: 'Suy ra' },
-            { label: '\\Leftrightarrow', code: '\\Leftrightarrow', display: '\\Leftrightarrow', tip: 'Tương đương' }
-          ]
-        }
-      ]
-    },
-    physics: {
-      name: 'Vật lí',
-      icon: '⚡',
-      groups: [
-        {
-          group: 'Cơ học & Nhiệt:',
-          items: [
-            { label: '\\vec{F}', code: '\\vec{F}', display: '\\vec{F}', tip: 'Véc-tơ lực F' },
-            { label: '\\vec{v}', code: '\\vec{v}', display: '\\vec{v}', tip: 'Véc-tơ vận tốc v' },
-            { label: '\\vec{a}', code: '\\vec{a}', display: '\\vec{a}', tip: 'Véc-tơ gia tốc a' },
-            { label: '\\Delta t', code: '\\Delta t', display: '\\Delta t', tip: 'Thời gian Delta t' },
-            { label: '\\vec{p}', code: '\\vec{p}', display: '\\vec{p}', tip: 'Động lượng' },
-            { label: 'E_d', code: 'E_d = \\frac{1}{2}mv^2', display: 'E_d', tip: 'Động năng' },
-            { label: 'E_t', code: 'E_t = mgh', display: 'E_t', tip: 'Thế năng' },
-            { label: 'W', code: 'W = F \\cdot s \\cdot \\cos\\alpha', display: 'W', tip: 'Công cơ học' },
-            { label: '\\mu', code: '\\mu', display: '\\mu', tip: 'Hệ số ma sát' },
-            { label: '\\rho', code: '\\rho', display: '\\rho', tip: 'Khối lượng riêng' },
-            { label: 'T(K)', code: 'T\\text{ (K)}', display: 'T\\text{ (K)}', tip: 'Nhiệt độ Kelvin' },
-            { label: '^{\\circ}C', code: '^{\\circ}\\text{C}', display: '^{\\circ}\\text{C}', tip: 'Độ C' },
-            { label: 'Q', code: 'Q = mc\\Delta t', display: 'Q', tip: 'Nhiệt lượng' }
-          ]
-        },
-        {
-          group: 'Điện - Từ & Sóng:',
-          items: [
-            { label: '\\lambda', code: '\\lambda', display: '\\lambda', tip: 'Bước sóng lambda' },
-            { label: '\\omega', code: '\\omega', display: '\\omega', tip: 'Tần số góc omega' },
-            { label: '\\Omega', code: '\\Omega', display: '\\Omega', tip: 'Điện trở Ôm (Ohm)' },
-            { label: '\\mu F', code: '\\mu\\text{F}', display: '\\mu\\text{F}', tip: 'Microfarad' },
-            { label: 'mH', code: '\\text{mH}', display: '\\text{mH}', tip: 'Milihenry' },
-            { label: '\\vec{E}', code: '\\vec{E}', display: '\\vec{E}', tip: 'Điện trường' },
-            { label: '\\vec{B}', code: '\\vec{B}', display: '\\vec{B}', tip: 'Từ trường' },
-            { label: '\\Phi', code: '\\Phi', display: '\\Phi', tip: 'Từ thông' },
-            { label: '\\mathcal{E}', code: '\\mathcal{E}', display: '\\mathcal{E}', tip: 'Suất điện động' },
-            { label: 'I=U/R', code: 'I = \\frac{U}{R}', display: 'I=\\frac{U}{R}', tip: 'Định luật Ôm' },
-            { label: 'P=UI', code: 'P = U \\cdot I', display: 'P=UI', tip: 'Công suất điện' }
-          ]
-        },
-        {
-          group: 'Lượng tử & Hạt nhân:',
-          items: [
-            { label: 'h\\nu', code: '\\varepsilon = h\\nu', display: 'h\\nu', tip: 'Lượng tử năng lượng' },
-            { label: 'E=mc^2', code: 'E = mc^2', display: 'E=mc^2', tip: 'Hệ thức Einstein' },
-            { label: '_{Z}^{A}X', code: '_{Z}^{A}\\text{X}', display: '_{Z}^{A}\\text{X}', tip: 'Ký hiệu hạt nhân' },
-            { label: '_{2}^{4}He', code: '_{2}^{4}\\text{He}', display: '_{2}^{4}\\text{He}', tip: 'Hạt alpha' },
-            { label: '_{-1}^{0}e', code: '_{-1}^{0}\\text{e}', display: '_{-1}^{0}\\text{e}', tip: 'Hạt beta' },
-            { label: '\\gamma', code: '\\gamma', display: '\\gamma', tip: 'Tia gamma' },
-            { label: 'T_{1/2}', code: 'T_{1/2}', display: 'T_{1/2}', tip: 'Chu kỳ bán rã' }
-          ]
-        }
-      ]
-    },
-    chemistry: {
-      name: 'Hóa học',
-      icon: '🧪',
-      groups: [
-        {
-          group: 'Mũi tên & Điều kiện:',
-          items: [
-            { label: '\\rightarrow', code: '\\rightarrow', display: '\\rightarrow', tip: 'Phản ứng một chiều' },
-            { label: '\\rightleftharpoons', code: '\\rightleftharpoons', display: '\\rightleftharpoons', tip: 'Phản ứng thuận nghịch' },
-            { label: '\\uparrow', code: '\\uparrow', display: '\\uparrow', tip: 'Khí thoát ra' },
-            { label: '\\downarrow', code: '\\downarrow', display: '\\downarrow', tip: 'Kết tủa' },
-            { label: '\\xrightarrow{t^{\\circ}}', code: '\\xrightarrow{t^{\\circ}}', display: '\\xrightarrow{t^{\\circ}}', tip: 'Nhiệt độ' },
-            { label: '\\xrightarrow{\\text{xt}}', code: '\\xrightarrow{\\text{xt}}', display: '\\xrightarrow{\\text{xt}}', tip: 'Chất xúc tác' },
-            { label: '\\xrightarrow{\\text{xt, } t^{\\circ}}', code: '\\xrightarrow{\\text{xt, } t^{\\circ}}', display: '\\xrightarrow{\\text{xt, } t^{\\circ}}', tip: 'Xúc tác & nhiệt độ' }
-          ]
-        },
-        {
-          group: 'Ion & Chất phổ biến:',
-          items: [
-            { label: 'H_2O', code: '\\text{H}_2\\text{O}', display: '\\text{H}_2\\text{O}', tip: 'Nước' },
-            { label: 'CO_2', code: '\\text{CO}_2', display: '\\text{CO}_2', tip: 'Khí carbonic' },
-            { label: 'H^+', code: '\\text{H}^+', display: '\\text{H}^+', tip: 'Ion H+' },
-            { label: 'OH^-', code: '\\text{OH}^-', display: '\\text{OH}^-', tip: 'Ion OH-' },
-            { label: 'SO_4^{2-}', code: '\\text{SO}_4^{2-}', display: '\\text{SO}_4^{2-}', tip: 'Ion sunfat' },
-            { label: 'CO_3^{2-}', code: '\\text{CO}_3^{2-}', display: '\\text{CO}_3^{2-}', tip: 'Ion cacbonat' },
-            { label: 'NO_3^-', code: '\\text{NO}_3^-', display: '\\text{NO}_3^-', tip: 'Ion nitrat' },
-            { label: 'Cl^-', code: '\\text{Cl}^-', display: '\\text{Cl}^-', tip: 'Ion clorua' },
-            { label: 'Ca^{2+}', code: '\\text{Ca}^{2+}', display: '\\text{Ca}^{2+}', tip: 'Ion Canxi' },
-            { label: 'Fe^{3+}', code: '\\text{Fe}^{3+}', display: '\\text{Fe}^{3+}', tip: 'Ion Sắt III' },
-            { label: 'Al^{3+}', code: '\\text{Al}^{3+}', display: '\\text{Al}^{3+}', tip: 'Ion Nhôm' }
-          ]
-        },
-        {
-          group: 'Liên kết & Hữu cơ:',
-          items: [
-            { label: '-', code: '-', display: '-', tip: 'Liên kết đơn' },
-            { label: '=', code: '=', display: '=', tip: 'Liên kết đôi' },
-            { label: '\\equiv', code: '\\equiv', display: '\\equiv', tip: 'Liên kết ba' },
-            { label: 'R-COOH', code: '\\text{R-COOH}', display: '\\text{R-COOH}', tip: 'Axit cacboxylic' },
-            { label: 'R-OH', code: '\\text{R-OH}', display: '\\text{R-OH}', tip: 'Ancol' },
-            { label: 'R-NH_2', code: '\\text{R-NH}_2', display: '\\text{R-NH}_2', tip: 'Amin' },
-            { label: '_{6}^{12}C', code: '_{6}^{12}\\text{C}', display: '_{6}^{12}\\text{C}', tip: 'Đồng vị cacbon 12' },
-            { label: '\\Delta H < 0', code: '\\Delta H < 0', display: '\\Delta H < 0', tip: 'Phản ứng tỏa nhiệt' },
-            { label: '\\Delta H > 0', code: '\\Delta H > 0', display: '\\Delta H > 0', tip: 'Phản ứng thu nhiệt' }
-          ]
-        }
-      ]
-    },
-    greek: {
-      name: 'Ký tự Hy Lạp',
-      icon: 'Ω',
-      groups: [
-        {
-          group: 'Chữ thường:',
-          items: [
-            { label: '\\alpha', code: '\\alpha', display: '\\alpha', tip: 'alpha' },
-            { label: '\\beta', code: '\\beta', display: '\\beta', tip: 'beta' },
-            { label: '\\gamma', code: '\\gamma', display: '\\gamma', tip: 'gamma' },
-            { label: '\\delta', code: '\\delta', display: '\\delta', tip: 'delta' },
-            { label: '\\epsilon', code: '\\epsilon', display: '\\epsilon', tip: 'epsilon' },
-            { label: '\\theta', code: '\\theta', display: '\\theta', tip: 'theta' },
-            { label: '\\lambda', code: '\\lambda', display: '\\lambda', tip: 'lambda' },
-            { label: '\\mu', code: '\\mu', display: '\\mu', tip: 'mu' },
-            { label: '\\pi', code: '\\pi', display: '\\pi', tip: 'pi' },
-            { label: '\\rho', code: '\\rho', display: '\\rho', tip: 'rho' },
-            { label: '\\sigma', code: '\\sigma', display: '\\sigma', tip: 'sigma' },
-            { label: '\\tau', code: '\\tau', display: '\\tau', tip: 'tau' },
-            { label: '\\phi', code: '\\phi', display: '\\phi', tip: 'phi' },
-            { label: '\\omega', code: '\\omega', display: '\\omega', tip: 'omega' }
-          ]
-        },
-        {
-          group: 'Chữ hoa:',
-          items: [
-            { label: '\\Delta', code: '\\Delta', display: '\\Delta', tip: 'Delta hoa' },
-            { label: '\\Gamma', code: '\\Gamma', display: '\\Gamma', tip: 'Gamma hoa' },
-            { label: '\\Theta', code: '\\Theta', display: '\\Theta', tip: 'Theta hoa' },
-            { label: '\\Lambda', code: '\\Lambda', display: '\\Lambda', tip: 'Lambda hoa' },
-            { label: '\\Sigma', code: '\\Sigma', display: '\\Sigma', tip: 'Sigma hoa' },
-            { label: '\\Phi', code: '\\Phi', display: '\\Phi', tip: 'Phi hoa' },
-            { label: '\\Omega', code: '\\Omega', display: '\\Omega', tip: 'Omega hoa' }
-          ]
-        }
-      ]
-    }
-  };
-
   const currentSubjectData = symbolCategoriesBySubject[activeSubjectTab] || symbolCategoriesBySubject.math;
 
   // Insert a LaTeX template into the active editor (MathLive placeholders: #? slot, #@ selection)
+  const insertTable = () => {
+    (activeEditorRef.current || editorRefs.current.content)?.insertTable(tableDims.rows, tableDims.cols);
+    setTableDims((d) => ({ ...d, open: false }));
+  };
   const insertMath = (tpl, opts = {}) => (activeEditorRef.current || editorRefs.current.content)?.insertMath(tpl, opts);
 
   // Upload a real image to BE storage, insert its markdown into the active field,
@@ -772,10 +701,12 @@ Tam giác vuông SAB tại A: tan(∠SBA) = SA / AB = a√3 / a = √3 => ∠SBA
     let updatedAnswersMeta = currentCorrectOption 
       ? `${currentOptions?.length || 4} đáp án (${currentCorrectOption}*)` 
       : `${currentOptions?.length || 4} đáp án (Chưa chọn)`;
-    if (activeQuestion?.questionType === 'ShortAnswer') {
+    if (activeType === 'ShortAnswer') {
       updatedAnswersMeta = `Đáp án: ${currentCorrectOption || 'Chưa nhập'}`;
-    } else if (activeQuestion?.questionType === 'TrueFalse') {
+    } else if (activeType === 'TrueFalse') {
       updatedAnswersMeta = `${currentOptions?.length || 4} mệnh đề (Đúng/Sai)`;
+    } else if (activeType === 'Other') {
+      updatedAnswersMeta = `${currentOptions?.length || 0} ý`;
     }
 
     const currentQData = {
@@ -786,9 +717,8 @@ Tam giác vuông SAB tại A: tan(∠SBA) = SA / AB = a√3 / a = √3 => ∠SBA
       options: currentOptions,
       correctOption: currentCorrectOption,
       solutionGuide: currentSolutionGuide,
-      answersMeta: currentCorrectOption 
-        ? `4 đáp án (${currentCorrectOption}*)` 
-        : '4 đáp án (Chưa chọn)',
+      questionType: activeType,
+      answersMeta: updatedAnswersMeta,
       previewSnippet: currentContent.split('\n').filter(l => l.trim().length > 0)[0] || 'Nội dung câu hỏi...'
     };
 
@@ -1258,6 +1188,26 @@ Tam giác vuông SAB tại A: tan(∠SBA) = SA / AB = a√3 / a = √3 => ∠SBA
                 <span>PT bậc 4</span>
               </button>
 
+              <div style={{ position: 'relative', display: 'inline-block' }}>
+                <button
+                  type="button"
+                  className="btn-toolbar-tool"
+                  onMouseDown={(e) => e.preventDefault()}
+                  onClick={() => setTableDims((d) => ({ ...d, open: !d.open }))}
+                  title="Chèn bảng vào ô đang soạn thảo"
+                >
+                  <Table2 size={14} />
+                  <span>Chèn bảng</span>
+                </button>
+                {tableDims.open && (
+                  <div style={{ position: 'absolute', top: '110%', left: 0, zIndex: 50, background: '#fff', border: '1px solid #E2E8F0', borderRadius: 8, padding: 10, boxShadow: '0 8px 24px rgba(15,23,42,.15)', display: 'flex', gap: 8, alignItems: 'center', whiteSpace: 'nowrap', fontSize: 13 }}>
+                    <label>Dòng <input type="number" min={1} max={20} value={tableDims.rows} onChange={(e) => setTableDims((d) => ({ ...d, rows: Number(e.target.value) || 1 }))} style={{ width: 48 }} /></label>
+                    <label>Cột <input type="number" min={1} max={10} value={tableDims.cols} onChange={(e) => setTableDims((d) => ({ ...d, cols: Number(e.target.value) || 1 }))} style={{ width: 48 }} /></label>
+                    <button type="button" className="btn-toolbar-tool" onMouseDown={(e) => e.preventDefault()} onClick={insertTable}>Chèn</button>
+                  </div>
+                )}
+              </div>
+
               <button
                 type="button"
                 ref={helpBtnRef}
@@ -1429,10 +1379,7 @@ Tam giác vuông SAB tại A: tan(∠SBA) = SA / AB = a√3 / a = √3 => ∠SBA
                     <FileCode2 size={15} />
                     <span>Nội dung bài tập</span>
                   </div>
-<<<<<<< HEAD
                   <span className="katex-support-hint">Nhấn Alt+= hoặc $ để chèn công thức</span>
-=======
->>>>>>> f2eaf189c26eb8ad1bb5d3cd5a6d47a3122bdfdb
                 </div>
 
                 <MathTextEditor
@@ -1449,6 +1396,31 @@ Tam giác vuông SAB tại A: tan(∠SBA) = SA / AB = a√3 / a = √3 => ∠SBA
               {/* ============================================================ */}
               {/* THIẾT LẬP ĐÁP ÁN TRẮC NGHIỆM & HƯỚNG DẪN GIẢI CHI TIẾT */}
               {/* ============================================================ */}
+              {(activeQuestion?.segments || []).some((sg) => sg?.type === 'table') && (
+                <section className="solution-and-answers-section" data-testid="table-editor">
+                  <div className="solution-section-header">
+                    <h3 className="solution-header-title">Bảng số liệu</h3>
+                    <span className="solution-header-hint">Sửa dạng Markdown, xem trước bên dưới</span>
+                  </div>
+                  {activeQuestion.segments.map((sg, i) => sg?.type === 'table' && (
+                    <div key={i} style={{ marginBottom: 12 }}>
+                      <textarea
+                        value={sg.content || ''}
+                        onChange={(e) => updateTableSegment(i, e.target.value)}
+                        rows={Math.min(12, (sg.content || '').split('\n').length + 1)}
+                        aria-label="Table markdown"
+                        style={{ width: '100%', fontFamily: 'monospace', fontSize: 13, padding: 8, border: '1px solid #DCD6E8', borderRadius: 8, boxSizing: 'border-box' }}
+                      />
+                      <MarkdownTable markdown={sg.content || ''} />
+                      <button type="button" onClick={() => updateTableSegment(i, null)}
+                        style={{ marginTop: 6, padding: '4px 10px', borderRadius: 6, border: '1px solid #FCA5A5', background: '#FEE2E2', color: '#991B1B', cursor: 'pointer', fontWeight: 600 }}>
+                        Xóa bảng
+                      </button>
+                    </div>
+                  ))}
+                </section>
+              )}
+
               <section className="solution-and-answers-section">
                 <div className="solution-section-header">
                   <div className="solution-header-left">
@@ -1457,9 +1429,35 @@ Tam giác vuông SAB tại A: tan(∠SBA) = SA / AB = a√3 / a = √3 => ∠SBA
                       Thiết lập đáp án
                     </h3>
                   </div>
-                  <span className="solution-header-hint">Chọn 1 đáp án chính xác</span>
+                  <span className="solution-header-hint">{{ MultipleChoice: 'Chọn 1 đáp án chính xác', TrueFalse: 'Chọn Đúng/Sai cho từng mệnh đề', ShortAnswer: 'Nhập đáp án', Other: 'Danh sách các ý của câu hỏi' }[activeType]}</span>
                 </div>
 
+                <div className="question-type-selector" role="radiogroup" aria-label="Question type"
+                  style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', marginBottom: '12px' }}>
+                  {QUESTION_TYPES.map((t) => (
+                    <button
+                      key={t.value}
+                      type="button"
+                      role="radio"
+                      aria-checked={activeType === t.value}
+                      onClick={() => handleChangeType(t.value)}
+                      style={{
+                        padding: '6px 12px',
+                        borderRadius: '6px',
+                        fontSize: '13px',
+                        cursor: 'pointer',
+                        border: `1px solid ${activeType === t.value ? '#2563EB' : '#CBD5E1'}`,
+                        background: activeType === t.value ? '#EFF6FF' : '#FFFFFF',
+                        color: activeType === t.value ? '#1D4ED8' : '#334155',
+                        fontWeight: activeType === t.value ? 600 : 400
+                      }}
+                    >
+                      {t.label}
+                    </button>
+                  ))}
+                </div>
+
+                {activeType === 'MultipleChoice' && (
                 <div className="options-grid-row">
                   {currentOptions.map((opt) => {
                     const isCorrect = currentCorrectOption === opt.key;
@@ -1496,6 +1494,97 @@ Tam giác vuông SAB tại A: tan(∠SBA) = SA / AB = a√3 / a = √3 => ∠SBA
                     );
                   })}
                 </div>
+                )}
+
+                {activeType === 'TrueFalse' && (
+                  <div className="options-grid-row options-grid-row--single">
+                    {currentOptions.map((opt) => (
+                      <div key={opt.key} className={`option-choice-card ${opt.isCorrect ? 'is-selected-correct' : ''}`}>
+                        <div className="option-choice-left">
+                          <span className="option-choice-letter">{opt.key.toLowerCase()})</span>
+                          <div style={{ flex: 1, minWidth: 0 }}>
+                            <MathTextEditor
+                              singleLine
+                              ref={(r) => { editorRefs.current[`option:${opt.key}`] = r; }}
+                              className="option-choice-input"
+                              value={opt.text}
+                              onChange={(v) => handleOptionTextChange(opt.key, v)}
+                              onFocus={() => setActive(`option:${opt.key}`)}
+                              placeholder={`Nhập mệnh đề ${opt.key.toLowerCase()})...`}
+                              ariaLabel={`Statement ${opt.key.toLowerCase()}`}
+                            />
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => handleToggleTf(opt.key)}
+                            style={{
+                              marginLeft: '8px', padding: '4px 10px', borderRadius: '6px', cursor: 'pointer',
+                              border: '1px solid #CBD5E1', fontWeight: 600,
+                              background: opt.isCorrect ? '#DCFCE7' : '#FEE2E2',
+                              color: opt.isCorrect ? '#166534' : '#991B1B'
+                            }}
+                          >
+                            {opt.isCorrect ? 'Đúng' : 'Sai'}
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {activeType === 'ShortAnswer' && (
+                  <div className="solution-guide-box">
+                    <label className="solution-guide-label">Đáp án (số hoặc biểu thức ngắn)</label>
+                    <input
+                      type="text"
+                      className="option-choice-input"
+                      value={currentCorrectOption || ''}
+                      onChange={(e) => setCurrentCorrectOption(e.target.value)}
+                      placeholder="Nhập đáp án đúng..."
+                      aria-label="Short answer value"
+                      style={{ width: '100%', padding: '8px 10px', border: '1px solid #CBD5E1', borderRadius: '6px' }}
+                    />
+                  </div>
+                )}
+
+                {activeType === 'Other' && (
+                  <div className="options-grid-row">
+                    {currentOptions.map((opt) => (
+                      <div key={opt.key} className="option-choice-card">
+                        <div className="option-choice-left">
+                          <span className="option-choice-letter">Ý {opt.key}.</span>
+                          <div style={{ flex: 1, minWidth: 0 }}>
+                            <MathTextEditor
+                              singleLine
+                              ref={(r) => { editorRefs.current[`option:${opt.key}`] = r; }}
+                              className="option-choice-input"
+                              value={opt.text}
+                              onChange={(v) => handleOptionTextChange(opt.key, v)}
+                              onFocus={() => setActive(`option:${opt.key}`)}
+                              placeholder={`Nhập ý ${opt.key}...`}
+                              ariaLabel={`Sub-question ${opt.key}`}
+                            />
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => handleRemoveSubQuestion(opt.key)}
+                            title="Xóa ý này"
+                            style={{ marginLeft: '8px', border: 'none', background: 'transparent', cursor: 'pointer', color: '#DC2626' }}
+                          >
+                            <Trash2 size={14} />
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                    <button
+                      type="button"
+                      onClick={handleAddSubQuestion}
+                      style={{ padding: '6px 12px', borderRadius: '6px', border: '1px dashed #94A3B8', background: 'transparent', cursor: 'pointer' }}
+                    >
+                      <Plus size={14} /> Thêm ý
+                    </button>
+                  </div>
+                )}
 
                 <div className="solution-guide-box">
                   <label className="solution-guide-label">
@@ -1537,7 +1626,7 @@ Tam giác vuông SAB tại A: tan(∠SBA) = SA / AB = a√3 / a = √3 => ∠SBA
                   </div>
 
                   {/* Attachment preview: click to view the image inline (lightbox), no new tab */}
-                  {activeQuestion?.imageUrl && (
+                  {(activeQuestion?.imageUrl || activeQuestion?.segments?.length > 0) && (
                     <QuestionMedia
                       compact
                       question={{
@@ -1549,17 +1638,27 @@ Tam giác vuông SAB tại A: tan(∠SBA) = SA / AB = a√3 / a = √3 => ∠SBA
                   )}
 
                   {/* Dynamic Live Options Preview */}
-                  {currentOptions && currentOptions.length > 0 && (
+                  {activeType === 'Other' && currentOptions.length > 0 && (
+                    <ol className="preview-options-container">
+                      {currentOptions.map((opt) => (
+                        <li key={opt.key}><MathRenderer text={opt.text || `(Chưa nhập ý ${opt.key})`} /></li>
+                      ))}
+                    </ol>
+                  )}
+                  {activeType === 'ShortAnswer' && (
+                    <div className="preview-options-container">Đáp án: {currentCorrectOption || '(Chưa nhập)'}</div>
+                  )}
+                  {(activeType === 'MultipleChoice' || activeType === 'TrueFalse') && currentOptions && currentOptions.length > 0 && (
                     <div className="preview-options-container">
                       <div className="preview-options-grid">
                         {currentOptions.map((opt) => {
-                          const isCorrect = currentCorrectOption === opt.key;
+                          const isCorrect = activeType === 'TrueFalse' ? opt.isCorrect : currentCorrectOption === opt.key;
                           return (
                             <div 
                               key={opt.key} 
                               className={`preview-option-item ${isCorrect ? 'is-correct-preview' : ''}`}
                             >
-                              <span className="preview-option-letter">{opt.key}.</span>
+                              <span className="preview-option-letter">{activeType === 'TrueFalse' ? `${opt.key.toLowerCase()})` : `${opt.key}.`}</span>
                               <span className="preview-option-content">
                                 <MathRenderer text={opt.text || `(Chưa nhập đáp án ${opt.key})`} />
                               </span>
