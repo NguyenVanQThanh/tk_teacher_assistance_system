@@ -7,7 +7,7 @@
 
 from typing import Optional
 
-from fastapi import Depends, HTTPException, Query, Request, status
+from fastapi import Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer
 from sqlalchemy.orm import Session
 from jose import jwt, JWTError
@@ -100,25 +100,12 @@ def get_current_user(token: str = Depends(oauth2_scheme), db: Session = Depends(
     """
     Dependency to authenticate and return the current active user from the JWT token
     carried in the Authorization: Bearer header.
+    Note: JWTs must only travel in the Authorization header, never in the URL query string
+    (query strings leak into access logs/proxies/history). Endpoints that browsers reach
+    via EventSource (which cannot set headers) authenticate separately with their own
+    short-lived session instead of a shared query-token dependency.
     """
     return resolve_user_from_token(token, db)
-
-
-def get_current_user_query_ok(
-    request: Request,
-    token: Optional[str] = Query(None, description="JWT for EventSource clients that cannot set headers"),
-    db: Session = Depends(get_db),
-) -> User:
-    """
-    Auth dependency that accepts the JWT either from the Authorization header OR from
-    the ?token= query parameter (browsers' EventSource API cannot set request headers,
-    so SSE endpoints use this variant).
-    """
-    header = request.headers.get("Authorization") or request.headers.get("authorization")
-    bearer = None
-    if header and header.lower().startswith("bearer "):
-        bearer = header[7:].strip()
-    return resolve_user_from_token(bearer or token, db)
 
 def require_roles(*role_names: str):
     """

@@ -12,7 +12,7 @@ from uuid import UUID
 from fastapi import HTTPException, status
 from sqlalchemy.orm import Session
 
-from models.models import User, Subject, ClassAssignment, StudentClass, StudentExerciseAttempt
+from models.models import User, Subject, Exercise, ClassAssignment, StudentClass, StudentExerciseAttempt
 from app.modules.exercise.schemas import (
     AttemptSubmitRequest, AttemptListItemOut, AttemptGradeUpdateRequest, AssignmentTakingOut
 )
@@ -68,6 +68,42 @@ class AttemptService:
                     "code": "ERR-EXE-ATTEMPT_ALREADY_OPEN",
                     "message": "An in-progress attempt already exists for this assignment.",
                     "attempt_id": str(open_attempt.attempt_id)
+                }
+            )
+
+        # 3b. Availability window: a new attempt may not start after the due date.
+        due_at = assignment.due_at
+        if due_at is not None:
+            if due_at.tzinfo is None:
+                due_at = due_at.replace(tzinfo=timezone.utc)
+            if datetime.now(timezone.utc) > due_at:
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail={
+                        "code": "ERR-EXE-ASSIGNMENT_EXPIRED",
+                        "message": "This assignment is past its due date."
+                    }
+                )
+
+        # 3c. Attempt limit: max_attempts comes from the exercise metadata (exams default to 1).
+        exercise = self.db.query(Exercise).filter(
+            Exercise.exercise_id == assignment.exercise_id,
+            Exercise.status != 'DELETED'
+        ).first()
+        ai_meta = (exercise.ai_metadata or {}) if exercise else {}
+        is_exam = "đề thi" in (exercise.title or "").lower() if exercise else False
+        max_attempts = int(ai_meta.get("max_attempts", 1 if is_exam else 3))
+        attempt_count = self.db.query(StudentExerciseAttempt).filter(
+            StudentExerciseAttempt.student_id == current_user.user_id,
+            StudentExerciseAttempt.assignment_id == assignment_id,
+            StudentExerciseAttempt.status != 'DELETED'
+        ).count()
+        if attempt_count >= max_attempts:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail={
+                    "code": "ERR-EXE-ATTEMPT_LIMIT_REACHED",
+                    "message": "You have used all allowed attempts for this assignment."
                 }
             )
 
@@ -334,6 +370,13 @@ class AttemptService:
             if payload.feedback is not None:
                 base["teacher_feedback"] = payload.feedback
             detailed_results = base
+
+        # Mark a teacher-set TOTAL score so a later answer-key regrade does not silently
+        # overwrite it (regrade_exercise preserves detailed_results['teacher_total_score']).
+        if payload.score is not None:
+            if not isinstance(detailed_results, dict):
+                detailed_results = dict(attempt.detailed_results or {})
+            detailed_results["teacher_total_score"] = float(payload.score)
 
         return self.repo.update_grade(
             attempt=attempt,

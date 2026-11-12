@@ -253,7 +253,9 @@ class GradingService:
             for k, v in old.items():
                 if k != "questions":
                     results[k] = v
-            att.score = score
+            # Never overwrite a teacher-set total score (manual grading decision).
+            teacher_total = old.get("teacher_total_score")
+            att.score = float(teacher_total) if teacher_total is not None else score
             att.detailed_results = results
         self.db.commit()
         return len(attempts)

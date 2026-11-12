@@ -335,21 +335,32 @@ class TestSyncVersion:
         assert resp.status_code == status.HTTP_200_OK
         assert "X-Data-Version" in resp.headers
 
-    def test_sync_stream_sse_first_event(self, client: TestClient, db_session, exam_setup: dict):
+    def test_sync_stream_sse_first_event(self, client: TestClient, db_session, monkeypatch, exam_setup: dict):
         # NOTE: TestClient/httpx-ASGITransport buffer streaming bodies in this environment, so the
         # HTTP-level stream cannot be consumed in-process. We drive the route handler directly and
         # verify the StreamingResponse (media type, headers) plus the first `data:` event.
         # Over real HTTP (uvicorn) this endpoint was verified to stream correctly.
         import asyncio
+        from sqlalchemy.orm import sessionmaker
         from fastapi.responses import StreamingResponse
-        from models.models import User
+        from starlette.requests import Request
         from app.modules.exercise.routers.sync import sync_stream
 
-        student = db_session.query(User).filter(User.phone == "0934567890").first()
-        assert student is not None
+        # The stream opens short-lived sessions via app.core.database.SessionLocal -> point them
+        # at the test engine for this test.
+        factory = sessionmaker(bind=db_session.bind)
+        monkeypatch.setattr("app.core.database.SessionLocal", factory)
+
+        token = exam_setup["student_headers"]["Authorization"].replace("Bearer ", "")
+        scope = {
+            "type": "http", "method": "GET", "path": "/api/v1/sync/stream",
+            "headers": [(b"authorization", f"Bearer {token}".encode())],
+            "query_string": b"",
+        }
+        request = Request(scope)
 
         async def run():
-            resp = await sync_stream(db=db_session, current_user=student)
+            resp = await sync_stream(request=request, token=None)
             assert isinstance(resp, StreamingResponse)
             assert resp.media_type == "text/event-stream"
             assert resp.headers.get("cache-control") == "no-cache"
@@ -368,12 +379,38 @@ class TestSyncVersion:
             "student_exercise_attempts", "subjects", "classes"
         }.issubset(set(payload["tables"].keys()))
 
-    def test_version_endpoint_accepts_query_token(self, client: TestClient, exam_setup: dict):
-        # EventSource cannot set the Authorization header -> ?token= must work too.
+    def test_sync_stream_accepts_query_token(self, client: TestClient, db_session, monkeypatch, exam_setup: dict):
+        # EventSource cannot set headers, so the SSE route accepts ?token= (only here).
+        import asyncio
+        from sqlalchemy.orm import sessionmaker
+        from starlette.requests import Request
+        from app.modules.exercise.routers.sync import sync_stream
+
+        factory = sessionmaker(bind=db_session.bind)
+        monkeypatch.setattr("app.core.database.SessionLocal", factory)
+        token = exam_setup["student_headers"]["Authorization"].replace("Bearer ", "")
+        scope = {"type": "http", "method": "GET", "path": "/api/v1/sync/stream", "headers": [], "query_string": b""}
+
+        async def run():
+            resp = await sync_stream(request=Request(scope), token=token)
+            it = resp.body_iterator
+            chunk = await it.__anext__()
+            await it.aclose()
+            return chunk
+
+        chunk = asyncio.run(run())
+        assert chunk.startswith("data: ")
+
+    def test_version_endpoint_rejects_query_token(self, client: TestClient, exam_setup: dict):
+        # JWTs must only travel in the Authorization header (query strings leak into logs).
+        # The ?token= variant is reserved for the SSE stream only.
         token = exam_setup["student_headers"]["Authorization"].replace("Bearer ", "")
         resp = client.get(f"/api/v1/sync/version?token={token}")
-        assert resp.status_code == status.HTTP_200_OK, resp.text
-        assert resp.json()["version"]
+        assert resp.status_code == status.HTTP_401_UNAUTHORIZED
+        # header auth still works
+        resp2 = client.get("/api/v1/sync/version", headers=exam_setup["student_headers"])
+        assert resp2.status_code == status.HTTP_200_OK
+        assert resp2.json()["version"]
 
     def test_version_includes_soft_deleted_rows(self, client: TestClient, db_session, exam_setup: dict):
         # A soft-deleted record (status=DELETED) with a bumped updated_at MUST raise the version,
@@ -419,3 +456,115 @@ class TestSyncVersion:
         assert parse(v2["version"]) >= parse(v1["version"])
         if v1["tables"]["class_assignments"] is not None:
             assert parse(v2["tables"]["class_assignments"]) >= parse(v1["tables"]["class_assignments"])
+
+
+def _set_due_past(db_session, assignment_id: str) -> None:
+    """Move an assignment's due_at into the past directly in the DB (API requires future)."""
+    from sqlalchemy import update
+    from models.models import ClassAssignment
+    past = datetime.now(timezone.utc) - timedelta(days=1)
+    db_session.execute(
+        update(ClassAssignment)
+        .where(ClassAssignment.assignment_id == uuid.UUID(assignment_id))
+        .values(due_at=past)
+    )
+    db_session.commit()
+
+
+class TestTakingWindowAndScoping:
+    def test_taking_blocked_after_due_without_attempt(self, client: TestClient, db_session, exam_setup: dict):
+        aid = _create_assignment(client, exam_setup)
+        _set_due_past(db_session, aid)
+        resp = client.get(f"/api/v1/assignments/{aid}/taking", headers=exam_setup["student_headers"])
+        assert resp.status_code == status.HTTP_403_FORBIDDEN, resp.text
+        assert resp.json()["detail"]["code"] == "ERR-EXE-ASSIGNMENT_EXPIRED"
+
+    def test_start_attempt_blocked_after_due(self, client: TestClient, db_session, exam_setup: dict):
+        aid = _create_assignment(client, exam_setup)
+        _set_due_past(db_session, aid)
+        resp = client.post(f"/api/v1/assignments/{aid}/attempts", headers=exam_setup["student_headers"])
+        assert resp.status_code == status.HTTP_403_FORBIDDEN, resp.text
+        assert resp.json()["detail"]["code"] == "ERR-EXE-ASSIGNMENT_EXPIRED"
+
+    def test_taking_allowed_for_finished_attempt_after_due(self, client: TestClient, db_session, exam_setup: dict):
+        # Review of an already-submitted attempt must keep working even after the due date.
+        aid = _create_assignment(client, exam_setup)
+        sh = exam_setup["student_headers"]
+        att = client.post(f"/api/v1/assignments/{aid}/attempts", headers=sh).json()["attempt_id"]
+        ex = client.get(
+            f"/api/v1/exercises/{exam_setup['exercise_id']}",
+            headers=exam_setup["teacher_headers"]
+        ).json()
+        qid = ex["questions"][0]["question_id"]
+        sub = client.put(f"/api/v1/attempts/{att}/submit", json={"answers": [{"question_id": qid, "answer_text": "x"}]}, headers=sh)
+        assert sub.status_code == status.HTTP_200_OK, sub.text
+        _set_due_past(db_session, aid)
+        resp = client.get(f"/api/v1/assignments/{aid}/taking", headers=sh)
+        assert resp.status_code == status.HTTP_200_OK, resp.text
+        assert len(resp.json()["questions"]) == 2
+
+    def test_start_attempt_blocked_when_max_attempts_reached(self, client: TestClient, exam_setup: dict):
+        # Create assignment with max_attempts=1, finish one attempt, then a new start must 403.
+        due = (datetime.now(timezone.utc) + timedelta(days=7)).isoformat()
+        resp = client.post(
+            f"/api/v1/classes/{exam_setup['class_id']}/assignments",
+            json={"exercise_id": exam_setup["exercise_id"], "due_at": due, "max_attempts": 1},
+            headers=exam_setup["teacher_headers"]
+        )
+        assert resp.status_code == status.HTTP_201_CREATED, resp.text
+        aid = resp.json()["assignment_id"]
+        sh = exam_setup["student_headers"]
+        att = client.post(f"/api/v1/assignments/{aid}/attempts", headers=sh).json()["attempt_id"]
+        ex = client.get(f"/api/v1/exercises/{exam_setup['exercise_id']}", headers=exam_setup["teacher_headers"]).json()
+        qid = ex["questions"][0]["question_id"]
+        sub = client.put(f"/api/v1/attempts/{att}/submit", json={"answers": [{"question_id": qid, "answer_text": "x"}]}, headers=sh)
+        assert sub.status_code == status.HTTP_200_OK
+        again = client.post(f"/api/v1/assignments/{aid}/attempts", headers=sh)
+        assert again.status_code == status.HTTP_403_FORBIDDEN
+        assert again.json()["detail"]["code"] == "ERR-EXE-ATTEMPT_LIMIT_REACHED"
+
+    def test_student_attempts_scoped_to_self(self, client: TestClient, exam_setup: dict):
+        # A Student passing another student's id must still only see their own attempts.
+        aid = _create_assignment(client, exam_setup)
+        sh = exam_setup["student_headers"]
+        client.post(f"/api/v1/assignments/{aid}/attempts", headers=sh)
+        me = client.get("/api/v1/auth/me", headers=sh).json()["user_id"]
+        other = client.get(
+            "/api/v1/auth/me",
+            headers={"Authorization": f"Bearer {get_student2_token(client)}"}
+        ).json()["user_id"]
+        assert me != other
+        resp = client.get(f"/api/v1/attempts?student_id={other}", headers=sh)
+        assert resp.status_code == status.HTTP_200_OK, resp.text
+        items = resp.json()
+        assert len(items) >= 1
+        for item in items:
+            assert item["student_id"] == me
+
+    def test_regrade_preserves_teacher_total_score(self, client: TestClient, exam_setup: dict):
+        # Teacher sets a manual total score; a later answer-key regrade must NOT overwrite it.
+        aid = _create_assignment(client, exam_setup)
+        sh, th = exam_setup["student_headers"], exam_setup["teacher_headers"]
+        att = client.post(f"/api/v1/assignments/{aid}/attempts", headers=sh).json()["attempt_id"]
+        ex = client.get(f"/api/v1/exercises/{exam_setup['exercise_id']}", headers=th).json()
+        q = next(q for q in ex["questions"] if q["question_type"] == "MultipleChoice")
+        opt_wrong = next(o for o in q["answer_options"] if not o["is_correct"])
+        opt_right = next(o for o in q["answer_options"] if o["is_correct"])
+        sub = client.put(
+            f"/api/v1/attempts/{att}/submit",
+            json={"answers": [{"question_id": q["question_id"], "answer_option_id": opt_wrong["option_id"]}]},
+            headers=sh
+        )
+        assert sub.status_code == status.HTTP_200_OK, sub.text
+        g = client.put(f"/api/v1/attempts/{att}/grade", json={"score": 9.5}, headers=th)
+        assert g.status_code == status.HTTP_200_OK, g.text
+        # Change the answer key -> triggers regrade of all submissions of the exercise.
+        ak = client.put(
+            f"/api/v1/exercises/{exam_setup['exercise_id']}/answer-key",
+            json={"keys": {q["question_id"]: opt_right["option_id"]}},
+            headers=th
+        )
+        assert ak.status_code == status.HTTP_200_OK, ak.text
+        assert ak.json()["regraded_attempts"] >= 1
+        det = client.get(f"/api/v1/attempts/{att}", headers=sh).json()
+        assert det["score"] == 9.5  # teacher's manual total score preserved

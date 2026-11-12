@@ -294,11 +294,60 @@ class AssignmentService:
                         "message": "You are not enrolled in the class for this assignment."
                     }
                 )
+            # Availability window + attempt-limit gating: the paper may be served only to
+            # resume an open attempt, to review an already-finished attempt, or while the
+            # assignment is still open and the student has attempts left.
+            self._check_student_taking_allowed(assignment, current_user.user_id)
         else:
             # Teacher / Admin: standard class access scoping.
             check_class_access(self.db, current_user, assignment.class_id)
 
         return self.build_student_paper(assignment, current_user.user_id)
+
+    def _check_student_taking_allowed(self, assignment: ClassAssignment, student_id: UUID) -> None:
+        """403 when a student without any attempt tries to read a paper past its due date or
+        after exhausting max_attempts. Open/finished attempts are always allowed (resume/review)."""
+        attempt_repo = AttemptRepository(self.db)
+        open_attempt = attempt_repo.find_open_attempt(student_id, assignment.assignment_id)
+        if open_attempt:
+            return
+
+        attempts = self.db.query(StudentExerciseAttempt).filter(
+            StudentExerciseAttempt.student_id == student_id,
+            StudentExerciseAttempt.assignment_id == assignment.assignment_id,
+            StudentExerciseAttempt.status != 'DELETED'
+        ).all()
+        if any(a.is_finished for a in attempts):
+            return  # review of own submitted attempt
+
+        due_at = assignment.due_at
+        if due_at is not None:
+            if due_at.tzinfo is None:
+                due_at = due_at.replace(tzinfo=timezone.utc)
+            if datetime.now(timezone.utc) > due_at:
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail={
+                        "code": "ERR-EXE-ASSIGNMENT_EXPIRED",
+                        "message": "This assignment is past its due date and you have no attempt to resume."
+                    }
+                )
+
+        exercise = self.db.query(Exercise).filter(
+            Exercise.exercise_id == assignment.exercise_id,
+            Exercise.status != 'DELETED'
+        ).first()
+        ai_meta = (exercise.ai_metadata or {}) if exercise else {}
+        is_exam = "đề thi" in (exercise.title or "").lower() if exercise else False
+        max_attempts = ai_meta.get("max_attempts", 1 if is_exam else 3)
+        if len(attempts) >= int(max_attempts):
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail={
+                    "code": "ERR-EXE-ATTEMPT_LIMIT_REACHED",
+                    "message": "You have used all allowed attempts for this assignment."
+                }
+            )
 
     def build_student_paper(self, assignment: ClassAssignment, student_id: UUID) -> AssignmentTakingOut:
         """Build the sanitized AssignmentTakingOut payload for an already-access-checked assignment."""

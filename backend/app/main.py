@@ -15,8 +15,10 @@ if backend_root not in sys.path:
 
 import logging
 import os
+from typing import Optional
 
 from dotenv import load_dotenv
+from starlette.concurrency import run_in_threadpool
 
 # Load environment variables from .env file
 load_dotenv()
@@ -85,23 +87,42 @@ app.add_middleware(
 )
 
 
+def _version_snapshot_sync() -> Optional[dict]:
+    """
+    Synchronous helper for the X-Data-Version middleware. Runs in a worker thread (never on the
+    event loop). In tests get_db is overridden -> reuse that session, closing the override
+    generator properly so the session is released; otherwise open a short-lived SessionLocal.
+    """
+    override = app.dependency_overrides.get(get_db)
+    if override is not None:
+        gen = override()
+        db = next(gen)
+        try:
+            return get_cached_version_snapshot(db=db)
+        finally:
+            gen.close()  # drives the override's finally block -> session closed
+    return get_cached_version_snapshot(db=None)
+
+
 @app.middleware("http")
 async def add_data_version_header(request: Request, call_next):
     """
-    Stamp `X-Data-Version: <ISO8601 UTC>` on every GET response so the FE can read the current
-    data version from any response. The version is computed at most once per 2s (process cache).
-    Never breaks the request: any DB error simply skips the header.
+    Stamp `X-Data-Version: <ISO8601 UTC>` on API GET responses so the FE can read the current
+    data version from any response. The version is computed at most once per 2s (process cache)
+    and the DB work runs in a threadpool so the event loop is never blocked. SSE and static
+    mounts are skipped. Never breaks the request: any DB error simply skips the header.
     """
     response = await call_next(request)
-    if request.method.upper() == "GET":
+    path = request.url.path
+    if (
+        request.method.upper() == "GET"
+        and path.startswith("/api")
+        and not path.startswith("/api/v1/sync/stream")
+    ):
         try:
-            db = None
-            # In tests, get_db is overridden -> reuse that session instead of opening a real one.
-            override = app.dependency_overrides.get(get_db)
-            if override is not None:
-                db = next(override())
-            snapshot = get_cached_version_snapshot(db=db)
-            response.headers["X-Data-Version"] = snapshot["version"]
+            snapshot = await run_in_threadpool(_version_snapshot_sync)
+            if snapshot:
+                response.headers["X-Data-Version"] = snapshot["version"]
         except Exception:
             logger.debug("X-Data-Version header skipped", exc_info=True)
     return response

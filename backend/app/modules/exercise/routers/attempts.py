@@ -143,15 +143,17 @@ def export_attempts_report(
     format: str = Query("csv", pattern="^(csv|pdf)$", description="Report format: csv or pdf"),
     class_id: Optional[UUID] = Query(None),
     assignment_id: Optional[UUID] = Query(None),
+    student_id: Optional[UUID] = Query(None, description="Optional student ID filter (ignored for Student role: always scoped to the caller)"),
     is_finished: Optional[bool] = Query(None),
     search: Optional[str] = Query(None),
     service: AttemptService = Depends(get_attempt_service),
     current_user: User = Depends(get_current_user)
 ):
-    """Export grading results (same role scoping and filters as the attempts list) as CSV or PDF."""
+    """Export grading results (same role scoping and filters as the attempts list) as CSV or PDF.
+    Student role is always scoped to the caller's own attempts regardless of student_id."""
     items = service.list_attempts(
         current_user=current_user, class_id=class_id, assignment_id=assignment_id,
-        is_finished=is_finished, search=search
+        student_id=student_id, is_finished=is_finished, search=search
     )
     if format == "pdf":
         return Response(build_pdf(items), media_type="application/pdf",
