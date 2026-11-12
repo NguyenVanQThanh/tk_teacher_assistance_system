@@ -52,6 +52,8 @@ services:
         condition: service_healthy
     volumes:
       - backend_uploads:/app/uploads
+      # SGK RAG data: put vectors.dump (+ images.tar) in ./sgk_data on the server
+      - ./sgk_data:/sgk_data:ro
     # prod: không --reload (dev override bằng command ở docker-compose.yml gốc)
     command: uvicorn app.main:app --host 0.0.0.0 --port 8000
     healthcheck:
