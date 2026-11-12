@@ -18,7 +18,7 @@ from app.modules.exercise.services.gemini_vision_parser_service import GeminiVis
 from app.modules.exercise.services.import_parser_service import ImportParserService, ParseResult
 from app.modules.exercise.services.pdf_layout_service import PdfLayoutService
 
-_FONT = "C:/Windows/Fonts/arial.ttf"
+from _font import FONT as _FONT
 
 
 def _pdf(lines):

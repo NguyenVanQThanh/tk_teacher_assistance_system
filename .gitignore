@@ -95,3 +95,4 @@ deploy/.env.prod
 Thumbs.db
 Desktop.ini
 .agents/mcp_config.json
+sgk_data/
