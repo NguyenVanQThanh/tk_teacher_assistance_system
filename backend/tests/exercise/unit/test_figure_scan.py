@@ -12,7 +12,7 @@ from PIL import Image, ImageDraw, ImageFont
 
 from app.modules.exercise.services import figure_detection_service as fds
 
-FONT = "C:/Windows/Fonts/arial.ttf"
+from _font import FONT
 W, H = 1654, 2339  # A4 at 200 DPI
 FIG = (300, 800, 1000, 1300)  # axes box in px
 

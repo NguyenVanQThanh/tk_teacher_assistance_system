@@ -16,7 +16,7 @@ from app.modules.exercise.services.pdf_layout_service import (
     PART_ESSAY, PART_MC, PART_SHORT, PART_TF, classify_part, find_part_headings,
 )
 
-_FONT = "C:/Windows/Fonts/arial.ttf"
+from _font import FONT as _FONT
 
 
 def _pdf() -> bytes:

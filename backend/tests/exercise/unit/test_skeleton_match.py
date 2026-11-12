@@ -14,7 +14,7 @@ from app.modules.exercise.services.pdf_layout_service import (
     PdfLayoutService, build_regions, clip_words, find_anchors, page_columns,
 )
 
-_FONT = "C:/Windows/Fonts/arial.ttf"
+from _font import FONT as _FONT
 LINES = [
     "ĐỀ SỐ 1",
     "PHẦN I. CÂU TRẮC NGHIỆM PHƯƠNG ÁN NHIỀU LỰA CHỌN", "Câu 1. mc one", "Câu 2. mc two",

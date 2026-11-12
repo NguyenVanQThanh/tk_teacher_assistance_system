@@ -20,7 +20,7 @@ from app.modules.exercise.services.pdf_layout_service import (
 from app.modules.exercise.schemas import QuestionTypeEnum
 
 
-_FONT = "C:/Windows/Fonts/arial.ttf"
+from _font import FONT as _FONT
 
 
 def _line(block, y, x, text, h=14.0, w=40.0):

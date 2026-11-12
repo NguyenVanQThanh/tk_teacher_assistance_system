@@ -5,6 +5,7 @@
 # Updated At: 2026-11-10
 # Updated By: AI Agent
 
+from _font import FONT
 import pymupdf
 
 from app.modules.exercise.schemas import QuestionTypeEnum
@@ -39,7 +40,7 @@ def _setup(monkeypatch, vlm):
 def _plot_pdf() -> bytes:
     doc = pymupdf.open()
     pg = doc.new_page(width=PW, height=PH)
-    pg.insert_font(fontname="f", fontfile="C:/Windows/Fonts/arial.ttf")
+    pg.insert_font(fontname="f", fontfile=FONT)
     pg.insert_text((60, 80), "Câu 1: Cho đồ thị.", fontname="f", fontsize=11)
     pg.draw_rect(pymupdf.Rect(200, 120, 400, 250), width=1)
     pg.draw_line((300, 120), (300, 250), width=1)
