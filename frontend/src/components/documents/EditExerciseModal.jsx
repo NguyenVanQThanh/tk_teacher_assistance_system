@@ -3,7 +3,7 @@
 // Created At: 2026-09-12
 // Created By: Tam Khang
 // Updated At: 2026-11-11
-// Updated By: AI Agent
+// Updated By: Tam Khang
 
 import React, { useState, useEffect, useRef } from 'react';
 import useUnsavedChangesGuard from '../../hooks/useUnsavedChangesGuard';
@@ -1162,22 +1162,8 @@ Tam giác vuông SAB tại A: tan(∠SBA) = SA / AB = a√3 / a = √3 => ∠SBA
                 </div>
               </div>
 
-              {/* Mức độ tư duy và thời gian làm bài chung khung bảng ký hiệu (Hình 2 style) */}
+              {/* Thời gian làm bài chung khung bảng ký hiệu (Hình 2 style) */}
               <div className="formula-top-meta-cluster">
-                {/* Mức độ tư duy */}
-                <div className="toolbar-level-pill-wrap" title="Mức độ tư duy đề thi">
-                  <select
-                    className="toolbar-level-select"
-                    value={getSimpleLevel(difficultyLevel)}
-                    onChange={(e) => setDifficultyLevel(e.target.value)}
-                  >
-                    <option value="Nhận biết">Nhận biết</option>
-                    <option value="Thông hiểu">Thông hiểu</option>
-                    <option value="Vận dụng">Vận dụng</option>
-                  </select>
-                  <ChevronDown size={13} className="toolbar-level-chevron" />
-                </div>
-
                 {/* Thời gian làm bài */}
                 <div className="toolbar-duration-pill-container" title="Thời gian làm bài">
                   <input
@@ -1443,7 +1429,10 @@ Tam giác vuông SAB tại A: tan(∠SBA) = SA / AB = a√3 / a = √3 => ∠SBA
                     <FileCode2 size={15} />
                     <span>Nội dung bài tập</span>
                   </div>
+<<<<<<< HEAD
                   <span className="katex-support-hint">Nhấn Alt+= hoặc $ để chèn công thức</span>
+=======
+>>>>>>> f2eaf189c26eb8ad1bb5d3cd5a6d47a3122bdfdb
                 </div>
 
                 <MathTextEditor

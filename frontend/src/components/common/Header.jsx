@@ -2,14 +2,13 @@
 // Description: Global persistent Header component for Teacher role with notifications, profile popover, and Q&A discussion modal.
 // Created At: 2026-08-30
 // Created By: Tam Khang
-// Updated At: 2026-09-13
+// Updated At: 2026-11-11
 // Updated By: Tam Khang
 
 import React, { useState, useRef, useEffect } from 'react';
 import { 
   Menu, 
   Bell, 
-  HelpCircle, 
   User, 
   LogOut, 
   Shield, 
@@ -110,15 +109,6 @@ export default function Header({ onToggleSidebar }) {
               </div>
             )}
           </div>
-
-          <button 
-            className="icon-btn" 
-            aria-label="Help"
-            title="Giải đáp thắc mắc học sinh"
-            onClick={() => setIsQAModalOpen(true)}
-          >
-            <HelpCircle size={19} />
-          </button>
 
           {/* User Profile Avatar with dropdown */}
           <div style={{ position: 'relative' }} ref={userMenuRef}>

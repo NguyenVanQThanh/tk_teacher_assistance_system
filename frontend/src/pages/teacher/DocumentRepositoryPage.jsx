@@ -2,7 +2,7 @@
 // Description: Teacher Document Repository Page featuring filtering, search, pagination, centered toast notifications, real metrics, and full CRUD.
 // Created At: 2026-08-30
 // Created By: Tam Khang
-// Updated At: 2026-10-28
+// Updated At: 2026-11-11
 // Updated By: Tam Khang
 
 import React, { useState, useMemo, useRef, useEffect, useCallback } from 'react';
@@ -70,7 +70,6 @@ const mapBackendDoc = (doc) => ({
 
 export default function DocumentRepositoryPage() {
   const [selectedGrade, setSelectedGrade] = useState('all');
-  const [selectedSubject, setSelectedSubject] = useState('all');
   const [selectedType, setSelectedType] = useState('all');
   const [searchQuery, setSearchQuery] = useState('');
   const [isUploadOpen, setIsUploadOpen] = useState(false);
@@ -127,10 +126,6 @@ export default function DocumentRepositoryPage() {
       if (selectedGrade !== 'all' && doc.grade !== selectedGrade) {
         return false;
       }
-      // Subject filter
-      if (selectedSubject !== 'all' && doc.subject !== selectedSubject) {
-        return false;
-      }
       // Type filter
       if (selectedType !== 'all' && doc.fileType !== selectedType) {
         return false;
@@ -144,7 +139,7 @@ export default function DocumentRepositoryPage() {
       }
       return true;
     });
-  }, [documents, selectedGrade, selectedSubject, selectedType, searchQuery]);
+  }, [documents, selectedGrade, selectedType, searchQuery]);
 
   const handleUploadSuccess = async (newDoc) => {
     await reloadData();
@@ -305,8 +300,6 @@ export default function DocumentRepositoryPage() {
           <DocumentFilterBar
             selectedGrade={selectedGrade}
             onChangeGrade={setSelectedGrade}
-            selectedSubject={selectedSubject}
-            onChangeSubject={setSelectedSubject}
             selectedType={selectedType}
             onChangeType={setSelectedType}
             searchQuery={searchQuery}

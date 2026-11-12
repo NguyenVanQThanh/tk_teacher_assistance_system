@@ -2,7 +2,7 @@
 // Description: Multi-criteria filter and search bar for Exercise Repository.
 // Created At: 2026-08-30
 // Created By: Tam Khang
-// Updated At: 2026-08-30
+// Updated At: 2026-11-11
 // Updated By: Tam Khang
 
 import React from 'react';
@@ -12,8 +12,6 @@ import './ExerciseFilterBar.css';
 export default function ExerciseFilterBar({
   selectedGrade,
   onChangeGrade,
-  selectedSubject,
-  onChangeSubject,
   selectedType,
   onChangeType,
   searchQuery,
@@ -39,29 +37,7 @@ export default function ExerciseFilterBar({
         </div>
       </div>
 
-      {/* Filter 2: Môn học */}
-      <div className="filter-field-group">
-        <label className="filter-field-label">Môn học</label>
-        <div className="select-container">
-          <select 
-            value={selectedSubject} 
-            onChange={(e) => onChangeSubject(e.target.value)}
-            className="filter-select"
-          >
-            <option value="all">Tất cả môn học</option>
-            <option value="math">Toán học</option>
-            <option value="physics">Vật lý</option>
-            <option value="chemistry">Hóa học</option>
-            <option value="biology">Sinh học</option>
-            <option value="history">Lịch sử</option>
-            <option value="english">Tiếng Anh</option>
-            <option value="it">Tin học</option>
-          </select>
-          <ChevronDown size={16} className="select-arrow-icon" />
-        </div>
-      </div>
-
-      {/* Filter 3: Loại bài tập */}
+      {/* Filter 2: Loại bài tập */}
       <div className="filter-field-group">
         <label className="filter-field-label">Loại bài tập</label>
         <div className="select-container">
@@ -80,7 +56,7 @@ export default function ExerciseFilterBar({
         </div>
       </div>
 
-      {/* Filter 4: Ô tìm kiếm bài tập */}
+      {/* Filter 3: Ô tìm kiếm bài tập */}
       <div className="filter-field-group search-field-group">
         <label className="filter-field-label" style={{ visibility: 'hidden' }}>Tìm kiếm</label>
         <div className="search-input-container">
