@@ -7,6 +7,7 @@
 
 import React from 'react';
 import { X, Printer, Download } from 'lucide-react';
+import { classifyStudent, CLASSIFICATION_LABELS } from '../../utils/gradeClassification';
 import './StudentTranscriptPrintModal.css';
 
 export default function StudentTranscriptPrintModal({ 
@@ -23,7 +24,7 @@ export default function StudentTranscriptPrintModal({
 
   const className = classInfo?.name?.split(' - ')[0] || '12A1';
   const schoolName = 'TRƯỜNG THPT NGUYỄN THƯỢNG HIỀN';
-  const academicYear = '2023 – 2024';
+  const academicYear = (classInfo?.term || '2025-2026').replace('-', ' – ');
 
   // 13 standard subjects list with detailed scores matching Vietnam curriculum
   const transcriptSubjects = [
@@ -41,6 +42,10 @@ export default function StudentTranscriptPrintModal({
     { tt: 12, name: 'THỂ DỤC', mieng: 'Đ', tx1: 'Đ', tx2: 'Đ', tx3: 'Đ', tx4: 'Đ', gk: 'Đ', ck: 'Đ', tbm: 'Đ', note: '' },
     { tt: 13, name: 'GD QP-AN', mieng: '10', tx1: '10.0', tx2: '10.0', tx3: '10.0', tx4: '9.5', gk: '9.0', ck: '10.0', tbm: '9.8', note: '' },
   ];
+
+  const rankCode = classifyStudent(
+    transcriptSubjects.map((sub) => parseFloat(sub.tbm)).filter((n) => !Number.isNaN(n))
+  );
 
   return (
     <div className="transcript-print-overlay" onClick={onClose}>
@@ -155,7 +160,7 @@ export default function StudentTranscriptPrintModal({
                 </div>
                 <div className="stat-line">
                   <span className="stat-lbl">Học lực:</span>
-                  <span className="stat-val font-bold">Giỏi</span>
+                  <span className="stat-val font-bold">{CLASSIFICATION_LABELS[rankCode]}</span>
                 </div>
                 <div className="stat-line">
                   <span className="stat-lbl">Hạnh kiểm:</span>

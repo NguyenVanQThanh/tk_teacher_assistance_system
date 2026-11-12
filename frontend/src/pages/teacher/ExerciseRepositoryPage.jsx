@@ -151,7 +151,7 @@ export default function ExerciseRepositoryPage() {
       // Enrich exercises data for card display
       const enriched = rawItems.map((ex) => {
         const meta = ex.ai_metadata || {};
-        const subjectName = subjectsMap[ex.subject_id] || 'Toán học';
+        const subjectName = subjectsMap[ex.subject_id] || 'Chung';
 
         let grade = meta.grade || '12';
         if (!meta.grade) {
@@ -173,7 +173,7 @@ export default function ExerciseRepositoryPage() {
           duration: meta.duration || (exType === 'test' ? '60 phút' : exType === 'quiz' ? '15 phút' : null),
           date: createdDate,
           grade: grade,
-          subject: subjectName.toLowerCase().includes('toán') ? 'math' : subjectName.toLowerCase().includes('vật lý') ? 'physics' : subjectName.toLowerCase().includes('hóa') ? 'chemistry' : 'math',
+          subject: subjectName.toLowerCase().includes('toán') ? 'math' : subjectName.toLowerCase().includes('vật lý') ? 'physics' : subjectName.toLowerCase().includes('hóa') ? 'chemistry' : 'other',
           subjectName: subjectName,
           authorName: 'Thầy Nguyễn Văn A',
           authorInitial: 'NA',

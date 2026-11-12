@@ -23,6 +23,7 @@ import MathRenderer from '../common/MathRenderer';
 import { getQuestionItems } from '../../utils/questionItems';
 import QuestionMedia from './QuestionMedia';
 import './ExercisePreviewModal.css';
+import toast from '../../components/common/toast';
 
 export default function ExercisePreviewModal({ exercise, isOpen, onClose }) {
   const [exerciseDetail, setExerciseDetail] = useState(null);
@@ -119,7 +120,7 @@ export default function ExercisePreviewModal({ exercise, isOpen, onClose }) {
       link.remove();
       window.URL.revokeObjectURL(url);
     } catch (err) {
-      alert('Không thể xuất file PDF cho bài tập này.');
+      toast.error('Không thể xuất file PDF cho bài tập này.');
     } finally {
       setDownloadingPdf(false);
     }
@@ -222,6 +223,12 @@ export default function ExercisePreviewModal({ exercise, isOpen, onClose }) {
           <div className="preview-info-box">
             <h3 className="preview-heading">{exercise.title}</h3>
             <div className="preview-sub-badges">
+              <span
+                className="badge-tag"
+                style={{ fontWeight: 700, color: (exerciseDetail?.exercise_kind || exercise.raw?.exercise_kind) === 'EXAM' ? '#B91C1C' : '#4338CA' }}
+              >
+                {(exerciseDetail?.exercise_kind || exercise.raw?.exercise_kind) === 'EXAM' ? 'Đề thi' : 'Luyện tập'}
+              </span>
               <span className="badge-tag">{questionCountText}</span>
               {durationText && <span className="badge-tag">{durationText}</span>}
               <span className="badge-tag">Tác giả: {exercise.authorName || 'Giáo viên'}</span>
@@ -234,10 +241,8 @@ export default function ExercisePreviewModal({ exercise, isOpen, onClose }) {
               onClick={handleDownloadPdf}
               disabled={downloadingPdf}
               title="Tải đề bài file PDF"
-              style={{ padding: '6px 12px', display: 'flex', alignItems: 'center', gap: '6px', fontSize: '13px', background: '#F3F4F6', borderRadius: '6px', border: '1px solid #E5E7EB', cursor: 'pointer' }}
             >
-              {downloadingPdf ? <Loader2 size={15} className="animate-spin" /> : <Download size={15} />}
-              <span>{downloadingPdf ? 'Đang tải...' : 'Tải PDF'}</span>
+              {downloadingPdf ? <Loader2 size={16} className="animate-spin" /> : <Download size={16} />}
             </button>
             <button type="button" className="btn-modal-close" onClick={onClose}>
               <X size={18} />

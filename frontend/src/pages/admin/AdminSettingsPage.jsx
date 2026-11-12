@@ -562,7 +562,7 @@ export default function AdminSettingsPage() {
               <div className="settings-toggle-item">
                 <div className="toggle-info">
                   <h5 className="toggle-title">Quét ảnh & Nhận diện chữ viết tay học sinh (Gemini Vision OCR)</h5>
-                  <p className="toggle-desc">Chuyển đổi bài làm chụp từ điện thoại thành văn bản và công thức toán học LaTeX tự động.</p>
+                  <p className="toggle-desc">Chuyển đổi bài làm chụp từ điện thoại thành văn bản và công thức toán học tự động.</p>
                 </div>
                 <label className="settings-switch">
                   <input 

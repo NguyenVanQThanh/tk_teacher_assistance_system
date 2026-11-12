@@ -5,7 +5,7 @@
 // Updated At: 2026-10-11
 // Updated By: Tam Khang
 
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { 
   BookOpen, 
@@ -19,6 +19,7 @@ import {
   PlusCircle
 } from 'lucide-react';
 import { assignmentsApi, attemptsApi } from '../../services/api';
+import useDataSync from '../../hooks/useDataSync';
 import './StudentSubjectRadarDetailCard.css';
 
 /**
@@ -253,46 +254,98 @@ export default function StudentSubjectRadarDetailCard({
     }
   }, [subjectName]);
 
-  // Synchronize assignments and attempts from session cache or backend
+  // Guards to avoid duplicate / too-frequent fetches
+  const isFetchingRef = useRef(false);
+  const isMountedRef = useRef(true);
+  const lastRemoteFetchRef = useRef(0);
+
   useEffect(() => {
-    let isMounted = true;
-    async function syncData() {
-      // 1. Check session cache first for fast load
+    isMountedRef.current = true;
+    return () => { isMountedRef.current = false; };
+  }, []);
+
+  // Remove every sessionStorage cache key related to student assignments/attempts
+  // (both the shared 'tk_student_assignments_cache' and the per-user keys used by StudentExercisesPage)
+  const clearRelatedCaches = () => {
+    try {
+      sessionStorage.removeItem('tk_student_assignments_cache');
+      let uid = 'default';
       try {
-        const cachedRaw = sessionStorage.getItem('tk_student_assignments_cache');
-        if (cachedRaw) {
-          const parsed = JSON.parse(cachedRaw);
-          if (parsed && Array.isArray(parsed.assignments)) {
-            if (isMounted) {
-              setBackendAssignments(parsed.assignments);
-              setBackendAttempts(parsed.attempts || []);
-            }
-            return;
-          }
+        const raw = localStorage.getItem('user_info');
+        if (raw) {
+          const u = JSON.parse(raw);
+          uid = u.user_id || u.id || 'default';
         }
       } catch (e) {}
+      sessionStorage.removeItem(`tk_student_assignments_session_${uid}`);
+      sessionStorage.removeItem(`tk_student_attempts_session_${uid}`);
+      sessionStorage.removeItem(`tk_student_subjects_session_${uid}`);
+    } catch (e) {}
+  };
 
-      // 2. Query backend APIs
-      try {
-        setIsLoading(true);
-        const [assigns, atts] = await Promise.all([
-          assignmentsApi.getAssignments().catch(() => []),
-          attemptsApi.getAttempts().catch(() => [])
-        ]);
-        if (isMounted) {
-          setBackendAssignments(Array.isArray(assigns) ? assigns : []);
-          setBackendAttempts(Array.isArray(atts) ? atts : []);
-        }
-      } catch (err) {
-        console.warn('Could not sync assignments from backend:', err);
-      } finally {
-        if (isMounted) setIsLoading(false);
+  // Shared fetch from BE used by initial mount (no cache) and by version-change invalidation
+  const fetchFromBackend = useCallback(async () => {
+    if (isFetchingRef.current) return false; // skip when a fetch is already in flight
+    isFetchingRef.current = true;
+    try {
+      setIsLoading(true);
+      const [assigns, atts] = await Promise.all([
+        assignmentsApi.getAssignments().catch(() => []),
+        attemptsApi.getAttempts().catch(() => [])
+      ]);
+      const safeAssigns = Array.isArray(assigns) ? assigns : [];
+      const safeAtts = Array.isArray(atts) ? atts : [];
+      if (isMountedRef.current) {
+        setBackendAssignments(safeAssigns);
+        setBackendAttempts(safeAtts);
       }
+      // Refresh the shared session cache so subsequent fast-path loads stay consistent
+      try {
+        sessionStorage.setItem('tk_student_assignments_cache', JSON.stringify({
+          assignments: safeAssigns,
+          attempts: safeAtts,
+        }));
+      } catch (e) {}
+      return true;
+    } catch (err) {
+      console.warn('Could not sync assignments from backend:', err);
+      return false;
+    } finally {
+      isFetchingRef.current = false;
+      if (isMountedRef.current) setIsLoading(false);
     }
-
-    syncData();
-    return () => { isMounted = false; };
   }, []);
+
+  // Synchronize assignments and attempts from session cache or backend
+  useEffect(() => {
+    // 1. Check session cache first for fast load
+    try {
+      const cachedRaw = sessionStorage.getItem('tk_student_assignments_cache');
+      if (cachedRaw) {
+        const parsed = JSON.parse(cachedRaw);
+        if (parsed && Array.isArray(parsed.assignments)) {
+          setBackendAssignments(parsed.assignments);
+          setBackendAttempts(parsed.attempts || []);
+          return;
+        }
+      }
+    } catch (e) {}
+
+    // 2. Query backend APIs
+    fetchFromBackend();
+  }, [fetchFromBackend]);
+
+  // Auto-invalidate the session cache and refetch when the backend data version changes
+  // (new assignment/attempt created elsewhere). Throttled to at least 5s apart.
+  const handleRemoteInvalidate = useCallback(() => {
+    const now = Date.now();
+    if (now - lastRemoteFetchRef.current < 5000) return;
+    lastRemoteFetchRef.current = now;
+    clearRelatedCaches();
+    fetchFromBackend();
+  }, [fetchFromBackend]);
+
+  useDataSync(handleRemoteInvalidate);
 
   const normCurrent = normalizeSubj(currentSubject);
 

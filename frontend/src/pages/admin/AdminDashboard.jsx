@@ -26,6 +26,7 @@ import {
 } from 'lucide-react';
 import { adminDashboardApi } from '../../services/api';
 import './AdminDashboard.css';
+import toast from '../../components/common/toast';
 
 export default function AdminDashboard() {
   const [timeframe, setTimeframe] = useState('week'); // 'week' | 'month'
@@ -172,7 +173,7 @@ export default function AdminDashboard() {
   const handleCreateUserSubmit = (e) => {
     e.preventDefault();
     if (!newUser.fullName || !newUser.email) {
-      alert('Vui lòng nhập đầy đủ họ tên và email.');
+      toast.error('Vui lòng nhập đầy đủ họ tên và email.');
       return;
     }
     setShowCreateUserModal(false);

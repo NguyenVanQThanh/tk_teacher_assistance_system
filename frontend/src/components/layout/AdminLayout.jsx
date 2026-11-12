@@ -23,6 +23,7 @@ import {
 import { useAuth } from '../../context/AuthContext';
 import AdminSidebar from '../admin/AdminSidebar';
 import './AdminLayout.css';
+import toast from '../../components/common/toast';
 
 export default function AdminLayout() {
   const { user, logout } = useAuth();
@@ -148,7 +149,7 @@ export default function AdminLayout() {
               type="button" 
               className="admin-icon-btn" 
               title="Trung tâm hỗ trợ"
-              onClick={() => alert('Trung tâm hướng dẫn quản trị viên SmartLMS')}
+              onClick={() => toast.info('Trung tâm hướng dẫn quản trị viên SmartLMS')}
             >
               <HelpCircle size={20} strokeWidth={1.8} />
             </button>

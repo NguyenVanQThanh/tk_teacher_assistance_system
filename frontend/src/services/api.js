@@ -38,6 +38,26 @@ api.interceptors.response.use(
   }
 );
 
+// Response interceptor: forward the X-Data-Version header of every GET response to dataSync.
+// Lazy dynamic import avoids a circular dependency (dataSync imports syncApi from this file).
+api.interceptors.response.use(
+  (response) => {
+    try {
+      const v = response?.headers?.['x-data-version'];
+      if (v) {
+        import('./dataSync')
+          .then((m) => {
+            const ds = m.default || m;
+            ds.notifyHeaderVersion?.(v);
+          })
+          .catch(() => {});
+      }
+    } catch (e) {}
+    return response;
+  },
+  (error) => Promise.reject(error)
+);
+
 export const authApi = {
   login: async (credentials) => {
     const response = await api.post('/api/v1/auth/login', credentials);
@@ -114,6 +134,10 @@ export const exercisesApi = {
   },
   updateExercise: async (exerciseId, data) => {
     const response = await api.put(`/api/v1/exercises/${exerciseId}`, data);
+    return response.data;
+  },
+  setAnswerRelease: async (exerciseId, released) => {
+    const response = await api.put(`/api/v1/exercises/${exerciseId}/answer-release`, { released });
     return response.data;
   },
   deleteExercise: async (exerciseId) => {
@@ -207,6 +231,10 @@ export const assignmentsApi = {
   deleteAssignment: async (assignmentId) => {
     await api.delete(`/api/v1/assignments/${assignmentId}`);
   },
+  setAnswerRelease: async (assignmentId, released) => {
+    const response = await api.put(`/api/v1/assignments/${assignmentId}/answer-release`, { released });
+    return response.data;
+  },
   restoreAssignment: async (assignmentId) => {
     const response = await api.post(`/api/v1/assignments/${assignmentId}/restore`);
     return response.data;
@@ -244,6 +272,14 @@ export const attemptsApi = {
   },
   updateGrade: async (attemptId, data) => {
     const response = await api.put(`/api/v1/attempts/${attemptId}/grade`, data);
+    return response.data;
+  },
+  updateAnswerKey: async (exerciseId, data) => {
+    const response = await api.put(`/api/v1/exercises/${exerciseId}/answer-key`, data);
+    return response.data;
+  },
+  exportReport: async (params = {}) => {
+    const response = await api.get('/api/v1/attempts/export', { params, responseType: 'blob' });
     return response.data;
   },
   getAssignmentAttempts: async (assignmentId, params = {}) => {
@@ -402,7 +438,59 @@ export const studentApi = {
   },
 };
 
+// Data version sync API: backend exposes GET /api/v1/sync/version -> { version, tables }
+// and an SSE stream GET /api/v1/sync/stream that emits { version } on change.
+export const syncApi = {
+  getVersion: async () => {
+    const response = await api.get('/api/v1/sync/version');
+    return response.data;
+  },
+  // Optional SSE subscription. EventSource cannot set the Authorization header, so a
+  // 30s single-purpose ticket (never the access token) goes in the query string.
+  // The ticket is fetched per (re)connect. Returns a close() function.
+  // Primary mechanism remains polling in dataSync.js; this is best-effort.
+  subscribeVersionStream: (onVersion) => {
+    if (typeof EventSource === 'undefined') return () => {};
+    const base = api.defaults.baseURL || '';
+    let es = null;
+    let closed = false;
+    let retryTimer = null;
+    const connect = async () => {
+      if (closed) return;
+      try {
+        const { data } = await api.post('/api/v1/sync/stream-ticket');
+        if (closed) return;
+        es = new EventSource(`${base}/api/v1/sync/stream?ticket=${encodeURIComponent(data.ticket)}`);
+      } catch (e) {
+        retryTimer = setTimeout(connect, 10000);
+        return;
+      }
+      es.onmessage = (ev) => {
+        try {
+          const d = JSON.parse(ev.data);
+          if (d?.version && typeof onVersion === 'function') onVersion(d.version);
+        } catch (e) {}
+      };
+      // Native auto-reconnect would reuse the expired ticket: close and fetch a new one.
+      es.onerror = () => {
+        try { es.close(); } catch (e) {}
+        if (!closed) retryTimer = setTimeout(connect, 5000);
+      };
+    };
+    connect();
+    return () => {
+      closed = true;
+      clearTimeout(retryTimer);
+      try { es && es.close(); } catch (e) {}
+    };
+  },
+};
+
 export const teacherApi = {
+  getNotifications: async () => {
+    const response = await api.get('/api/v1/teacher/notifications');
+    return response.data;
+  },
   getDashboard: async (params = {}) => {
     const response = await api.get('/api/v1/teacher/dashboard', { params });
     return response.data;

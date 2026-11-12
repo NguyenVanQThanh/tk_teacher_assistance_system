@@ -2,7 +2,7 @@
 # Description: Unit tests for the "Other" question type (schema validation and manual grading skip) and type-change validation on update.
 # Created At: 2026-11-12
 # Created By: AI Agent
-# Updated At: 2026-11-12
+# Updated At: 2026-11-13
 # Updated By: AI Agent
 
 import uuid
@@ -53,3 +53,24 @@ def test_other_is_pending_manual_grade():
     assert score is None
     assert res["question_type"] == "Other" and res["is_correct"] is None and res["pending_manual_grade"] is True
     assert res["student_answer_text"] == '["x","y"]'
+
+
+def test_regrade_keeps_teacher_verdict_on_other():
+    # Teacher marks on "Other" (sent as manual_marks -> manual_override) must survive an answer-key regrade.
+    db = MagicMock()
+    service = GradingService(db)
+    q_id = uuid.uuid4()
+    q = MagicMock()
+    q.question_id, q.question_type, q.status, q.answer_options = q_id, "Other", "ACTIVE", []
+    ex = MagicMock()
+    ex.questions = [q]
+    service.exercise_repo.get_by_id = MagicMock(return_value=ex)
+    att = MagicMock()
+    att.detailed_results = {"questions": [{
+        "question_id": str(q_id), "question_type": "Other", "student_answer_text": '["x"]',
+        "is_correct": True, "manual_override": True, "pending_manual_grade": False,
+    }]}
+    db.query.return_value.join.return_value.filter.return_value.all.return_value = [att]
+    assert service.regrade_exercise(uuid.uuid4()) == 1
+    res = att.detailed_results["questions"][0]
+    assert res["is_correct"] is True and res["pending_manual_grade"] is False and res["manual_override"] is True

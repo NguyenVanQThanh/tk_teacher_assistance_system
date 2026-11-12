@@ -7,6 +7,7 @@
 
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
+import AnswerReleaseButton from './AnswerReleaseButton';
 import './RecentSubmissionsSummaryCard.css';
 
 export default function RecentSubmissionsSummaryCard({ recentSubmissions }) {
@@ -45,6 +46,9 @@ export default function RecentSubmissionsSummaryCard({ recentSubmissions }) {
         statusLabel: item.status_label || item.statusLabel,
         avatarBg: item.avatar_bg || item.avatarBg || '#E0E7FF',
         avatarColor: item.avatar_color || item.avatarColor || '#4338CA',
+        assignmentId: item.assignment_id,
+        isExam: Boolean(item.is_exam),
+        answersReleased: Boolean(item.answers_released),
       }))
     : defaultList;
 
@@ -80,6 +84,10 @@ export default function RecentSubmissionsSummaryCard({ recentSubmissions }) {
                 <span className="student-class-label">{item.className}</span>
               </div>
             </div>
+
+            {item.isExam && item.assignmentId && (
+              <AnswerReleaseButton assignmentId={item.assignmentId} released={item.answersReleased} />
+            )}
 
             <div className="status-badge-cell">
               <span className={`recent-status-pill status-${item.status}`}>

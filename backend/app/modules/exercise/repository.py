@@ -158,10 +158,13 @@ class ExerciseRepository:
             "total": total
         }
 
-    def update(self, exercise: Exercise, title: Optional[str] = None, ai_metadata: Optional[dict] = None) -> Exercise:
-        """Update title or AI metadata of an Exercise."""
+    def update(self, exercise: Exercise, title: Optional[str] = None, ai_metadata: Optional[dict] = None,
+               exercise_kind: Optional[str] = None) -> Exercise:
+        """Update title, AI metadata or kind of an Exercise."""
         if title is not None:
             exercise.title = title
+        if exercise_kind is not None:
+            exercise.exercise_kind = exercise_kind
         if ai_metadata is not None:
             exercise.ai_metadata = ai_metadata
         self.db.commit()

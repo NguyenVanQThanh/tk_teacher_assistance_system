@@ -1,0 +1,55 @@
+/* File Name: QuestionContentView.css
+   Description: Styles for QuestionContentView — mirrors the teacher edit-page
+   preview look (preview-content-block / preview-content-line /
+   preview-highlight-formula-card in EditExerciseModal.css) so student pages render
+   question content identically to the GV edit preview.
+   Created At: 2026-11-12
+   Created By: AI Agent */
+
+.question-content-view {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-width: 0;
+}
+
+.qcv-text-block {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.qcv-text-line {
+  line-height: 1.65;
+  color: inherit;
+  overflow-wrap: break-word;
+}
+
+/* Standalone $$...$$ formula card (same look as the edit-page preview-highlight-formula-card) */
+.qcv-formula-card {
+  background-color: #FFFFFF;
+  border: 1px solid #E2E8F0;
+  border-radius: 8px;
+  padding: 10px 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.03);
+  overflow-x: auto;
+}
+
+/* Inline markdown images inside a content line */
+.question-content-view .math-content-image {
+  display: block;
+  max-width: 100%;
+  max-height: 260px;
+  border-radius: 8px;
+  border: 1px solid #E2E8F0;
+  margin: 4px 0;
+  background: #FFFFFF;
+}
+
+/* Tables rendered inside the content view keep their own qm-table styles */
+.question-content-view .qm-table-wrap {
+  margin: 6px 0;
+}

@@ -1,24 +1,43 @@
 # File Name: assignment_service.py
-# Description: Service layer for ClassAssignment operations (creation, scoping, feed listing, soft-delete, restore).
+# Description: Service layer for ClassAssignment operations (creation, scoping, feed listing, soft-delete, restore)
+#              plus the student-safe "taking" paper builder (sanitized questions, no answer key).
 # Created At: 2026-07-31
 # Created By: Tam Khang
-# Updated At: 2026-10-04
-# Updated By: Tam Khang
+# Updated At: 2026-11-13
+# Updated By: AI Agent
 
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from typing import List, Optional, Dict, Any
 from uuid import UUID
 from fastapi import HTTPException, status
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 from sqlalchemy import or_
 
-from models.models import User, Class, Exercise, TeacherSubject, ClassAssignment, Subject, StudentExerciseAttempt, Question
+from models.models import User, Class, Exercise, TeacherSubject, ClassAssignment, Subject, StudentClass, StudentExerciseAttempt, Question
 from app.modules.exercise.schemas import (
     AssignmentCreate, AssignmentResultSummaryOut, AssignmentAttemptDetail,
-    CognitiveAnalysis, CognitiveLevelStats
+    CognitiveAnalysis, CognitiveLevelStats,
+    AssignmentTakingOut, AssignmentTakingInfoOut, AssignmentTakingExerciseOut,
+    StudentQuestionOut, StudentOpenAttemptOut
 )
-from app.modules.exercise.repository import AssignmentRepository, ExerciseRepository
+from app.modules.exercise.repository import AssignmentRepository, ExerciseRepository, AttemptRepository
 from app.modules.academic.scoping import get_user_role_name, check_class_access, get_accessible_class_ids
+
+# ai_metadata keys that may be shown to students (display only; no generation context).
+_STUDENT_SAFE_META_KEYS = {"type", "grade", "grade_name", "level", "duration", "duration_minutes",
+                           "max_attempts", "is_ai_generated", "sources"}
+
+
+def open_attempt_deadline(assignment: ClassAssignment, exercise: Optional[Exercise]) -> Optional[datetime]:
+    """Latest moment an open attempt may be resumed or submitted: due_at plus the paper duration
+    (an attempt started right before the due date still gets its full time). None = no due date."""
+    due_at = assignment.due_at
+    if due_at is None:
+        return None
+    if due_at.tzinfo is None:
+        due_at = due_at.replace(tzinfo=timezone.utc)
+    minutes = int(((exercise.ai_metadata or {}) if exercise else {}).get("duration_minutes", 45) or 45)
+    return due_at + timedelta(minutes=minutes)
 
 
 class AssignmentService:
@@ -224,7 +243,7 @@ class AssignmentService:
             # Teacher name and AI metadata
             is_ai_gen = bool(a.exercise and (a.exercise.ai_metadata or {}).get("is_ai_generated"))
             teacher_name = "Trợ lý AI Tam Khang" if is_ai_gen else (a.assigner.full_name if a.assigner else "Giáo viên bộ môn")
-            category = "ai_generated" if is_ai_gen else ("exam" if "đề thi" in (a.exercise.title or '').lower() else "class_exercise")
+            category = "ai_generated" if is_ai_gen else ("exam" if a.exercise.exercise_kind == "EXAM" else "class_exercise")
             category_label = "Bài tập tạo sinh AI" if is_ai_gen else ("Bài thi" if category == "exam" else "Bài tập trên lớp")
 
             results.append({
@@ -236,6 +255,7 @@ class AssignmentService:
                 "due_at": a.due_at,
                 "status": a.status,
                 "exercise_title": a.exercise.title if a.exercise else "Bài tập",
+                "answers_released": a.answers_released_at is not None,
                 "total_questions": a.exercise.total_questions if a.exercise else 0,
                 "class_name": a.class_obj.class_name if a.class_obj else "Lớp học",
                 "subject_id": a.exercise.subject_id if a.exercise else None,
@@ -249,10 +269,183 @@ class AssignmentService:
                 "feed_status": feed_status,
                 "category": category,
                 "categoryLabel": category_label,
-                "is_ai_generated": is_ai_gen
+                "is_ai_generated": is_ai_gen,
+                # Teacher/AI-assigned exercise type; None means unclassified
+                "exercise_type": (a.exercise.ai_metadata or {}).get("type") if a.exercise else None
             })
 
         return results
+
+    def get_assignment_taking(self, assignment_id: UUID, current_user: User) -> AssignmentTakingOut:
+        """
+        Student-safe "paper" of an assignment: assignment info + exercise info + SANITIZED questions
+        (no correct_answer / explanation / is_correct) + the current user's open attempt (if any).
+
+        - 404 when the assignment does not exist or was cancelled (status DELETED).
+        - 403 when a Student is not enrolled in the assignment's class (teachers/admins go through
+          the standard class-access scoping instead).
+        """
+        # repo.get_by_id already excludes DELETED assignments -> cancelled ones 404 here.
+        assignment = self.repo.get_by_id(assignment_id)
+        if not assignment:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail={
+                    "code": "ERR-EXE-ASSIGNMENT_NOT_FOUND",
+                    "message": "Class assignment record not found."
+                }
+            )
+
+        role_name = get_user_role_name(self.db, current_user)
+        if role_name == "Student":
+            enrolled = self.db.query(StudentClass).filter(
+                StudentClass.student_id == current_user.user_id,
+                StudentClass.class_id == assignment.class_id,
+                StudentClass.status != 'DELETED'
+            ).first()
+            if not enrolled:
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail={
+                        "code": "ERR-EXE-STUDENT_NOT_ENROLLED",
+                        "message": "You are not enrolled in the class for this assignment."
+                    }
+                )
+            # Availability window + attempt-limit gating: the paper may be served only to
+            # resume an open attempt, to review an already-finished attempt, or while the
+            # assignment is still open and the student has attempts left.
+            self._check_student_taking_allowed(assignment, current_user.user_id)
+        else:
+            # Teacher / Admin: standard class access scoping.
+            check_class_access(self.db, current_user, assignment.class_id)
+
+        return self.build_student_paper(assignment, current_user.user_id)
+
+    def _check_student_taking_allowed(self, assignment: ClassAssignment, student_id: UUID) -> None:
+        """403 when a student without any attempt tries to read a paper past its due date or
+        after exhausting max_attempts. Finished attempts are always allowed (review); an open attempt
+        may be resumed only until open_attempt_deadline (due_at + duration)."""
+        exercise = self.db.query(Exercise).filter(
+            Exercise.exercise_id == assignment.exercise_id,
+            Exercise.status != 'DELETED'
+        ).first()
+        attempt_repo = AttemptRepository(self.db)
+        open_attempt = attempt_repo.find_open_attempt(student_id, assignment.assignment_id)
+        if open_attempt:
+            deadline = open_attempt_deadline(assignment, exercise)
+            if deadline is None or datetime.now(timezone.utc) <= deadline:
+                return
+
+        attempts = self.db.query(StudentExerciseAttempt).filter(
+            StudentExerciseAttempt.student_id == student_id,
+            StudentExerciseAttempt.assignment_id == assignment.assignment_id,
+            StudentExerciseAttempt.status != 'DELETED'
+        ).all()
+        if any(a.is_finished for a in attempts):
+            return  # review of own submitted attempt
+
+        due_at = assignment.due_at
+        if due_at is not None:
+            if due_at.tzinfo is None:
+                due_at = due_at.replace(tzinfo=timezone.utc)
+            if datetime.now(timezone.utc) > due_at:
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail={
+                        "code": "ERR-EXE-ASSIGNMENT_EXPIRED",
+                        "message": "This assignment is past its due date and you have no attempt to resume."
+                    }
+                )
+
+        ai_meta = (exercise.ai_metadata or {}) if exercise else {}
+        is_exam = (exercise.exercise_kind == "EXAM") if exercise else False
+        max_attempts = ai_meta.get("max_attempts", 1 if is_exam else 3)
+        if len(attempts) >= int(max_attempts):
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail={
+                    "code": "ERR-EXE-ATTEMPT_LIMIT_REACHED",
+                    "message": "You have used all allowed attempts for this assignment."
+                }
+            )
+
+    def build_student_paper(self, assignment: ClassAssignment, student_id: UUID) -> AssignmentTakingOut:
+        """Build the sanitized AssignmentTakingOut payload for an already-access-checked assignment."""
+        exercise = self.db.query(Exercise).filter(
+            Exercise.exercise_id == assignment.exercise_id,
+            Exercise.status != 'DELETED'
+        ).first()
+        if not exercise:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail={
+                    "code": "ERR-EXE-EXERCISE_NOT_FOUND",
+                    "message": "Exercise not found."
+                }
+            )
+
+        questions = self.db.query(Question).options(
+            joinedload(Question.answer_options)
+        ).filter(
+            Question.exercise_id == exercise.exercise_id,
+            Question.status != 'DELETED'
+        ).order_by(Question.display_order.asc()).all()
+
+        subject_obj = None
+        if exercise.subject_id:
+            subject_obj = self.db.query(Subject).filter(
+                Subject.subject_id == exercise.subject_id,
+                Subject.status != 'DELETED'
+            ).first()
+
+        # duration_minutes / max_attempts live in exercise.ai_metadata (same rule as the feed).
+        ai_meta = exercise.ai_metadata or {}
+        is_exam = exercise.exercise_kind == "EXAM"
+        duration_minutes = ai_meta.get("duration_minutes", 45)
+        max_attempts = ai_meta.get("max_attempts", 1 if is_exam else 3)
+
+        # The student's own in-progress attempt for this assignment (if any).
+        open_attempt = AttemptRepository(self.db).find_open_attempt(student_id, assignment.assignment_id)
+        open_attempt_out: Optional[StudentOpenAttemptOut] = None
+        if open_attempt:
+            saved_answers = None
+            detailed = open_attempt.detailed_results
+            if isinstance(detailed, dict):
+                saved_answers = detailed.get("answers")
+            open_attempt_out = StudentOpenAttemptOut(
+                attempt_id=open_attempt.attempt_id,
+                created_at=open_attempt.created_at,
+                start_time=open_attempt.start_time,
+                answers=saved_answers
+            )
+
+        # StudentQuestionOut omits correct_answer/explanation; its segments/options sanitize themselves.
+        student_questions = [StudentQuestionOut.model_validate(q) for q in questions]
+
+        return AssignmentTakingOut(
+            assignment=AssignmentTakingInfoOut(
+                assignment_id=assignment.assignment_id,
+                exercise_id=assignment.exercise_id,
+                class_id=assignment.class_id,
+                due_at=assignment.due_at,
+                duration_minutes=duration_minutes,
+                max_attempts=max_attempts,
+                status=assignment.status,
+                teacher_name=assignment.assigner.full_name if assignment.assigner else None,
+                class_name=assignment.class_obj.class_name if assignment.class_obj else None,
+                subject_name=subject_obj.subject_name if subject_obj else None
+            ),
+            exercise=AssignmentTakingExerciseOut(
+                exercise_id=exercise.exercise_id,
+                title=exercise.title,
+                subject_id=exercise.subject_id,
+                subject_name=subject_obj.subject_name if subject_obj else None,
+                # Whitelist: generation context (prompts, matrices, document ids) stays server-side.
+                ai_metadata={k: v for k, v in (exercise.ai_metadata or {}).items() if k in _STUDENT_SAFE_META_KEYS}
+            ),
+            questions=student_questions,
+            open_attempt=open_attempt_out
+        )
 
     def delete_assignment(self, assignment_id: UUID, current_user: User) -> ClassAssignment:
         assignment = self.repo.get_by_id(assignment_id)
@@ -275,6 +468,20 @@ class AssignmentService:
             )
 
         return self.repo.soft_delete(assignment)
+
+    def set_answers_released(self, assignment_id: UUID, released: bool, current_user: User) -> ClassAssignment:
+        """Teacher/admin toggles whether students may see per-question results of an exam."""
+        assignment = self.repo.get_by_id(assignment_id)
+        if not assignment:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail={"code": "ERR-EXE-ASSIGNMENT_NOT_FOUND", "message": "Class assignment record not found."}
+            )
+        check_class_access(self.db, current_user, assignment.class_id)
+        assignment.answers_released_at = datetime.now(timezone.utc) if released else None
+        self.db.commit()
+        self.db.refresh(assignment)
+        return assignment
 
     def restore_assignment(self, assignment_id: UUID, current_user: User) -> ClassAssignment:
         assignment = self.repo.get_by_id(assignment_id, include_deleted=True)

@@ -4,11 +4,13 @@
 # Created By: Tam Khang
 # Updated At: 2026-11-12
 # Updated By: AI Agent
+# Note: Student-safe schemas (StudentQuestionOut and friends) intentionally omit correct_answer /
+# explanation / is_correct so students can never read the answer key from API responses.
 
 from enum import Enum
 from uuid import UUID
 from datetime import datetime
-from typing import Optional, List, Any
+from typing import Optional, List, Any, Dict, Literal
 from pydantic import BaseModel, Field, ValidationInfo, field_validator, model_validator
 
 
@@ -240,6 +242,7 @@ class ExerciseCreate(BaseModel):
     title: str = Field(..., min_length=1, max_length=255, description="Exercise title")
     subject_id: UUID = Field(..., description="Subject UUID")
     ai_metadata: Optional[Any] = Field(None, description="Metadata for AI generation")
+    exercise_kind: Literal["PRACTICE", "EXAM"] = Field("PRACTICE", description="PRACTICE or EXAM")
 
     @field_validator("title")
     @classmethod
@@ -253,6 +256,7 @@ class ExerciseCreate(BaseModel):
 class ExerciseUpdate(BaseModel):
     title: Optional[str] = Field(None, min_length=1, max_length=255, description="New exercise title")
     ai_metadata: Optional[Any] = Field(None, description="New AI metadata")
+    exercise_kind: Optional[Literal["PRACTICE", "EXAM"]] = Field(None, description="New exercise kind")
 
     @field_validator("title")
     @classmethod
@@ -272,6 +276,8 @@ class ExerciseOut(BaseModel):
     created_by: UUID
     total_questions: int
     ai_metadata: Optional[Any] = None
+    exercise_kind: str = "PRACTICE"
+    answers_released: bool = False
     status: str
     created_at: datetime
     updated_at: datetime
@@ -316,6 +322,10 @@ class AssignmentCreate(BaseModel):
         return v
 
 
+class AnswerReleaseRequest(BaseModel):
+    released: bool
+
+
 class AssignmentOut(BaseModel):
     assignment_id: UUID
     class_id: UUID
@@ -325,6 +335,7 @@ class AssignmentOut(BaseModel):
     due_at: datetime
     status: str
     exercise_title: Optional[str] = None
+    answers_released: Optional[bool] = False
     total_questions: Optional[int] = None
     class_name: Optional[str] = None
     subject_id: Optional[UUID] = None
@@ -342,6 +353,7 @@ class AssignmentOut(BaseModel):
     category: Optional[str] = "class_exercise"
     categoryLabel: Optional[str] = "Bài tập trên lớp"
     is_ai_generated: Optional[bool] = False
+    exercise_type: Optional[str] = None
 
     @model_validator(mode="before")
     @classmethod
@@ -352,7 +364,7 @@ class AssignmentOut(BaseModel):
             class_name = getattr(data.class_obj, "class_name", None) if hasattr(data, "class_obj") and data.class_obj else None
             teacher_name = getattr(data.assigner, "full_name", None) if hasattr(data, "assigner") and data.assigner else None
             subject_id = getattr(data.exercise, "subject_id", None)
-            is_exam = "đề thi" in (data.exercise.title or "").lower()
+            is_exam = getattr(data.exercise, "exercise_kind", "PRACTICE") == "EXAM"
             ai_meta = getattr(data.exercise, "ai_metadata", {}) or {}
             custom_duration = ai_meta.get("duration_minutes", 45)
             custom_attempts = ai_meta.get("max_attempts", 1 if is_exam else 3)
@@ -365,6 +377,7 @@ class AssignmentOut(BaseModel):
                 "due_at": data.due_at,
                 "status": data.status,
                 "exercise_title": data.exercise.title if hasattr(data.exercise, "title") else None,
+                "answers_released": getattr(data, "answers_released_at", None) is not None,
                 "total_questions": data.exercise.total_questions if hasattr(data.exercise, "total_questions") else None,
                 "class_name": class_name,
                 "subject_id": subject_id,
@@ -494,6 +507,9 @@ class AttemptListItemOut(BaseModel):
     end_time: Optional[datetime] = None
     total_time_seconds: Optional[int] = None
     status: str
+    # Exam answer release flag of the attempt's assignment (teacher-controlled; exams only).
+    is_exam: bool = False
+    answers_released: bool = False
 
     model_config = {"from_attributes": True}
 
@@ -504,6 +520,17 @@ class AttemptGradeUpdateRequest(BaseModel):
     detailed_results: Optional[Any] = Field(None, description="Optional updated detailed question results")
     status: Optional[str] = Field("approved", description="Grading workflow status: pending_grading, pending_review, approved")
     is_published: Optional[bool] = Field(True, description="Publish finalized score to student")
+    manual_marks: Optional[Dict[str, bool]] = Field(None, description="Teacher verdicts for short-answer questions keyed by question_id")
+
+
+class AnswerKeyUpdateRequest(BaseModel):
+    """New correct options for MultipleChoice questions; all submissions are regraded afterwards."""
+    keys: Dict[UUID, UUID] = Field(default_factory=dict, description="question_id -> correct option_id")
+
+
+class RegradeOut(BaseModel):
+    updated_questions: int
+    regraded_attempts: int
 
 
 class GradingScoreDistribution(BaseModel):
@@ -625,3 +652,125 @@ class QuestionImageUploadOut(BaseModel):
     content_type: Optional[str] = Field(None, description="MIME type of the image")
     width: Optional[int] = Field(None, description="Image width in pixels (when detectable)")
     height: Optional[int] = Field(None, description="Image height in pixels (when detectable)")
+
+
+# =====================================================================
+# STUDENT-SAFE (SANITIZED) SCHEMAS — no answer key may leak to students
+# =====================================================================
+
+# Keys that must never reach a student inside segment payloads (SegmentSchema is extra-allow,
+# so sensitive keys can sneak in via OCR/import; they are stripped recursively).
+SENSITIVE_SEGMENT_KEYS = {
+    "is_correct", "correct", "answer", "answers",
+    "correct_answer", "explanation", "solution", "key",
+}
+
+
+def strip_sensitive_segment_keys(obj: Any) -> Any:
+    """Recursively remove answer-key-like keys from segment dicts/lists (including nested segments)."""
+    if isinstance(obj, dict):
+        return {
+            k: strip_sensitive_segment_keys(v)
+            for k, v in obj.items()
+            if str(k).lower() not in SENSITIVE_SEGMENT_KEYS
+        }
+    if isinstance(obj, list):
+        return [strip_sensitive_segment_keys(item) for item in obj]
+    return obj
+
+
+class StudentAnswerOptionOut(BaseModel):
+    """Answer option as seen by a student: NO is_correct flag."""
+    option_id: UUID
+    question_id: UUID
+    content: str
+    display_order: int
+
+    model_config = {"from_attributes": True}
+
+
+class StudentSegmentOut(SegmentSchema):
+    """Segment as seen by a student: keeps type/content/latex/display/bbox/confidence and any
+    non-sensitive extra keys, but strips is_correct/correct/answer/... recursively."""
+    @model_validator(mode="before")
+    @classmethod
+    def strip_sensitive_keys(cls, data: Any) -> Any:
+        return strip_sensitive_segment_keys(data)
+
+
+class StudentQuestionOut(BaseModel):
+    """Question as seen by a student: same shape as QuestionOut WITHOUT correct_answer and
+    explanation; answer_options are StudentAnswerOptionOut; segments are sanitized."""
+    question_id: UUID
+    exercise_id: UUID
+    document_id: Optional[UUID] = None
+    content: str
+    content_markdown: Optional[str] = None
+    content_latex: Optional[str] = None
+    segments: Optional[List[StudentSegmentOut]] = None
+    confidence_score: Optional[float] = None
+    needs_review: bool = False
+    question_type: str
+    difficulty: Optional[str] = None
+    display_order: int
+    image_url: Optional[str] = None
+    image_metadata: Optional[Any] = None
+    is_ai_generated: bool
+    status: str
+    created_at: datetime
+    updated_at: datetime
+    answer_options: List[StudentAnswerOptionOut] = []
+
+    model_config = {"from_attributes": True}
+
+
+class StudentOpenAttemptOut(BaseModel):
+    """The student's own in-progress attempt (if any) attached to the taking payload."""
+    attempt_id: UUID
+    created_at: Optional[datetime] = None
+    start_time: Optional[datetime] = None
+    answers: Optional[Any] = None
+
+    model_config = {"from_attributes": True}
+
+
+class AssignmentTakingInfoOut(BaseModel):
+    assignment_id: UUID
+    exercise_id: UUID
+    class_id: UUID
+    due_at: Optional[datetime] = None
+    duration_minutes: int = 45
+    max_attempts: int = 1
+    status: str
+    # Denormalized display fields for the student taking screen (never sensitive).
+    teacher_name: Optional[str] = None
+    class_name: Optional[str] = None
+    subject_name: Optional[str] = None
+
+
+class AssignmentTakingExerciseOut(BaseModel):
+    exercise_id: UUID
+    title: str
+    subject_id: Optional[UUID] = None
+    subject_name: Optional[str] = None
+    # Non-sensitive metadata (type, duration, AI sources, ...) for display parity with the feed.
+    ai_metadata: Optional[Any] = None
+
+
+class AssignmentTakingOut(BaseModel):
+    """Student-safe 'paper' of an assignment: assignment info + exercise info + sanitized questions
+    + the student's own open attempt (if any)."""
+    assignment: AssignmentTakingInfoOut
+    exercise: AssignmentTakingExerciseOut
+    questions: List[StudentQuestionOut] = []
+    open_attempt: Optional[StudentOpenAttemptOut] = None
+
+    model_config = {"from_attributes": True}
+
+
+class SyncVersionOut(BaseModel):
+    """Data version snapshot: global version + per-table latest change timestamps (ISO8601 UTC)."""
+    version: str
+    tables: Dict[str, Optional[str]] = {}
+
+    model_config = {"from_attributes": True}

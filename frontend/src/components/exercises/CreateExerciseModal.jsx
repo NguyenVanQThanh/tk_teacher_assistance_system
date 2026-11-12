@@ -57,6 +57,7 @@ export default function CreateExerciseModal({ isOpen, onClose, onCreateSuccess }
   const [grade, setGrade] = useState('12');
   const [subject, setSubject] = useState('math');
   const [type, setType] = useState('quiz');
+  const [exerciseKind, setExerciseKind] = useState('PRACTICE');
   
   // Multi-file upload states
   const [uploadedFile, setUploadedFile] = useState(null);
@@ -401,6 +402,7 @@ export default function CreateExerciseModal({ isOpen, onClose, onCreateSuccess }
       const newEx = await exercisesApi.createExercise({
         title: finalTitle,
         subject_id: targetSubjectId,
+        exercise_kind: exerciseKind,
         total_questions: 0,
         ai_metadata: {
           grade: grade,
@@ -1120,6 +1122,18 @@ export default function CreateExerciseModal({ isOpen, onClose, onCreateSuccess }
 
               {/* Grade, Subject & Test Code */}
               <div className="form-row-2">
+                <div className="form-field-group">
+                  <label className="input-field-label">Loại bài</label>
+                  <select
+                    className="select-input"
+                    value={exerciseKind}
+                    onChange={(e) => setExerciseKind(e.target.value)}
+                  >
+                    <option value="PRACTICE">Bài tập luyện tập (hiện đáp án)</option>
+                    <option value="EXAM">Đề thi / kiểm tra (ẩn đáp án đến khi công bố)</option>
+                  </select>
+                </div>
+
                 <div className="form-field-group">
                   <label className="input-field-label">Khối lớp</label>
                   <select 

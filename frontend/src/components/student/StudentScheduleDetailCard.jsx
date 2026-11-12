@@ -18,6 +18,10 @@ import {
   Check
 } from 'lucide-react';
 import './StudentScheduleDetailCard.css';
+import toast from '../../components/common/toast';
+
+// Selectable types for student-created schedules
+const SCHEDULE_TYPES = ['Tự học', 'Kiểm tra', 'Thi', 'Ôn tập', 'Khác'];
 
 export default function StudentScheduleDetailCard({ 
   selectedDate, 
@@ -65,8 +69,11 @@ export default function StudentScheduleDetailCard({
   // State to control modal for adding new schedule
   const [isAddScheduleModalOpen, setIsAddScheduleModalOpen] = useState(false);
   const [newScheduleTitle, setNewScheduleTitle] = useState('');
-  const [newScheduleTime, setNewScheduleTime] = useState('14:00 – 15:30');
+  const [newScheduleStart, setNewScheduleStart] = useState('14:00');
+  const [newScheduleEnd, setNewScheduleEnd] = useState('15:30');
   const [newScheduleTag, setNewScheduleTag] = useState('Tự học');
+  // Schedule type filter: 'all' or one of SCHEDULE_TYPES / built-in types
+  const [typeFilter, setTypeFilter] = useState('all');
 
   // Compute daily schedule items combining backend weekly_schedule, assignments due, and custom schedules
   const dailyScheduleItems = useMemo(() => {
@@ -93,6 +100,7 @@ export default function StudentScheduleDetailCard({
         accent,
         title: s.subject_name,
         classTag: s.room || 'Lớp 12A1',
+        type: 'Lớp học',
         badgeTag: `Tiết ${s.period}`,
         badgeClass,
         time: `${s.start_time} – ${s.end_time}`
@@ -118,6 +126,7 @@ export default function StudentScheduleDetailCard({
         accent: a.is_overdue ? 'red' : 'orange',
         title: a.title,
         classTag: a.subject_name || 'Bộ môn',
+        type: 'Bài tập',
         badgeTag: a.is_overdue ? 'Quá hạn' : 'Hạn chót',
         badgeClass: a.is_overdue ? 'badge-red' : 'badge-orange',
         time: `Trước ${timeStr}`
@@ -126,7 +135,7 @@ export default function StudentScheduleDetailCard({
 
     // 3. Custom schedules added by the student for this specific day
     const matchingCustom = customSchedules.filter(
-      cs => cs.day === currentDay && cs.month === currentMonth && cs.year === currentYear
+      cs => !cs.deleted && cs.day === currentDay && cs.month === currentMonth && cs.year === currentYear
     );
     matchingCustom.forEach((cs) => {
       list.push({
@@ -137,6 +146,7 @@ export default function StudentScheduleDetailCard({
         badgeTag: cs.badgeTag || 'Luyện tập AI',
         badgeClass: cs.badgeClass || 'badge-green',
         time: cs.time,
+        type: cs.badgeTag,
         isCustom: true
       });
     });
@@ -210,6 +220,10 @@ export default function StudentScheduleDetailCard({
   const handleSaveNewSchedule = (e) => {
     e.preventDefault();
     if (!newScheduleTitle.trim()) return;
+    if (newScheduleEnd <= newScheduleStart) {
+      toast.error('End time must be after start time.');
+      return;
+    }
 
     const newSchedule = {
       id: `custom_${Date.now()}`,
@@ -217,7 +231,7 @@ export default function StudentScheduleDetailCard({
       month: currentMonth,
       year: currentYear,
       title: newScheduleTitle.trim(),
-      time: newScheduleTime.trim() || '14:00 – 15:30',
+      time: `${newScheduleStart} – ${newScheduleEnd}`,
       classTag: 'Tự học',
       badgeTag: newScheduleTag || 'Cá nhân',
       badgeClass: 'badge-green',
@@ -235,6 +249,22 @@ export default function StudentScheduleDetailCard({
     setNewScheduleTitle('');
     setIsAddScheduleModalOpen(false);
   };
+
+  // Soft delete: flag the custom schedule as deleted instead of removing it
+  const handleDeleteSchedule = (id) => {
+    const updated = customSchedules.map(cs => (cs.id === id ? { ...cs, deleted: true } : cs));
+    setCustomSchedules(updated);
+    try {
+      localStorage.setItem('student_custom_schedule_items', JSON.stringify(updated));
+    } catch (err) {
+      console.warn('Error persisting schedule deletion:', err);
+    }
+  };
+
+  const visibleItems = typeFilter === 'all'
+    ? dailyScheduleItems
+    : dailyScheduleItems.filter(i => i.type === typeFilter);
+  const filterOptions = ['Lớp học', 'Bài tập', ...SCHEDULE_TYPES];
 
   // Persistent notes management with localStorage
   const [notes, setNotes] = useState(() => {
@@ -302,9 +332,19 @@ export default function StudentScheduleDetailCard({
           </span>
         </div>
 
+        <select
+          value={typeFilter}
+          onChange={(e) => setTypeFilter(e.target.value)}
+          aria-label="Filter by schedule type"
+          style={{ margin: '8px 0', padding: '4px 8px', borderRadius: 8 }}
+        >
+          <option value="all">Tất cả loại lịch</option>
+          {filterOptions.map(t => <option key={t} value={t}>{t}</option>)}
+        </select>
+
         {/* Schedule list */}
         <div className="schedule-today-items-list">
-          {dailyScheduleItems.map((item) => (
+          {visibleItems.map((item) => (
             <div key={item.id} className={`schedule-item-box border-accent-${item.accent}`}>
               <div className="schedule-item-top-row">
                 <h4 className="schedule-item-name" title={item.title}>{item.title}</h4>
@@ -319,6 +359,16 @@ export default function StudentScheduleDetailCard({
                   <Clock size={13} className="meta-icon" />
                   <span>{item.time}</span>
                 </div>
+                {item.isCustom && (
+                  <button
+                    type="button"
+                    className="btn-delete-note"
+                    onClick={() => handleDeleteSchedule(item.id)}
+                    title="Xóa lịch"
+                  >
+                    <Trash2 size={12} />
+                  </button>
+                )}
               </div>
             </div>
           ))}
@@ -371,21 +421,16 @@ export default function StudentScheduleDetailCard({
                 <div className="form-group-row">
                   <div className="form-group-item">
                     <label>Khung giờ:</label>
-                    <input
-                      type="text"
-                      placeholder="Ví dụ: 14:00 – 15:30"
-                      value={newScheduleTime}
-                      onChange={(e) => setNewScheduleTime(e.target.value)}
-                    />
+                    <input type="time" required value={newScheduleStart}
+                      onChange={(e) => setNewScheduleStart(e.target.value)} />
+                    <input type="time" required value={newScheduleEnd}
+                      onChange={(e) => setNewScheduleEnd(e.target.value)} />
                   </div>
                   <div className="form-group-item">
                     <label>Loại lịch:</label>
-                    <input
-                      type="text"
-                      placeholder="Ví dụ: Tự học, Ôn thi..."
-                      value={newScheduleTag}
-                      onChange={(e) => setNewScheduleTag(e.target.value)}
-                    />
+                    <select value={newScheduleTag} onChange={(e) => setNewScheduleTag(e.target.value)}>
+                      {SCHEDULE_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
+                    </select>
                   </div>
                 </div>
 

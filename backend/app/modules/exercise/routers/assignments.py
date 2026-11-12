@@ -2,8 +2,8 @@
 # Description: API Router for ClassAssignment endpoints (F-EXE-02) and student assignments feed.
 # Created At: 2026-07-31
 # Created By: Tam Khang
-# Updated At: 2026-10-03
-# Updated By: Tam Khang
+# Updated At: 2026-11-12
+# Updated By: AI Agent
 
 from uuid import UUID
 from typing import List, Optional
@@ -13,7 +13,9 @@ from sqlalchemy.orm import Session
 from app.core.database import get_db
 from models.models import User
 from app.modules.auth.dependencies import require_perm, get_current_user
-from app.modules.exercise.schemas import AssignmentCreate, AssignmentOut, AssignmentResultSummaryOut
+from app.modules.exercise.schemas import (
+    AnswerReleaseRequest, AssignmentCreate, AssignmentOut, AssignmentResultSummaryOut, AssignmentTakingOut
+)
 from app.modules.exercise.services.assignment_service import AssignmentService
 
 router = APIRouter(tags=["class-assignments"])
@@ -99,6 +101,28 @@ def delete_class_assignment(
     service.delete_assignment(assignment_id, current_user)
 
 
+@router.put(
+    "/api/v1/assignments/{assignment_id}/answer-release",
+    response_model=AssignmentOut,
+    dependencies=[Depends(require_perm("EXE_ASSIGNMENT_MANAGE"))]
+)
+def set_answer_release(
+    assignment_id: UUID,
+    payload: AnswerReleaseRequest,
+    service: AssignmentService = Depends(get_assignment_service),
+    current_user: User = Depends(get_current_user)
+):
+    """
+    Reveal (released=true) or hide (released=false) exam answers/results for students of this
+    assignment. Requires EXE_ASSIGNMENT_MANAGE permission.
+    """
+    a = service.set_answers_released(assignment_id, payload.released, current_user)
+    return AssignmentOut(
+        assignment_id=a.assignment_id, class_id=a.class_id, exercise_id=a.exercise_id,
+        assigned_by=a.assigned_by, assigned_at=a.assigned_at, due_at=a.due_at, status=a.status,
+        answers_released=a.answers_released_at is not None,
+    )
+
 @router.post(
     "/api/v1/assignments/{assignment_id}/restore",
     response_model=AssignmentOut,
@@ -113,6 +137,25 @@ def restore_class_assignment(
     Restore a cancelled assignment (Soft Delete). Requires EXE_ASSIGNMENT_MANAGE permission.
     """
     return service.restore_assignment(assignment_id, current_user)
+
+
+@router.get(
+    "/api/v1/assignments/{assignment_id}/taking",
+    response_model=AssignmentTakingOut,
+    dependencies=[Depends(require_perm("EXE_ATTEMPT_SUBMIT"))]
+)
+def get_assignment_taking(
+    assignment_id: UUID,
+    service: AssignmentService = Depends(get_assignment_service),
+    current_user: User = Depends(get_current_user)
+):
+    """
+    Student-safe "paper" of an assignment: assignment + exercise info, questions with the answer key
+    stripped (no correct_answer / explanation / is_correct), and the caller's own open attempt (if any).
+    Students must be enrolled in the assignment's class (403 otherwise); cancelled (DELETED)
+    assignments return 404. Requires EXE_ATTEMPT_SUBMIT permission.
+    """
+    return service.get_assignment_taking(assignment_id, current_user)
 
 
 @router.get(

@@ -32,6 +32,7 @@ import { useAuth } from '../../context/AuthContext';
 import { authApi } from '../../services/api';
 import { getTeacherProfileDefaults } from '../../utils/teacherSubjectHelper';
 import './TeacherProfileModal.css';
+import toast from '../../components/common/toast';
 
 export default function TeacherProfileModal({ 
   isOpen, 
@@ -219,7 +220,7 @@ export default function TeacherProfileModal({
                 type="button" 
                 className="btn-avatar-camera"
                 title="Thay đổi ảnh đại diện"
-                onClick={() => alert('Chọn ảnh mới từ thiết bị')}
+                onClick={() => toast.info('Chọn ảnh mới từ thiết bị')}
               >
                 <Camera size={13} />
               </button>

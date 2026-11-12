@@ -18,8 +18,10 @@ Updated By: AI Agent
 .math-text-editor.is-single-line .ProseMirror {
   min-height: auto;
   padding: 2px 6px;
-  white-space: nowrap;
-  overflow-x: auto;
+  /* Wrap long text so the box grows instead of showing a horizontal scrollbar. */
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  overflow-x: visible;
 }
 .math-text-editor.solution-guide-textarea .ProseMirror {
   min-height: 60px;

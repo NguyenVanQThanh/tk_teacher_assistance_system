@@ -2,8 +2,8 @@
 # Description: Main entry point of the FastAPI application.
 # Created At: 2026-07-17
 # Created By: Tam Khang
-# Updated At: 2026-11-09
-# Updated By: Tam Khang
+# Updated At: 2026-11-13
+# Updated By: AI Agent
 
 import sys
 from pathlib import Path
@@ -15,8 +15,11 @@ if backend_root not in sys.path:
 
 import logging
 import os
+import re
+from typing import Optional
 
 from dotenv import load_dotenv
+from starlette.concurrency import run_in_threadpool
 
 # Load environment variables from .env file
 load_dotenv()
@@ -29,6 +32,22 @@ if not logging.getLogger().handlers:
     )
 
 logger = logging.getLogger("smartlms.startup")
+
+_TOKEN_QUERY_RE = re.compile(r"([?&](?:token|ticket)=)[^&\s\"]*")
+
+class _MaskTokenQueryFilter(logging.Filter):
+    """Redact ?token=/?ticket= (defense in depth; SSE now uses a 30s ticket) from uvicorn access-log lines."""
+
+    def filter(self, record: logging.LogRecord) -> bool:
+        if isinstance(record.args, tuple):
+            record.args = tuple(
+                _TOKEN_QUERY_RE.sub(r"\1***", a) if isinstance(a, str) else a for a in record.args
+            )
+        return True
+
+# ponytail: masks only the in-process uvicorn access log; reverse proxies may still log the
+# 30s single-use-purpose ticket, which is harmless once expired.
+logging.getLogger("uvicorn.access").addFilter(_MaskTokenQueryFilter())
 
 
 def _mask_key(value: str) -> str:
@@ -47,11 +66,13 @@ logger.warning(
     os.environ.get("ENABLE_MARKER_PDF", "1"),
 )
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 
 from app.core.config import QUESTION_IMAGE_DIR, QUESTION_IMAGE_URL_PREFIX, SGK_IMAGE_DIR, SGK_IMAGE_URL_PREFIX
+from app.core.database import get_db
+from app.modules.exercise.services.sync_service import get_cached_version_snapshot
 
 from app.modules.auth.routers.auth import router as auth_router
 from app.modules.academic.routers.subjects import router as subjects_router
@@ -62,6 +83,7 @@ from app.modules.exercise.routers.exercises import router as exercises_router
 from app.modules.exercise.routers.questions import router as questions_router
 from app.modules.exercise.routers.assignments import router as assignments_router
 from app.modules.exercise.routers.attempts import router as attempts_router
+from app.modules.exercise.routers.sync import router as sync_router
 from app.modules.document.routers.documents import router as documents_router
 from app.modules.admin.routers.users import router as admin_users_router
 from app.modules.admin.routers.dashboard import router as admin_dashboard_router
@@ -78,8 +100,53 @@ app.add_middleware(
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
-    expose_headers=["X-Import-Skipped-Count", "X-Import-Skipped"],
+    expose_headers=["X-Import-Skipped-Count", "X-Import-Skipped", "X-Data-Version"],
 )
+
+
+def _version_snapshot_sync() -> Optional[dict]:
+    """
+    Synchronous helper for the X-Data-Version middleware. Runs in a worker thread (never on the
+    event loop). In tests get_db is overridden -> reuse that session, closing the override
+    generator properly so the session is released; otherwise open a short-lived SessionLocal.
+    """
+    override = app.dependency_overrides.get(get_db)
+    if override is not None:
+        gen = override()
+        db = next(gen)
+        try:
+            return get_cached_version_snapshot(db=db)
+        finally:
+            gen.close()  # drives the override's finally block -> session closed
+    return get_cached_version_snapshot(db=None)
+
+
+@app.middleware("http")
+async def add_data_version_header(request: Request, call_next):
+    """
+    Stamp `X-Data-Version: <ISO8601 UTC>` on API GET responses so the FE can read the current
+    data version from any response. The version is computed at most once per 2s (process cache)
+    and the DB work runs in a threadpool so the event loop is never blocked. SSE and static
+    mounts are skipped. Never breaks the request: any DB error simply skips the header.
+    """
+    response = await call_next(request)
+    path = request.url.path
+    if (
+        request.method.upper() == "GET"
+        and 200 <= response.status_code < 300  # no version leak on 401/403/errors
+        # Defense in depth: never stamp a response that was not requested with credentials
+        # (every /api GET requires auth today; a future public endpoint must not leak it).
+        and request.headers.get("authorization")
+        and path.startswith("/api")
+        and not path.startswith("/api/v1/sync/stream")
+    ):
+        try:
+            snapshot = await run_in_threadpool(_version_snapshot_sync)
+            if snapshot:
+                response.headers["X-Data-Version"] = snapshot["version"]
+        except Exception:
+            logger.debug("X-Data-Version header skipped", exc_info=True)
+    return response
 
 # Register routers
 app.include_router(auth_router)
@@ -91,6 +158,7 @@ app.include_router(exercises_router)
 app.include_router(questions_router)
 app.include_router(assignments_router)
 app.include_router(attempts_router)
+app.include_router(sync_router)
 app.include_router(documents_router)
 app.include_router(admin_users_router)
 app.include_router(admin_dashboard_router)

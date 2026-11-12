@@ -131,8 +131,8 @@ class TestGradingServiceUnit:
 
         score, detailed = service.grade_attempt(exercise_id, answers)
 
-        # 1 MC question worth 10.0 points
-        assert score == 10.00
+        # MC part and short-answer part split the 10 points evenly (3:3) -> MC question worth 5.0
+        assert score == 5.00
         assert len(detailed["questions"]) == 2
 
         sa_result = next(q for q in detailed["questions"] if q["question_id"] == str(sa_id))
@@ -199,3 +199,30 @@ class TestGradingServiceUnit:
         assert len(detailed["questions"]) == 2
         assert all(q["pending_manual_grade"] is True for q in detailed["questions"])
         assert all(q["is_correct"] is None for q in detailed["questions"])
+
+
+    def test_true_false_partial_credit_and_numeric_short_answer(self):
+        """Parts are weighted 3/4/3; TF gets partial credit; short answers compare numerically."""
+        service = GradingService(MagicMock())
+        mc_id, tf_id, sa_id = uuid.uuid4(), uuid.uuid4(), uuid.uuid4()
+        mc_ok = uuid.uuid4()
+        q_mc = create_mock_question(mc_id, "MultipleChoice", [create_mock_option(mc_ok, True)])
+        opts = []
+        for letter, correct in zip("abcd", (True, True, False, False)):
+            o = create_mock_option(uuid.uuid4(), correct)
+            o.content = f"{letter}) statement"
+            opts.append(o)
+        q_tf = create_mock_question(tf_id, "TrueFalse", opts)
+        q_sa = create_mock_question(sa_id, "ShortAnswer", [])
+        q_sa.correct_answer = "2.50"
+        ex = MagicMock()
+        ex.questions = [q_mc, q_tf, q_sa]
+        service.exercise_repo.get_by_id = MagicMock(return_value=ex)
+
+        answers = [
+            AnswerInput(question_id=mc_id, answer_option_id=mc_ok),
+            AnswerInput(question_id=tf_id, answer_text="a:true;b:true;c:true;d:false"),  # 3 of 4 correct
+            AnswerInput(question_id=sa_id, answer_text="2,5"),
+        ]
+        score, _ = service.grade_attempt(uuid.uuid4(), answers)
+        assert score == 3.0 + 4.0 * 0.5 + 3.0

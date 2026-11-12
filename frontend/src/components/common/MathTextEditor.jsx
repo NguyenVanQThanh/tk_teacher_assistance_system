@@ -93,7 +93,8 @@ const MathTextEditor = forwardRef(function MathTextEditor(
 
   // Sync external value changes (e.g. question switching).
   useEffect(() => {
-    if (editor && (value ?? '') !== lastEmitted.current) {
+    // Never reset content while the user is typing here: it would jump the caret to the start
+    if (editor && !editor.isFocused && (value ?? '') !== lastEmitted.current) {
       lastEmitted.current = value ?? '';
       editor.commands.setContent(parseToDoc(value, { singleLine }), { emitUpdate: false });
     }

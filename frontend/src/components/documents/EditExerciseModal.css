@@ -1608,3 +1608,14 @@
   border: 1px solid #BFDBFE;
   flex-shrink: 0;
 }
+
+/* Editable answer fields inside option cards: allow text selection and a text caret */
+.option-choice-card .math-text-editor,
+.option-choice-card .math-text-editor .ProseMirror {
+  cursor: text;
+  user-select: text;
+  -webkit-user-select: text;
+}
+.option-choice-card .math-text-editor .ProseMirror {
+  min-height: 24px;
+}
