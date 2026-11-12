@@ -2,8 +2,8 @@
 # Description: API Router for Teacher and Homeroom Teacher Dashboard metrics, learning quality radar analytics, recent submissions, and weekly schedule.
 # Created At: 2026-10-25
 # Created By: Tam Khang
-# Updated At: 2026-10-30
-# Updated By: Tam Khang
+# Updated At: 2026-11-12
+# Updated By: AI Agent
 
 from typing import List, Optional, Dict, Any
 from uuid import UUID
@@ -20,7 +20,7 @@ from models.models import (
 )
 from app.modules.auth.dependencies import require_perm, get_current_user
 from app.modules.academic.scoping import get_user_role_name
-from app.modules.exercise.routers.teacher_schedule import get_synced_schedule_items
+from app.modules.exercise.routers.teacher_schedule import get_synced_schedule_items, week_start
 from app.modules.exercise.services.attempt_service import AttemptService
 from app.modules.exercise.services.learning_quality_service import LearningQualityService
 
@@ -195,7 +195,11 @@ def get_teacher_dashboard(
         Class, ClassAssignment.class_id == Class.class_id
     ).filter(
         ClassAssignment.class_id.in_(all_class_ids),
-        StudentExerciseAttempt.status != "DELETED"
+        StudentExerciseAttempt.status != "DELETED",
+        # Recent submissions list only ungraded work; graded/approved attempts must not reappear
+        StudentExerciseAttempt.is_finished.is_(True),
+        StudentExerciseAttempt.score.is_(None),
+        StudentExerciseAttempt.status != "approved"
     )
 
     all_attempts = attempts_query.order_by(
@@ -261,52 +265,8 @@ def get_teacher_dashboard(
             score=float(att.score) if att.score is not None else None
         ))
 
-    # Fallback if no attempts in DB yet
-    if not recent_submissions:
-        recent_submissions = [
-            RecentSubmissionItem(
-                id="sub-1",
-                student_name="Trần Thị B",
-                avatar_initial="TB",
-                avatar_bg="#E0E7FF",
-                avatar_color="#4338CA",
-                exercise_title="Đề thi thử Hóa học #2",
-                class_name="12A1",
-                submitted_time="10 phút trước",
-                status="submitted",
-                status_label="Đã nộp",
-                score=None
-            ),
-            RecentSubmissionItem(
-                id="sub-2",
-                student_name="Lê Văn C",
-                avatar_initial="LC",
-                avatar_bg="#FEF3C7",
-                avatar_color="#D97706",
-                exercise_title="Bài tập Toán Hình học",
-                class_name="12A1",
-                submitted_time="1 giờ trước",
-                status="late",
-                status_label="Trễ hạn",
-                score=None
-            ),
-            RecentSubmissionItem(
-                id="sub-3",
-                student_name="Phạm Hương D",
-                avatar_initial="PD",
-                avatar_bg="#FCE7F3",
-                avatar_color="#DB2777",
-                exercise_title="Tiểu luận Lịch sử",
-                class_name="12A1",
-                submitted_time="Hôm qua, 15:30",
-                status="submitted",
-                status_label="Đã nộp",
-                score=None
-            )
-        ]
-
     # 5. Build synchronized weekly timetable schedule for upcoming week
-    synced_items = get_synced_schedule_items()
+    synced_items = get_synced_schedule_items(week_start())
     weekly_schedule: List[WeeklyScheduleItem] = []
     for item in synced_items:
         theme = "purple" if "12A1" in item.class_name or "11B2" in item.class_name else "blue"
@@ -402,3 +362,54 @@ def get_teacher_learning_quality(
         feedback_notes=quality_dict["feedback_notes"]
     )
 
+
+
+class TeacherNotificationItem(BaseModel):
+    id: str
+    type: str
+    title: str
+    content: str
+    time: Optional[str] = None
+    link: Optional[str] = None
+
+@router.get(
+    "/notifications",
+    response_model=List[TeacherNotificationItem],
+    dependencies=[Depends(require_perm("EXE_ATTEMPT_VIEW"))]
+)
+def get_teacher_notifications(
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Derive basic notifications from existing data: pending grading summary, latest ungraded
+    submissions, and today's timetable sessions. No separate notification storage is required.
+    """
+    items: List[TeacherNotificationItem] = []
+    stats = AttemptService(db).get_grading_dashboard(current_user)
+    if stats.pending_grading_count:
+        items.append(TeacherNotificationItem(
+            id="pending-grading", type="activity", title="Submissions waiting for grading",
+            content=f"{stats.pending_grading_count} submission(s) need grading.",
+            link="/teacher/grading?status=pending_grading"
+        ))
+    recent = [a for a in AttemptService(db).list_attempts(current_user=current_user)
+              if a.is_finished and a.score is None and a.status != "approved"]
+    recent.sort(key=lambda a: a.end_time or a.start_time or datetime.min.replace(tzinfo=timezone.utc), reverse=True)
+    for a in recent[:5]:
+        when = a.end_time or a.start_time
+        items.append(TeacherNotificationItem(
+            id=f"attempt-{a.attempt_id}", type="activity", title="New submission",
+            content=f"{a.student_name} submitted \"{a.exercise_title}\" ({a.class_name}).",
+            time=when.isoformat() if when else None,
+            link=f"/teacher/grading?attempt_id={a.attempt_id}"
+        ))
+    today_iso = date.today().isoformat()
+    for s in get_synced_schedule_items(week_start()):
+        if s.date_str == today_iso:
+            items.append(TeacherNotificationItem(
+                id=f"schedule-{s.id}", type="system", title="Class today",
+                content=f"{s.subject_name} - {s.class_name}, {s.start_time}-{s.end_time}, {s.room}.",
+                link="/teacher/schedule"
+            ))
+    return items

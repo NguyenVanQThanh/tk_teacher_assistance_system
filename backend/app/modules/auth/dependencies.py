@@ -5,7 +5,9 @@
 # Updated At: 2026-07-17
 # Updated By: Tam Khang
 
-from fastapi import Depends, HTTPException, status
+from typing import Optional
+
+from fastapi import Depends, HTTPException, Query, Request, status
 from fastapi.security import OAuth2PasswordBearer
 from sqlalchemy.orm import Session
 from jose import jwt, JWTError
@@ -19,9 +21,10 @@ from app.modules.auth.services.permission_service import PermissionService
 # Configure OAuth2PasswordBearer, auto_error=False to allow custom error envelopes for missing tokens
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="api/v1/auth/login", auto_error=False)
 
-def get_current_user(token: str = Depends(oauth2_scheme), db: Session = Depends(get_db)) -> User:
+def resolve_user_from_token(token: Optional[str], db: Session) -> User:
     """
-    Dependency to authenticate and return the current active user from the JWT token.
+    Resolve the active user from a raw JWT string. Shared by get_current_user (header)
+    and get_current_user_query_ok (header or ?token= query, used by SSE/EventSource).
     Raises standardized HTTPExceptions for missing, invalid, or expired tokens, and blocked or inactive accounts.
     """
     if not token:
@@ -89,8 +92,33 @@ def get_current_user(token: str = Depends(oauth2_scheme), db: Session = Depends(
                 "message": "Account has not been activated."
             }
         )
-        
+
     return user
+
+
+def get_current_user(token: str = Depends(oauth2_scheme), db: Session = Depends(get_db)) -> User:
+    """
+    Dependency to authenticate and return the current active user from the JWT token
+    carried in the Authorization: Bearer header.
+    """
+    return resolve_user_from_token(token, db)
+
+
+def get_current_user_query_ok(
+    request: Request,
+    token: Optional[str] = Query(None, description="JWT for EventSource clients that cannot set headers"),
+    db: Session = Depends(get_db),
+) -> User:
+    """
+    Auth dependency that accepts the JWT either from the Authorization header OR from
+    the ?token= query parameter (browsers' EventSource API cannot set request headers,
+    so SSE endpoints use this variant).
+    """
+    header = request.headers.get("Authorization") or request.headers.get("authorization")
+    bearer = None
+    if header and header.lower().startswith("bearer "):
+        bearer = header[7:].strip()
+    return resolve_user_from_token(bearer or token, db)
 
 def require_roles(*role_names: str):
     """

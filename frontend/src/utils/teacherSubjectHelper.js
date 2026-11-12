@@ -23,6 +23,13 @@ export const SUBJECT_MAP = {
  * @returns {{ subjectId: string, subjectName: string, shortName: string }}
  */
 export function getTeacherSubjectInfo(user) {
+  // Single source of truth: subjects assigned in DB (/auth/me -> teaching_subjects).
+  const dbSubject = user?.teaching_subjects?.[0];
+  if (dbSubject) {
+    const id = getSubjectIdByName(dbSubject);
+    const known = SUBJECT_MAP[id];
+    return { subjectId: id, subjectName: dbSubject, shortName: known?.shortName || dbSubject };
+  }
   const name = (user?.full_name || '').toLowerCase();
   const email = (user?.email || '').toLowerCase();
   const phone = (user?.phone || '');
@@ -71,6 +78,19 @@ export function getSubjectIdByName(name) {
  * @returns {Object} Full profile defaults
  */
 export function getTeacherProfileDefaults(user) {
+  const base = legacyProfileDefaults(user);
+  const dbSubject = user?.teaching_subjects?.[0];
+  if (!dbSubject) return base;
+  // Keep position/department consistent with the DB-assigned subject.
+  const homeroomSuffix = base.isHomeroom && base.homeroomClass ? ` • Chủ nhiệm ${base.homeroomClass}` : '';
+  return {
+    ...base,
+    department: `Tổ ${dbSubject}`,
+    position: `Giáo viên bộ môn ${dbSubject}${homeroomSuffix}`,
+  };
+}
+
+function legacyProfileDefaults(user) {
   const name = (user?.full_name || '').toLowerCase();
   const email = (user?.email || '').toLowerCase();
   const phone = (user?.phone || '');

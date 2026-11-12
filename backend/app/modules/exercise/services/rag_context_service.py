@@ -70,16 +70,9 @@ class RagContextService:
     def _teacher_scope(db, role_name, subject_id, class_id, document_ids) -> Optional[dict]:
         """Search kwargs for teacher documents, or None when there is nothing to search."""
         if role_name == "Student":
-            if not (subject_id and class_id):
-                return None
-            teacher_ids = [
-                t for (t,) in db.query(TeacherSubject.teacher_id).filter(
-                    TeacherSubject.class_id == class_id,
-                    TeacherSubject.subject_id == subject_id,
-                    TeacherSubject.status == "ACTIVE",
-                ).all()
-            ]
-            return {"teacher_subject_scope": (subject_id, teacher_ids)} if teacher_ids else None
+            # Students get textbook theory only: teacher documents may be exams/matrices, and the
+            # generated questions must not mirror them.
+            return None
         return {"document_ids": list(document_ids)} if document_ids else None
 
     @staticmethod

@@ -1,9 +1,10 @@
 # File Name: attempt_service.py
-# Description: Service layer for StudentExerciseAttempt operations (start, submit, grade, view).
+# Description: Service layer for StudentExerciseAttempt operations (start, submit, grade, view)
+#              plus the student-safe sanitized "paper" of an owned attempt.
 # Created At: 2026-08-05
 # Created By: Tam Khang
-# Updated At: 2026-10-04
-# Updated By: Tam Khang
+# Updated At: 2026-11-12
+# Updated By: AI Agent
 
 from datetime import datetime, timezone
 from typing import List, Optional
@@ -11,9 +12,12 @@ from uuid import UUID
 from fastapi import HTTPException, status
 from sqlalchemy.orm import Session
 
-from models.models import User, ClassAssignment, StudentClass, StudentExerciseAttempt
-from app.modules.exercise.schemas import AttemptSubmitRequest, AttemptListItemOut, AttemptGradeUpdateRequest
+from models.models import User, Subject, ClassAssignment, StudentClass, StudentExerciseAttempt
+from app.modules.exercise.schemas import (
+    AttemptSubmitRequest, AttemptListItemOut, AttemptGradeUpdateRequest, AssignmentTakingOut
+)
 from app.modules.exercise.repository import AttemptRepository, AssignmentRepository
+from app.modules.exercise.services.assignment_service import AssignmentService
 from app.modules.exercise.services.grading_service import GradingService
 from app.modules.academic.scoping import get_user_role_name, check_class_access, get_accessible_class_ids
 
@@ -159,13 +163,51 @@ class AttemptService:
 
         return attempt
 
+    def get_attempt_paper(self, attempt_id: UUID, current_user: User) -> AssignmentTakingOut:
+        """
+        Return the sanitized paper (questions without answer key) of an attempt owned by the
+        current student. Only the attempt owner may access it (403 otherwise).
+        """
+        attempt = self.repo.get_by_id(attempt_id)
+        if not attempt:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail={
+                    "code": "ERR-EXE-ATTEMPT_NOT_FOUND",
+                    "message": "Exercise attempt record not found."
+                }
+            )
+
+        if attempt.student_id != current_user.user_id:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail={
+                    "code": "ERR-EXE-ATTEMPT_NOT_OWNER",
+                    "message": "You can only view the paper of your own attempt."
+                }
+            )
+
+        assignment = self.assignment_repo.get_by_id(attempt.assignment_id)
+        if not assignment:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail={
+                    "code": "ERR-EXE-ASSIGNMENT_NOT_FOUND",
+                    "message": "Associated assignment record not found."
+                }
+            )
+
+        # Reuses the student-safe builder (sanitized questions, open attempt attached).
+        return AssignmentService(self.db).build_student_paper(assignment, current_user.user_id)
+
     def list_attempts(
         self,
         current_user: User,
         class_id: Optional[UUID] = None,
         assignment_id: Optional[UUID] = None,
         is_finished: Optional[bool] = None,
-        search: Optional[str] = None
+        search: Optional[str] = None,
+        student_id: Optional[UUID] = None
     ) -> List[AttemptListItemOut]:
         """List attempts with RBAC data scoping for Teacher / Student / Admin."""
         role_name = get_user_role_name(self.db, current_user)
@@ -195,6 +237,7 @@ class AttemptService:
             attempts = self.repo.list_attempts(
                 class_ids=target_class_ids,
                 assignment_id=assignment_id,
+                student_id=student_id,
                 is_finished=is_finished,
                 search=search
             )
@@ -204,10 +247,12 @@ class AttemptService:
             attempts = self.repo.list_attempts(
                 class_ids=target_class_ids,
                 assignment_id=assignment_id,
+                student_id=student_id,
                 is_finished=is_finished,
                 search=search
             )
 
+        subject_names = {sid: name for sid, name in self.db.query(Subject.subject_id, Subject.subject_name).all()}
         items: List[AttemptListItemOut] = []
         for att in attempts:
             student_name = att.student.full_name if att.student else "Học sinh"
@@ -231,6 +276,7 @@ class AttemptService:
                     exercise_title=exercise_title,
                     assignment_title=exercise_title,
                     subject_id=subject_id,
+                    subject_name=subject_names.get(subject_id),
                     score=float(att.score) if att.score is not None else None,
                     is_finished=att.is_finished,
                     start_time=att.start_time,
@@ -272,13 +318,40 @@ class AttemptService:
         # Enforce class access scoping for Teacher
         check_class_access(self.db, current_user, assignment.class_id)
 
+        detailed_results = payload.detailed_results
+        if payload.manual_marks:
+            # Persist teacher verdicts on short answers so later regrades keep them.
+            base = dict(detailed_results if isinstance(detailed_results, dict) else (attempt.detailed_results or {}))
+            marks = {str(k).lower(): bool(v) for k, v in payload.manual_marks.items()}
+            questions = []
+            for r in base.get("questions", []):
+                r = dict(r)
+                verdict = marks.get(str(r.get("question_id", "")).lower())
+                if verdict is not None:
+                    r.update(is_correct=verdict, manual_override=True, pending_manual_grade=False)
+                questions.append(r)
+            base["questions"] = questions
+            if payload.feedback is not None:
+                base["teacher_feedback"] = payload.feedback
+            detailed_results = base
+
         return self.repo.update_grade(
             attempt=attempt,
             score=payload.score,
             feedback=payload.feedback,
-            detailed_results=payload.detailed_results,
+            detailed_results=detailed_results,
             status=payload.status
         )
+
+    def update_answer_key_and_regrade(self, exercise_id: UUID, keys: dict, current_user: User) -> dict:
+        """Apply a new MultipleChoice answer key and persist recomputed scores for ALL submissions of the exercise."""
+        from app.modules.exercise.services.exercise_service import ExerciseService
+        # Scoping check (raises 404 when the teacher cannot access the exercise)
+        ExerciseService(self.db).get_exercise_detail(current_user, exercise_id)
+        grader = GradingService(self.db)
+        updated = grader.apply_answer_key(exercise_id, list(keys.items()))
+        regraded = grader.regrade_exercise(exercise_id)
+        return {"updated_questions": updated, "regraded_attempts": regraded}
 
     def get_grading_dashboard(self, current_user: User) -> "GradingDashboardOut":
         """Compute aggregate metrics and breakdown statistics for grading dashboard."""

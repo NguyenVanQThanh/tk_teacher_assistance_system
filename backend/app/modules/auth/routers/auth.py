@@ -87,8 +87,8 @@ def get_me(current_user: User = Depends(get_current_user), db: Session = Depends
         ).filter(
             TeacherSubject.teacher_id == current_user.user_id,
             TeacherSubject.status != "DELETED"
-        ).all()
-        teaching_subjects = [row[0] for row in ts_records] if ts_records else ["Toán học"]
+        ).distinct().all()
+        teaching_subjects = [row[0] for row in ts_records]
 
     perms = list(PermissionService.get_effective_permissions(db, current_user.user_id, current_user.role_id))
     return UserProfileOut(

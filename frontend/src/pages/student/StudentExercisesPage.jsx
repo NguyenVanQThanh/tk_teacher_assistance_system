@@ -5,7 +5,7 @@
 // Updated At: 2026-10-11
 // Updated By: Tam Khang
 
-import React, { useState, useEffect, useMemo, useRef } from 'react';
+import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { 
   HelpCircle, 
@@ -42,6 +42,7 @@ import {
 } from 'lucide-react';
 import AiSourcesList from '../../components/exercises/AiSourcesList';
 import { classesApi, assignmentsApi, attemptsApi, subjectsApi, exercisesApi } from '../../services/api';
+import useDataSync from '../../hooks/useDataSync';
 import './StudentExercisesPage.css';
 
 // Helper to format deadline preserving exact date & time without unwanted UTC shifts
@@ -401,48 +402,35 @@ export default function StudentExercisesPage() {
     }
   ], []);
 
-  // Manual refresh handler to force fetch fresh data from backend into cache
-  const handleRefreshData = () => {
-    clearSessionCache();
-    setLocalAiExercisesTrigger(prev => prev + 1);
-  };
+  // Guards to avoid duplicate / too-frequent fetches
+  const isFetchingRef = useRef(false);
+  const isMountedRef = useRef(true);
+  const lastRemoteFetchRef = useRef(0);
 
-  // Fetch student assignments and attempts: uses session cache when available, otherwise queries BE/DB and saves to session cache
   useEffect(() => {
-    let isMounted = true;
-    async function loadData() {
-      // 1. Check if session cache already has data for this session
-      const cached = readSessionCache();
-      if (cached) {
-        if (isMounted) {
-          setBackendAssignments(cached.assignments);
-          setBackendAttempts(cached.attempts);
-          if (cached.subjects && cached.subjects.length > 0) {
-            setAvailableSubjects(cached.subjects);
-          }
-        }
-        return; // Early return: no backend call needed within the same session
-      }
+    isMountedRef.current = true;
+    return () => { isMountedRef.current = false; };
+  }, []);
 
-      // 2. When FE does not have session cache, call BE and DB once to populate cache
-      try {
-        setLoading(true);
+  // Shared fresh-data fetch from BE/DB: used by initial mount (when no session cache),
+  // the manual "Làm mới" button, and automatic invalidation on backend data version change.
+  const fetchFreshData = useCallback(async () => {
+    if (isFetchingRef.current) return false; // skip when a fetch is already in flight
+    isFetchingRef.current = true;
+    try {
+      setLoading(true);
 
-        const [assignmentsRes, attemptsRes, subjectsRes] = await Promise.allSettled([
-          assignmentsApi.getAssignments(),
-          attemptsApi.getAttempts().catch(() => []),
-          availableSubjects.length === 0 ? subjectsApi.getSubjects().catch(() => []) : Promise.resolve(availableSubjects),
-        ]);
+      const [assignmentsRes, attemptsRes, subjectsRes] = await Promise.allSettled([
+        assignmentsApi.getAssignments(),
+        attemptsApi.getAttempts().catch(() => []),
+        subjectsApi.getSubjects().catch(() => []),
+      ]);
 
-        const rawAssignments = assignmentsRes.status === 'fulfilled' && Array.isArray(assignmentsRes.value) ? assignmentsRes.value : [];
-        const studentAttempts = attemptsRes.status === 'fulfilled' && Array.isArray(attemptsRes.value) ? attemptsRes.value : [];
-        const subjectsList = subjectsRes.status === 'fulfilled' && Array.isArray(subjectsRes.value) ? subjectsRes.value : availableSubjects;
+      const rawAssignments = assignmentsRes.status === 'fulfilled' && Array.isArray(assignmentsRes.value) ? assignmentsRes.value : [];
+      const studentAttempts = attemptsRes.status === 'fulfilled' && Array.isArray(attemptsRes.value) ? attemptsRes.value : [];
+      const subjectsList = subjectsRes.status === 'fulfilled' && Array.isArray(subjectsRes.value) ? subjectsRes.value : [];
 
-        if (isMounted && subjectsList.length > 0) {
-          setAvailableSubjects(subjectsList);
-        }
-
-        const allAssigned = rawAssignments.map(a => {
+      const allAssigned = rawAssignments.map(a => {
           const myAttempts = studentAttempts.filter(att => 
             String(att.assignment_id || '').toLowerCase() === String(a.assignment_id || '').toLowerCase()
           );
@@ -488,31 +476,69 @@ export default function StudentExercisesPage() {
             attempt: finishedAttempt || myAttempts[0],
             score: a.latest_score ?? (finishedAttempt?.score ?? null),
             isRealBackend: true,
-            isAiGenerated: isAi
+            isAiGenerated: isAi,
+            exerciseType: a.exercise_type || null
           };
         });
 
-        // Save into session cache
-        writeSessionCache(allAssigned, studentAttempts, subjectsList);
+      // Save into session cache
+      writeSessionCache(allAssigned, studentAttempts, subjectsList);
 
-        if (isMounted) {
-          setBackendAttempts(studentAttempts);
-          setBackendAssignments(allAssigned);
-        }
-      } catch (err) {
-        console.error('Failed to load student assignments from backend:', err);
-      } finally {
-        if (isMounted) {
-          setLoading(false);
+      if (isMountedRef.current) {
+        setBackendAttempts(studentAttempts);
+        setBackendAssignments(allAssigned);
+        if (subjectsList.length > 0) {
+          setAvailableSubjects(subjectsList);
         }
       }
+      return true;
+    } catch (err) {
+      console.error('Failed to load student assignments from backend:', err);
+      return false;
+    } finally {
+      isFetchingRef.current = false;
+      if (isMountedRef.current) {
+        setLoading(false);
+      }
     }
-    loadData();
+  }, []);
 
-    return () => {
-      isMounted = false;
-    };
-  }, [localAiExercisesTrigger]);
+  // Manual refresh handler to force fetch fresh data from backend into cache
+  const handleRefreshData = () => {
+    clearSessionCache();
+    setLocalAiExercisesTrigger(prev => prev + 1);
+  };
+
+  // Fetch student assignments and attempts: uses session cache when available (fast path, survives F5),
+  // otherwise queries BE/DB once and saves to session cache
+  useEffect(() => {
+    // 1. Check if session cache already has data for this session
+    const cached = readSessionCache();
+    if (cached) {
+      setBackendAssignments(cached.assignments);
+      setBackendAttempts(cached.attempts);
+      if (cached.subjects && cached.subjects.length > 0) {
+        setAvailableSubjects(cached.subjects);
+      }
+      return; // Early return: no backend call needed within the same session
+    }
+
+    // 2. When FE does not have session cache, call BE and DB once to populate cache
+    fetchFreshData();
+  }, [localAiExercisesTrigger, fetchFreshData]);
+
+  // Auto-invalidate the session cache and refetch when the backend data version changes
+  // (e.g. a teacher assigned a new exercise from another tab/session). Throttled to at
+  // least 5s apart; overlapping fetches are skipped via isFetchingRef.
+  const handleRemoteInvalidate = useCallback(() => {
+    const now = Date.now();
+    if (now - lastRemoteFetchRef.current < 5000) return;
+    lastRemoteFetchRef.current = now;
+    clearSessionCache();
+    fetchFreshData();
+  }, [fetchFreshData]);
+
+  useDataSync(handleRemoteInvalidate);
 
   // Safe icon helper that always returns a valid Lucide component even after JSON parsing
   const getAssignmentIcon = (item) => {
@@ -660,9 +686,9 @@ export default function StudentExercisesPage() {
   const [aiTopicPrompt, setAiTopicPrompt] = useState('Este và Lipit – Phản ứng xà phòng hóa, este hóa và chất béo triolein');
 
   // Question counts by Part & Difficulty Levels (Nhận biết, Thông hiểu, Vận dụng)
-  const [part1Levels, setPart1Levels] = useState({ know: 6, comp: 5, app: 4 }); // Part I: MC 4 options
-  const [part2Levels, setPart2Levels] = useState({ know: 1, comp: 2, app: 1 }); // Part II: True/False
-  const [part3Levels, setPart3Levels] = useState({ know: 0, comp: 2, app: 4 }); // Part III: Short Answer
+  const [part1Levels, setPart1Levels] = useState({ know: 0, comp: 0, app: 0 }); // Part I: MC 4 options
+  const [part2Levels, setPart2Levels] = useState({ know: 0, comp: 0, app: 0 }); // Part II: True/False
+  const [part3Levels, setPart3Levels] = useState({ know: 0, comp: 0, app: 0 }); // Part III: Short Answer
 
   // Calculations
   const part1Total = part1Levels.know + part1Levels.comp + part1Levels.app;
@@ -684,11 +710,21 @@ export default function StudentExercisesPage() {
   ];
 
   // Increment / Decrement handlers for difficulty counts
+  // Max total questions per section (Part I/II/III)
+  const MAX_PER_SECTION = 15;
+  // Set a level count: clamps to >= 0 and keeps the section total <= MAX_PER_SECTION
+  const setLevelValue = (setter, key, value) => {
+    setter(prev => {
+      const others = Object.keys(prev).reduce((sum, k) => (k === key ? sum : sum + prev[k]), 0);
+      const n = Math.max(0, Math.min(Number.isFinite(value) ? Math.floor(value) : 0, MAX_PER_SECTION - others));
+      return { ...prev, [key]: n };
+    });
+  };
   const handleLevelChange = (setter, key, delta) => {
-    setter(prev => ({
-      ...prev,
-      [key]: Math.max(0, prev[key] + delta)
-    }));
+    setter(prev => {
+      const others = Object.keys(prev).reduce((sum, k) => (k === key ? sum : sum + prev[k]), 0);
+      return { ...prev, [key]: Math.max(0, Math.min(prev[key] + delta, MAX_PER_SECTION - others)) };
+    });
   };
 
   // Submit AI Generation Handler (Persisted to Database)
@@ -843,6 +879,9 @@ export default function StudentExercisesPage() {
           if (itemCat !== 'ai_generated' && !item.isAiGenerated) return false;
         } else if (selectedType === 'exam') {
           if (itemCat !== 'exam') return false;
+        } else if (selectedType === 'unclassified') {
+          // Unclassified: no exercise type set (applies to class-assigned and AI-generated alike)
+          if (item.exerciseType) return false;
         }
       }
 
@@ -1013,6 +1052,7 @@ export default function StudentExercisesPage() {
             <option value="exam">Bài thi</option>
             <option value="class_exercise">Bài tập trên lớp</option>
             <option value="ai_generated">Bài tập tạo sinh AI</option>
+            <option value="unclassified">Chưa phân loại</option>
           </select>
         </div>
 
@@ -1445,7 +1485,7 @@ export default function StudentExercisesPage() {
                             >
                               <Minus size={13} />
                             </button>
-                            <span className="counter-num-display">{part1Levels.know}</span>
+                            <input type="number" min="0" max={MAX_PER_SECTION} className="counter-num-display" style={{ width: 44, textAlign: "center" }} value={part1Levels.know} onChange={(e) => setLevelValue(setPart1Levels, 'know', parseInt(e.target.value, 10))} />
                             <button 
                               type="button" 
                               className="btn-counter-ctrl"
@@ -1469,7 +1509,7 @@ export default function StudentExercisesPage() {
                             >
                               <Minus size={13} />
                             </button>
-                            <span className="counter-num-display">{part1Levels.comp}</span>
+                            <input type="number" min="0" max={MAX_PER_SECTION} className="counter-num-display" style={{ width: 44, textAlign: "center" }} value={part1Levels.comp} onChange={(e) => setLevelValue(setPart1Levels, 'comp', parseInt(e.target.value, 10))} />
                             <button 
                               type="button" 
                               className="btn-counter-ctrl"
@@ -1493,7 +1533,7 @@ export default function StudentExercisesPage() {
                             >
                               <Minus size={13} />
                             </button>
-                            <span className="counter-num-display">{part1Levels.app}</span>
+                            <input type="number" min="0" max={MAX_PER_SECTION} className="counter-num-display" style={{ width: 44, textAlign: "center" }} value={part1Levels.app} onChange={(e) => setLevelValue(setPart1Levels, 'app', parseInt(e.target.value, 10))} />
                             <button 
                               type="button" 
                               className="btn-counter-ctrl"
@@ -1533,7 +1573,7 @@ export default function StudentExercisesPage() {
                             >
                               <Minus size={13} />
                             </button>
-                            <span className="counter-num-display">{part2Levels.know}</span>
+                            <input type="number" min="0" max={MAX_PER_SECTION} className="counter-num-display" style={{ width: 44, textAlign: "center" }} value={part2Levels.know} onChange={(e) => setLevelValue(setPart2Levels, 'know', parseInt(e.target.value, 10))} />
                             <button 
                               type="button" 
                               className="btn-counter-ctrl"
@@ -1557,7 +1597,7 @@ export default function StudentExercisesPage() {
                             >
                               <Minus size={13} />
                             </button>
-                            <span className="counter-num-display">{part2Levels.comp}</span>
+                            <input type="number" min="0" max={MAX_PER_SECTION} className="counter-num-display" style={{ width: 44, textAlign: "center" }} value={part2Levels.comp} onChange={(e) => setLevelValue(setPart2Levels, 'comp', parseInt(e.target.value, 10))} />
                             <button 
                               type="button" 
                               className="btn-counter-ctrl"
@@ -1581,7 +1621,7 @@ export default function StudentExercisesPage() {
                             >
                               <Minus size={13} />
                             </button>
-                            <span className="counter-num-display">{part2Levels.app}</span>
+                            <input type="number" min="0" max={MAX_PER_SECTION} className="counter-num-display" style={{ width: 44, textAlign: "center" }} value={part2Levels.app} onChange={(e) => setLevelValue(setPart2Levels, 'app', parseInt(e.target.value, 10))} />
                             <button 
                               type="button" 
                               className="btn-counter-ctrl"
@@ -1621,7 +1661,7 @@ export default function StudentExercisesPage() {
                             >
                               <Minus size={13} />
                             </button>
-                            <span className="counter-num-display">{part3Levels.know}</span>
+                            <input type="number" min="0" max={MAX_PER_SECTION} className="counter-num-display" style={{ width: 44, textAlign: "center" }} value={part3Levels.know} onChange={(e) => setLevelValue(setPart3Levels, 'know', parseInt(e.target.value, 10))} />
                             <button 
                               type="button" 
                               className="btn-counter-ctrl"
@@ -1645,7 +1685,7 @@ export default function StudentExercisesPage() {
                             >
                               <Minus size={13} />
                             </button>
-                            <span className="counter-num-display">{part3Levels.comp}</span>
+                            <input type="number" min="0" max={MAX_PER_SECTION} className="counter-num-display" style={{ width: 44, textAlign: "center" }} value={part3Levels.comp} onChange={(e) => setLevelValue(setPart3Levels, 'comp', parseInt(e.target.value, 10))} />
                             <button 
                               type="button" 
                               className="btn-counter-ctrl"
@@ -1669,7 +1709,7 @@ export default function StudentExercisesPage() {
                             >
                               <Minus size={13} />
                             </button>
-                            <span className="counter-num-display">{part3Levels.app}</span>
+                            <input type="number" min="0" max={MAX_PER_SECTION} className="counter-num-display" style={{ width: 44, textAlign: "center" }} value={part3Levels.app} onChange={(e) => setLevelValue(setPart3Levels, 'app', parseInt(e.target.value, 10))} />
                             <button 
                               type="button" 
                               className="btn-counter-ctrl"

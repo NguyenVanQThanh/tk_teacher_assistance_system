@@ -260,7 +260,7 @@ export default function AddQuestionModal({
       shortAnswerExpected,
       solutionGuide,
       previewSnippet: content.slice(0, 120) + (content.length > 120 ? '...' : ''),
-      formulaMeta: `${latexBlocksCount} công thức LaTeX`,
+      formulaMeta: `${latexBlocksCount} công thức`,
       answersMeta: `${options.length} đáp án (${correctOpt}*)`
     };
   };
@@ -733,7 +733,7 @@ export default function AddQuestionModal({
                 onClick={() => insertLatexSnippet('\n$$\n\\begin{aligned}\n  \n\\end{aligned}\n$$\n')}
               >
                 <Code size={14} className="btn-struct-icon" />
-                <span>Chèn khối LaTeX</span>
+                <span>Chèn công thức</span>
               </button>
 
               <button
@@ -765,15 +765,15 @@ export default function AddQuestionModal({
               <h3 className="section-main-title">Nội dung đề bài & Lựa chọn</h3>
             </div>
             <span className="badge-katex-support">
-              <span className="katex-icon-square">KaTeX</span>
-              <span>Hỗ trợ Markdown & LaTeX chuẩn KaTeX</span>
+              <span className="katex-icon-square">fx</span>
+              <span>Hỗ trợ nhập công thức toán học</span>
             </span>
           </div>
 
           {/* Question Textarea Box */}
           <div className="question-input-card">
             <div className="textarea-top-hint-row">
-              <span className="textarea-lead-label">Đề bài câu hỏi (Kèm công thức LaTeX):</span>
+              <span className="textarea-lead-label">Đề bài câu hỏi (Kèm công thức):</span>
               <span className="textarea-syntax-guide">Đặt công thức trong cặp dấu $...$</span>
             </div>
 
@@ -792,12 +792,12 @@ export default function AddQuestionModal({
               <div className="meta-counts-cluster">
                 <span>{wordCount} từ</span>
                 <span className="meta-bullet">•</span>
-                <span>{latexBlocksCount} khối công thức LaTeX</span>
+                <span>{latexBlocksCount} công thức</span>
               </div>
 
               <div className="ai-tools-cluster">
                 {showAiNotice && (
-                  <span className="ai-notice-toast">Đã tối ưu hóa cú pháp LaTeX!</span>
+                  <span className="ai-notice-toast">Đã tối ưu hóa nội dung!</span>
                 )}
                 <button
                   type="button"

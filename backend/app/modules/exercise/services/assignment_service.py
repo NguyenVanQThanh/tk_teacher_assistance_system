@@ -1,23 +1,26 @@
 # File Name: assignment_service.py
-# Description: Service layer for ClassAssignment operations (creation, scoping, feed listing, soft-delete, restore).
+# Description: Service layer for ClassAssignment operations (creation, scoping, feed listing, soft-delete, restore)
+#              plus the student-safe "taking" paper builder (sanitized questions, no answer key).
 # Created At: 2026-07-31
 # Created By: Tam Khang
-# Updated At: 2026-10-04
-# Updated By: Tam Khang
+# Updated At: 2026-11-12
+# Updated By: AI Agent
 
 from datetime import datetime, timezone
 from typing import List, Optional, Dict, Any
 from uuid import UUID
 from fastapi import HTTPException, status
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 from sqlalchemy import or_
 
-from models.models import User, Class, Exercise, TeacherSubject, ClassAssignment, Subject, StudentExerciseAttempt, Question
+from models.models import User, Class, Exercise, TeacherSubject, ClassAssignment, Subject, StudentClass, StudentExerciseAttempt, Question
 from app.modules.exercise.schemas import (
     AssignmentCreate, AssignmentResultSummaryOut, AssignmentAttemptDetail,
-    CognitiveAnalysis, CognitiveLevelStats
+    CognitiveAnalysis, CognitiveLevelStats,
+    AssignmentTakingOut, AssignmentTakingInfoOut, AssignmentTakingExerciseOut,
+    StudentQuestionOut, StudentOpenAttemptOut
 )
-from app.modules.exercise.repository import AssignmentRepository, ExerciseRepository
+from app.modules.exercise.repository import AssignmentRepository, ExerciseRepository, AttemptRepository
 from app.modules.academic.scoping import get_user_role_name, check_class_access, get_accessible_class_ids
 
 
@@ -249,10 +252,130 @@ class AssignmentService:
                 "feed_status": feed_status,
                 "category": category,
                 "categoryLabel": category_label,
-                "is_ai_generated": is_ai_gen
+                "is_ai_generated": is_ai_gen,
+                # Teacher/AI-assigned exercise type; None means unclassified
+                "exercise_type": (a.exercise.ai_metadata or {}).get("type") if a.exercise else None
             })
 
         return results
+
+    def get_assignment_taking(self, assignment_id: UUID, current_user: User) -> AssignmentTakingOut:
+        """
+        Student-safe "paper" of an assignment: assignment info + exercise info + SANITIZED questions
+        (no correct_answer / explanation / is_correct) + the current user's open attempt (if any).
+
+        - 404 when the assignment does not exist or was cancelled (status DELETED).
+        - 403 when a Student is not enrolled in the assignment's class (teachers/admins go through
+          the standard class-access scoping instead).
+        """
+        # repo.get_by_id already excludes DELETED assignments -> cancelled ones 404 here.
+        assignment = self.repo.get_by_id(assignment_id)
+        if not assignment:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail={
+                    "code": "ERR-EXE-ASSIGNMENT_NOT_FOUND",
+                    "message": "Class assignment record not found."
+                }
+            )
+
+        role_name = get_user_role_name(self.db, current_user)
+        if role_name == "Student":
+            enrolled = self.db.query(StudentClass).filter(
+                StudentClass.student_id == current_user.user_id,
+                StudentClass.class_id == assignment.class_id,
+                StudentClass.status != 'DELETED'
+            ).first()
+            if not enrolled:
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail={
+                        "code": "ERR-EXE-STUDENT_NOT_ENROLLED",
+                        "message": "You are not enrolled in the class for this assignment."
+                    }
+                )
+        else:
+            # Teacher / Admin: standard class access scoping.
+            check_class_access(self.db, current_user, assignment.class_id)
+
+        return self.build_student_paper(assignment, current_user.user_id)
+
+    def build_student_paper(self, assignment: ClassAssignment, student_id: UUID) -> AssignmentTakingOut:
+        """Build the sanitized AssignmentTakingOut payload for an already-access-checked assignment."""
+        exercise = self.db.query(Exercise).filter(
+            Exercise.exercise_id == assignment.exercise_id,
+            Exercise.status != 'DELETED'
+        ).first()
+        if not exercise:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail={
+                    "code": "ERR-EXE-EXERCISE_NOT_FOUND",
+                    "message": "Exercise not found."
+                }
+            )
+
+        questions = self.db.query(Question).options(
+            joinedload(Question.answer_options)
+        ).filter(
+            Question.exercise_id == exercise.exercise_id,
+            Question.status != 'DELETED'
+        ).order_by(Question.display_order.asc()).all()
+
+        subject_obj = None
+        if exercise.subject_id:
+            subject_obj = self.db.query(Subject).filter(
+                Subject.subject_id == exercise.subject_id,
+                Subject.status != 'DELETED'
+            ).first()
+
+        # duration_minutes / max_attempts live in exercise.ai_metadata (same rule as the feed).
+        ai_meta = exercise.ai_metadata or {}
+        is_exam = "đề thi" in (exercise.title or "").lower()
+        duration_minutes = ai_meta.get("duration_minutes", 45)
+        max_attempts = ai_meta.get("max_attempts", 1 if is_exam else 3)
+
+        # The student's own in-progress attempt for this assignment (if any).
+        open_attempt = AttemptRepository(self.db).find_open_attempt(student_id, assignment.assignment_id)
+        open_attempt_out: Optional[StudentOpenAttemptOut] = None
+        if open_attempt:
+            saved_answers = None
+            detailed = open_attempt.detailed_results
+            if isinstance(detailed, dict):
+                saved_answers = detailed.get("answers")
+            open_attempt_out = StudentOpenAttemptOut(
+                attempt_id=open_attempt.attempt_id,
+                created_at=open_attempt.created_at,
+                start_time=open_attempt.start_time,
+                answers=saved_answers
+            )
+
+        # StudentQuestionOut omits correct_answer/explanation; its segments/options sanitize themselves.
+        student_questions = [StudentQuestionOut.model_validate(q) for q in questions]
+
+        return AssignmentTakingOut(
+            assignment=AssignmentTakingInfoOut(
+                assignment_id=assignment.assignment_id,
+                exercise_id=assignment.exercise_id,
+                class_id=assignment.class_id,
+                due_at=assignment.due_at,
+                duration_minutes=duration_minutes,
+                max_attempts=max_attempts,
+                status=assignment.status,
+                teacher_name=assignment.assigner.full_name if assignment.assigner else None,
+                class_name=assignment.class_obj.class_name if assignment.class_obj else None,
+                subject_name=subject_obj.subject_name if subject_obj else None
+            ),
+            exercise=AssignmentTakingExerciseOut(
+                exercise_id=exercise.exercise_id,
+                title=exercise.title,
+                subject_id=exercise.subject_id,
+                subject_name=subject_obj.subject_name if subject_obj else None,
+                ai_metadata=exercise.ai_metadata
+            ),
+            questions=student_questions,
+            open_attempt=open_attempt_out
+        )
 
     def delete_assignment(self, assignment_id: UUID, current_user: User) -> ClassAssignment:
         assignment = self.repo.get_by_id(assignment_id)

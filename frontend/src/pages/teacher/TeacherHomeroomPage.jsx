@@ -28,6 +28,7 @@ import {
 import { Link } from 'react-router-dom';
 import { classesApi } from '../../services/api';
 import { useAuth } from '../../context/AuthContext';
+import { compareVietnameseNames } from '../../utils/gradeClassification';
 import StudentDetailModal from '../../components/teacher/StudentDetailModal';
 import EditStudentInfoModal from '../../components/teacher/EditStudentInfoModal';
 import EditStudentGradesModal from '../../components/teacher/EditStudentGradesModal';
@@ -230,7 +231,7 @@ export default function TeacherHomeroomPage() {
 
   // Filtering & Sorting
   const filteredStudents = useMemo(() => {
-    let result = studentsList.filter((student) => {
+    let result = [...studentsList].sort((a, b) => compareVietnameseNames(a.name, b.name)).filter((student) => {
       if (statusFilter !== 'all' && student.status !== statusFilter) {
         return false;
       }

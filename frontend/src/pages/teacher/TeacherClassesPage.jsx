@@ -57,6 +57,8 @@ export default function TeacherClassesPage() {
   // Refs keep the loader stable: it must not be re-created (and re-subscribed) when the user object changes.
   const userIdRef = useRef(user?.user_id);
   userIdRef.current = user?.user_id;
+  const profileSubjectRef = useRef(user?.teaching_subjects?.[0]);
+  profileSubjectRef.current = user?.teaching_subjects?.[0];
   const isRefreshingRef = useRef(false);
   const lastLoadedAtRef = useRef(0);
   const userId = user?.user_id;
@@ -135,7 +137,7 @@ export default function TeacherClassesPage() {
           const gradeMatch = cls.class_name.match(/(10|11|12)/);
           const grade = gradeMatch ? gradeMatch[1] : '';
 
-          const subjectName = assignedSubjectName || (subjectsData[0]?.subject_name || 'Bộ môn');
+          const subjectName = assignedSubjectName || profileSubjectRef.current || 'Bộ môn';
           const lowerSub = subjectName.toLowerCase();
           let iconType = 'book';
 

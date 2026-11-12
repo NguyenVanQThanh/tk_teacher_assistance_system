@@ -19,118 +19,35 @@ import {
 } from 'lucide-react';
 import './StudentPendingAssignmentsDetailCard.css';
 
-// Rich mock data for student pending assignments
-const PENDING_ASSIGNMENTS_DATA = [
-  {
-    id: 1,
-    title: 'Toán 12: Đạo hàm & Khảo sát hàm số',
-    subject: 'Toán học',
-    type: 'classroom',
-    typeLabel: 'Trên lớp',
-    teacher: 'Thầy Nguyễn Văn A',
-    classCode: '12A1',
-    dueLabel: 'Trễ 2 ngày',
-    dueDate: '25/03/2024',
-    isOverdue: true,
-    dueStatus: 'danger',
-    questionCount: 25,
-    duration: '45 phút',
-    link: '/student/exercises'
-  },
-  {
-    id: 2,
-    title: 'Hóa học: Chuyên đề Este – Lipit & Bài toán đốt cháy',
-    subject: 'Hóa học',
-    type: 'classroom',
-    typeLabel: 'Trên lớp',
-    teacher: 'Cô Trần Thị B',
-    classCode: '12A1',
-    dueLabel: 'Đến hạn 22:00 hôm nay',
-    dueDate: '27/03/2024',
-    isOverdue: false,
-    dueStatus: 'warning',
-    questionCount: 20,
-    duration: '30 phút',
-    link: '/student/exercises'
-  },
-  {
-    id: 3,
-    title: 'Vật lý: Dao động điều hòa & Con lắc lò xo',
-    subject: 'Vật lý',
-    type: 'classroom',
-    typeLabel: 'Trên lớp',
-    teacher: 'Thầy Lê Văn C',
-    classCode: '12A1',
-    dueLabel: 'Đến hạn ngày mai',
-    dueDate: '28/03/2024',
-    isOverdue: false,
-    dueStatus: 'info',
-    questionCount: 30,
-    duration: '45 phút',
-    link: '/student/exercises'
-  },
-  {
-    id: 4,
-    title: 'AI Generator: Rèn luyện Đọc hiểu Tiếng Anh Unit 4',
-    subject: 'Tiếng Anh',
-    type: 'ai_generated',
-    typeLabel: 'Tạo sinh AI',
-    teacher: 'Hệ thống AI Assistant',
-    classCode: 'Tự học',
-    dueLabel: 'Luyện tập tự do',
-    dueDate: 'Không giới hạn',
-    isOverdue: false,
-    dueStatus: 'success',
-    questionCount: 15,
-    duration: '20 phút',
-    link: '/student/exercises'
-  },
-  {
-    id: 5,
-    title: 'AI Generator: Ôn thi THPT QG Môn Toán (Mức độ Vận dụng)',
-    subject: 'Toán học',
-    type: 'ai_generated',
-    typeLabel: 'Tạo sinh AI',
-    teacher: 'Hệ thống AI Assistant',
-    classCode: 'Rèn luyện AI',
-    dueLabel: 'Gợi ý hoàn thành tuần này',
-    dueDate: '30/03/2024',
-    isOverdue: false,
-    dueStatus: 'purple',
-    questionCount: 10,
-    duration: '25 phút',
-    link: '/student/exercises'
-  }
-];
-
 export default function StudentPendingAssignmentsDetailCard({ onSwitchToSchedule, assignments = null }) {
   const navigate = useNavigate();
+  // Real pending (unfinished) assignments from the dashboard API
+  const PENDING_ASSIGNMENTS_DATA = (Array.isArray(assignments) ? assignments : [])
+    .filter(a => !a.is_completed)
+    .map(a => ({
+      id: a.assignment_id,
+      assignment_id: a.assignment_id,
+      exercise_id: a.exercise_id,
+      title: a.title,
+      subject: a.subject_name,
+      type: a.is_ai_generated ? 'ai_generated' : 'classroom',
+      typeLabel: a.is_ai_generated ? 'Tạo sinh AI' : (a.subject_name || 'Trên lớp'),
+      teacher: a.is_ai_generated ? 'Trợ lý AI' : (a.subject_name || 'Giáo viên bộ môn'),
+      classCode: a.is_ai_generated ? 'Tự học' : 'Trên lớp',
+      dueLabel: a.is_overdue ? 'Đã quá hạn' : (a.due_at ? `Hạn: ${new Date(a.due_at).toLocaleDateString('vi-VN')}` : 'Đến hạn'),
+      isOverdue: Boolean(a.is_overdue),
+      dueStatus: a.is_overdue ? 'danger' : 'normal',
+      questionCount: a.total_questions || 0,
+      duration: `${a.duration_minutes || 45} phút`
+    }));
   const [filterType, setFilterType] = useState('all'); // 'all' | 'classroom' | 'ai_generated'
 
   const handleOpenExercise = (assignment) => {
-    const isAi = assignment.type === 'ai_generated';
     navigate('/student/exercises', {
       state: {
         searchTitle: assignment.title,
         autoOpenTitle: assignment.title,
-        autoOpenId: assignment.id || assignment.assignment_id,
-        fallbackExercise: {
-          id: assignment.id || assignment.assignment_id,
-          assignment_id: assignment.assignment_id || assignment.id,
-          exercise_id: assignment.exercise_id || assignment.id,
-          title: assignment.title,
-          teacher: assignment.teacher || 'Giáo viên bộ môn',
-          subject: assignment.subject || 'Toán học',
-          questionsCount: assignment.questionCount ? `${assignment.questionCount} câu hỏi` : '20 câu hỏi',
-          total_questions: assignment.questionCount || 20,
-          duration: assignment.duration || '45 phút',
-          deadline: assignment.dueDate || assignment.dueLabel || '16:59 11/10/2026',
-          status: 'active',
-          statusLabel: 'Đang mở',
-          isRealBackend: Boolean(assignment.assignment_id),
-          category: isAi ? 'ai_generated' : 'class_exercise',
-          categoryLabel: isAi ? 'Bài tập tạo sinh AI' : 'Bài tập trên lớp'
-        }
+        autoOpenId: assignment.id || assignment.assignment_id
       }
     });
   };

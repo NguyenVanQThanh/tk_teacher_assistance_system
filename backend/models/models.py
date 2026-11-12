@@ -271,6 +271,9 @@ class ClassAssignment(Base):
     assigned_at = Column(DateTime(timezone=True), server_default=func.now())
     due_at = Column(DateTime(timezone=True), nullable=False)
     status = Column(String(20), default='ACTIVE', nullable=False)
+    # Added 2026-11-12 so updates (incl. soft delete/restore) are visible to the data-version
+    # sync endpoint; previously only assigned_at existed and cancellations were invisible.
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
 
     class_obj = relationship("Class", backref="assignments")
     exercise = relationship("Exercise", backref="assignments")
