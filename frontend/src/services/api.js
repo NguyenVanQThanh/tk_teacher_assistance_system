@@ -38,6 +38,26 @@ api.interceptors.response.use(
   }
 );
 
+// Response interceptor: forward the X-Data-Version header of every GET response to dataSync.
+// Lazy dynamic import avoids a circular dependency (dataSync imports syncApi from this file).
+api.interceptors.response.use(
+  (response) => {
+    try {
+      const v = response?.headers?.['x-data-version'];
+      if (v) {
+        import('./dataSync')
+          .then((m) => {
+            const ds = m.default || m;
+            ds.notifyHeaderVersion?.(v);
+          })
+          .catch(() => {});
+      }
+    } catch (e) {}
+    return response;
+  },
+  (error) => Promise.reject(error)
+);
+
 export const authApi = {
   login: async (credentials) => {
     const response = await api.post('/api/v1/auth/login', credentials);
@@ -246,6 +266,14 @@ export const attemptsApi = {
     const response = await api.put(`/api/v1/attempts/${attemptId}/grade`, data);
     return response.data;
   },
+  updateAnswerKey: async (exerciseId, data) => {
+    const response = await api.put(`/api/v1/exercises/${exerciseId}/answer-key`, data);
+    return response.data;
+  },
+  exportReport: async (params = {}) => {
+    const response = await api.get('/api/v1/attempts/export', { params, responseType: 'blob' });
+    return response.data;
+  },
   getAssignmentAttempts: async (assignmentId, params = {}) => {
     const response = await api.get(`/api/v1/assignments/${assignmentId}/attempts`, { params });
     return response.data;
@@ -402,7 +430,44 @@ export const studentApi = {
   },
 };
 
+// Data version sync API: backend exposes GET /api/v1/sync/version -> { version, tables }
+// and an SSE stream GET /api/v1/sync/stream that emits { version } on change.
+export const syncApi = {
+  getVersion: async () => {
+    const response = await api.get('/api/v1/sync/version');
+    return response.data;
+  },
+  // Optional SSE subscription. EventSource cannot set the Authorization header,
+  // so the token is passed as a query param (best-effort). Returns a close() function.
+  // Primary mechanism remains polling in dataSync.js; use this only if the BE stream works.
+  subscribeVersionStream: (onVersion) => {
+    if (typeof EventSource === 'undefined') return () => {};
+    const token = localStorage.getItem('access_token');
+    const base = api.defaults.baseURL || '';
+    const url = `${base}/api/v1/sync/stream${token ? `?token=${encodeURIComponent(token)}` : ''}`;
+    let es;
+    try {
+      es = new EventSource(url);
+    } catch (e) {
+      return () => {};
+    }
+    es.onmessage = (ev) => {
+      try {
+        const data = JSON.parse(ev.data);
+        if (data?.version && typeof onVersion === 'function') onVersion(data.version);
+      } catch (e) {}
+    };
+    return () => {
+      try { es.close(); } catch (e) {}
+    };
+  },
+};
+
 export const teacherApi = {
+  getNotifications: async () => {
+    const response = await api.get('/api/v1/teacher/notifications');
+    return response.data;
+  },
   getDashboard: async (params = {}) => {
     const response = await api.get('/api/v1/teacher/dashboard', { params });
     return response.data;

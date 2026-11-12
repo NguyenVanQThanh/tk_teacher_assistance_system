@@ -15,39 +15,22 @@ export default function PendingStudentAssignmentsCard({
   onClickCard,
   assignments = null
 }) {
-  const dynamicTasks = Array.isArray(assignments) && assignments.length > 0
-    ? assignments.slice(0, 3).map((a, idx) => ({
-        id: a.assignment_id || idx,
-        title: a.title,
-        type: 'classroom',
-        typeLabel: a.subject_name || 'Trên lớp',
-        dueLabel: a.is_overdue ? 'Đã quá hạn' : (a.due_at ? `Hạn: ${new Date(a.due_at).toLocaleDateString('vi-VN')}` : 'Đến hạn'),
-        isOverdue: Boolean(a.is_overdue)
-      }))
-    : null;
-
-  const classroomCount = dynamicTasks ? assignments.length : 3;
-  const aiGeneratedCount = 2;
+  // Only unfinished assignments count as pending (matches the exercise library "active"/"overdue" tabs)
+  const pending = Array.isArray(assignments) ? assignments.filter(a => !a.is_completed) : null;
+  const toTask = (a) => ({
+    id: a.assignment_id,
+    assignment_id: a.assignment_id,
+    exercise_id: a.exercise_id,
+    title: a.title,
+    type: a.is_ai_generated ? 'ai' : 'classroom',
+    typeLabel: a.is_ai_generated ? 'Tạo sinh AI' : (a.subject_name || 'Trên lớp'),
+    dueLabel: a.is_overdue ? 'Đã quá hạn' : (a.due_at ? `Hạn: ${new Date(a.due_at).toLocaleDateString('vi-VN')}` : 'Đến hạn'),
+    isOverdue: Boolean(a.is_overdue)
+  });
+  const classroomCount = pending ? pending.filter(a => !a.is_ai_generated).length : 0;
+  const aiGeneratedCount = pending ? pending.filter(a => a.is_ai_generated).length : 0;
   const totalCount = classroomCount + aiGeneratedCount;
-
-  const tasks = dynamicTasks || [
-    {
-      id: 1,
-      title: 'Toán 12: Đạo hàm & Khảo sát hàm số',
-      type: 'classroom',
-      typeLabel: 'Trên lớp',
-      dueLabel: 'Trễ 2 ngày',
-      isOverdue: true
-    },
-    {
-      id: 2,
-      title: 'Hóa học: Chuyên đề Este – Lipit',
-      type: 'classroom',
-      typeLabel: 'Trên lớp',
-      dueLabel: 'Đến hạn: 22:00',
-      isOverdue: false
-    }
-  ];
+  const tasks = pending ? pending.slice(0, 3).map(toTask) : [];
 
   const navigate = useNavigate();
 
@@ -63,24 +46,7 @@ export default function PendingStudentAssignmentsCard({
       state: {
         searchTitle: task.title,
         autoOpenTitle: task.title,
-        autoOpenId: task.id || task.assignment_id,
-        fallbackExercise: {
-          id: task.id || task.assignment_id,
-          assignment_id: task.assignment_id || task.id,
-          exercise_id: task.exercise_id || task.id,
-          title: task.title,
-          teacher: 'Giáo viên bộ môn',
-          subject: task.subject || 'Toán học',
-          questionsCount: '20 câu hỏi',
-          total_questions: 20,
-          duration: '45 phút',
-          deadline: task.dueLabel || '16:59 11/10/2026',
-          status: 'active',
-          statusLabel: 'Đang mở',
-          isRealBackend: Boolean(task.assignment_id),
-          category: 'class_exercise',
-          categoryLabel: 'Bài tập trên lớp'
-        }
+        autoOpenId: task.id || task.assignment_id
       }
     });
   };

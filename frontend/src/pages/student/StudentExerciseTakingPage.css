@@ -2160,3 +2160,170 @@ Updated By: Tam Khang
   border-color: #C084FC;
 }
 
+/* ============================================================ */
+/* 7. BACKEND LOAD ERROR SCREEN (real UUID target, BE failed)   */
+/* ============================================================ */
+.exam-backend-error-screen {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100vh;
+  background: #F8FAFC;
+  padding: 24px;
+  box-sizing: border-box;
+}
+
+.exam-backend-error-card {
+  background: #FFFFFF;
+  border: 1px solid #E2E8F0;
+  border-radius: 16px;
+  box-shadow: 0 20px 40px -12px rgba(15, 23, 42, 0.15);
+  max-width: 460px;
+  width: 100%;
+  padding: 36px 32px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 12px;
+}
+
+.backend-error-icon {
+  color: #DC2626;
+}
+
+.backend-error-title {
+  margin: 0;
+  font-size: 20px;
+  font-weight: 800;
+  color: #1E1B4B;
+}
+
+.backend-error-message {
+  margin: 0;
+  font-size: 14px;
+  color: #64748B;
+  line-height: 1.6;
+}
+
+.btn-backend-error-back {
+  margin-top: 8px;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  background: linear-gradient(135deg, #6549A6, #4D308D);
+  color: #FFFFFF;
+  border: none;
+  border-radius: 10px;
+  padding: 10px 18px;
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+.btn-backend-error-back:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 6px 16px rgba(101, 73, 166, 0.4);
+}
+
+/* ============================================================ */
+/* 8. EXAM LOCKDOWN OVERLAY (multi-monitor / extended display)  */
+/*    Chặn TOÀN màn hình khi đang làm bài thật mà phát hiện     */
+/*    nhiều màn hình (chế độ extend). z-index cao hơn mọi       */
+/*    modal khác.                                                */
+/* ============================================================ */
+.exam-lockdown-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(15, 23, 42, 0.92);
+  backdrop-filter: blur(10px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 3000;
+  padding: 24px;
+  animation: modalFadeIn 0.2s ease-out;
+}
+
+.exam-lockdown-overlay-card {
+  background: #FFFFFF;
+  border-radius: 20px;
+  width: 100%;
+  max-width: 520px;
+  box-shadow: 0 30px 60px -12px rgba(0, 0, 0, 0.5);
+  padding: 36px 32px;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 14px;
+  animation: modalSlideUp 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.lockdown-icon-badge {
+  width: 64px;
+  height: 64px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #F59E0B, #D97706);
+  color: #FFFFFF;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 8px 20px rgba(245, 158, 11, 0.4);
+}
+
+.lockdown-title {
+  margin: 0;
+  font-size: 20px;
+  font-weight: 800;
+  color: #92400E;
+}
+
+.lockdown-desc {
+  margin: 0;
+  font-size: 14.5px;
+  color: #475569;
+  line-height: 1.65;
+}
+
+.lockdown-screen-meta {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  background: #F8FAFC;
+  border: 1px solid #E2E8F0;
+  border-radius: 10px;
+  padding: 10px 14px;
+  width: 100%;
+  box-sizing: border-box;
+  font-size: 12.5px;
+  color: #64748B;
+}
+
+.btn-lockdown-continue {
+  margin-top: 6px;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  background: linear-gradient(135deg, #6549A6, #4D308D);
+  color: #FFFFFF;
+  border: none;
+  border-radius: 10px;
+  padding: 12px 22px;
+  font-size: 14.5px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+.btn-lockdown-continue:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 8px 18px rgba(101, 73, 166, 0.45);
+}
+

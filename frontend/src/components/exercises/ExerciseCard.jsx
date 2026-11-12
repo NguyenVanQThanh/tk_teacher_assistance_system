@@ -104,7 +104,6 @@ export default function ExerciseCard({ exercise, onPreview, onEdit, onDownload, 
             <Edit3 size={16} />
           </button>
 
-          {!exercise.hasShare && (
             <button 
               type="button" 
               className="icon-action-btn download-btn"
@@ -113,7 +112,6 @@ export default function ExerciseCard({ exercise, onPreview, onEdit, onDownload, 
             >
               <Download size={16} />
             </button>
-          )}
         </div>
       </div>
     </div>

@@ -111,7 +111,14 @@ export default function GradingFeedbackModal({
             resultsMap[r.question_id] = r;
           });
 
-          const pointsPerQ = 10.0 / exQuestions.length;
+          // Same part weights as the backend grader (MC 3 / TF 4 / short 3, normalised over parts present).
+          const WEIGHTS = { MultipleChoice: 3, TrueFalse: 4, ShortAnswer: 3 };
+          const partCounts = {};
+          exQuestions.forEach((q) => { partCounts[q.question_type] = (partCounts[q.question_type] || 0) + 1; });
+          const totalWeight = Object.keys(WEIGHTS).reduce((a, t) => a + (partCounts[t] ? WEIGHTS[t] : 0), 0);
+          const maxFor = (q) => (WEIGHTS[q.question_type] && totalWeight
+            ? (10 * WEIGHTS[q.question_type]) / totalWeight / partCounts[q.question_type] : 0);
+          const TF_PARTIAL = [0, 0.1, 0.25, 0.5, 1];
 
           const mapped = exQuestions.map((q, idx) => {
             const res = resultsMap[q.question_id] || {};
@@ -134,6 +141,7 @@ export default function GradingFeedbackModal({
               };
             });
 
+            const pointsPerQ = maxFor(q);
             let isCorrect = false;
             let currentPoints = 0;
 
@@ -142,7 +150,11 @@ export default function GradingFeedbackModal({
               currentPoints = isCorrect ? pointsPerQ : 0;
             } else if (isTF) {
               isCorrect = res.is_correct !== undefined ? res.is_correct : false;
-              currentPoints = isCorrect ? pointsPerQ : 0;
+              const subVals = Object.values(res.sub_results || {});
+              const okCount = subVals.filter(Boolean).length;
+              currentPoints = typeof res.points === 'number'
+                ? res.points
+                : (subVals.length === 4 ? pointsPerQ * TF_PARTIAL[okCount] : (subVals.length ? pointsPerQ * okCount / subVals.length : 0));
             } else if (isShort) {
               // Short answer: check if already evaluated or matches exact string
               if (res.is_correct !== null && res.is_correct !== undefined) {
@@ -178,6 +190,14 @@ export default function GradingFeedbackModal({
               stem: q.content,
               options: formattedOptions,
               subResults: res.sub_results || {},
+              studentTF: (() => {
+                const m = {};
+                String(res.student_answer_text || '').split(';').forEach((p) => {
+                  const [k, v] = p.split(':');
+                  if (k && v !== undefined) m[k.trim().toLowerCase()] = v.trim().toLowerCase() === 'true';
+                });
+                return m;
+              })(),
               image_url: q.image_url,
               segments: q.segments
             };
@@ -225,6 +245,7 @@ export default function GradingFeedbackModal({
         return {
           ...q,
           correctOption: optionKey,
+          keyChanged: true,
           isCorrect,
           currentPoints
         };
@@ -245,6 +266,7 @@ export default function GradingFeedbackModal({
           ...q,
           isCorrect,
           currentPoints,
+          manuallyMarked: true,
           needsManualGrading: false // Marked as graded once clicked
         };
       }
@@ -290,7 +312,13 @@ export default function GradingFeedbackModal({
       statusLabel: 'Đã duyệt',
       questionsData: questions,
       cascadeRegrade: cascade,
-      modifiedQuestions: questions
+      modifiedQuestions: questions,
+      // Persisted by the parent: new MC answer key + teacher verdicts on short answers
+      answerKey: questions.filter((q) => q.type === 'multiple_choice' && q.keyChanged)
+        .map((q) => ({ question_id: q.id, option_id: (q.options.find((o) => o.key === q.correctOption) || {}).option_id }))
+        .filter((k) => k.option_id),
+      manualMarks: questions.filter((q) => q.type === 'short_answer' && q.manuallyMarked)
+        .reduce((acc, q) => ({ ...acc, [q.id]: !!q.isCorrect }), {})
     });
     onClose();
   };
@@ -526,7 +554,7 @@ export default function GradingFeedbackModal({
                                   <MathRenderer text={opt.text} />
                                 </span>
                                 <span className={`badge-correct ${!isSubCorrect ? 'badge-wrong' : ''}`}>
-                                  {isCorrectStatement ? 'Mệnh đề Đúng' : 'Mệnh đề Sai'}
+                                  {`Đáp án: ${isCorrectStatement ? 'Đúng' : 'Sai'} | HS chọn: ${q.studentTF && q.studentTF[optLabel] !== undefined ? (q.studentTF[optLabel] ? 'Đúng' : 'Sai') : '--'}`}
                                 </span>
                               </div>
                             );
@@ -561,7 +589,7 @@ export default function GradingFeedbackModal({
                           </div>
                           <div className="written-content-row">
                             <span className="short-answer-val" style={{ whiteSpace: 'pre-wrap' }}>
-                              <MathRenderer text={q.studentAnswer || '--'} />
+                              {String(q.studentAnswer || '--').replace('.', ',')}
                             </span>
                             {q.correctAnswer && (
                               <span className="short-answer-expected-key">

@@ -234,10 +234,8 @@ export default function ExercisePreviewModal({ exercise, isOpen, onClose }) {
               onClick={handleDownloadPdf}
               disabled={downloadingPdf}
               title="Tải đề bài file PDF"
-              style={{ padding: '6px 12px', display: 'flex', alignItems: 'center', gap: '6px', fontSize: '13px', background: '#F3F4F6', borderRadius: '6px', border: '1px solid #E5E7EB', cursor: 'pointer' }}
             >
-              {downloadingPdf ? <Loader2 size={15} className="animate-spin" /> : <Download size={15} />}
-              <span>{downloadingPdf ? 'Đang tải...' : 'Tải PDF'}</span>
+              {downloadingPdf ? <Loader2 size={16} className="animate-spin" /> : <Download size={16} />}
             </button>
             <button type="button" className="btn-modal-close" onClick={onClose}>
               <X size={18} />

@@ -2,8 +2,8 @@
 # Description: API Router for ClassAssignment endpoints (F-EXE-02) and student assignments feed.
 # Created At: 2026-07-31
 # Created By: Tam Khang
-# Updated At: 2026-10-03
-# Updated By: Tam Khang
+# Updated At: 2026-11-12
+# Updated By: AI Agent
 
 from uuid import UUID
 from typing import List, Optional
@@ -13,7 +13,9 @@ from sqlalchemy.orm import Session
 from app.core.database import get_db
 from models.models import User
 from app.modules.auth.dependencies import require_perm, get_current_user
-from app.modules.exercise.schemas import AssignmentCreate, AssignmentOut, AssignmentResultSummaryOut
+from app.modules.exercise.schemas import (
+    AssignmentCreate, AssignmentOut, AssignmentResultSummaryOut, AssignmentTakingOut
+)
 from app.modules.exercise.services.assignment_service import AssignmentService
 
 router = APIRouter(tags=["class-assignments"])
@@ -113,6 +115,25 @@ def restore_class_assignment(
     Restore a cancelled assignment (Soft Delete). Requires EXE_ASSIGNMENT_MANAGE permission.
     """
     return service.restore_assignment(assignment_id, current_user)
+
+
+@router.get(
+    "/api/v1/assignments/{assignment_id}/taking",
+    response_model=AssignmentTakingOut,
+    dependencies=[Depends(require_perm("EXE_ATTEMPT_SUBMIT"))]
+)
+def get_assignment_taking(
+    assignment_id: UUID,
+    service: AssignmentService = Depends(get_assignment_service),
+    current_user: User = Depends(get_current_user)
+):
+    """
+    Student-safe "paper" of an assignment: assignment + exercise info, questions with the answer key
+    stripped (no correct_answer / explanation / is_correct), and the caller's own open attempt (if any).
+    Students must be enrolled in the assignment's class (403 otherwise); cancelled (DELETED)
+    assignments return 404. Requires EXE_ATTEMPT_SUBMIT permission.
+    """
+    return service.get_assignment_taking(assignment_id, current_user)
 
 
 @router.get(

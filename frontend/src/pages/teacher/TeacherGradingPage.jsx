@@ -244,14 +244,26 @@ export default function TeacherGradingPage() {
     }
   }, [searchParams, submissions, statusFilter]);
 
+  // Save the answer key (recomputes ALL submissions server-side), then this attempt's verdicts/feedback.
+  const persistGrade = async (u) => {
+    if (u.cascadeRegrade && u.answerKey && u.answerKey.length > 0 && u.exercise_id) {
+      const keys = {};
+      u.answerKey.forEach((k) => { keys[k.question_id] = k.option_id; });
+      await attemptsApi.updateAnswerKey(u.exercise_id, { keys });
+    }
+    await attemptsApi.updateGrade(u.attempt_id, {
+      score: u.score !== null ? u.score : 0,
+      feedback: u.feedback || '',
+      manual_marks: u.manualMarks && Object.keys(u.manualMarks).length ? u.manualMarks : undefined,
+    });
+    if (u.cascadeRegrade) await loadData();
+  };
+
   // Handle grade/approval saved from modal (transitions to 'approved' and supports cascade batch regrade)
   const handleSaveGrade = async (updatedSubmission) => {
     try {
       if (updatedSubmission.attempt_id) {
-        await attemptsApi.updateGrade(updatedSubmission.attempt_id, {
-          score: updatedSubmission.score !== null ? updatedSubmission.score : 0,
-          feedback: updatedSubmission.feedback || '',
-        });
+        await persistGrade(updatedSubmission);
       }
 
       setSubmissions((prev) =>
@@ -291,10 +303,7 @@ export default function TeacherGradingPage() {
   const handleSaveAndNext = async (updatedSubmission) => {
     try {
       if (updatedSubmission.attempt_id) {
-        await attemptsApi.updateGrade(updatedSubmission.attempt_id, {
-          score: updatedSubmission.score !== null ? updatedSubmission.score : 0,
-          feedback: updatedSubmission.feedback || '',
-        });
+        await persistGrade(updatedSubmission);
       }
     } catch (err) {
       console.error(err);
@@ -405,6 +414,25 @@ export default function TeacherGradingPage() {
     return filteredSubmissions.slice(startIndex, startIndex + itemsPerPage);
   }, [filteredSubmissions, currentPage, itemsPerPage]);
 
+  // Server-side report (CSV / PDF) with the same role scoping as the list
+  const handleExportServer = async (format) => {
+    try {
+      const blob = await attemptsApi.exportReport({ format });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `grading_report_${new Date().toISOString().slice(0, 10)}.${format}`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+      setToastMessage(`Đã xuất báo cáo ${format.toUpperCase()} thành công!`);
+    } catch (err) {
+      setToastMessage('Lỗi khi xuất báo cáo.');
+    }
+    setTimeout(() => setToastMessage(null), 3500);
+  };
+
   const handleExportReport = () => {
     try {
       const headers = ['Mã bài làm', 'Họ và tên học sinh', 'Lớp', 'Môn học', 'Đề bài', 'Điểm số', 'Trạng thái', 'Nhận xét', 'Thời gian nộp'];
@@ -459,14 +487,24 @@ export default function TeacherGradingPage() {
           {/* Page Title & Actions */}
           <div className="grading-header-row">
             <h1 className="grading-page-title">Quản lý Chấm điểm</h1>
+            <div style={{ display: 'flex', gap: 8 }}>
             <button 
               type="button" 
               className="btn-export-report"
               onClick={handleExportReport}
             >
               <Download size={16} />
-              <span>Xuất báo cáo</span>
+              <span>Xuất CSV</span>
             </button>
+            <button 
+              type="button" 
+              className="btn-export-report"
+              onClick={() => handleExportServer('pdf')}
+            >
+              <FileText size={16} />
+              <span>Xuất PDF</span>
+            </button>
+            </div>
           </div>
 
           {/* 3 Redefined Metric Summary Cards as requested */}

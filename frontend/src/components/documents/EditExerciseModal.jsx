@@ -217,10 +217,10 @@ function EditExerciseModalInner({ isOpen, doc, onClose, onSave }) {
       score: '2.0 điểm',
       suggestedTime: '10 phút',
       previewSnippet: 'Cho hàm số bậc ba $y = f(x) = ax^3 + bx^2 + cx + d$ có đồ thị như hình vẽ bên dưới. Tìm tất cả các giá trị thực của tham số $m$ để phương trình sau có đúng 4...',
-      formulaMeta: '18 công thức LaTeX • 1 đồ thị SVG',
+      formulaMeta: '18 công thức • 1 đồ thị',
       answersMeta: '4 đáp án trắc nghiệm (A*)',
       attachmentName: 'Do_thi_ham_bac_ba_cau_1.svg',
-      attachmentDesc: 'Đã nạp 1 hình minh họa vector tọa độ Desmos chất lượng cao (SVG)',
+      attachmentDesc: 'Đã nạp 1 hình minh họa vector tọa độ Desmos chất lượng cao ',
       content: `Cho hàm số bậc ba $y = f(x) = ax^3 + bx^2 + cx + d$ có đồ thị như hình vẽ bên dưới.
 
 Tìm tất cả các giá trị thực của tham số $m$ để phương trình sau có đúng 4 nghiệm thực phân biệt:
@@ -247,7 +247,7 @@ Bước 3: Kết luận điều kiện của m để có 4 nghiệm phân biệt
       score: '2.0 điểm',
       suggestedTime: '8 phút',
       previewSnippet: 'Tìm nguyên hàm của hàm số $f(x) = 2x + e^x$. Biết rằng một nguyên hàm $F(x)$ thỏa mãn $F(0) = 3$...',
-      formulaMeta: '3 công thức LaTeX',
+      formulaMeta: '3 công thức',
       answersMeta: '4 đáp án (Chưa chọn)',
       attachmentName: null,
       attachmentDesc: null,
@@ -271,7 +271,7 @@ Vậy F(x) = x^2 + e^x + 2.`
       score: '1.5 điểm',
       suggestedTime: '4 phút',
       previewSnippet: 'Cho khối lăng trụ có diện tích đáy $B = 6$ và chiều cao $h = 3$. Thể tích của khối lăng trụ đã cho bằng bao nhiêu?...',
-      formulaMeta: '1 công thức LaTeX',
+      formulaMeta: '1 công thức',
       answersMeta: '4 đáp án (B*)',
       attachmentName: null,
       attachmentDesc: null,
@@ -293,7 +293,7 @@ Vậy F(x) = x^2 + e^x + 2.`
       score: '2.5 điểm',
       suggestedTime: '12 phút',
       previewSnippet: 'Trong không gian $Oxyz$, cho mặt cầu $(S): x^2 + y^2 + z^2 - 2x + 4y - 6z - 11 = 0$ và mặt phẳng $(P): 2x + 2y - z + 17 = 0$...',
-      formulaMeta: '8 công thức LaTeX',
+      formulaMeta: '8 công thức',
       answersMeta: '4 đáp án (D*)',
       attachmentName: null,
       attachmentDesc: null,
@@ -317,7 +317,7 @@ Do d < R nên mặt phẳng (P) cắt (S) theo đường tròn bán kính r = �
       score: '2.0 điểm',
       suggestedTime: '6 phút',
       previewSnippet: 'Cho hình chóp $S.ABCD$ có đáy $ABCD$ là hình vuông cạnh $a$, $SA$ vuông góc với đáy, $SA = a\\sqrt{3}$. Tính góc giữa đường thẳng $SB$ và mặt phẳng...',
-      formulaMeta: '5 công thức LaTeX • 1 hình vẽ',
+      formulaMeta: '5 công thức • 1 hình vẽ',
       answersMeta: '4 đáp án (A*)',
       attachmentName: null,
       attachmentDesc: null,
@@ -468,7 +468,7 @@ Tam giác vuông SAB tại A: tan(∠SBA) = SA / AB = a√3 / a = √3 => ∠SBA
                 score: '2.0 điểm',
                 suggestedTime: '5 phút',
                 previewSnippet: q.content ? q.content.slice(0, 120) + (q.content.length > 120 ? '...' : '') : '',
-                formulaMeta: q.content?.includes('$') ? 'Chứa công thức LaTeX' : 'Văn bản thường',
+                formulaMeta: q.content?.includes('$') ? 'Chứa công thức' : 'Văn bản thường',
                 answersMeta: `${options.length} đáp án (${correctOpt}*)`,
                 content: q.content || q.content_latex || '',
                 questionType: loadedType,
@@ -785,7 +785,7 @@ Tam giác vuông SAB tại A: tan(∠SBA) = SA / AB = a√3 / a = √3 => ∠SBA
       score: '2.0 điểm',
       suggestedTime: '10 phút',
       previewSnippet: `Câu ${newNum}: Nhập nội dung câu hỏi mới...`,
-      formulaMeta: '0 công thức LaTeX',
+      formulaMeta: '0 công thức',
       answersMeta: '4 đáp án (Chưa chọn)',
       attachmentName: null,
       attachmentDesc: null,
@@ -1142,7 +1142,7 @@ Tam giác vuông SAB tại A: tan(∠SBA) = SA / AB = a√3 / a = √3 => ∠SBA
                 onMouseDown={(e) => e.preventDefault()}
                 onClick={() => imageInputRef.current && imageInputRef.current.click()}
                 disabled={isUploadingImage}
-                title="Tải ảnh từ máy lên BE storage rồi chèn vào ô đang soạn thảo"
+                title="Tải ảnh từ máy lên rồi chèn vào ô đang soạn thảo"
               >
                 {isUploadingImage ? <Loader2 size={14} className="animate-spin" /> : <ImageIcon size={14} />}
                 <span>{isUploadingImage ? 'Đang tải ảnh...' : 'Chèn hình ảnh'}</span>
@@ -1400,7 +1400,7 @@ Tam giác vuông SAB tại A: tan(∠SBA) = SA / AB = a√3 / a = √3 => ∠SBA
                 <section className="solution-and-answers-section" data-testid="table-editor">
                   <div className="solution-section-header">
                     <h3 className="solution-header-title">Bảng số liệu</h3>
-                    <span className="solution-header-hint">Sửa dạng Markdown, xem trước bên dưới</span>
+                    <span className="solution-header-hint">Chỉnh sửa bảng, xem trước bên dưới</span>
                   </div>
                   {activeQuestion.segments.map((sg, i) => sg?.type === 'table' && (
                     <div key={i} style={{ marginBottom: 12 }}>
@@ -1408,7 +1408,7 @@ Tam giác vuông SAB tại A: tan(∠SBA) = SA / AB = a√3 / a = √3 => ∠SBA
                         value={sg.content || ''}
                         onChange={(e) => updateTableSegment(i, e.target.value)}
                         rows={Math.min(12, (sg.content || '').split('\n').length + 1)}
-                        aria-label="Table markdown"
+                        aria-label="Table content"
                         style={{ width: '100%', fontFamily: 'monospace', fontSize: 13, padding: 8, border: '1px solid #DCD6E8', borderRadius: 8, boxSizing: 'border-box' }}
                       />
                       <MarkdownTable markdown={sg.content || ''} />

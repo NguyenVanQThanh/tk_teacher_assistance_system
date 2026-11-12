@@ -87,6 +87,8 @@ class AiExerciseGeneratorService:
             ctx_block = (
                 "Tài liệu tham khảo (nguồn tin cậy, đã gắn nhãn). Câu hỏi PHẢI bám sát nội dung này. "
                 "[SGK ...] là sách giáo khoa (ưu tiên), [GV ...] là tài liệu giáo viên (bổ sung). "
+                "Chỉ dùng LÝ THUYẾT, định nghĩa, tính chất, ví dụ trong SGK để tự biên soạn câu hỏi MỚI; "
+                "KHÔNG sao chép, diễn đạt lại hay mô phỏng câu hỏi/đề thi/ma trận đề có trong tài liệu. "
                 "Không bịa kiến thức ngoài tài liệu; thêm trường source_ref là nhãn nguồn đã dùng.\n"
                 f"<tai_lieu>\n{context}\n</tai_lieu>\n\n"
             )

@@ -54,6 +54,8 @@ class UpcomingAssignmentItemOut(BaseModel):
     total_questions: int = 0
     is_overdue: bool = False
     is_completed: bool = False
+    is_ai_generated: bool = False
+    category: str = "class_exercise"
 
 
 class ScheduleSessionOut(BaseModel):
@@ -182,6 +184,7 @@ def get_student_dashboard(
         for a in assignments:
             is_finished = a.assignment_id in finished_assignment_ids
             is_overdue = a.due_at < now and not is_finished
+            is_ai = bool((a.exercise.ai_metadata or {}).get("is_ai_generated"))
             s_name = a.exercise.subject.subject_name if hasattr(a.exercise, "subject") and a.exercise.subject else "Bộ môn"
             upcoming_list.append(
                 UpcomingAssignmentItemOut(
@@ -193,7 +196,9 @@ def get_student_dashboard(
                     duration_minutes=45,
                     total_questions=a.exercise.total_questions or 0,
                     is_overdue=is_overdue,
-                    is_completed=is_finished
+                    is_completed=is_finished,
+                    is_ai_generated=is_ai,
+                    category="ai_generated" if is_ai else ("exam" if "đề thi" in (a.exercise.title or "").lower() else "class_exercise")
                 )
             )
 

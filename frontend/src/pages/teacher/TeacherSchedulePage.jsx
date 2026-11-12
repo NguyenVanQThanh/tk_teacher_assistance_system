@@ -24,6 +24,9 @@ import {
 import { teacherApi } from '../../services/api';
 import './TeacherSchedulePage.css';
 
+// Build a YYYY-MM-DD string for a native date input (month is 0-indexed)
+const toIsoDate = (y, m, d) => `${y}-${String(m + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+
 export default function TeacherSchedulePage() {
   const today = useMemo(() => new Date(), []);
   const [currentYear, setCurrentYear] = useState(today.getFullYear());
@@ -44,7 +47,7 @@ export default function TeacherSchedulePage() {
     startTime: '07:30',
     endTime: '09:00',
     urgency: 'teaching', // 'critical' | 'high' | 'teaching'
-    date: today.getDate()
+    date: toIsoDate(today.getFullYear(), today.getMonth(), today.getDate())
   });
 
   // Urgency configuration dictionary (3 standardized levels)
@@ -453,12 +456,14 @@ export default function TeacherSchedulePage() {
     e.preventDefault();
     const classNameDisplay = newScheduleForm.className?.trim() || '';
     const urgencyData = urgencyConfig[newScheduleForm.urgency] || urgencyConfig.teaching;
+    const [py, pm, pd] = (newScheduleForm.date || '').split('-').map(Number);
+    const picked = py ? { year: py, month: pm - 1, day: pd } : { year: currentYear, month: currentMonth, day: selectedDay };
 
     const newEntry = {
       id: Date.now(),
-      year: currentYear,
-      month: currentMonth,
-      day: parseInt(newScheduleForm.date) || selectedDay,
+      year: picked.year,
+      month: picked.month,
+      day: picked.day,
       title: newScheduleForm.title,
       className: classNameDisplay,
       grade: newScheduleForm.grade || 'all',
@@ -471,6 +476,8 @@ export default function TeacherSchedulePage() {
     };
 
     setScheduleList(prev => [...prev, newEntry]);
+    setCurrentYear(newEntry.year);
+    setCurrentMonth(newEntry.month);
     setSelectedDay(newEntry.day);
     setIsAddModalOpen(false);
     const targetLabel = classNameDisplay ? `cho lớp ${classNameDisplay}` : '';
@@ -724,7 +731,7 @@ export default function TeacherSchedulePage() {
                       type="button" 
                       className="btn-quick-add"
                       onClick={() => {
-                        setNewScheduleForm(prev => ({ ...prev, date: selectedDay }));
+                        setNewScheduleForm(prev => ({ ...prev, date: toIsoDate(currentYear, currentMonth, selectedDay) }));
                         setIsAddModalOpen(true);
                       }}
                     >
@@ -843,11 +850,9 @@ export default function TeacherSchedulePage() {
 
               <div className="form-row-3col">
                 <div className="form-field-group">
-                  <label className="field-label">Ngày dạy (Tháng {currentMonth + 1})</label>
+                  <label className="field-label">Ngày dạy</label>
                   <input 
-                    type="number" 
-                    min="1" 
-                    max="31"
+                    type="date" 
                     required
                     value={newScheduleForm.date}
                     onChange={(e) => setNewScheduleForm({ ...newScheduleForm, date: e.target.value })}

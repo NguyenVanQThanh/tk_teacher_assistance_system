@@ -31,13 +31,18 @@ import {
   Lock,
   Loader2,
   Maximize2,
-  Minimize2
+  Minimize2,
+  MonitorX,
+  RefreshCw
 } from 'lucide-react';
 import { useNavigate, Link, useParams, useLocation } from 'react-router-dom';
-import { exercisesApi, attemptsApi } from '../../services/api';
+import { exercisesApi, attemptsApi, assignmentsApi } from '../../services/api';
+import { studentTakingApi, sanitizeQuestionsForStudent } from '../../services/studentTakingApi';
 import MathRenderer from '../../components/common/MathRenderer';
+import QuestionContentView from '../../components/common/QuestionContentView';
 import MathTextEditor from '../../components/common/MathTextEditor';
 import MathSymbolToolbar from '../../components/common/MathSymbolToolbar';
+import useExamLockdown from '../../hooks/useExamLockdown';
 import '../../components/documents/EditExerciseModal.css';
 import QuestionMedia from '../../components/exercises/QuestionMedia';
 import AiSourcesList from '../../components/exercises/AiSourcesList';
@@ -55,10 +60,22 @@ export default function StudentExerciseTakingPage() {
   // Real Backend Data States
   const [backendExercise, setBackendExercise] = useState(null);
   const [backendQuestions, setBackendQuestions] = useState([]);
+  const [backendAssignment, setBackendAssignment] = useState(null);
   const [attemptId, setAttemptId] = useState(null);
   const [isLoadingBackend, setIsLoadingBackend] = useState(false);
   const [backendError, setBackendError] = useState(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // UUID check: distinguishes real backend targets from local AI/mock exercises
+  const isUuid = (id) => typeof id === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id);
+
+  // Sort backend questions by display_order and their options by display_order
+  const sortBackendQuestions = (qs) => [...(qs || [])]
+    .map(q => ({
+      ...q,
+      answer_options: [...(q.answer_options || [])].sort((a, b) => (a.display_order || 0) - (b.display_order || 0))
+    }))
+    .sort((a, b) => (a.display_order || 0) - (b.display_order || 0));
 
   // Exercise / Exam Metadata from localStorage (for AI generated practice fallback)
   const savedAiExercise = useMemo(() => {
@@ -104,8 +121,6 @@ export default function StudentExerciseTakingPage() {
   useEffect(() => {
     let isMounted = true;
     async function initExam() {
-      const isUuid = (id) => typeof id === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id);
-
       const targetExerciseId = stateExerciseId || exerciseId;
       let targetAssignmentId = stateAssignmentId;
 
@@ -113,12 +128,13 @@ export default function StudentExerciseTakingPage() {
       if (isUuid(targetExerciseId) && !isUuid(targetAssignmentId)) {
         try {
           const assignments = await assignmentsApi.getAssignments();
-          const matched = (assignments || []).find(a => 
+          const matched = (assignments || []).find(a =>
             String(a.exercise_id).toLowerCase() === String(targetExerciseId).toLowerCase() ||
             String(a.assignment_id).toLowerCase() === String(targetExerciseId).toLowerCase()
           );
           if (matched && matched.assignment_id) {
             targetAssignmentId = matched.assignment_id;
+            if (isMounted) setBackendAssignment(matched);
           }
         } catch (resolveErr) {
           console.warn('Assignment lookup fallback error:', resolveErr);
@@ -131,20 +147,54 @@ export default function StudentExerciseTakingPage() {
 
           let sortedQ = [];
           let exerciseData = null;
-          // 1. Fetch exercise detail from backend
-          if (isUuid(targetExerciseId)) {
+          let takingOpenAttemptId = null;
+
+          // 1. Preferred: sanitized taking payload from the BE
+          //    GET /api/v1/assignments/{assignmentId}/taking -> { assignment, exercise, questions (sanitized), open_attempt }
+          if (isUuid(targetAssignmentId)) {
+            try {
+              const taking = await studentTakingApi.getAssignmentTaking(targetAssignmentId);
+              if (isMounted && taking) {
+                const assignment = taking.assignment || null;
+                exerciseData = taking.exercise || null;
+                const rawQuestions = Array.isArray(taking.questions)
+                  ? taking.questions
+                  : (Array.isArray(exerciseData?.questions) ? exerciseData.questions : []);
+                // Defensive double-sanitize: the BE should already strip answer fields
+                sortedQ = sortBackendQuestions(sanitizeQuestionsForStudent(rawQuestions));
+                if (exerciseData) setBackendExercise({ ...exerciseData, questions: sortedQ });
+                setBackendQuestions(sortedQ);
+                if (assignment) setBackendAssignment(assignment);
+                if (taking.open_attempt && taking.open_attempt.attempt_id) {
+                  takingOpenAttemptId = taking.open_attempt.attempt_id;
+                }
+              }
+            } catch (takingErr) {
+              const status = takingErr?.response?.status;
+              if (status === 404 || status === 405) {
+                console.warn('Taking endpoint not deployed yet (404/405), falling back to exercise detail:', takingErr?.message);
+              } else {
+                console.warn('getAssignmentTaking failed, trying exercise detail fallback:', takingErr);
+              }
+            }
+          }
+
+          // 2. Fallback: raw exercise detail — strip sensitive answer fields client-side
+          //    (correct_answer, explanation, answer_options[].is_correct, segments[].is_correct)
+          if (!exerciseData && isUuid(targetExerciseId)) {
             try {
               exerciseData = await exercisesApi.getExerciseDetail(targetExerciseId);
             } catch (fetchErr) {
               console.warn('Direct exercise lookup failed, attempting assignment resolution fallback...', fetchErr);
               try {
                 const assignments = await assignmentsApi.getAssignments();
-                const matched = (assignments || []).find(a => 
+                const matched = (assignments || []).find(a =>
                   String(a.assignment_id).toLowerCase() === String(targetExerciseId).toLowerCase()
                 );
                 if (matched && matched.exercise_id) {
                   exerciseData = await exercisesApi.getExerciseDetail(matched.exercise_id);
                   targetAssignmentId = matched.assignment_id;
+                  if (isMounted) setBackendAssignment(matched);
                 }
               } catch (fallbackErr) {
                 console.error('Assignment resolution fallback error:', fallbackErr);
@@ -152,16 +202,9 @@ export default function StudentExerciseTakingPage() {
             }
 
             if (isMounted && exerciseData) {
-              setBackendExercise(exerciseData);
-              if (exerciseData.questions && exerciseData.questions.length > 0) {
-                sortedQ = [...exerciseData.questions]
-                  .map(q => ({
-                    ...q,
-                    answer_options: [...(q.answer_options || [])].sort((a, b) => (a.display_order || 0) - (b.display_order || 0))
-                  }))
-                  .sort((a, b) => (a.display_order || 0) - (b.display_order || 0));
-                setBackendQuestions(sortedQ);
-              }
+              sortedQ = sortBackendQuestions(sanitizeQuestionsForStudent(exerciseData.questions));
+              setBackendExercise({ ...exerciseData, questions: sortedQ });
+              setBackendQuestions(sortedQ);
             }
           }
 
@@ -189,7 +232,8 @@ export default function StudentExerciseTakingPage() {
               specifiedAttempt = matchingAttempts.find(a => String(a.attempt_id).toLowerCase() === String(stateAttemptId).toLowerCase()) || null;
             }
 
-            const openAttempt = matchingAttempts.find(a => !a.is_finished);
+            const openAttempt = matchingAttempts.find(a => !a.is_finished)
+              || (takingOpenAttemptId ? { attempt_id: takingOpenAttemptId, is_finished: false } : null);
             const finishedAttempt = matchingAttempts.find(a => a.is_finished);
             
             const isExamExercise = Boolean(
@@ -353,7 +397,39 @@ export default function StudentExerciseTakingPage() {
     };
   }, [exerciseId, stateAssignmentId, stateExerciseId]);
 
+  // True when the route targets a real backend record (UUID) — mock data must NEVER be used then
+  const isBackendTarget = Boolean(
+    isUuid(exerciseId) || isUuid(stateAssignmentId) || isUuid(stateExerciseId)
+  );
+
   const exerciseInfo = useMemo(() => {
+    // Backend (UUID) targets ALWAYS use real BE data — never the local mock datasets (id 1/4, chemPart*, shortAnswerSamples)
+    if (isBackendTarget) {
+      const qList = backendQuestions;
+      const p1 = qList.filter(q => normalizeQType(q.question_type) === 'MULTIPLE_CHOICE').length;
+      const p2 = qList.filter(q => normalizeQType(q.question_type) === 'TRUE_FALSE').length;
+      const p3 = qList.filter(q => normalizeQType(q.question_type) === 'SHORT_ANSWER').length;
+      const p4 = qList.filter(q => normalizeQType(q.question_type) === 'OTHER').length;
+      const isMath = (backendExercise?.title || location.state?.title || '').toLowerCase().includes('toán');
+      const assignmentDuration = Number(backendAssignment?.duration_minutes || backendExercise?.duration_minutes || 0);
+      return {
+        id: backendExercise?.exercise_id || currentExamId,
+        title: backendExercise?.title || location.state?.title || 'Đề thi trực tuyến',
+        subject: location.state?.subject || backendAssignment?.subject_name || (isMath ? 'Toán học' : 'Hóa học'),
+        category: 'exam',
+        categoryLabel: 'Bài thi chính thức',
+        teacher: location.state?.teacher || backendAssignment?.teacher_name || backendExercise?.teacher_name || 'Sample Teacher (Thầy Nguyễn Văn A)',
+        totalQuestions: qList.length,
+        part1Count: p1,
+        part2Count: p2,
+        part3Count: p3,
+        part4Count: p4,
+        durationMinutes: assignmentDuration > 0 ? assignmentDuration : 45,
+        isExam: true,
+        isBackend: true
+      };
+    }
+
     if (backendExercise) {
       const qList = backendQuestions;
       const p1 = qList.filter(q => normalizeQType(q.question_type) === 'MULTIPLE_CHOICE').length;
@@ -431,7 +507,7 @@ export default function StudentExerciseTakingPage() {
       durationMinutes: 45,
       isExam: true
     };
-  }, [backendExercise, backendQuestions, savedAiExercise, isChemistry, location.state]);
+  }, [isBackendTarget, backendExercise, backendQuestions, backendAssignment, savedAiExercise, isChemistry, location.state, currentExamId]);
 
   const totalQuestions = exerciseInfo.totalQuestions;
 
@@ -446,12 +522,6 @@ export default function StudentExerciseTakingPage() {
   const [filterMode, setFilterMode] = useState('all'); // 'all', 'flagged'
 
   // Check if exam/exercise is already submitted in localStorage (strictly for local offline practice)
-  const isBackendTarget = Boolean(
-    (exerciseId && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(exerciseId)) ||
-    (stateAssignmentId && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(stateAssignmentId)) ||
-    (stateExerciseId && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(stateExerciseId))
-  );
-
   const savedSubmission = useMemo(() => {
     if (isBackendTarget) return null;
     try {
@@ -589,6 +659,68 @@ export default function StudentExerciseTakingPage() {
     return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
   }, [isExamSubmitted, isReadOnlyReview]);
 
+  // Exam lock: warn on blur/fullscreen exit, block copy/paste/context menu/devtools keys,
+  // and prevent leaving the page (reload/close/back) while the exam is in progress.
+  useEffect(() => {
+    if (isExamSubmitted || isReadOnlyReview) return undefined;
+    const warn = () => setShowAntiCheatWarning(true);
+    const block = (e) => e.preventDefault();
+    const onFullscreenChange = () => {
+      const fs = Boolean(document.fullscreenElement);
+      setIsFullscreen(fs);
+      if (!fs) warn();
+    };
+    const onKeyDown = (e) => {
+      const k = (e.key || '').toLowerCase();
+      const ctrl = e.ctrlKey || e.metaKey;
+      if (
+        k === 'f12' || k === 'printscreen' ||
+        (ctrl && ['c', 'x', 'v', 'a', 'p', 's', 'u'].includes(k) && !(e.target && /^(input|textarea)$/i.test(e.target.tagName) && ['c', 'x', 'v', 'a'].includes(k))) ||
+        (ctrl && e.shiftKey && ['i', 'j', 'c'].includes(k))
+      ) {
+        e.preventDefault();
+      }
+    };
+    const onBeforeUnload = (e) => { e.preventDefault(); e.returnValue = ''; };
+    // Trap the browser back button
+    window.history.pushState(null, '', window.location.href);
+    const onPopState = () => {
+      window.history.pushState(null, '', window.location.href);
+      warn();
+    };
+    window.addEventListener('blur', warn);
+    document.addEventListener('fullscreenchange', onFullscreenChange);
+    document.addEventListener('copy', block);
+    document.addEventListener('cut', block);
+    document.addEventListener('paste', block);
+    document.addEventListener('contextmenu', block);
+    document.addEventListener('keydown', onKeyDown);
+    window.addEventListener('beforeunload', onBeforeUnload);
+    window.addEventListener('popstate', onPopState);
+    return () => {
+      window.removeEventListener('blur', warn);
+      document.removeEventListener('fullscreenchange', onFullscreenChange);
+      document.removeEventListener('copy', block);
+      document.removeEventListener('cut', block);
+      document.removeEventListener('paste', block);
+      document.removeEventListener('contextmenu', block);
+      document.removeEventListener('keydown', onKeyDown);
+      window.removeEventListener('beforeunload', onBeforeUnload);
+      window.removeEventListener('popstate', onPopState);
+    };
+  }, [isExamSubmitted, isReadOnlyReview]);
+
+  // Full exam lockdown — ONLY for real backend targets while taking
+  // (not after submit, not in read-only review). Auto-enters fullscreen, re-locks
+  // fullscreen when exited, and blocks multi-monitor/extended setups via overlay.
+  // Everything is released (exitFullscreen + listeners) when `enabled` flips false,
+  // i.e. on successful submit or when switching to review mode.
+  const lockdownEnabled = isBackendTarget && !isExamSubmitted && !isReadOnlyReview && !backendError;
+  const lockdown = useExamLockdown({
+    enabled: lockdownEnabled,
+    onFullscreenLost: () => setShowAntiCheatWarning(true),
+  });
+
   // Clean and validate Short Answer (Max 4 chars, decimal comma only)
   const cleanShortAnswer = (val) => {
     if (!val) return '';
@@ -680,7 +812,8 @@ export default function StudentExerciseTakingPage() {
   const answeredCount = Object.keys(answers).filter(k => isQuestionAnswered(Number(k)) && Number(k) < totalQuestions).length;
   const unansweredCount = totalQuestions - answeredCount;
   const flaggedCount = Object.keys(flaggedQuestions).filter(k => flaggedQuestions[k] && Number(k) < totalQuestions).length;
-  const progressPercent = Math.round((answeredCount / totalQuestions) * 100);
+  const progressPercent = totalQuestions > 0 ? Math.round((answeredCount / totalQuestions) * 100) : 0;
+  const partPct = (answered, total) => (total > 0 ? Math.min(100, Math.round((answered / total) * 100)) : 0);
 
   // Breakdown by Part
   const part1Answered = Array.from({ length: exerciseInfo.part1Count }, (_, i) => i).filter(i => isQuestionAnswered(i)).length;
@@ -758,17 +891,17 @@ export default function StudentExerciseTakingPage() {
         }
 
         let targetAttemptId = attemptId;
-        if (!targetAttemptId && isUuid(targetAssignmentId)) {
+        if (!targetAttemptId && isUuid(stateAssignmentId)) {
           try {
             const myAttempts = await attemptsApi.getAttempts();
-            const open = (myAttempts || []).find(a => 
-              String(a.assignment_id).toLowerCase() === String(targetAssignmentId).toLowerCase() && !a.is_finished
+            const open = (myAttempts || []).find(a =>
+              String(a.assignment_id).toLowerCase() === String(stateAssignmentId).toLowerCase() && !a.is_finished
             );
             if (open) {
               targetAttemptId = open.attempt_id;
               setAttemptId(targetAttemptId);
             } else {
-              const startRes = await attemptsApi.startAttempt(targetAssignmentId);
+              const startRes = await attemptsApi.startAttempt(stateAssignmentId);
               targetAttemptId = startRes.attempt_id;
               setAttemptId(targetAttemptId);
             }
@@ -926,6 +1059,7 @@ export default function StudentExerciseTakingPage() {
                 text,
                 optionId: opt.option_id,
                 isCorrect: Boolean(opt.is_correct)
+                  || Boolean(qRes && qRes.correct_option_id && String(qRes.correct_option_id) === String(opt.option_id))
               };
             })
           : [
@@ -941,10 +1075,11 @@ export default function StudentExerciseTakingPage() {
           type: 'single_choice',
           statement: bQ.content || 'Nội dung câu hỏi',
           options,
-          explanation: bQ.explanation,
-          correctAnswer: bQ.correct_answer,
+          explanation: bQ.explanation ?? qRes?.explanation ?? null,
+          correctAnswer: bQ.correct_answer ?? qRes?.correct_answer ?? null,
           isCorrect: qRes ? qRes.is_correct : (options.find(o => o.key === answers[currentQuestionIdx])?.isCorrect ?? null),
           image_url: bQ.image_url,
+          image_metadata: bQ.image_metadata,
           segments: bQ.segments,
           qRes
         };
@@ -977,10 +1112,11 @@ export default function StudentExerciseTakingPage() {
           type: 'true_false',
           statement: bQ.content || 'Nội dung câu hỏi Đúng/Sai',
           items,
-          explanation: bQ.explanation,
-          correctAnswer: bQ.correct_answer,
+          explanation: bQ.explanation ?? qRes?.explanation ?? null,
+          correctAnswer: bQ.correct_answer ?? qRes?.correct_answer ?? null,
           isCorrect: qRes ? qRes.is_correct : null,
           image_url: bQ.image_url,
+          image_metadata: bQ.image_metadata,
           segments: bQ.segments,
           qRes
         };
@@ -992,10 +1128,11 @@ export default function StudentExerciseTakingPage() {
           type: 'other',
           statement: bQ.content || 'Nội dung câu hỏi',
           subQuestions: getQuestionItems(bQ).map((opt) => opt.content || ''),
-          explanation: bQ.explanation,
+          explanation: bQ.explanation ?? qRes?.explanation ?? null,
           correctAnswer: null,
           isCorrect: null,
           image_url: bQ.image_url,
+          image_metadata: bQ.image_metadata,
           segments: bQ.segments,
           qRes
         };
@@ -1006,14 +1143,27 @@ export default function StudentExerciseTakingPage() {
           number: qNum,
           type: 'short_answer',
           statement: bQ.content || 'Nội dung câu hỏi trả lời ngắn',
-          explanation: bQ.explanation,
-          correctAnswer: bQ.correct_answer,
+          explanation: bQ.explanation ?? qRes?.explanation ?? null,
+          correctAnswer: bQ.correct_answer ?? qRes?.correct_answer ?? null,
           isCorrect: qRes ? qRes.is_correct : null,
           image_url: bQ.image_url,
+          image_metadata: bQ.image_metadata,
           segments: bQ.segments,
           qRes
         };
       }
+    }
+
+    // Backend (UUID) target but no question loaded (loading / BE error): NEVER fall back to the mock datasets
+    if (isBackendTarget) {
+      return {
+        id: null,
+        part: '',
+        number: qNum,
+        type: 'single_choice',
+        statement: '',
+        options: []
+      };
     }
 
     // CHEMISTRY 12 DATASET (Este & Lipit)
@@ -1431,7 +1581,7 @@ export default function StudentExerciseTakingPage() {
       statement: sItem.text,
       diagram: sItem.diagram
     };
-  }, [currentQuestionIdx, isChemistry, exerciseInfo, backendQuestions, attemptDetailedResults, answers]);
+  }, [currentQuestionIdx, isChemistry, isBackendTarget, exerciseInfo, backendQuestions, attemptDetailedResults, answers]);
 
   const otherEditorRefs = useRef({});
   const otherActiveRef = useRef(null);
@@ -1503,6 +1653,27 @@ export default function StudentExerciseTakingPage() {
       <div className="exercise-taking-container" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100vh', background: '#F8FAFC' }}>
         <Loader2 size={40} className="animate-spin" style={{ animation: 'spin 1s linear infinite', color: '#2563EB', marginBottom: '16px' }} />
         <p style={{ color: '#475569', fontSize: '15px', fontWeight: 500 }}>Đang tải đề thi và phiên làm bài...</p>
+      </div>
+    );
+  }
+
+  // Backend target but the BE failed: show a clear error state — NEVER fall back to mock data
+  if (isBackendTarget && backendError && !backendExercise) {
+    return (
+      <div className="exercise-taking-container exam-backend-error-screen">
+        <div className="exam-backend-error-card">
+          <AlertCircle size={44} className="backend-error-icon" />
+          <h3 className="backend-error-title">Không thể tải đề thi từ hệ thống</h3>
+          <p className="backend-error-message">{backendError}</p>
+          <button
+            type="button"
+            className="btn-backend-error-back"
+            onClick={() => navigate('/student/exercises')}
+          >
+            <ArrowLeft size={16} />
+            <span>Về Kho bài tập</span>
+          </button>
+        </div>
       </div>
     );
   }
@@ -1867,7 +2038,7 @@ export default function StudentExerciseTakingPage() {
 
             {/* Question Statement */}
             <div className="question-statement-text">
-              <MathRenderer text={questionData.statement} />
+              <QuestionContentView text={questionData.statement} />
               <QuestionMedia question={questionData} compact />
             </div>
 
@@ -1911,7 +2082,7 @@ export default function StudentExerciseTakingPage() {
                           )}
                         </div>
                         <span className="option-content-text">
-                          <MathRenderer text={(opt.text || '').replace(/^[A-Da-d][\.\)]\s*/, '').trim()} />
+                          <QuestionContentView text={(opt.text || '').replace(/^[A-Da-d][\.\)]\s*/, '').trim()} />
                         </span>
                         {isReadOnlyReview && isCorrectOpt && (
                           <span className="review-badge-tag correct-tag">Đáp án đúng</span>
@@ -1959,7 +2130,7 @@ export default function StudentExerciseTakingPage() {
                         <div className="tf-item-content">
                           <span className="tf-sub-key-badge">{item.key})</span>
                           <span className="tf-sub-text">
-                            <MathRenderer text={(item.text || '').replace(/^[a-dA-D][\.\)]\s*/, '').replace(/[\r\n\s\.]*[√✓\u221a]\s*$/, '').replace(/[\r\n\s\.]*\(\s*\)\s*$/, '').trim()} />
+                            <QuestionContentView text={(item.text || '').replace(/^[a-dA-D][\.\)]\s*/, '').replace(/[\r\n\s\.]*[√✓\u221a]\s*$/, '').replace(/[\r\n\s\.]*\(\s*\)\s*$/, '').trim()} />
                           </span>
                           {isReadOnlyReview && correctVal !== undefined && (
                             <span className={`tf-key-verdict-pill ${correctVal ? 'pill-true' : 'pill-false'}`}>
@@ -2035,7 +2206,7 @@ export default function StudentExerciseTakingPage() {
                   return (
                     <div key={`${currentQuestionIdx}-${sIdx}`} className="other-sub-question" style={{ margin: '14px 0' }}>
                       <div style={{ fontWeight: 600, marginBottom: '6px' }}>
-                        <span>{sIdx + 1}) </span><MathRenderer text={sub} />
+                        <span>{sIdx + 1}) </span><QuestionContentView text={sub} />
                       </div>
                       {isReadOnlyReview ? (
                         <div className="comparison-box student-ans-box">
@@ -2211,7 +2382,7 @@ export default function StudentExerciseTakingPage() {
                   <span className="guide-title">Lời giải chi tiết & Phương pháp giải</span>
                 </div>
                 <div className="solution-guide-body">
-                  <MathRenderer text={questionData.explanation || questionData.solutionGuide} />
+                  <QuestionContentView text={questionData.explanation || questionData.solutionGuide} />
                 </div>
               </div>
             )}
@@ -2379,7 +2550,7 @@ export default function StudentExerciseTakingPage() {
                     <strong>{part1Answered}/{exerciseInfo.part1Count} câu</strong>
                   </div>
                   <div className="part-bar-track">
-                    <div className="part-bar-fill fill-purple" style={{ width: `${(part1Answered / exerciseInfo.part1Count) * 100}%` }} />
+                    <div className="part-bar-fill fill-purple" style={{ width: `${partPct(part1Answered, exerciseInfo.part1Count)}%` }} />
                   </div>
                 </div>
 
@@ -2389,7 +2560,7 @@ export default function StudentExerciseTakingPage() {
                     <strong>{part2Answered}/{exerciseInfo.part2Count} câu</strong>
                   </div>
                   <div className="part-bar-track">
-                    <div className="part-bar-fill fill-indigo" style={{ width: `${(part2Answered / exerciseInfo.part2Count) * 100}%` }} />
+                    <div className="part-bar-fill fill-indigo" style={{ width: `${partPct(part2Answered, exerciseInfo.part2Count)}%` }} />
                   </div>
                 </div>
 
@@ -2399,7 +2570,7 @@ export default function StudentExerciseTakingPage() {
                     <strong>{part3Answered}/{exerciseInfo.part3Count} câu</strong>
                   </div>
                   <div className="part-bar-track">
-                    <div className="part-bar-fill fill-violet" style={{ width: `${(part3Answered / exerciseInfo.part3Count) * 100}%` }} />
+                    <div className="part-bar-fill fill-violet" style={{ width: `${partPct(part3Answered, exerciseInfo.part3Count)}%` }} />
                   </div>
                 </div>
               </div>
@@ -2544,6 +2715,47 @@ export default function StudentExerciseTakingPage() {
                 <ArrowRight size={16} />
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* ============================================================ */}
+      {/* 6. LOCKDOWN OVERLAY: chặn toàn màn hình khi phát hiện nhiều màn hình (extend) */}
+      {/* Chỉ gỡ khi phát hiện lại CHỈ 1 màn hình (isExtended === false) */}
+      {/* ============================================================ */}
+      {lockdown.showMonitorOverlay && (
+        <div className="exam-lockdown-overlay">
+          <div className="exam-lockdown-overlay-card">
+            <div className="lockdown-icon-badge">
+              <MonitorX size={30} />
+            </div>
+            <h3 className="lockdown-title">Phát hiện nhiều màn hình (chế độ Extend)</h3>
+            <p className="lockdown-desc">
+              Hệ thống phát hiện bạn đang dùng <strong>nhiều màn hình (chế độ extend)</strong>.
+              Vui lòng chuyển về <strong>CHỈ 1 màn hình</strong> rồi bấm
+              {' "Kiểm tra lại & Tiếp tục" '}để làm bài.
+            </p>
+            <div className="lockdown-screen-meta">
+              <span>screen.isExtended: <strong>{String(lockdown.extendedDetected)}</strong></span>
+              <span>
+                Màn hình: {window.screen.width}×{window.screen.height}
+                {' '}· availLeft: {window.screen.availLeft}
+                {' '}· availWidth: {window.screen.availWidth}
+              </span>
+            </div>
+            <button
+              type="button"
+              className="btn-lockdown-continue"
+              onClick={() => {
+                const stillExtended = lockdown.recheckMonitors();
+                if (!stillExtended) {
+                  lockdown.requestFullscreen().catch(() => {});
+                }
+              }}
+            >
+              <RefreshCw size={16} />
+              <span>Kiểm tra lại &amp; Tiếp tục</span>
+            </button>
           </div>
         </div>
       )}

@@ -19,15 +19,18 @@ import {
   Clock,
   Trash2,
   CheckCircle2,
-  ExternalLink
+  ExternalLink,
+  Download
 } from 'lucide-react';
 import { Link, useParams, useNavigate } from 'react-router-dom';
 import StudentDetailModal from '../../components/teacher/StudentDetailModal';
-import { classesApi, subjectsApi, assignmentsApi } from '../../services/api';
+import { classesApi, subjectsApi, assignmentsApi, attemptsApi } from '../../services/api';
 import { useAuth } from '../../context/AuthContext';
 import { getTeacherSubjectInfo, getSubjectIdByName } from '../../utils/teacherSubjectHelper';
 import './TeacherClassDetailPage.css';
 import confirmDialog from '../../components/common/confirmDialog';
+import AssignExercisesDialog from '../../components/teacher/AssignExercisesDialog';
+import { downloadGradebookCsv } from '../../utils/gradebookExport';
 
 export default function TeacherClassDetailPage() {
   const { classId } = useParams();
@@ -46,6 +49,20 @@ export default function TeacherClassDetailPage() {
   const [error, setError] = useState(null);
   const [actionSuccess, setActionSuccess] = useState('');
   const [deletingId, setDeletingId] = useState(null);
+  const [showAssignDialog, setShowAssignDialog] = useState(false);
+
+  // Export whole-class gradebook limited to the teacher's own subject
+  const handleExportClass = async () => {
+    try {
+      const res = await attemptsApi.getAttempts({ class_id: classId });
+      const items = (Array.isArray(res) ? res : res?.items || []).filter(
+        (a) => !classInfo?.subjectName || getSubjectIdByName(a.subject_name || '') === getSubjectIdByName(classInfo.subjectName)
+      );
+      downloadGradebookCsv(items, `gradebook_${classInfo?.name || classId}.csv`);
+    } catch (err) {
+      alert('Could not export the gradebook.');
+    }
+  };
 
   const navigate = useNavigate();
 
@@ -230,11 +247,15 @@ export default function TeacherClassDetailPage() {
             <button
               type="button"
               className="btn-header-assign-new"
-              onClick={() => navigate('/teacher/exercises')}
-              title="Mở Kho bài tập để chọn và giao bài mới cho lớp"
+              onClick={() => setShowAssignDialog(true)}
+              title="Chọn bài tập theo khối để giao cho lớp"
             >
               <Plus size={16} />
               <span>Giao bài tập mới</span>
+            </button>
+            <button type="button" className="btn-header-assign-new" onClick={handleExportClass} title="Export class gradebook">
+              <Download size={16} />
+              <span>Export gradebook</span>
             </button>
           </div>
         </div>
@@ -454,7 +475,7 @@ export default function TeacherClassDetailPage() {
                         <button
                           type="button"
                           className="btn-go-to-exercises"
-                          onClick={() => navigate('/teacher/exercises')}
+                          onClick={() => setShowAssignDialog(true)}
                         >
                           <Plus size={15} />
                           <span>Đến Kho bài tập</span>
@@ -468,6 +489,14 @@ export default function TeacherClassDetailPage() {
           </div>
         </div>
       )}
+
+      <AssignExercisesDialog
+        isOpen={showAssignDialog}
+        onClose={() => setShowAssignDialog(false)}
+        classId={classId}
+        grade={classInfo?.gradeText?.replace(/\D/g, '')}
+        onAssigned={fetchClassData}
+      />
 
       {/* Full-screen Student Performance Analytics Modal */}
       {selectedStudent && (

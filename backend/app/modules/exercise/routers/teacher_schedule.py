@@ -21,8 +21,14 @@ get_current_user = require_roles("Teacher", "HomeroomTeacher", "Admin")
 
 router = APIRouter(prefix="/api/v1/teacher/schedule", tags=["Teacher Schedule"])
 
-# Number of upcoming days (starting today) covered by the generated timetable
-SCHEDULE_WINDOW_DAYS = 7
+# Days covered by the generated timetable: the full current week (Mon-Sun) plus the whole next week,
+# so the schedule never ends mid-week.
+SCHEDULE_WINDOW_DAYS = 14
+
+def week_start(ref: Optional[date] = None) -> date:
+    """Monday of the week containing ref (default today)."""
+    ref = ref or date.today()
+    return ref - timedelta(days=ref.weekday())
 
 DAY_LABELS = {
     0: "THỨ 2", 1: "THỨ 3", 2: "THỨ 4", 3: "THỨ 5", 4: "THỨ 6", 5: "THỨ 7", 6: "CHỦ NHẬT",
@@ -115,8 +121,8 @@ class ScheduleNotesResponse(BaseModel):
 
 
 def get_synced_schedule_items(start_date: Optional[date] = None) -> List[TeacherScheduleItemOut]:
-    """Generate timetable sessions for the next SCHEDULE_WINDOW_DAYS days starting from start_date (default today)."""
-    start = start_date or date.today()
+    """Generate timetable sessions for SCHEDULE_WINDOW_DAYS days starting from start_date (default: this Monday)."""
+    start = start_date or week_start()
     items: List[TeacherScheduleItemOut] = []
     next_id = 1
     for offset in range(SCHEDULE_WINDOW_DAYS):
