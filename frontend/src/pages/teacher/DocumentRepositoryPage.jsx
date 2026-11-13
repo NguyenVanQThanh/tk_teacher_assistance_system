@@ -22,6 +22,7 @@ import {
 import { Link, useNavigate } from 'react-router-dom';
 import { documentsApi } from '../../services/api';
 import DocumentFilterBar from '../../components/documents/DocumentFilterBar';
+import { useAuth } from '../../context/AuthContext';
 import DocumentCard from '../../components/documents/DocumentCard';
 import DocumentDetailView from '../../components/documents/DocumentDetailView';
 import UploadDocumentModal from '../../components/documents/UploadDocumentModal';
@@ -66,9 +67,13 @@ const mapBackendDoc = (doc) => ({
   description: doc.description || 'Tài liệu học tập được chia sẻ cho học sinh và giáo viên.',
   downloadsCount: `${doc.download_count || 0}`,
   fileUrl: doc.file_url,
+  uploadedBy: doc.uploaded_by,
 });
 
 export default function DocumentRepositoryPage() {
+  const { user } = useAuth();
+  const currentUserId = user?.user_id || user?.id;
+  const isAdmin = user?.role === 'Admin';
   const [selectedGrade, setSelectedGrade] = useState('all');
   const [selectedType, setSelectedType] = useState('all');
   const [searchQuery, setSearchQuery] = useState('');
@@ -313,6 +318,7 @@ export default function DocumentRepositoryPage() {
                 <DocumentCard
                   key={doc.id}
                   doc={doc}
+                  canModify={isAdmin || (currentUserId && String(doc.uploadedBy) === String(currentUserId))}
                   onPreview={(d) => setSelectedDoc(d)}
                   onView={(d) => setPreviewDoc(d)}
                   onDownload={(d) => handleDownloadDocument(d)}

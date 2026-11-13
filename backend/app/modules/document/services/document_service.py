@@ -16,6 +16,7 @@ from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from models.models import Document, Subject, User, Role
+from app.modules.auth import access_policy
 from app.modules.document.services.document_ingest_service import DocumentIngestService
 from app.modules.document.schemas import (
     DocumentOut, DocumentListOut, DocumentDashboardOut,
@@ -44,17 +45,15 @@ class DocumentService:
     @staticmethod
     def is_admin(db: Session, user: User) -> bool:
         """Return True when the user's role is Admin (case-insensitive, matching the router role gate)."""
-        role = db.query(Role).filter(Role.role_id == user.role_id).first()
-        return bool(role and role.name.lower() == "admin")
+        return access_policy.is_admin(db, user)
 
     @staticmethod
     def visible_documents_query(db: Session, current_user: User):
-        """Base query of documents the user may see: published ones, plus their own (admins see all)."""
+        """Base query of documents the user may see (see access_policy.document_visibility_clause)."""
         query = db.query(Document).filter(Document.status != "DELETED")
-        if not DocumentService.is_admin(db, current_user):
-            query = query.filter(
-                (Document.status == "Uploaded") | (Document.uploaded_by == current_user.user_id)
-            )
+        clause = access_policy.document_visibility_clause(db, current_user)
+        if clause is not None:
+            query = query.filter(clause)
         return query
 
     @staticmethod
@@ -65,28 +64,27 @@ class DocumentService:
         requires_ownership: bool = False,
         allow_deleted: bool = False
     ) -> None:
-        """Verify user permissions and document access rights."""
-        is_owner = doc.uploaded_by == current_user.user_id
-        is_admin = DocumentService.is_admin(db, current_user)
-
+        """Verify visibility (404 when hidden) and, for writes, ownership (403 when visible but not owned)."""
+        not_found = HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail={"code": "ERR-DOC-NOT_FOUND", "message": "Document not found."}
+        )
         # Soft-deleted documents are not readable or mutable by anyone; restore is the only way back.
         if doc.status == "DELETED" and not allow_deleted:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail={"code": "ERR-DOC-NOT_FOUND", "message": "Document not found."}
-            )
+            raise not_found
 
-        if requires_ownership and not (is_owner or is_admin):
+        clause = access_policy.document_visibility_clause(db, current_user)
+        if clause is not None:
+            visible = db.query(Document.document_id).filter(
+                Document.document_id == doc.document_id, clause
+            ).first()
+            if not visible:
+                raise not_found
+
+        if requires_ownership and doc.uploaded_by != current_user.user_id and not access_policy.is_admin(db, current_user):
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail={"code": "ERR-DOC-PERMISSION_DENIED", "message": "You do not have permission to modify this document."}
-            )
-
-        # Only published ("Uploaded") documents are visible to non-owners; Draft, Archived and DELETED stay private.
-        if doc.status != "Uploaded" and not (is_owner or is_admin):
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail={"code": "ERR-DOC-NOT_FOUND", "message": "Document not found."}
             )
 
     @staticmethod

@@ -55,6 +55,13 @@ export default function AdminSidebar({ isMobileOpen, onCloseMobile }) {
       path: '/admin/classes',
     },
     {
+      id: 'subjects',
+      label: 'Môn học & Tổ trưởng',
+      enLabel: 'Subjects & Heads',
+      icon: Building2,
+      path: '/admin/subjects',
+    },
+    {
       id: 'permissions',
       label: 'Phân quyền & Vai trò',
       enLabel: 'Roles & Permissions',

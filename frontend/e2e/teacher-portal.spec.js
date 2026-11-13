@@ -67,6 +67,47 @@ test.describe('Teacher Portal End-to-End Automation Test Suite', () => {
     await expect(searchInput).toBeVisible();
   });
 
+  test('TC-03b: Document cards show Edit/Delete only for owned items', async ({ page }) => {
+    await page.fill('#identifier-input', TEACHER_PHONE);
+    await page.fill('#password-input', TEACHER_PASS);
+    await page.click('button[type="submit"]');
+    await page.waitForURL('**/teacher');
+    await page.goto('/teacher/documents');
+    await page.waitForLoadState('networkidle');
+
+    const cards = page.locator('.document-card');
+    const count = await cards.count();
+    for (let i = 0; i < count; i++) {
+      const card = cards.nth(i);
+      const hasDelete = (await card.locator('.doc-close-btn').count()) > 0;
+      const hasEdit = (await card.locator('button[title="Chỉnh sửa thông tin"]').count()) > 0;
+      const isReadOnlyBadge = (await card.getByTestId('head-dept-badge').count()) > 0;
+      // Owner: both actions. Others (head of department): badge only, no write actions.
+      expect(hasDelete).toBe(hasEdit);
+      expect(isReadOnlyBadge).toBe(!hasEdit);
+    }
+  });
+
+  test('TC-04b: Exercise cards show Edit/Delete only for owned items', async ({ page }) => {
+    await page.fill('#identifier-input', TEACHER_PHONE);
+    await page.fill('#password-input', TEACHER_PASS);
+    await page.click('button[type="submit"]');
+    await page.waitForURL('**/teacher');
+    await page.goto('/teacher/exercises');
+    await page.waitForLoadState('networkidle');
+
+    const cards = page.locator('.exercise-card');
+    const count = await cards.count();
+    for (let i = 0; i < count; i++) {
+      const card = cards.nth(i);
+      const hasDelete = (await card.locator('.exercise-close-btn').count()) > 0;
+      const hasEdit = (await card.locator('.edit-btn').count()) > 0;
+      const isReadOnlyBadge = (await card.getByTestId('head-dept-badge').count()) > 0;
+      expect(hasDelete).toBe(hasEdit);
+      expect(isReadOnlyBadge).toBe(!hasEdit);
+    }
+  });
+
   test('TC-04: Exercise Repository & Management (/teacher/exercises)', async ({ page }) => {
     // Login & navigate
     await page.fill('#identifier-input', TEACHER_PHONE);

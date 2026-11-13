@@ -616,8 +616,58 @@ class AssignmentResultSummaryOut(BaseModel):
     model_config = {"from_attributes": True}
 
 
+class AiPartMatrix(BaseModel):
+    """Question counts per difficulty for one part (0-15 each)."""
+    NhanBiet: int = Field(0, ge=0, le=15)
+    ThongHieu: int = Field(0, ge=0, le=15)
+    VanDung: int = Field(0, ge=0, le=15)
+
+    def total(self) -> int:
+        return self.NhanBiet + self.ThongHieu + self.VanDung
+
+
+class AiMatrix(BaseModel):
+    """Exam matrix: mcq (Part1), tf (Part2) and short (Part3) counts per difficulty."""
+    mcq: AiPartMatrix = Field(default_factory=AiPartMatrix)
+    tf: AiPartMatrix = Field(default_factory=AiPartMatrix)
+    short: AiPartMatrix = Field(default_factory=AiPartMatrix)
+
+    def total(self) -> int:
+        return self.mcq.total() + self.tf.total() + self.short.total()
+
+    def as_dict(self) -> dict:
+        return {k: getattr(self, k).model_dump() for k in ("mcq", "tf", "short")}
+
+
+class StudentAiGenerateRequest(BaseModel):
+    """Payload (JSON string in the multipart `payload` field) for POST /api/v1/ai-exercises/student."""
+    subject_id: UUID
+    chapters: List[str] = Field(..., max_length=10)
+    topic_prompt: str = Field("", max_length=300)
+    duration_minutes: int = Field(45, ge=5, le=180)
+    matrix: AiMatrix
+
+    @field_validator("chapters")
+    @classmethod
+    def _clean_chapters(cls, v: List[str]) -> List[str]:
+        cleaned = [c.strip() for c in v if isinstance(c, str) and c.strip()]
+        return list(dict.fromkeys(cleaned))
+
+    @field_validator("topic_prompt")
+    @classmethod
+    def _strip_topic(cls, v: str) -> str:
+        return (v or "").strip()
+
+
+class AiChapterOut(BaseModel):
+    chapter: str
+    doc_id: str
+    page_start: Optional[int] = None
+
+
 class AiExerciseGenerateRequest(BaseModel):
-    subject_name: str
+    subject_name: str = ""
+    subject_id: Optional[UUID] = None
     grade_name: Optional[str] = "Lớp 12"
     topic_prompt: str
     part1_count: int = 4
@@ -626,6 +676,7 @@ class AiExerciseGenerateRequest(BaseModel):
     duration_minutes: int = 45
     class_id: Optional[UUID] = None
     document_ids: List[UUID] = []
+    matrix: Optional[AiMatrix] = None
 
 
 class AiExerciseGenerateOut(BaseModel):

@@ -77,6 +77,8 @@ services:
     volumes:
       - ./backend:/app
       - ./backend/uploads:/app/uploads
+      # SGK RAG data: vectors.dump + images.tar (see deploy/scripts/setup_sgk.sh)
+      - ./sgk_data:/sgk_data:ro
     # --reload stays on for dev. --limit-concurrency is a safety valve: 30
     # users may hold ~30 SSE streams plus normal API calls, so 128 leaves
     # headroom while still bounding runaway connection counts.

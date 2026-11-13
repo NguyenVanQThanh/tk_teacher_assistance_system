@@ -106,6 +106,65 @@ test.describe('Student Portal End-to-End Automation Test Suite', () => {
     }
   });
 
+  test('TC-STU-03b: AI generator form validates subject, chapters and file client-side', async ({ page }) => {
+    const chapters = [
+      { chapter: 'Chương 1: ESTE - LIPIT', doc_id: 'd1', page_start: 5 },
+      { chapter: 'Chương 2: CACBOHIDRAT', doc_id: 'd1', page_start: 30 },
+    ];
+    let postedForm = null;
+    await page.route('**/api/v1/ai-exercises/chapters**', (route) => route.fulfill({ json: chapters }));
+    await page.route('**/api/v1/ai-exercises/student', async (route) => {
+      postedForm = route.request().postData() || '';
+      await route.fulfill({
+        status: 422,
+        json: { detail: { code: 'ERR-EXE-AI_EMPTY_MATRIX', message: 'Matrix is empty' } },
+      });
+    });
+
+    await page.fill('#identifier-input', STUDENT_PHONE);
+    await page.fill('#password-input', STUDENT_PASS);
+    await page.click('button[type="submit"]');
+    await page.waitForURL('**/student**');
+    await page.goto('/student/exercises');
+    await page.waitForLoadState('networkidle');
+
+    await page.click('.btn-open-ai-generator');
+    const submit = page.locator('.btn-modal-generate-submit');
+    // Submit stays disabled until subject + chapter + questions are chosen
+    await expect(submit).toBeDisabled();
+
+    const subjectSelect = page.getByTestId('ai-subject-select');
+    await subjectSelect.selectOption({ index: 1 });
+    await expect(page.getByTestId('ai-chapter-list')).toBeVisible();
+    await expect(submit).toBeDisabled();
+
+    // Select 1 chapter and set 1 MCQ (NhanBiet)
+    await page.getByTestId('ai-chapter-list').locator('input[type="checkbox"]').first().check();
+    await page.locator('.part-config-card').first().locator('input[type="number"]').first().fill('1');
+    await expect(submit).toBeEnabled();
+
+    // File validation: wrong type and >= 1 MiB are rejected client-side
+    const fileInput = page.getByTestId('ai-file-input');
+    await fileInput.setInputFiles({ name: 'bad.exe', mimeType: 'application/octet-stream', buffer: Buffer.from('x') });
+    await expect(page.getByTestId('ai-file-error')).toBeVisible();
+    await expect(submit).toBeDisabled();
+    await fileInput.setInputFiles({ name: 'big.txt', mimeType: 'text/plain', buffer: Buffer.alloc(1024 * 1024, 97) });
+    await expect(page.getByTestId('ai-file-error')).toContainText('1 MB');
+    await fileInput.setInputFiles({ name: 'ok.txt', mimeType: 'text/plain', buffer: Buffer.from('este lipit') });
+    await expect(page.getByTestId('ai-file-error')).toHaveCount(0);
+    await expect(submit).toBeEnabled();
+
+    // Submit: multipart request carries payload JSON with chapters and full matrix
+    await submit.click();
+    await expect.poll(() => postedForm).not.toBeNull();
+    expect(postedForm).toContain('name="payload"');
+    expect(postedForm).toContain('"chapters":["Chương 1: ESTE - LIPIT"]');
+    expect(postedForm).toContain('"NhanBiet":1');
+    expect(postedForm).toContain('name="file"');
+    // Backend error code is mapped to a friendly Vietnamese message
+    await expect(page.locator('body')).toContainText('lớn hơn 0');
+  });
+
   test('TC-STU-04: Standalone Online Exam Taking Mode (/student/exercises/:id/taking)', async ({ page }) => {
     // Login
     await page.fill('#identifier-input', STUDENT_PHONE);

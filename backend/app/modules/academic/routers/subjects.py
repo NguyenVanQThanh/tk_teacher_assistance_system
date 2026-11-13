@@ -14,7 +14,9 @@ from sqlalchemy.orm import Session
 from app.core.database import get_db
 from models.models import User
 from app.modules.auth.dependencies import require_perm, get_current_user
-from app.modules.academic.schemas import SubjectCreate, SubjectUpdate, SubjectOut, AcademicStatusEnum
+from app.modules.academic.schemas import (
+    SubjectCreate, SubjectUpdate, SubjectOut, AcademicStatusEnum, HeadTeacherAssign, HeadTeacherCandidate,
+)
 from app.modules.academic.services.subject_service import SubjectService
 
 router = APIRouter(prefix="/api/v1/subjects", tags=["academic-subjects"])
@@ -89,7 +91,7 @@ def update_subject(
         subject_id=subject_id,
         subject_name=payload.subject_name,
         description=payload.description,
-        status_val=status_val
+        status_val=status_val,
     )
 
 
@@ -115,3 +117,23 @@ def restore_subject(subject_id: UUID, db: Session = Depends(get_db)):
     Khôi phục môn học bị xóa mềm về ACTIVE (dành riêng cho Admin). Yêu cầu quyền ACAD_SUBJECT_MANAGE.
     """
     return SubjectService.restore_subject(db=db, subject_id=subject_id)
+
+
+@router.get(
+    "/{subject_id}/head-teacher-candidates",
+    response_model=List[HeadTeacherCandidate],
+    dependencies=[Depends(require_perm("ACAD_SUBJECT_HEAD_ASSIGN"))]
+)
+def list_head_teacher_candidates(subject_id: UUID, db: Session = Depends(get_db)):
+    """List active teachers who teach the subject and can be made head. Requires ACAD_SUBJECT_HEAD_ASSIGN."""
+    return SubjectService.list_head_candidates(db=db, subject_id=subject_id)
+
+
+@router.put(
+    "/{subject_id}/head-teacher",
+    response_model=SubjectOut,
+    dependencies=[Depends(require_perm("ACAD_SUBJECT_HEAD_ASSIGN"))]
+)
+def assign_head_teacher(subject_id: UUID, payload: HeadTeacherAssign, db: Session = Depends(get_db)):
+    """Assign or clear (teacher_id null) the head of a subject department. Requires ACAD_SUBJECT_HEAD_ASSIGN."""
+    return SubjectService.assign_head_teacher(db=db, subject_id=subject_id, teacher_id=payload.teacher_id)

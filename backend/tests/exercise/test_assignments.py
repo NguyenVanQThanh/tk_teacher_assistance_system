@@ -102,7 +102,7 @@ class TestClassAssignmentModule:
         ex_vat_ly = client.post(
             "/api/v1/exercises",
             json={"title": "Bai tap Vat Ly 1", "subject_id": s1},
-            headers=admin_headers
+            headers=teacher_headers
         ).json()["exercise_id"]
 
         ex_hoa_hoc = client.post(
@@ -111,15 +111,15 @@ class TestClassAssignmentModule:
             headers=admin_headers
         ).json()["exercise_id"]
 
-        # 5. Teacher tries to assign Hoa Hoc (s2) to Class c1 -> 403 (Teacher does not teach Hoa Hoc in c1)
+        # 5. Teacher tries to assign an admin-owned Hoa Hoc (s2) exercise to Class c1 -> 404 (not visible to this teacher)
         future_due = (datetime.now(timezone.utc) + timedelta(days=7)).isoformat()
         resp_403 = client.post(
             f"/api/v1/classes/{c1}/assignments",
             json={"exercise_id": ex_hoa_hoc, "due_at": future_due},
             headers=teacher_headers
         )
-        assert resp_403.status_code == status.HTTP_403_FORBIDDEN
-        assert resp_403.json()["detail"]["code"] == "ERR-EXE-CLASS_ACCESS_DENIED"
+        assert resp_403.status_code == status.HTTP_404_NOT_FOUND
+        assert resp_403.json()["detail"]["code"] == "ERR-EXE-EXERCISE_NOT_FOUND"
 
         # 6. Teacher assigns Vat Ly (s1) to Class c1 -> 201 CREATED
         resp_201 = client.post(

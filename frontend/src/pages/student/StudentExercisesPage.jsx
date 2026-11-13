@@ -41,7 +41,7 @@ import {
   Search
 } from 'lucide-react';
 import AiSourcesList from '../../components/exercises/AiSourcesList';
-import { classesApi, assignmentsApi, attemptsApi, subjectsApi, exercisesApi } from '../../services/api';
+import { classesApi, assignmentsApi, attemptsApi, subjectsApi, aiExercisesApi } from '../../services/api';
 import useDataSync from '../../hooks/useDataSync';
 import './StudentExercisesPage.css';
 import toast from '../../components/common/toast';
@@ -64,6 +64,34 @@ export const formatDeadline = (dueAtStr) => {
   } catch (e) {
     return 'Không có';
   }
+};
+
+// Student AI generation limits (mirror backend contract)
+const AI_MAX_FILE_BYTES = 1024 * 1024; // files must be strictly smaller than 1 MiB
+const AI_ALLOWED_EXTENSIONS = ['pdf', 'docx', 'txt'];
+const MAX_AI_CHAPTERS = 10;
+
+const AI_ERROR_MESSAGES = {
+  'ERR-EXE-AI_CHAPTER_REQUIRED': 'Vui lòng chọn ít nhất một chương.',
+  'ERR-EXE-AI_INVALID_CHAPTER': 'Chương đã chọn không hợp lệ. Vui lòng chọn lại.',
+  'ERR-EXE-AI_EMPTY_MATRIX': 'Vui lòng chọn số lượng câu hỏi lớn hơn 0.',
+  'ERR-EXE-AI_FILE_TOO_LARGE': 'Tệp tải lên phải nhỏ hơn 1 MB.',
+  'ERR-EXE-AI_FILE_NO_TEXT': 'Không đọc được nội dung văn bản trong tệp. Hãy dùng tệp có chữ (không phải ảnh quét).',
+  'ERR-EXE-AI_BUSY': 'Hệ thống AI đang bận. Vui lòng thử lại sau ít phút.',
+  'ERR-EXE-AI_GENERATION_FAILED': 'AI chưa tạo được bài tập lúc này. Vui lòng bấm "Khởi tạo bài tập với AI" để thử lại.',
+};
+
+// Map backend error (code or HTTP status) to a friendly Vietnamese message
+const mapAiErrorMessage = (err, fallback) => {
+  const detail = err?.response?.data?.detail;
+  const code = detail?.code;
+  if (code && AI_ERROR_MESSAGES[code]) return AI_ERROR_MESSAGES[code];
+  const status = err?.response?.status;
+  if (status === 413) return AI_ERROR_MESSAGES['ERR-EXE-AI_FILE_TOO_LARGE'];
+  if (status === 415) return 'Định dạng tệp không được hỗ trợ (chỉ PDF, DOCX, TXT).';
+  if (status === 503) return AI_ERROR_MESSAGES['ERR-EXE-AI_BUSY'];
+  if (status === 403) return 'Bạn chưa thuộc lớp học nào nên chưa thể tạo bài tập AI.';
+  return (typeof detail === 'object' && detail?.message) || fallback || err?.message || 'Có lỗi khi tạo bài tập trên máy chủ. Vui lòng thử lại.';
 };
 
 // Session cache helpers: stores raw assignments, attempts and subjects for the current browser session
@@ -679,10 +707,64 @@ export default function StudentExercisesPage() {
   const [generatedAiResult, setGeneratedAiResult] = useState(null);
 
   // Form Configuration for AI Exercise
-  const [aiSubject, setAiSubject] = useState('Hóa học');
-  const [aiGrade, setAiGrade] = useState('Lớp 12');
+  const [aiSubjectId, setAiSubjectId] = useState('');
   const [aiDuration, setAiDuration] = useState(45);
-  const [aiTopicPrompt, setAiTopicPrompt] = useState('Este và Lipit – Phản ứng xà phòng hóa, este hóa và chất béo triolein');
+  const [aiTopicPrompt, setAiTopicPrompt] = useState('');
+  const [aiChapters, setAiChapters] = useState([]); // [{chapter, doc_id, page_start}]
+  const [aiSelectedChapters, setAiSelectedChapters] = useState([]); // chapter names
+  const [aiChaptersLoading, setAiChaptersLoading] = useState(false);
+  const [aiChaptersError, setAiChaptersError] = useState('');
+  const [aiFile, setAiFile] = useState(null);
+  const [aiFileError, setAiFileError] = useState('');
+
+  const aiSubject = useMemo(() => {
+    const s = (availableSubjects || []).find(x => String(x.subject_id) === String(aiSubjectId));
+    return s?.subject_name || '';
+  }, [availableSubjects, aiSubjectId]);
+
+  // Load chapters whenever the selected subject changes
+  useEffect(() => {
+    let cancelled = false;
+    setAiChapters([]);
+    setAiSelectedChapters([]);
+    setAiChaptersError('');
+    if (!aiSubjectId) return undefined;
+    setAiChaptersLoading(true);
+    aiExercisesApi.getChapters(aiSubjectId)
+      .then(res => { if (!cancelled) setAiChapters(Array.isArray(res) ? res : []); })
+      .catch(err => {
+        if (cancelled) return;
+        setAiChaptersError(mapAiErrorMessage(err, 'Không tải được danh sách chương cho môn học này.'));
+      })
+      .finally(() => { if (!cancelled) setAiChaptersLoading(false); });
+    return () => { cancelled = true; };
+  }, [aiSubjectId]);
+
+  const toggleAiChapter = (name) => {
+    setAiSelectedChapters(prev => prev.includes(name)
+      ? prev.filter(c => c !== name)
+      : (prev.length >= MAX_AI_CHAPTERS ? prev : [...prev, name]));
+  };
+
+  const handleAiFileChange = (e) => {
+    const f = e.target.files && e.target.files[0];
+    setAiFileError('');
+    if (!f) { setAiFile(null); return; }
+    const ext = (f.name.split('.').pop() || '').toLowerCase();
+    if (!AI_ALLOWED_EXTENSIONS.includes(ext)) {
+      setAiFile(null);
+      setAiFileError('Chỉ hỗ trợ tệp PDF, DOCX hoặc TXT.');
+      e.target.value = '';
+      return;
+    }
+    if (f.size >= AI_MAX_FILE_BYTES) {
+      setAiFile(null);
+      setAiFileError('Tệp phải nhỏ hơn 1 MB.');
+      e.target.value = '';
+      return;
+    }
+    setAiFile(f);
+  };
 
   // Question counts by Part & Difficulty Levels (Nhận biết, Thông hiểu, Vận dụng)
   const [part1Levels, setPart1Levels] = useState({ know: 0, comp: 0, app: 0 }); // Part I: MC 4 options
@@ -728,8 +810,24 @@ export default function StudentExercisesPage() {
 
   // Submit AI Generation Handler (Persisted to Database)
   const handleGenerateAiExercise = async () => {
+    if (!aiSubjectId) {
+      toast.error('Vui lòng chọn môn học.');
+      return;
+    }
+    if (aiSelectedChapters.length < 1) {
+      toast.error(AI_ERROR_MESSAGES['ERR-EXE-AI_CHAPTER_REQUIRED']);
+      return;
+    }
     if (totalAiQuestions === 0) {
       toast.error('Vui lòng chọn số lượng câu hỏi lớn hơn 0.');
+      return;
+    }
+    if (totalAiQuestions > 40) {
+      toast.error('Tổng số câu hỏi tối đa là 40.');
+      return;
+    }
+    if (aiFileError) {
+      toast.error(aiFileError);
       return;
     }
 
@@ -745,17 +843,20 @@ export default function StudentExercisesPage() {
     }, 1600);
 
     try {
+      const toLevels = (l) => ({ NhanBiet: l.know, ThongHieu: l.comp, VanDung: l.app });
       const payload = {
-        subject_name: aiSubject,
-        grade_name: aiGrade,
-        topic_prompt: aiTopicPrompt,
-        part1_count: part1Total,
-        part2_count: part2Total,
-        part3_count: part3Total,
-        duration_minutes: aiDuration
+        subject_id: aiSubjectId,
+        chapters: aiSelectedChapters,
+        topic_prompt: aiTopicPrompt.trim(),
+        duration_minutes: aiDuration,
+        matrix: {
+          mcq: toLevels(part1Levels),
+          tf: toLevels(part2Levels),
+          short: toLevels(part3Levels)
+        }
       };
 
-      const result = await exercisesApi.generateAiExercise(payload);
+      const result = await aiExercisesApi.generateForStudent(payload, aiFile);
 
       clearTimeout(step2Timer);
       clearTimeout(step3Timer);
@@ -800,11 +901,7 @@ export default function StudentExercisesPage() {
       clearTimeout(step2Timer);
       clearTimeout(step3Timer);
       console.error('Failed to generate AI exercise in DB:', err);
-      const detail = err.response?.data?.detail;
-      const errMsg = detail?.code === 'ERR-EXE-AI_GENERATION_FAILED'
-        ? 'AI chưa tạo được bài tập lúc này. Vui lòng bấm "Tạo bài tập" để thử lại.'
-        : (detail?.message || err.message || 'Có lỗi khi tạo bài tập trên máy chủ. Vui lòng thử lại.');
-      toast.error(errMsg);
+      toast.error(mapAiErrorMessage(err));
       setIsGenerating(false);
       setGenerationStep(0);
     }
@@ -1354,33 +1451,18 @@ export default function StudentExercisesPage() {
 
                   <div className="ai-config-grid-3cols">
                     <div className="ai-form-group">
-                      <label className="ai-form-label">Môn học</label>
-                      <select 
+                      <label className="ai-form-label" htmlFor="ai-subject-select">Môn học</label>
+                      <select
+                        id="ai-subject-select"
+                        data-testid="ai-subject-select"
                         className="ai-form-select"
-                        value={aiSubject}
-                        onChange={(e) => setAiSubject(e.target.value)}
+                        value={aiSubjectId}
+                        onChange={(e) => setAiSubjectId(e.target.value)}
                       >
-                        <option value="Hóa học">Hóa học</option>
-                        <option value="Toán học">Toán học</option>
-                        <option value="Vật lý">Vật lý</option>
-                        <option value="Sinh học">Sinh học</option>
-                        <option value="Tiếng Anh">Tiếng Anh</option>
-                        <option value="Lịch sử">Lịch sử</option>
-                        <option value="Địa lý">Địa lý</option>
-                        <option value="Tin học">Tin học</option>
-                      </select>
-                    </div>
-
-                    <div className="ai-form-group">
-                      <label className="ai-form-label">Khối lớp</label>
-                      <select 
-                        className="ai-form-select"
-                        value={aiGrade}
-                        onChange={(e) => setAiGrade(e.target.value)}
-                      >
-                        <option value="Lớp 12">Lớp 12</option>
-                        <option value="Lớp 11">Lớp 11</option>
-                        <option value="Lớp 10">Lớp 10</option>
+                        <option value="">-- Chọn môn học --</option>
+                        {(availableSubjects || []).map(s => (
+                          <option key={s.subject_id} value={s.subject_id}>{s.subject_name}</option>
+                        ))}
                       </select>
                     </div>
 
@@ -1401,8 +1483,56 @@ export default function StudentExercisesPage() {
                     </div>
                   </div>
                   <p style={{ fontSize: 12, color: '#6b7280', margin: '8px 0 0' }}>
-                    Nội dung được lấy từ SGK {aiSubject} {aiGrade.replace('Lớp', 'khối')} và tài liệu của giáo viên bộ môn (nếu có).
+                    Nội dung được lấy từ SGK {aiSubject || 'môn học đã chọn'} theo khối lớp của bạn và tài liệu của giáo viên bộ môn trong lớp (nếu có).
                   </p>
+                </div>
+
+                {/* 1b. Chapters (multi-select, at least one required) */}
+                <div className="ai-config-section">
+                  <div className="section-label-header">
+                    <BookOpen size={16} />
+                    <span>Chương cần ôn tập (chọn ít nhất 1, tối đa {MAX_AI_CHAPTERS})</span>
+                  </div>
+                  {!aiSubjectId ? (
+                    <p style={{ fontSize: 12, color: '#6b7280', margin: 0 }}>Hãy chọn môn học để xem danh sách chương.</p>
+                  ) : aiChaptersLoading ? (
+                    <p style={{ fontSize: 12, color: '#6b7280', margin: 0 }}>Đang tải danh sách chương...</p>
+                  ) : aiChaptersError ? (
+                    <p data-testid="ai-chapters-error" style={{ fontSize: 12, color: '#dc2626', margin: 0 }}>{aiChaptersError}</p>
+                  ) : aiChapters.length === 0 ? (
+                    <p style={{ fontSize: 12, color: '#6b7280', margin: 0 }}>Môn học này chưa có dữ liệu chương trong SGK.</p>
+                  ) : (
+                    <div data-testid="ai-chapter-list" style={{ display: 'flex', flexDirection: 'column', gap: 6, maxHeight: 180, overflowY: 'auto' }}>
+                      {aiChapters.map((c) => (
+                        <label key={`${c.doc_id}-${c.chapter}`} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13 }}>
+                          <input
+                            type="checkbox"
+                            checked={aiSelectedChapters.includes(c.chapter)}
+                            onChange={() => toggleAiChapter(c.chapter)}
+                          />
+                          <span>{c.chapter}</span>
+                        </label>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                {/* 1c. Optional reference file */}
+                <div className="ai-config-section">
+                  <div className="section-label-header">
+                    <FileText size={16} />
+                    <span>Tài liệu tham khảo (tùy chọn)</span>
+                  </div>
+                  <input
+                    type="file"
+                    data-testid="ai-file-input"
+                    accept=".pdf,.docx,.txt"
+                    onChange={handleAiFileChange}
+                  />
+                  <p style={{ fontSize: 12, color: '#6b7280', margin: '6px 0 0' }}>PDF, DOCX hoặc TXT, nhỏ hơn 1 MB.</p>
+                  {aiFileError && (
+                    <p data-testid="ai-file-error" style={{ fontSize: 12, color: '#dc2626', margin: '4px 0 0' }}>{aiFileError}</p>
+                  )}
                 </div>
 
                 {/* 2. Topic & Chatbox AI Prompt */}
@@ -1418,6 +1548,7 @@ export default function StudentExercisesPage() {
                         className="ai-topic-textarea"
                         rows={3}
                         placeholder="Nhập chủ đề kiến thức, dạng bài tập cụ thể hoặc yêu cầu mở rộng (Ví dụ: Tập trung phản ứng este hóa, chất béo triolein, các câu hỏi tính khối lượng muối xà phòng hóa...)"
+                        maxLength={300}
                         value={aiTopicPrompt}
                         onChange={(e) => setAiTopicPrompt(e.target.value)}
                       />
@@ -1437,8 +1568,7 @@ export default function StudentExercisesPage() {
                             type="button"
                             className="suggestion-chip-btn"
                             onClick={() => {
-                              setAiSubject(item.subject);
-                              setAiTopicPrompt(item.prompt);
+                              setAiTopicPrompt(item.prompt.slice(0, 300));
                             }}
                           >
                             <span>{item.label}</span>
@@ -1784,7 +1914,7 @@ export default function StudentExercisesPage() {
                   type="button" 
                   className="btn-modal-generate-submit"
                   onClick={handleGenerateAiExercise}
-                  disabled={totalAiQuestions === 0}
+                  disabled={totalAiQuestions === 0 || !aiSubjectId || aiSelectedChapters.length === 0 || Boolean(aiFileError)}
                 >
                   <Sparkles size={16} />
                   <span>Khởi tạo bài tập với AI ({totalAiQuestions} câu)</span>

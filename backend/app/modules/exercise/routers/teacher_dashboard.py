@@ -198,6 +198,7 @@ def get_teacher_dashboard(
         Class, ClassAssignment.class_id == Class.class_id
     ).filter(
         ClassAssignment.class_id.in_(all_class_ids),
+        ClassAssignment.owner_student_id.is_(None),  # exclude personal student AI assignments
         StudentExerciseAttempt.status != "DELETED",
         # Recent submissions list only ungraded work; graded/approved attempts must not reappear
         StudentExerciseAttempt.is_finished.is_(True),

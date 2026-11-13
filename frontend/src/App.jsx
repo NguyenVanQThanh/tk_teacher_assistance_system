@@ -40,6 +40,7 @@ const AdminDashboard = React.lazy(() => import('./pages/admin/AdminDashboard'));
 const AdminUsersPage = React.lazy(() => import('./pages/admin/AdminUsersPage'));
 const AdminClassesPage = React.lazy(() => import('./pages/admin/AdminClassesPage'));
 const AdminRolesPage = React.lazy(() => import('./pages/admin/AdminRolesPage'));
+const AdminSubjectsPage = React.lazy(() => import('./pages/admin/AdminSubjectsPage'));
 const AdminReportsPage = React.lazy(() => import('./pages/admin/AdminReportsPage'));
 const AdminSettingsPage = React.lazy(() => import('./pages/admin/AdminSettingsPage'));
 const AdminMonitoringPage = React.lazy(() => import('./pages/admin/AdminMonitoringPage'));
@@ -239,6 +240,7 @@ export default function App() {
             <Route path="/admin/users" element={<AdminUsersPage />} />
             <Route path="/admin/classes" element={<AdminClassesPage />} />
             <Route path="/admin/roles" element={<AdminRolesPage />} />
+            <Route path="/admin/subjects" element={<AdminSubjectsPage />} />
             <Route path="/admin/reports" element={<AdminReportsPage />} />
             <Route path="/admin/monitoring" element={<AdminMonitoringPage />} />
             <Route path="/admin/settings" element={<AdminSettingsPage />} />

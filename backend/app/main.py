@@ -91,6 +91,7 @@ from app.modules.exercise.routers.questions import router as questions_router
 from app.modules.exercise.routers.assignments import router as assignments_router
 from app.modules.exercise.routers.attempts import router as attempts_router
 from app.modules.exercise.routers.sync import router as sync_router
+from app.modules.exercise.routers.ai_generation import router as ai_generation_router
 from app.modules.document.routers.documents import router as documents_router
 from app.modules.admin.routers.users import router as admin_users_router
 from app.modules.admin.routers.dashboard import router as admin_dashboard_router
@@ -312,6 +313,7 @@ app.include_router(classes_router)
 app.include_router(enrollments_router)
 app.include_router(teacher_assignments_router)
 app.include_router(exercises_router)
+app.include_router(ai_generation_router)
 app.include_router(questions_router)
 app.include_router(assignments_router)
 app.include_router(attempts_router)

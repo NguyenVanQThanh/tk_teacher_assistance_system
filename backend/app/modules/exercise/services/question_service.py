@@ -2,8 +2,8 @@
 # Description: Service layer for Question and AnswerOption operations within exercises.
 # Created At: 2026-07-31
 # Created By: Tam Khang
-# Updated At: 2026-07-31
-# Updated By: Tam Khang
+# Updated At: 2026-11-13
+# Updated By: AI Agent
 
 from uuid import UUID
 from fastapi import HTTPException, status
@@ -24,7 +24,7 @@ class QuestionService:
 
     def add_question(self, current_user: User, exercise_id: UUID, payload: QuestionCreate) -> Question:
         # 1. Verify access to exercise
-        exercise = self.exercise_service.get_exercise_detail(current_user, exercise_id)
+        exercise = self.exercise_service.get_exercise_for_write(current_user, exercise_id)
 
         # 2. Build Question model
         question = Question(
@@ -73,7 +73,7 @@ class QuestionService:
             )
 
         # Verify exercise permission
-        self.exercise_service.get_exercise_detail(current_user, question.exercise_id)
+        self.exercise_service.get_exercise_for_write(current_user, question.exercise_id)
 
         options = None
         if payload.answer_options is not None:
@@ -117,7 +117,7 @@ class QuestionService:
             )
 
         # Verify exercise permission
-        self.exercise_service.get_exercise_detail(current_user, question.exercise_id)
+        self.exercise_service.get_exercise_for_write(current_user, question.exercise_id)
 
         self.question_repo.soft_delete(question)
         self.exercise_repo.update_total_questions(question.exercise_id)

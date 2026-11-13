@@ -2,14 +2,15 @@
 # Description: Service layer for Subject business logic — duplicate check, create, update, delete, restore, and list.
 # Created At: 2026-07-21
 # Created By: Tam Khang
-# Updated At: 2026-07-26
-# Updated By: Tam Khang
+# Updated At: 2026-11-13
+# Updated By: AI Agent
 
 import logging
 from typing import List, Optional
 from uuid import UUID
 
 from fastapi import HTTPException, status
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from models.models import User
@@ -113,7 +114,7 @@ class SubjectService:
         subject_id: UUID,
         subject_name: Optional[str] = None,
         description: Optional[str] = None,
-        status_val: Optional[str] = None
+        status_val: Optional[str] = None,
     ) -> Subject:
         """
         Update a subject.
@@ -142,6 +143,62 @@ class SubjectService:
             "Domain Event: EVT-ACAD-SUBJECT_UPDATED - subject_id: %s", subject.subject_id
         )
         return subject
+
+    @staticmethod
+    def assign_head_teacher(db: Session, subject_id: UUID, teacher_id: Optional[UUID]) -> Subject:
+        """Set or clear (teacher_id=None) the head of a subject department. Raises 404/422."""
+        subject = SubjectService.get_subject(db, subject_id)
+        if teacher_id is not None:
+            SubjectService._validate_head_teacher(db, subject.subject_id, teacher_id)
+        subject.head_teacher_id = teacher_id
+        db.commit()
+        db.refresh(subject)
+        logger.info(
+            "Domain Event: EVT-ACAD-SUBJECT_HEAD_ASSIGNED - subject_id: %s, head_teacher_id: %s",
+            subject_id, teacher_id,
+        )
+        return subject
+
+    @staticmethod
+    def list_head_candidates(db: Session, subject_id: UUID) -> list:
+        """Active teachers with an ACTIVE teaching assignment for the subject."""
+        from models.models import Role, TeacherSubject
+        SubjectService.get_subject(db, subject_id)
+        return (
+            db.query(User)
+            .join(TeacherSubject, TeacherSubject.teacher_id == User.user_id)
+            .join(Role, Role.role_id == User.role_id)
+            .filter(
+                TeacherSubject.subject_id == subject_id,
+                TeacherSubject.status == 'ACTIVE',
+                func.lower(Role.name).in_(("teacher", "homeroomteacher")),
+                func.upper(User.status) == 'ACTIVE',
+            )
+            .distinct()
+            .order_by(User.full_name)
+            .all()
+        )
+
+    @staticmethod
+    def _validate_head_teacher(db: Session, subject_id: UUID, teacher_id: UUID) -> None:
+        """Head must be an active Teacher who actively teaches the subject; otherwise 422."""
+        from models.models import Role, TeacherSubject
+        user = db.query(User).filter(User.user_id == teacher_id).first()
+        role = db.query(Role).filter(Role.role_id == user.role_id).first() if user else None
+        teaches = db.query(TeacherSubject).filter(
+            TeacherSubject.teacher_id == teacher_id,
+            TeacherSubject.subject_id == subject_id,
+            TeacherSubject.status == 'ACTIVE',
+        ).first() is not None
+        is_active = bool(user) and str(getattr(user, "status", "ACTIVE")).upper() == "ACTIVE"
+        if not (user and role and role.name.lower() in ("teacher", "homeroomteacher") and is_active and teaches):
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail={
+                    "code": "ERR-ACAD-INVALID_HEAD_TEACHER",
+                    "message": "Head teacher must be an active teacher assigned to this subject."
+                }
+            )
 
     @staticmethod
     def delete_subject(db: Session, subject_id: UUID) -> None:

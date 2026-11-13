@@ -36,7 +36,7 @@ import {
   RefreshCw
 } from 'lucide-react';
 import { useNavigate, Link, useParams, useLocation } from 'react-router-dom';
-import { exercisesApi, attemptsApi, assignmentsApi } from '../../services/api';
+import { attemptsApi, assignmentsApi } from '../../services/api';
 import { studentTakingApi, sanitizeQuestionsForStudent } from '../../services/studentTakingApi';
 import MathRenderer from '../../components/common/MathRenderer';
 import QuestionContentView from '../../components/common/QuestionContentView';
@@ -195,34 +195,7 @@ export default function StudentExerciseTakingPage() {
             }
           }
 
-          // 2. Fallback: raw exercise detail — strip sensitive answer fields client-side
-          //    (correct_answer, explanation, answer_options[].is_correct, segments[].is_correct)
-          if (!exerciseData && isUuid(targetExerciseId)) {
-            try {
-              exerciseData = await exercisesApi.getExerciseDetail(targetExerciseId);
-            } catch (fetchErr) {
-              console.warn('Direct exercise lookup failed, attempting assignment resolution fallback...', fetchErr);
-              try {
-                const assignments = await assignmentsApi.getAssignments();
-                const matched = (assignments || []).find(a =>
-                  String(a.assignment_id).toLowerCase() === String(targetExerciseId).toLowerCase()
-                );
-                if (matched && matched.exercise_id) {
-                  exerciseData = await exercisesApi.getExerciseDetail(matched.exercise_id);
-                  targetAssignmentId = matched.assignment_id;
-                  if (isMounted) setBackendAssignment(matched);
-                }
-              } catch (fallbackErr) {
-                console.error('Assignment resolution fallback error:', fallbackErr);
-              }
-            }
-
-            if (isMounted && exerciseData) {
-              sortedQ = sortBackendQuestions(sanitizeQuestionsForStudent(exerciseData.questions));
-              setBackendExercise({ ...exerciseData, questions: sortedQ });
-              setBackendQuestions(sortedQ);
-            }
-          }
+          // Students never read the raw exercise detail (it carries the answer key); only the taking payload is used.
 
           // 2b. Re-fetch the taking payload once an attempt exists so the paper follows
           //     that attempt's shuffle seed. The BE shuffles questions/options from

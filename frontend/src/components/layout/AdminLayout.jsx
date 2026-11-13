@@ -75,6 +75,7 @@ export default function AdminLayout() {
     const path = location.pathname;
     if (path.startsWith('/admin/users')) return 'Quản lý người dùng';
     if (path.startsWith('/admin/classes')) return 'Quản lý trường lớp';
+    if (path.startsWith('/admin/subjects')) return 'Môn học & Tổ trưởng bộ môn';
     if (path.startsWith('/admin/roles')) return 'Phân quyền & Vai trò';
     if (path.startsWith('/admin/reports')) return 'Báo cáo & Thống kê';
     if (path.startsWith('/admin/monitoring')) return 'Giám sát hệ thống';

@@ -60,6 +60,13 @@ class AttemptService:
                 }
             )
 
+        # Another student's personal assignment is invisible.
+        if assignment.owner_student_id is not None and assignment.owner_student_id != current_user.user_id:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail={"code": "ERR-EXE-ASSIGNMENT_NOT_FOUND", "message": "Class assignment record not found."}
+            )
+
         # 2. Verify student is enrolled in the assigned class
         enrolled = self.db.query(StudentClass).filter(
             StudentClass.student_id == current_user.user_id,
@@ -222,6 +229,12 @@ class AttemptService:
 
         # Check permission scoping
         if attempt.student_id != current_user.user_id:
+            # Students may only read their own attempts (classmates share class access but not results)
+            if (get_user_role_name(self.db, current_user) or "").lower() == "student":
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail={"code": "ERR-EXE-ATTEMPT_ACCESS_DENIED", "message": "You cannot access another student's attempt."}
+                )
             # If user is not the attempt owner, check if user is teacher/admin with class access
             assignment = self.assignment_repo.get_by_id(attempt.assignment_id)
             if not assignment:

@@ -117,6 +117,14 @@ export const subjectsApi = {
     const response = await api.get(`/api/v1/subjects/${subjectId}`);
     return response.data;
   },
+  getHeadCandidates: async (subjectId) => {
+    const response = await api.get(`/api/v1/subjects/${subjectId}/head-teacher-candidates`);
+    return response.data;
+  },
+  assignHeadTeacher: async (subjectId, teacherId) => {
+    const response = await api.put(`/api/v1/subjects/${subjectId}/head-teacher`, { teacher_id: teacherId });
+    return response.data;
+  },
 };
 
 export const exercisesApi = {
@@ -169,6 +177,25 @@ export const exercisesApi = {
   },
   generateAiExercise: async (data) => {
     const response = await api.post('/api/v1/exercises/ai-generate', data);
+    return response.data;
+  },
+};
+
+export const aiExercisesApi = {
+  // Chapters available for a subject (grade resolved server-side from the student's class)
+  getChapters: async (subjectId) => {
+    const response = await api.get('/api/v1/ai-exercises/chapters', { params: { subject_id: subjectId } });
+    return response.data;
+  },
+  // Multipart: `payload` JSON string + optional `file`
+  generateForStudent: async (payload, file = null) => {
+    const formData = new FormData();
+    formData.append('payload', JSON.stringify(payload));
+    if (file) formData.append('file', file);
+    const response = await api.post('/api/v1/ai-exercises/student', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+      timeout: 180000,
+    });
     return response.data;
   },
 };

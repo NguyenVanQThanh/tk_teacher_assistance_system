@@ -20,6 +20,7 @@ import {
 } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
 import ExerciseFilterBar from '../../components/exercises/ExerciseFilterBar';
+import { useAuth } from '../../context/AuthContext';
 import ExerciseCard from '../../components/exercises/ExerciseCard';
 import CreateExerciseModal from '../../components/exercises/CreateExerciseModal';
 import ExercisePreviewModal from '../../components/exercises/ExercisePreviewModal';
@@ -31,6 +32,9 @@ import './ExerciseRepositoryPage.css';
 const PAGE_SIZE = 6;
 
 export default function ExerciseRepositoryPage() {
+  const { user } = useAuth();
+  const currentUserId = user?.user_id || user?.id;
+  const isAdmin = user?.role === 'Admin';
   const [showSidebar, setShowSidebar] = useState(true);
   const [selectedGrade, setSelectedGrade] = useState('all');
   const [selectedType, setSelectedType] = useState('all');
@@ -339,6 +343,7 @@ export default function ExerciseRepositoryPage() {
                   <ExerciseCard
                     key={exercise.id}
                     exercise={exercise}
+                    canModify={isAdmin || (currentUserId && String(exercise.raw?.created_by) === String(currentUserId))}
                     onPreview={(item) => setPreviewExercise(item)}
                     onEdit={(item) => setEditingExercise(item)}
                     onDownload={(item) => handleDownloadPdf(item)}

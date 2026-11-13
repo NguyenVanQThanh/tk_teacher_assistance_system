@@ -663,13 +663,12 @@ class TestReviewHardening:
         assert r.json()["regraded_attempts"] == 2
         assert client.get(f"/api/v1/attempts/{att2}", headers=ah).json()["score"] > 0
 
-        # A teacher who can see but does not own an exercise cannot change its key.
+        # A teacher cannot see an Admin-owned exercise (no head-of-subject sharing), so the key is hidden (404).
         admin_ex = client.post(
             "/api/v1/exercises", json={"title": "Admin exam", "subject_id": exam_setup["subject_id"]}, headers=ah
         ).json()["exercise_id"]
         denied = client.put(f"/api/v1/exercises/{admin_ex}/answer-key", json={"keys": {}}, headers=th)
-        assert denied.status_code == status.HTTP_403_FORBIDDEN, denied.text
-        assert denied.json()["detail"]["code"] == "ERR-EXE-ANSWER_KEY_OWNER_ONLY"
+        assert denied.status_code == status.HTTP_404_NOT_FOUND, denied.text
         assert client.put(url, json={"keys": {q["question_id"]: right["option_id"]}}, headers=ah).status_code == 200
 
     def test_grade_save_with_auto_total_does_not_pin_score(self, client: TestClient, exam_setup: dict):

@@ -68,12 +68,27 @@ class SubjectUpdate(BaseModel):
         return v
 
 
+class HeadTeacherAssign(BaseModel):
+    """Schema for assigning (or clearing, with null) the head of a subject department."""
+    teacher_id: Optional[UUID] = Field(None, description="Active teacher teaching the subject; null clears the head")
+
+
+class HeadTeacherCandidate(BaseModel):
+    """A teacher eligible to be head of a subject department."""
+    user_id: UUID
+    full_name: str
+    phone: Optional[str] = None
+
+    model_config = {"from_attributes": True}
+
+
 class SubjectOut(BaseModel):
     """Schema for subject response output."""
     subject_id: UUID
     subject_name: str
     description: Optional[str]
     status: AcademicStatusEnum = AcademicStatusEnum.ACTIVE
+    head_teacher_id: Optional[UUID] = None
     created_at: datetime
     updated_at: datetime
 

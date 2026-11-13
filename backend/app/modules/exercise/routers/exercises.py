@@ -2,8 +2,8 @@
 # Description: API Router for Exercise endpoints (F-EXE-01).
 # Created At: 2026-07-31
 # Created By: Tam Khang
-# Updated At: 2026-11-09
-# Updated By: Tam Khang
+# Updated At: 2026-11-13
+# Updated By: AI Agent
 
 import json
 import hashlib
@@ -16,6 +16,8 @@ from pydantic import ValidationError
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
+from app.modules.academic.scoping import get_user_role_name
+from app.modules.auth import access_policy
 from models.models import User, Exercise
 from app.modules.auth.dependencies import require_perm, get_current_user
 from app.modules.exercise.schemas import (
@@ -96,9 +98,21 @@ def generate_ai_exercise(
     current_user: User = Depends(get_current_user)
 ):
     """
-    Generate an AI exercise with realistic Part 1, 2, 3 questions, assign it to the student's class,
-    and persist Exercise, Question, AnswerOption, and ClassAssignment records into PostgreSQL.
+    Teacher-only AI exercise generation. Students use POST /api/v1/ai-exercises/student.
     """
+    role_name = get_user_role_name(service.db, current_user)
+    if not access_policy.is_teacher(role_name) and role_name != "Admin":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail={"code": "ERR-EXE-AI_TEACHER_ONLY", "message": "Only teachers can generate exercises here."}
+        )
+    if payload.document_ids:
+        visible = access_policy.visible_document_ids(service.db, current_user, payload.document_ids)
+        if any(d not in visible for d in payload.document_ids):
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail={"code": "ERR-DOC-NOT_FOUND", "message": "Document not found."}
+            )
     return service.generate_ai_exercise(current_user, payload)
 
 
@@ -286,8 +300,8 @@ def _import_questions_impl(
     response: Optional[Response],
 ):
     """Heavy import body; the public endpoint holds IMPORT_SEMAPHORE while calling it."""
-    # 1. Verify access to exercise
-    exercise_service.get_exercise_detail(current_user, exercise_id)
+    # 1. Verify write access to exercise (404 invisible, 403 not owner)
+    exercise_service.get_exercise_for_write(current_user, exercise_id)
 
     # 2. Validate question file
     q_filename = question_file.filename or ""
@@ -395,7 +409,7 @@ def _import_questions_impl(
         else:
             groups.append((label, [parsed_q]))
 
-    base_exercise = exercise_service.get_exercise_detail(current_user, exercise_id)
+    base_exercise = exercise_service.get_exercise_for_write(current_user, exercise_id)
     if base_exercise is None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -452,7 +466,7 @@ def _import_questions_impl(
                     target_exercise_id = new_ex.exercise_id
 
         # 4b. Clear old questions of the target exercise before re-importing
-        existing_exercise = exercise_service.get_exercise_detail(current_user, target_exercise_id)
+        existing_exercise = exercise_service.get_exercise_for_write(current_user, target_exercise_id)
         if existing_exercise and existing_exercise.questions:
             for old_q in existing_exercise.questions:
                 old_q.status = "DELETED"

@@ -11,7 +11,7 @@ from datetime import datetime, timezone
 from fastapi import APIRouter, Depends, status
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
-from sqlalchemy import func
+from sqlalchemy import func, or_
 
 from app.core.database import get_db
 from models.models import (
@@ -176,14 +176,18 @@ def get_student_dashboard(
             Exercise, ClassAssignment.exercise_id == Exercise.exercise_id
         ).filter(
             ClassAssignment.class_id.in_(class_ids),
-            ClassAssignment.status != "DELETED"
+            ClassAssignment.status != "DELETED",
+            # Hide other students' personal AI assignments
+            or_(ClassAssignment.owner_student_id.is_(None),
+                ClassAssignment.owner_student_id == current_user.user_id)
         ).order_by(ClassAssignment.due_at.asc()).all()
 
         finished_assignment_ids = {att.assignment_id for att in attempts}
 
         for a in assignments:
             is_finished = a.assignment_id in finished_assignment_ids
-            is_overdue = a.due_at < now and not is_finished
+            due_at = a.due_at if a.due_at.tzinfo else a.due_at.replace(tzinfo=timezone.utc)
+            is_overdue = due_at < now and not is_finished
             is_ai = bool((a.exercise.ai_metadata or {}).get("is_ai_generated"))
             s_name = a.exercise.subject.subject_name if hasattr(a.exercise, "subject") and a.exercise.subject else "Bộ môn"
             upcoming_list.append(
