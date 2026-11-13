@@ -10,6 +10,7 @@
 
 import asyncio
 import json
+import time
 from typing import AsyncGenerator, Optional
 from uuid import UUID
 
@@ -29,6 +30,11 @@ router = APIRouter(tags=["sync"])
 
 # How often each SSE connection polls the DB for changes.
 SSE_POLL_INTERVAL_SECONDS = 2.0
+
+# Idle connections are closed by proxies: Cloudflare drops a stream that stays silent for
+# ~100s (524), and nginx has its own read timeout. A comment line keeps the connection warm
+# without waking the client (SSE comments are ignored by EventSource).
+SSE_HEARTBEAT_SECONDS = 15.0
 
 
 @router.get("/api/v1/sync/version", response_model=SyncVersionOut)
@@ -96,6 +102,7 @@ async def sync_stream(
 
     async def event_generator() -> AsyncGenerator[str, None]:
         last_version = None
+        last_emit = time.monotonic()
         try:
             while not await request.is_disconnected():
                 # No cache here: every connection tracks its own last emitted version.
@@ -104,7 +111,12 @@ async def sync_stream(
                 version = snapshot.get("version")
                 if version != last_version:
                     last_version = version
+                    last_emit = time.monotonic()
                     yield f"data: {json.dumps(snapshot, ensure_ascii=False)}\n\n"
+                elif time.monotonic() - last_emit >= SSE_HEARTBEAT_SECONDS:
+                    # Keep the connection alive through Cloudflare/nginx while nothing changes.
+                    last_emit = time.monotonic()
+                    yield ": keep-alive\n\n"
                 await asyncio.sleep(SSE_POLL_INTERVAL_SECONDS)
         except HTTPException:
             # User blocked/deactivated mid-stream: close the stream.

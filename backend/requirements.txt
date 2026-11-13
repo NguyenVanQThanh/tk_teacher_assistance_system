@@ -27,6 +27,9 @@ pillow>=10.0.0
 reportlab>=4.0.0
 matplotlib>=3.8.0
 
+# Object storage (Cloudflare R2, S3-compatible) — only imported when STORAGE_BACKEND=r2.
+boto3>=1.34
+
 # marker-pdf KHÔNG còn trong prod image: nó kéo theo torch (hàng GB) làm build chậm.
 # Code đã fallback về pdfplumber khi thiếu marker (xem app/modules/exercise/services/import_parser_service.py)
 # và Docker compose set ENABLE_MARKER_PDF=0. Nếu cần OCR LaTeX cục bộ thì cài riêng:

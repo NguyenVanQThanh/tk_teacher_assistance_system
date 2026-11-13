@@ -68,10 +68,7 @@ class ParseResult:
     errors: List[ParseError] = field(default_factory=list)
 
 
-from app.core.config import QUESTION_IMAGE_DIR, QUESTION_IMAGE_URL_PREFIX
-
-UPLOAD_DIR = str(QUESTION_IMAGE_DIR)
-IMAGE_URL_PREFIX = QUESTION_IMAGE_URL_PREFIX
+from app.core.storage import get_storage
 
 
 class ImportParserService:
@@ -89,7 +86,7 @@ class ImportParserService:
         tables_data = []
         inline_images = []
 
-        os.makedirs(UPLOAD_DIR, exist_ok=True)
+        storage = get_storage()
 
         # Extract images from docx relationships
         image_count = 0
@@ -100,10 +97,9 @@ class ImportParserService:
                 if image_ext.lower() not in ["png", "jpg", "jpeg", "gif", "bmp", "webp"]:
                     image_ext = "png"
                 filename = f"q_img_{uuid.uuid4().hex[:10]}.{image_ext}"
-                filepath = os.path.join(UPLOAD_DIR, filename)
-                with open(filepath, "wb") as f:
-                    f.write(image_bytes)
-                image_url = f"{IMAGE_URL_PREFIX}/{filename}"
+                content_type = f"image/{'jpeg' if image_ext.lower() == 'jpg' else image_ext.lower()}"
+                storage.put(f"questions/{filename}", image_bytes, content_type=content_type)
+                image_url = storage.url(f"questions/{filename}")
                 inline_images.append({
                     "url": image_url,
                     "index": image_count

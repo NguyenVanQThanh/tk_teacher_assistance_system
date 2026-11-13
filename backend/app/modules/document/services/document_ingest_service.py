@@ -20,6 +20,7 @@ from sqlalchemy import text
 
 from app.core import config
 from app.core.resource_limits import ETL_SEMAPHORE
+from app.core.storage import LocalStorage, get_storage
 from app.modules.exercise.services.mistral_vision_parser_service import (
     MistralVisionParserService,
     flatten_content,
@@ -28,7 +29,7 @@ from app.modules.exercise.services.mistral_vision_parser_service import (
 
 logger = logging.getLogger("smartlms.document.ingest")
 
-UPLOAD_DIR = Path("uploads/documents")
+UPLOAD_DIR = Path(config.UPLOAD_ROOT) / "documents"
 MIN_TOK, MAX_TOK = 300, 500
 MAX_RETRIES = 3
 CHUNK_INSERT_BATCH_SIZE = 100
@@ -241,12 +242,16 @@ def _with_retry(fn: Callable[[], Any], label: str, base_delay: float = 2.0) -> A
 
 
 def save_figure(img: Image.Image, document_id: str, page: int) -> str:
-    """Store a page image under uploads/documents_figures/<document_id>/ and return its path."""
-    folder = Path(config.DOCUMENT_FIGURE_DIR) / str(document_id)
-    folder.mkdir(parents=True, exist_ok=True)
-    path = folder / f"p{page}.png"
-    img.save(path, format="PNG")
-    return str(path).replace("\\", "/")
+    """Store a page image under documents_figures/<document_id>/ and return its stored path/URL."""
+    key = f"documents_figures/{document_id}/p{page}.png"
+    buffer = io.BytesIO()
+    img.save(buffer, format="PNG")
+    storage = get_storage()
+    storage.put(key, buffer.getvalue(), content_type="image/png")
+    # Local rows historically stored a filesystem path; keep that shape for local mode.
+    if isinstance(storage, LocalStorage):
+        return str(storage.root / key).replace("\\", "/")
+    return storage.url(key)
 
 
 def iter_pages_from_pdf_docs(
@@ -424,18 +429,25 @@ class DocumentIngestService:
             return
         DocumentIngestService._set_status(db, document_id, "PROCESSING")
         try:
-            path = UPLOAD_DIR / Path(row[0] or "").name
-            if not path.exists():
-                raise FileNotFoundError(f"Stored file missing: {path.name}")
-            # Check the on-disk size BEFORE read_bytes() so an oversized upload
+            storage = get_storage()
+            file_url = row[0] or ""
+            key = storage.key_from_url(file_url)
+            if key is None and file_url:
+                # Legacy rows may store only the filename; resolve it under documents/.
+                name = Path(file_url).name
+                key = f"documents/{name}" if name and name not in (".", "..") else None
+            name = Path(key).name if key else (Path(file_url).name or "file")
+            if not key or not storage.exists(key):
+                raise FileNotFoundError(f"Stored file missing: {name}")
+            # Check the stored size BEFORE get() so an oversized upload
             # cannot allocate a huge bytes object and OOM the container.
-            file_size = path.stat().st_size
+            file_size = storage.size(key)
             if file_size > config.MAX_INGEST_BYTES:
                 raise ValueError(
                     f"Document too large: {file_size} bytes exceeds "
                     f"MAX_INGEST_BYTES={config.MAX_INGEST_BYTES} bytes."
                 )
-            chunks = DocumentIngestService.build_chunks(row[1], path.read_bytes(), str(document_id))
+            chunks = DocumentIngestService.build_chunks(row[1], storage.get(key), str(document_id))
             if not chunks:
                 raise ValueError("No content could be extracted from the document.")
             vectors = embed_texts([c["content"] for c in chunks])

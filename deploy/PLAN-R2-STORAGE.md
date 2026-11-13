@@ -37,19 +37,26 @@ Browser ◄──URL tải về────────────────�
 
 ## 3. Checklist implement (code backend)
 
-- [ ] Thêm `boto3>=1.34` vào `backend/requirements.txt`
-- [ ] Tạo module storage (vd: `backend/app/core/r2_storage.py`): tạo `boto3.client("s3",
-      endpoint_url="https://<ACCOUNT_ID>.r2.cloudflarestorage.com", region_name="auto", ...)`
-- [ ] Đọc config từ biến môi trường (xem mục 4): `STORAGE_BACKEND`, `R2_ACCOUNT_ID`,
+> Trạng thái 2026-11-13: **đã implement** — xem `backend/app/core/storage.py`.
+> Bật bằng `STORAGE_BACKEND=r2` (alias `cloud`/`s3`), rollback bằng `STORAGE_BACKEND=local`.
+
+- [x] Thêm `boto3>=1.34` vào `backend/requirements.txt`
+- [x] Tạo module storage (`backend/app/core/storage.py`): `LocalStorage` + `R2Storage`
+      (`boto3.client("s3", endpoint_url="https://<ACCOUNT_ID>.r2.cloudflarestorage.com", region_name="auto")`)
+- [x] Đọc config từ biến môi trường: `STORAGE_BACKEND`, `R2_ACCOUNT_ID`,
   `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, `R2_BUCKET`, `R2_PUBLIC_BASE_URL`
-- [ ] Sửa chỗ ghi file upload (hiện ghi local vào `QUESTION_IMAGE_DIR`) sang `put_object`
-      lên R2, lưu `object key` vào DB
-- [ ] Sửa chỗ đọc/serve `/uploads/...` (hiện `StaticFiles`) sang trả URL R2
-      (`{R2_PUBLIC_BASE_URL}/{key}`); nếu bucket private thì dùng presigned GET URL
-- [ ] Alembic migration nếu phải đổi schema cột lưu đường dẫn ảnh
-- [ ] Test đầu-cuối: upload đề PDF/ảnh → lưu DB → user tải về bằng URL R2 →
-      kiểm tra Cloudflare analytics không thấy egress tính phí, EC2 không tốn băng thông file
-- [ ] Cập nhật `deploy/.env.prod` trên server với `R2_*` thật (không commit)
+- [x] Sửa chỗ ghi file upload (`QUESTION_IMAGE_DIR`, `uploads/documents`) sang `storage.put`;
+      DB vẫn lưu URL string như cũ
+- [x] Sửa chỗ đọc/serve `/uploads/...` sang `storage.get` / URL R2.
+      `/sgk-images/` vẫn là static local vì là dữ liệu SGK giải nén từ `images.tar`
+- [x] Không cần Alembic migration: cột `file_url`/`image_url` vẫn là string
+- [x] Nối vào CD: `.github/workflows/deploy.yml` nhận secret `STORAGE_BACKEND` + `R2_*`,
+      ghi đè vào `deploy/.env.prod` trên server, và **chặn deploy** nếu `STORAGE_BACKEND=r2`
+      mà thiếu bất kỳ biến `R2_*` nào
+- [ ] Test đầu-cuối với bucket thật: upload đề PDF/ảnh → lưu DB → tải về bằng URL R2 →
+      kiểm tra Cloudflare analytics (cần credential thật, chưa chạy)
+- [ ] Điền `R2_*` thật — hoặc trong `deploy/.env.prod` trên server, hoặc trong GitHub
+      Secrets (không commit cả hai)
 
 ## 4. Biến môi trường cần thêm (đã khai báo sẵn trong `deploy/.env.prod.example`)
 
@@ -61,6 +68,10 @@ R2_SECRET_ACCESS_KEY=...
 R2_BUCKET=smartlms-uploads
 R2_PUBLIC_BASE_URL=https://files.<domain-cua-ban>
 ```
+
+Cả 5 biến `R2_*` đều **bắt buộc** khi `STORAGE_BACKEND=r2` — `get_storage()` ném
+`RuntimeError` liệt kê tên biến thiếu nếu không đủ, nên đừng coi `R2_PUBLIC_BASE_URL` là
+tuỳ chọn.
 
 ## 5. Cấu hình cần tạo trên Cloudflare
 

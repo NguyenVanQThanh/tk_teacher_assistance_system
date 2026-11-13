@@ -6,24 +6,73 @@
 # Updated By: Tam Khang
 
 from typing import Optional
+from urllib.parse import quote
 from uuid import UUID
 from fastapi import BackgroundTasks, APIRouter, Depends, Query, UploadFile, File, Form, status, HTTPException
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, Response
 from sqlalchemy.orm import Session
-from pathlib import Path
 
 from app.core.database import get_db
+from app.core.storage import LocalStorage, get_storage
 from models.models import User
 from app.modules.auth.dependencies import require_roles
 from app.modules.document.schemas import DocumentOut, DocumentListOut, DocumentDashboardOut, DocumentUpdate
 from app.modules.document.services import document_service
 from app.modules.document.services.document_ingest_service import DocumentIngestService
-from app.modules.document.services.document_service import DocumentService, UPLOAD_DIR
+from app.modules.document.services.document_service import DocumentService
 
 # The repository is a teacher resource; students are rejected on every route.
 get_current_user = require_roles("Teacher", "HomeroomTeacher", "Admin")
 
 router = APIRouter(prefix="/api/v1/documents", tags=["documents"])
+
+
+def _content_disposition(disposition: str, filename: str) -> str:
+    """Build the same Content-Disposition value Starlette's FileResponse uses."""
+    encoded = quote(filename)
+    if encoded != filename:
+        return f"{disposition}; filename*=utf-8''{encoded}"
+    return f'{disposition}; filename="{filename}"'
+
+
+def _document_response(file_url: Optional[str], media_type: str, disposition: str, filename: str) -> Response:
+    """Serve a document from the configured storage backend with the requested headers."""
+    storage = get_storage()
+    key = DocumentService._storage_key(file_url)
+    if not key:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail={"code": "ERR-DOC-NOT_FOUND", "message": "File attachment not found."}
+        )
+
+    if isinstance(storage, LocalStorage):
+        # Local files stream straight from disk: keeps Range/ETag support (in-browser PDF
+        # viewers need Range) and avoids loading a 50 MB file into the API process.
+        path = storage.path_for(key)
+        if not path.is_file():
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail={"code": "ERR-DOC-NOT_FOUND", "message": "File attachment not found."}
+            )
+        return FileResponse(
+            path=path,
+            filename=filename,
+            media_type=media_type,
+            content_disposition_type=disposition,
+        )
+
+    try:
+        data = DocumentService.read_file_bytes(file_url)
+    except FileNotFoundError:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail={"code": "ERR-DOC-NOT_FOUND", "message": "File attachment not found."}
+        )
+    return Response(
+        content=data,
+        media_type=media_type,
+        headers={"Content-Disposition": _content_disposition(disposition, filename)},
+    )
 
 
 @router.get("/dashboard", response_model=DocumentDashboardOut)
@@ -152,12 +201,6 @@ def view_document(
     """
     doc = DocumentService.get_document_by_id(db, document_id)
     DocumentService.check_document_access(db, doc, current_user, requires_ownership=False)
-    file_path = UPLOAD_DIR / Path(doc.file_url).name if doc.file_url else None
-    if file_path is None or not file_path.exists():
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail={"code": "ERR-DOC-NOT_FOUND", "message": "File attachment not found."}
-        )
 
     ext = (doc.file_type or "").lower()
     media_type = "application/pdf" if ext == "pdf" else "application/octet-stream"
@@ -166,11 +209,11 @@ def view_document(
     # Only PDF/images are safe to render inline; everything else is offered as attachment.
     disposition = "inline" if media_type != "application/octet-stream" else "attachment"
 
-    return FileResponse(
-        path=file_path,
-        filename=f"{doc.title}.{doc.file_type or 'pdf'}",
+    return _document_response(
+        doc.file_url,
         media_type=media_type,
-        content_disposition_type=disposition
+        disposition=disposition,
+        filename=f"{doc.title}.{doc.file_type or 'pdf'}",
     )
 
 
@@ -185,16 +228,16 @@ def download_document(
     """
     doc = DocumentService.get_document_by_id(db, document_id)
     DocumentService.check_document_access(db, doc, current_user, requires_ownership=False)
-    file_path = UPLOAD_DIR / Path(doc.file_url).name if doc.file_url else None
     # Verify the file exists before counting so a missing file never yields a bogus download.
-    if file_path is None or not file_path.exists():
+    if not DocumentService.file_exists(doc.file_url):
         raise HTTPException(status_code=404, detail="File attachment not found.")
     doc = DocumentService.record_download(db, document_id, current_user)
 
-    return FileResponse(
-        path=file_path,
+    return _document_response(
+        doc.file_url,
+        media_type="application/octet-stream",
+        disposition="attachment",
         filename=f"{doc.title}.{doc.file_type or 'pdf'}",
-        media_type="application/octet-stream"
     )
 
 

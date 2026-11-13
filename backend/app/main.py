@@ -326,7 +326,10 @@ app.include_router(teacher_schedule_router)
 app.include_router(teacher_dashboard_router)
 app.include_router(monitoring_router)
 
-# Serve question images from BE storage (path configurable via .env, see app/core/config.py)
+# Serve question images from BE storage (path configurable via .env, see app/core/config.py).
+# Both mounts stay unconditional: the SGK figures are local static data loaded from
+# sgk_data/images.tar (never uploaded through the storage backend), and keeping the
+# question-image mount preserves URLs stored by earlier local-mode rows.
 QUESTION_IMAGE_DIR.mkdir(parents=True, exist_ok=True)
 app.mount(
     QUESTION_IMAGE_URL_PREFIX,

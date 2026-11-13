@@ -1,7 +1,7 @@
 # File Name: question_image_service.py
-# Description: Storage service for images attached to questions. Files are written to the
-# BE storage directory configured via QUESTION_IMAGE_DIR (see app/core/config.py) and served
-# under QUESTION_IMAGE_URL_PREFIX. Returns metadata that callers persist on the Question row.
+# Description: Storage service for images attached to questions. Files are written through
+# the configured storage backend (local uploads/questions or Cloudflare R2) and served
+# under the backend's public URL. Returns metadata that callers persist on the Question row.
 # Created At: 2026-11-08
 # Created By: Tam Khang
 
@@ -13,10 +13,9 @@ from fastapi import HTTPException, UploadFile, status
 
 from app.core.config import (
     QUESTION_IMAGE_ALLOWED_EXTENSIONS,
-    QUESTION_IMAGE_DIR,
     QUESTION_IMAGE_MAX_BYTES,
-    QUESTION_IMAGE_URL_PREFIX,
 )
+from app.core.storage import get_storage
 
 
 class QuestionImageService:
@@ -54,17 +53,16 @@ class QuestionImageService:
             raise ValueError(f"Image exceeds maximum size of {QUESTION_IMAGE_MAX_BYTES} bytes.")
 
         filename = f"q_img_{uuid.uuid4().hex[:12]}.{ext}"
-        QUESTION_IMAGE_DIR.mkdir(parents=True, exist_ok=True)
-        target_path = QUESTION_IMAGE_DIR / filename
-        with open(target_path, "wb") as f:
-            f.write(data)
-
-        width, height = QuestionImageService._detect_dimensions(data, ext)
         if not content_type:
             content_type = "image/svg+xml" if ext == "svg" else f"image/{'jpeg' if ext == 'jpg' else ext}"
 
+        storage = get_storage()
+        storage.put(f"questions/{filename}", data, content_type)
+
+        width, height = QuestionImageService._detect_dimensions(data, ext)
+
         return {
-            "url": f"{QUESTION_IMAGE_URL_PREFIX}/{filename}",
+            "url": storage.url(f"questions/{filename}"),
             "filename": filename,
             "original_name": original_name,
             "size_bytes": len(data),

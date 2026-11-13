@@ -10,6 +10,7 @@ from unittest.mock import MagicMock
 import pytest
 from PIL import Image
 
+from app.core.storage import LocalStorage
 from app.modules.document.services import document_ingest_service as svc
 from app.modules.document.services.document_ingest_service import DocumentIngestService
 
@@ -86,8 +87,9 @@ def _statuses(db):
 
 
 def test_ingest_success_transitions(monkeypatch, tmp_path):
-    monkeypatch.setattr(svc, "UPLOAD_DIR", tmp_path)
-    (tmp_path / "f.pdf").write_bytes(b"x")
+    monkeypatch.setattr(svc, "get_storage", lambda: LocalStorage(tmp_path))
+    (tmp_path / "documents").mkdir()
+    (tmp_path / "documents" / "f.pdf").write_bytes(b"x")
     monkeypatch.setattr(DocumentIngestService, "build_chunks",
                         staticmethod(lambda *a, **k: [{"page": 1, "modality": "text", "content": "hi", "meta": {}}]))
     monkeypatch.setattr(svc, "embed_texts", lambda t: [[0.1, 0.2] for _ in t])
@@ -99,7 +101,7 @@ def test_ingest_success_transitions(monkeypatch, tmp_path):
 
 
 def test_ingest_failure_sets_failed(monkeypatch, tmp_path):
-    monkeypatch.setattr(svc, "UPLOAD_DIR", tmp_path)
+    monkeypatch.setattr(svc, "get_storage", lambda: LocalStorage(tmp_path))
     db = _db()  # file missing
     DocumentIngestService._run(db, "d1")
     assert _statuses(db) == ["PROCESSING", "FAILED"]

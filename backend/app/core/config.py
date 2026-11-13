@@ -24,6 +24,23 @@ SGK_IMAGE_URL_PREFIX = (
     os.environ.get("SGK_IMAGE_URL_PREFIX", "/sgk-images") or "/sgk-images"
 ).rstrip("/") or "/sgk-images"
 
+# ---------------------------------------------------------------------------
+# File storage backend for uploaded files. The DB keeps storing URL strings, so
+# switching between local disk and Cloudflare R2 does not change the schema.
+# ---------------------------------------------------------------------------
+# local (default) or r2/cloud/s3 (all three mean Cloudflare R2, case-insensitive).
+STORAGE_BACKEND = (os.environ.get("STORAGE_BACKEND", "local") or "local").strip().lower()
+
+# Root directory for local storage; storage keys are resolved relative to it.
+UPLOAD_ROOT = Path(os.environ.get("UPLOAD_ROOT", "uploads"))
+
+# Cloudflare R2 (S3-compatible) credentials; only used when STORAGE_BACKEND=r2.
+R2_ACCOUNT_ID = os.environ.get("R2_ACCOUNT_ID", "")
+R2_ACCESS_KEY_ID = os.environ.get("R2_ACCESS_KEY_ID", "")
+R2_SECRET_ACCESS_KEY = os.environ.get("R2_SECRET_ACCESS_KEY", "")
+R2_BUCKET = os.environ.get("R2_BUCKET", "")
+R2_PUBLIC_BASE_URL = os.environ.get("R2_PUBLIC_BASE_URL", "")
+
 # Maximum accepted image size (default 10 MB).
 QUESTION_IMAGE_MAX_BYTES = int(os.environ.get("QUESTION_IMAGE_MAX_BYTES", str(10 * 1024 * 1024)))
 

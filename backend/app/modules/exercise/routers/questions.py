@@ -35,7 +35,7 @@ def upload_question_image(
     current_user: User = Depends(get_current_user),
 ):
     """
-    Upload an image to BE storage (path configurable via QUESTION_IMAGE_DIR in .env).
+    Upload an image through the configured storage backend (local disk or Cloudflare R2).
     Returns the public URL plus metadata to persist on the question record.
     Requires EXE_EXERCISE_MANAGE permission.
     """

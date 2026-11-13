@@ -30,6 +30,9 @@ services:
       - "5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
+      # Chỉ chạy khi volume còn RỖNG: tạo extension unaccent (exercise search) + vector.
+      # Volume đã có dữ liệu thì phải tự chạy CREATE EXTENSION (xem deploy/README.md).
+      - ./postgres-init:/docker-entrypoint-initdb.d:ro
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
       interval: 10s
@@ -101,23 +104,49 @@ services:
       backend:
         condition: service_healthy
 
-  # Reverse proxy tuỳ chọn — chỉ chạy khi truyền --profile proxy:
+  # Reverse proxy tuỳ chọn — bật bằng --profile proxy (hoặc tự bật khi dùng --profile tunnel):
   #   docker compose --project-directory . --env-file deploy/.env.prod \
   #     -f deploy/docker-compose.prod.yml --profile proxy up -d
-  # Khi đó chỉ cần mở đúng port 80 (và 443 nếu thêm TLS) trên server.
+  # Bind/port cấu hình qua .env.prod (NGINX_BIND / NGINX_PORT) để không đụng nginx host.
   nginx:
     image: nginx:alpine
     container_name: smartlms_nginx
     restart: unless-stopped
     mem_limit: 128m
-    profiles: ["proxy"]
+    profiles: ["proxy", "tunnel", "quick"]
     ports:
-      - "80:80"
+      - "${NGINX_BIND:-0.0.0.0}:${NGINX_PORT:-80}:80"
     volumes:
       - ./deploy/nginx/nginx.conf:/etc/nginx/conf.d/default.conf:ro
     depends_on:
       - frontend
       - backend
+
+  # Cloudflare Tunnel — xem chú thích trong deploy/docker-compose.images.yml.
+  # Public hostname trên Zero Trust dashboard trỏ vào http://nginx:80
+  cloudflared:
+    image: cloudflare/cloudflared:latest
+    container_name: smartlms_cloudflared
+    restart: unless-stopped
+    mem_limit: 128m
+    profiles: ["tunnel"]
+    command: tunnel --no-autoupdate run
+    environment:
+      TUNNEL_TOKEN: ${CLOUDFLARE_TUNNEL_TOKEN:-}
+    depends_on:
+      - nginx
+
+  # Quick tunnel 0 đồng (không cần domain/token) — chỉ để demo.
+  # Bật bằng --profile quick; URL nằm trong docker logs smartlms_cloudflared_quick
+  cloudflared-quick:
+    image: cloudflare/cloudflared:latest
+    container_name: smartlms_cloudflared_quick
+    restart: unless-stopped
+    mem_limit: 128m
+    profiles: ["quick"]
+    command: tunnel --no-autoupdate --url http://nginx:80
+    depends_on:
+      - nginx
 
 volumes:
   postgres_data:

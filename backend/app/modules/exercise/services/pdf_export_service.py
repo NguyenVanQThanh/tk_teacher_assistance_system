@@ -9,9 +9,7 @@ import io
 import os
 import re
 import tempfile
-from pathlib import Path
 from typing import List, Tuple, Dict, Any, Optional
-from urllib.parse import unquote, urlsplit
 import httpx
 from PIL import Image as PILImage
 import matplotlib
@@ -34,7 +32,7 @@ from reportlab.pdfbase.ttfonts import TTFont
 
 from models.models import Exercise, Question, AnswerOption
 from app.modules.exercise.schemas import QuestionTypeEnum
-from app.core.config import QUESTION_IMAGE_DIR, QUESTION_IMAGE_URL_PREFIX
+from app.core.storage import read_bytes_from_url
 
 
 # ---------------------------------------------------------------------------
@@ -554,21 +552,6 @@ class PdfExportService:
         """True for absolute http(s) image URLs."""
         return bool(re.match(r"^https?://", image_url or "", re.IGNORECASE))
 
-    @classmethod
-    def _local_image_path(cls, image_url: str) -> Optional[Path]:
-        """Map ``<QUESTION_IMAGE_URL_PREFIX>/<file>`` to a file under QUESTION_IMAGE_DIR."""
-        if not image_url or cls._is_remote_image_url(image_url):
-            return None
-        prefix = str(QUESTION_IMAGE_URL_PREFIX or "").rstrip("/")
-        path = unquote(urlsplit(image_url).path or image_url)
-        if not prefix or not path.startswith(prefix + "/"):
-            return None
-        # Only the basename is used so ".." segments cannot escape the storage directory.
-        filename = Path(path[len(prefix):].lstrip("/")).name
-        if not filename:
-            return None
-        return Path(QUESTION_IMAGE_DIR) / filename
-
     @staticmethod
     def _download_remote_image(image_url: str) -> Optional[bytes]:
         """Download a remote image with a short timeout and a hard size cap (None on failure)."""
@@ -598,18 +581,23 @@ class PdfExportService:
         if image_url in cache:
             return cache[image_url]
         data: Optional[bytes] = None
-        local_path = cls._local_image_path(image_url)
-        if local_path is not None:
-            try:
-                if local_path.is_file() and 0 < local_path.stat().st_size <= MAX_IMAGE_BYTES:
-                    data = local_path.read_bytes()
-                else:
-                    print(f"Warning: Question image not found or too large: {local_path}")
-            except OSError as exc:
-                print(f"Warning: Could not read question image {local_path}: {exc}")
-                data = None
-        elif cls._is_remote_image_url(image_url):
-            data = cls._download_remote_image(image_url)
+        try:
+            data = read_bytes_from_url(image_url)
+        except FileNotFoundError:
+            # Not in our storage: absolute URLs may still be fetched over HTTP.
+            if cls._is_remote_image_url(image_url):
+                data = cls._download_remote_image(image_url)
+            else:
+                print(f"Warning: Question image not found: {image_url}")
+        except RuntimeError:
+            # Storage misconfiguration (e.g. R2 credentials missing) must be visible.
+            raise
+        except Exception as exc:
+            print(f"Warning: Could not read question image {image_url}: {exc}")
+            data = None
+        if data is not None and (not data or len(data) > MAX_IMAGE_BYTES):
+            print(f"Warning: Question image is empty or too large: {image_url}")
+            data = None
         cache[image_url] = data
         return data
 
@@ -646,7 +634,7 @@ class PdfExportService:
         if not isinstance(image_url, str) or not image_url.strip():
             return []
         image_url = image_url.strip()
-        if cls._local_image_path(image_url) is None and not cls._is_remote_image_url(image_url):
+        if not cls._is_remote_image_url(image_url) and not image_url.startswith("/"):
             return []  # unsupported URL form: nothing to embed
         data = cls._load_image_bytes(image_url, cache)
         flowable = cls._build_image_flowable(data) if data else None

@@ -6,6 +6,7 @@
 
 import io
 import uuid
+from pathlib import Path
 from types import SimpleNamespace
 
 import httpx
@@ -28,6 +29,14 @@ def _png_bytes(size=(160, 90), color=(180, 40, 40)):
 def _write_png(path, size=(160, 90)):
     path.write_bytes(_png_bytes(size=size))
     return path
+
+
+def _patch_image_reader(monkeypatch, tmp_path):
+    """Make the PDF exporter read question images from a temporary directory."""
+    def read_bytes(url):
+        return (tmp_path / Path(url).name).read_bytes()
+
+    monkeypatch.setattr(pdf_export_service, "read_bytes_from_url", read_bytes)
 
 
 def _option(order, content, is_correct=False):
@@ -79,7 +88,7 @@ def _pdf_text(doc):
 def test_pdf_embeds_question_image_and_markdown_table(tmp_path, monkeypatch):
     """A question image and a GFM table both end up in the generated PDF."""
     _write_png(tmp_path / "figure.png")
-    monkeypatch.setattr(pdf_export_service, "QUESTION_IMAGE_DIR", tmp_path)
+    _patch_image_reader(monkeypatch, tmp_path)
 
     content = (
         "Cho bảng số liệu sau:\n"
@@ -110,7 +119,7 @@ def test_pdf_embeds_question_image_and_markdown_table(tmp_path, monkeypatch):
 def test_large_question_image_is_scaled(tmp_path, monkeypatch):
     """Oversized images are scaled proportionally to max 480x300pt."""
     _write_png(tmp_path / "big.png", size=(2000, 1500))
-    monkeypatch.setattr(pdf_export_service, "QUESTION_IMAGE_DIR", tmp_path)
+    _patch_image_reader(monkeypatch, tmp_path)
 
     question = _question(1, "Hình minh họa kèm theo.", image_url="/uploads/questions/big.png",
                          options=_mc_options())
@@ -131,7 +140,7 @@ def test_large_question_image_is_scaled(tmp_path, monkeypatch):
 
 def test_missing_question_image_does_not_break_pdf(tmp_path, monkeypatch):
     """A missing local image adds a warning line but the PDF is still produced."""
-    monkeypatch.setattr(pdf_export_service, "QUESTION_IMAGE_DIR", tmp_path)
+    _patch_image_reader(monkeypatch, tmp_path)
 
     question = _question(1, "Nội dung câu hỏi không có ảnh.",
                          image_url="/uploads/questions/does_not_exist.png",
@@ -150,7 +159,7 @@ def test_missing_question_image_does_not_break_pdf(tmp_path, monkeypatch):
 
 def test_invalid_markdown_table_renders_as_text(tmp_path, monkeypatch):
     """A pipe block without a valid separator is rendered as plain text, not a table."""
-    monkeypatch.setattr(pdf_export_service, "QUESTION_IMAGE_DIR", tmp_path)
+    _patch_image_reader(monkeypatch, tmp_path)
 
     content = (
         "| Chỉ tiêu | Giá trị |\n"
@@ -173,7 +182,7 @@ def test_invalid_markdown_table_renders_as_text(tmp_path, monkeypatch):
 def test_local_image_never_hits_the_network(tmp_path, monkeypatch):
     """Local /uploads/questions images are read from disk without any HTTP call."""
     _write_png(tmp_path / "local.png")
-    monkeypatch.setattr(pdf_export_service, "QUESTION_IMAGE_DIR", tmp_path)
+    _patch_image_reader(monkeypatch, tmp_path)
 
     def exploding_get(*args, **kwargs):
         raise AssertionError("httpx.get must not be called for local images")
@@ -246,7 +255,7 @@ def test_absolute_image_url_failure_adds_warning(tmp_path, monkeypatch):
 
 def test_table_in_content_markdown_is_rendered(tmp_path, monkeypatch):
     """Tables carried by content_markdown are parsed when content itself has none."""
-    monkeypatch.setattr(pdf_export_service, "QUESTION_IMAGE_DIR", tmp_path)
+    _patch_image_reader(monkeypatch, tmp_path)
 
     question = _question(
         1,
@@ -272,7 +281,7 @@ def test_table_in_content_markdown_is_rendered(tmp_path, monkeypatch):
 
 def test_latex_and_table_coexist(tmp_path, monkeypatch):
     """Inline LaTeX still renders (as images) alongside a markdown table."""
-    monkeypatch.setattr(pdf_export_service, "QUESTION_IMAGE_DIR", tmp_path)
+    _patch_image_reader(monkeypatch, tmp_path)
 
     content = (
         "Cho hàm số $y = x^2$.\n"
@@ -297,7 +306,7 @@ def test_latex_and_table_coexist(tmp_path, monkeypatch):
 
 def test_exercise_title_and_duration_are_used(tmp_path, monkeypatch):
     """The exercise title and ai_metadata duration replace the hardcoded header."""
-    monkeypatch.setattr(pdf_export_service, "QUESTION_IMAGE_DIR", tmp_path)
+    _patch_image_reader(monkeypatch, tmp_path)
 
     question = _question(1, "Câu hỏi kiểm tra tiêu đề.", options=_mc_options())
     exercise = _exercise([question], title="Đề kiểm tra giữa kỳ", ai_metadata={"duration_minutes": 45})
@@ -315,7 +324,7 @@ def test_exercise_title_and_duration_are_used(tmp_path, monkeypatch):
 
 def test_table_segment_is_rendered_when_content_has_none(tmp_path, monkeypatch):
     """A table stripped from the stem into q.segments is still rendered."""
-    monkeypatch.setattr(pdf_export_service, "QUESTION_IMAGE_DIR", tmp_path)
+    _patch_image_reader(monkeypatch, tmp_path)
 
     question = _question(1, "Cho bảng số liệu:", options=_mc_options())
     question.segments = [
@@ -336,7 +345,7 @@ def test_table_segment_is_rendered_when_content_has_none(tmp_path, monkeypatch):
 
 def test_table_is_not_duplicated_when_content_and_segments_both_have_it(tmp_path, monkeypatch):
     """The segment table is skipped when the stem already renders the same table."""
-    monkeypatch.setattr(pdf_export_service, "QUESTION_IMAGE_DIR", tmp_path)
+    _patch_image_reader(monkeypatch, tmp_path)
 
     table = "| Chỉ tiêu | Giá trị |\n| --- | --- |\n| A | 1 |"
     question = _question(1, f"Cho bảng:\n{table}", options=_mc_options())

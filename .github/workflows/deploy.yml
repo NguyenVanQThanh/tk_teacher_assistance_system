@@ -1,0 +1,221 @@
+# CD: push lên branch `prod` -> GitHub build 2 image -> push GHCR -> deploy lên server.
+#
+# Server KHÔNG cần git clone, KHÔNG cần source code. Nó chỉ cần:
+#   /opt/smartlms/deploy/.env.prod     (secrets, tạo tay 1 lần)
+#   /opt/smartlms/sgk_data/            (2.1 GB, upload 1 lần bằng deploy-remote.ps1)
+#
+# sshd trên server KHÔNG mở ra Internet: chỉ vào được qua Cloudflare Access
+# (ssh-staging.vnexus.io.vn). Vì vậy job deploy cài cloudflared và dùng
+# ProxyCommand thay vì kết nối TCP thẳng. Xác thực không tương tác bằng
+# SERVICE TOKEN của Cloudflare Zero Trust (không phải browser/SSO).
+#
+# Secrets bắt buộc (Settings > Secrets and variables > Actions):
+#   DEPLOY_HOST             hostname SSH qua Access (vd ssh-staging.vnexus.io.vn)
+#                           KHÔNG phải IP server — IP vẫn bị tunnel che
+#   DEPLOY_USER             user SSH (vd thanhnvq)
+#   DEPLOY_SSH_KEY          private key (public key đã nằm trong ~/.ssh/authorized_keys)
+#   DEPLOY_PATH             thư mục project trên server (vd /opt/smartlms)
+#   CF_ACCESS_CLIENT_ID     Cloudflare Zero Trust > Access > Service Auth > Client ID
+#   CF_ACCESS_CLIENT_SECRET Client Secret tương ứng
+#
+# Secrets cho account Admin chính (khuyến nghị đặt — xem backend/app/scripts/bootstrap_admin.py):
+#   ADMIN_PHONE     số điện thoại đăng nhập (login bằng phone, KHÔNG phải email)
+#   ADMIN_PASSWORD  mật khẩu >= 8 ký tự, không được là placeholder trong .env.prod.example
+#   ADMIN_EMAIL     tuỳ chọn
+#   ADMIN_FULL_NAME tuỳ chọn (mặc định "System Administrator")
+#   Khi có secret, workflow ghi đè đúng key đó trong deploy/.env.prod trên server.
+#   Secret rỗng => giữ nguyên giá trị đang có trong .env.prod (không xoá).
+#
+# Secrets cho lưu trữ file upload trên Cloudflare R2 (xem deploy/PLAN-R2-STORAGE.md):
+#   STORAGE_BACKEND       local (mặc định) | r2
+#   R2_ACCOUNT_ID         Cloudflare account ID
+#   R2_ACCESS_KEY_ID      access key của R2 API token
+#   R2_SECRET_ACCESS_KEY  secret key của R2 API token
+#   R2_BUCKET             tên bucket (vd smartlms-tk)
+#   R2_PUBLIC_BASE_URL    domain public của bucket (custom domain hoặc *.r2.dev)
+#   Cùng quy tắc: secret rỗng => giữ nguyên .env.prod. Nếu STORAGE_BACKEND là r2
+#   mà thiếu bất kỳ R2_* nào thì deploy DỪNG trước khi restart.
+#
+# Secret tuỳ chọn:
+#   GHCR_PAT        PAT quyền read:packages — chỉ cần khi package để private
+# Variable tuỳ chọn:
+#   DEPLOY_PROFILE  profile compose: tunnel (mặc định) | proxy | quick
+name: deploy
+
+on:
+  push:
+    branches: [prod]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  packages: write
+
+concurrency:
+  group: deploy-prod
+  cancel-in-progress: false
+
+env:
+  REGISTRY: ghcr.io
+  # Pin cloudflared: bản 2026.6.0 có regression làm service token bị bỏ qua và
+  # cloudflared quay sang browser auth (cloudflare/cloudflared#1673) -> treo CI.
+  CLOUDFLARED_VERSION: "2026.5.1"
+
+jobs:
+  build-and-push:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Compute image names
+        id: meta
+        run: |
+          # GHCR yêu cầu tên image VIẾT THƯỜNG; github.repository_owner có thể có chữ hoa.
+          OWNER=$(echo "${{ github.repository_owner }}" | tr '[:upper:]' '[:lower:]')
+          echo "owner=$OWNER" >> "$GITHUB_OUTPUT"
+
+      - uses: docker/setup-buildx-action@v3
+
+      - name: Login to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build & push backend
+        uses: docker/build-push-action@v6
+        with:
+          context: ./backend
+          push: true
+          tags: |
+            ${{ env.REGISTRY }}/${{ steps.meta.outputs.owner }}/smartlms-backend:${{ github.sha }}
+            ${{ env.REGISTRY }}/${{ steps.meta.outputs.owner }}/smartlms-backend:latest
+          cache-from: type=gha,scope=backend
+          cache-to: type=gha,mode=max,scope=backend
+
+      - name: Build & push frontend
+        uses: docker/build-push-action@v6
+        with:
+          context: ./frontend
+          file: ./deploy/docker/Dockerfile.frontend.prod
+          build-args: |
+            VITE_API_BASE_URL=/api
+          push: true
+          tags: |
+            ${{ env.REGISTRY }}/${{ steps.meta.outputs.owner }}/smartlms-frontend:${{ github.sha }}
+            ${{ env.REGISTRY }}/${{ steps.meta.outputs.owner }}/smartlms-frontend:latest
+          cache-from: type=gha,scope=frontend
+          cache-to: type=gha,mode=max,scope=frontend
+
+  deploy:
+    needs: build-and-push
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install cloudflared
+        run: |
+          set -euo pipefail
+          mkdir -p "$HOME/.local/bin"
+          curl -fsSL -o "$HOME/.local/bin/cloudflared" \
+            "https://github.com/cloudflare/cloudflared/releases/download/${CLOUDFLARED_VERSION}/cloudflared-linux-amd64"
+          chmod +x "$HOME/.local/bin/cloudflared"
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+          "$HOME/.local/bin/cloudflared" --version
+
+      - name: Configure SSH over Cloudflare Access
+        env:
+          DEPLOY_SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+          DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
+          DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
+        run: |
+          set -euo pipefail
+          mkdir -p ~/.ssh && chmod 700 ~/.ssh
+          printf '%s\n' "$DEPLOY_SSH_KEY" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          # ProxyCommand: cloudflared mở kết nối tới Access, Access forward sang sshd.
+          # StrictHostKeyChecking accept-new: runner mới mỗi lần nên chưa có known_hosts.
+          cat > ~/.ssh/config <<EOF
+          Host smartlms
+            HostName $DEPLOY_HOST
+            User $DEPLOY_USER
+            IdentityFile ~/.ssh/deploy_key
+            IdentitiesOnly yes
+            ProxyCommand cloudflared access ssh --hostname %h
+            StrictHostKeyChecking accept-new
+            ServerAliveInterval 15
+            ServerAliveCountMax 8
+          EOF
+          chmod 600 ~/.ssh/config
+
+      - name: Export Cloudflare Access service token
+        env:
+          CF_ACCESS_CLIENT_ID: ${{ secrets.CF_ACCESS_CLIENT_ID }}
+          CF_ACCESS_CLIENT_SECRET: ${{ secrets.CF_ACCESS_CLIENT_SECRET }}
+        run: |
+          set -euo pipefail
+          if [ -z "$CF_ACCESS_CLIENT_ID" ] || [ -z "$CF_ACCESS_CLIENT_SECRET" ]; then
+            echo "ERROR: thieu secret CF_ACCESS_CLIENT_ID / CF_ACCESS_CLIENT_SECRET"
+            exit 1
+          fi
+          # cloudflared đọc 2 biến này để xác thực Access không tương tác.
+          {
+            echo "TUNNEL_SERVICE_TOKEN_ID=$CF_ACCESS_CLIENT_ID"
+            echo "TUNNEL_SERVICE_TOKEN_SECRET=$CF_ACCESS_CLIENT_SECRET"
+          } >> "$GITHUB_ENV"
+
+      # Gom biến vào 1 file rồi scp — tránh quoting khi truyền qua ssh.
+      - name: Build remote env overrides
+        env:
+          IMAGE_TAG: ${{ github.sha }}
+          GHCR_USER: ${{ github.actor }}
+          GHCR_TOKEN: ${{ secrets.GHCR_PAT || secrets.GITHUB_TOKEN }}
+          PROFILE: ${{ vars.DEPLOY_PROFILE || 'tunnel' }}
+          ADMIN_PHONE: ${{ secrets.ADMIN_PHONE }}
+          ADMIN_PASSWORD: ${{ secrets.ADMIN_PASSWORD }}
+          ADMIN_EMAIL: ${{ secrets.ADMIN_EMAIL }}
+          ADMIN_FULL_NAME: ${{ secrets.ADMIN_FULL_NAME }}
+          STORAGE_BACKEND: ${{ secrets.STORAGE_BACKEND }}
+          R2_ACCOUNT_ID: ${{ secrets.R2_ACCOUNT_ID }}
+          R2_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+          R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+          R2_BUCKET: ${{ secrets.R2_BUCKET }}
+          R2_PUBLIC_BASE_URL: ${{ secrets.R2_PUBLIC_BASE_URL }}
+        run: |
+          set -euo pipefail
+          umask 077
+          : > /tmp/deploy.env
+          for name in IMAGE_TAG GHCR_USER GHCR_TOKEN PROFILE \
+                      ADMIN_PHONE ADMIN_PASSWORD ADMIN_EMAIL ADMIN_FULL_NAME \
+                      STORAGE_BACKEND R2_ACCOUNT_ID R2_ACCESS_KEY_ID R2_SECRET_ACCESS_KEY \
+                      R2_BUCKET R2_PUBLIC_BASE_URL; do
+            val="${!name:-}"
+            if [ -n "$val" ]; then
+              printf '%s=%s\n' "$name" "$val" >> /tmp/deploy.env
+            fi
+          done
+          echo "thu duoc $(wc -l < /tmp/deploy.env) bien"
+
+      # Chỉ đồng bộ file cấu hình — không đẩy source code lên server.
+      - name: Sync config + deploy script to server
+        env:
+          DEPLOY_PATH: ${{ secrets.DEPLOY_PATH }}
+        run: |
+          set -euo pipefail
+          ssh smartlms "mkdir -p '$DEPLOY_PATH/deploy/nginx' '$DEPLOY_PATH/deploy/scripts' '$DEPLOY_PATH/postgres-init'"
+          scp deploy/docker-compose.images.yml smartlms:"$DEPLOY_PATH/deploy/docker-compose.images.yml"
+          scp deploy/nginx/nginx.conf           smartlms:"$DEPLOY_PATH/deploy/nginx/nginx.conf"
+          scp postgres-init/01_extensions.sql   smartlms:"$DEPLOY_PATH/postgres-init/01_extensions.sql"
+          scp deploy/scripts/remote-deploy.sh   smartlms:"$DEPLOY_PATH/deploy/scripts/remote-deploy.sh"
+          scp /tmp/deploy.env                   smartlms:"$DEPLOY_PATH/.deploy.env"
+
+      - name: Pull new images and restart
+        env:
+          DEPLOY_PATH: ${{ secrets.DEPLOY_PATH }}
+        run: |
+          set -euo pipefail
+          # sed phòng trường hợp file bị checkout với CRLF (script sh sẽ chết vì \r).
+          ssh smartlms "sed -i 's/\r\$//' '$DEPLOY_PATH/deploy/scripts/remote-deploy.sh' && bash '$DEPLOY_PATH/deploy/scripts/remote-deploy.sh' '$DEPLOY_PATH'"

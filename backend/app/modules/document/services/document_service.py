@@ -16,6 +16,8 @@ from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from models.models import Document, Subject, User, Role
+from app.core.config import UPLOAD_ROOT
+from app.core.storage import get_storage, is_remote_backend
 from app.modules.auth import access_policy
 from app.modules.document.services.document_ingest_service import DocumentIngestService
 from app.modules.document.schemas import (
@@ -24,8 +26,10 @@ from app.modules.document.schemas import (
     ALLOWED_GRADES, ALLOWED_DOCUMENT_TYPES
 )
 
-UPLOAD_DIR = Path("uploads/documents")
-UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
+# Kept for backwards compatibility with modules/tests that import the old upload directory.
+UPLOAD_DIR = Path(UPLOAD_ROOT) / "documents"
+if not is_remote_backend():
+    UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
 
 
 def format_storage_size(bytes_val: int) -> str:
@@ -88,6 +92,53 @@ class DocumentService:
             )
 
     @staticmethod
+    def _storage_key(file_url: Optional[str]) -> Optional[str]:
+        """Resolve a stored document URL to a storage key (legacy rows may hold only a basename)."""
+        if not file_url:
+            return None
+        storage = get_storage()
+        key = storage.key_from_url(file_url)
+        if key is None:
+            # Older rows/tests stored only the filename; keep resolving it under documents/.
+            name = Path(file_url).name
+            key = f"documents/{name}" if name and name not in (".", "..") else None
+        return key
+
+    @staticmethod
+    def read_file_bytes(file_url: Optional[str]) -> bytes:
+        """Read a document's bytes from the configured storage backend."""
+        key = DocumentService._storage_key(file_url)
+        if not key:
+            raise FileNotFoundError(f"Unsupported document URL: {file_url!r}")
+        try:
+            return get_storage().get(key)
+        except ValueError as exc:
+            raise FileNotFoundError(f"Invalid document key: {key!r}") from exc
+
+    @staticmethod
+    def file_exists(file_url: Optional[str]) -> bool:
+        """True when the stored object for ``file_url`` exists in the active backend."""
+        key = DocumentService._storage_key(file_url)
+        if not key:
+            return False
+        try:
+            return get_storage().exists(key)
+        except Exception:
+            # A backend error must not turn a download into a 500; report "not found".
+            return False
+
+    @staticmethod
+    def _file_size(file_url: Optional[str]) -> int:
+        """Best-effort stored file size (0 when the object is missing/unreadable)."""
+        key = DocumentService._storage_key(file_url)
+        if not key:
+            return 0
+        try:
+            return get_storage().size(key)
+        except Exception:
+            return 0
+
+    @staticmethod
     def to_document_out(
         doc: Document,
         db: Session,
@@ -105,9 +156,7 @@ class DocumentService:
 
         size = doc.file_size or 0
         if size == 0 and doc.file_url:
-            disk_path = UPLOAD_DIR / Path(doc.file_url).name
-            if disk_path.exists():
-                size = disk_path.stat().st_size
+            size = DocumentService._file_size(doc.file_url)
 
         return DocumentOut(
             document_id=doc.document_id,
@@ -166,7 +215,8 @@ class DocumentService:
             )
 
         stored_filename = f"{uuid.uuid4()}{file_ext}"
-        target_path = UPLOAD_DIR / stored_filename
+        storage = get_storage()
+        storage_key = f"documents/{stored_filename}"
 
         file_bytes = file.file.read()
         file_size = len(file_bytes)
@@ -193,15 +243,14 @@ class DocumentService:
                 }
             )
 
-        with open(target_path, "wb") as f:
-            f.write(file_bytes)
+        storage.put(storage_key, file_bytes, content_type=file.content_type or "application/octet-stream")
 
         doc = Document(
             document_id=uuid.uuid4(),
             uploaded_by=current_user.user_id,
             subject_id=subject_id,
             title=title.strip(),
-            file_url=f"/uploads/documents/{stored_filename}",
+            file_url=storage.url(storage_key),
             file_type=file_ext.replace(".", "").lower(),
             file_size=file_size,
             file_hash=file_hash,
@@ -417,9 +466,7 @@ class DocumentService:
             if d.file_size:
                 total_storage_bytes += d.file_size
             elif d.file_url:
-                disk_path = UPLOAD_DIR / Path(d.file_url).name
-                if disk_path.exists():
-                    total_storage_bytes += disk_path.stat().st_size
+                total_storage_bytes += DocumentService._file_size(d.file_url)
 
         storage_formatted = format_storage_size(total_storage_bytes)
 
