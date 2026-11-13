@@ -27,6 +27,10 @@ EPOCH_VERSION = "1970-01-01T00:00:00Z"
 CACHE_TTL_SECONDS = 2.0
 
 _cache_lock = threading.Lock()
+# Serializes cache misses so a burst of 30 concurrent GETs opens at most one extra DB
+# session for the version snapshot instead of one per request (which would exhaust the
+# connection pool while every request still holds its own session).
+_compute_lock = threading.Lock()
 _cache: Dict[str, Any] = {"expires_at": 0.0, "payload": None}
 
 
@@ -119,17 +123,27 @@ def get_cached_version_snapshot(db: Optional[Session] = None) -> Dict[str, Any]:
         if cached is not None and now < _cache["expires_at"]:
             return cached
 
-    own_session = db is None
-    if own_session:
-        from app.core.database import SessionLocal
-        db = SessionLocal()
-    try:
-        payload = SyncService(db).get_version_snapshot()
-    finally:
-        if own_session:
-            db.close()
+    # Cache miss: only one thread computes while the others wait, then re-check the cache.
+    # Without this, a 30-request burst opens 30 extra sessions on top of the 30 request
+    # sessions and every request waits pool_timeout (observed as a ~10s p99).
+    with _compute_lock:
+        now = time.monotonic()
+        with _cache_lock:
+            cached = _cache["payload"]
+            if cached is not None and now < _cache["expires_at"]:
+                return cached
 
-    with _cache_lock:
-        _cache["payload"] = payload
-        _cache["expires_at"] = time.monotonic() + CACHE_TTL_SECONDS
-    return payload
+        own_session = db is None
+        if own_session:
+            from app.core.database import SessionLocal
+            db = SessionLocal()
+        try:
+            payload = SyncService(db).get_version_snapshot()
+        finally:
+            if own_session:
+                db.close()
+
+        with _cache_lock:
+            _cache["payload"] = payload
+            _cache["expires_at"] = time.monotonic() + CACHE_TTL_SECONDS
+        return payload

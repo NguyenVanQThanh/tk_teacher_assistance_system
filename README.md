@@ -103,3 +103,13 @@ Chạy test suite cho Backend:
 cd backend
 pytest
 ```
+
+---
+
+## 4. Tài liệu vận hành
+
+- [`docs/performance.md`](docs/performance.md) — tối ưu 30 user đồng thời, RAM 5 GB,
+  connection pool, load test, Nginx/CDN.
+- [`docs/monitoring.md`](docs/monitoring.md) — module giám sát API realtime,
+  dashboard `/admin/monitoring`, SSE, retention.
+- [`deploy/README.md`](deploy/README.md) — triển khai production, Nginx, RAM budget.

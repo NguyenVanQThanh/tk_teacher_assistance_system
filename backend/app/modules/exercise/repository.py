@@ -381,6 +381,29 @@ class AttemptRepository:
             StudentExerciseAttempt.status != 'DELETED'
         ).first()
 
+    def find_latest_attempt(self, student_id: UUID, assignment_id: UUID) -> Optional[StudentExerciseAttempt]:
+        """Find the student's most recent attempt (open OR finished) for an assignment.
+
+        Used to resolve the display-shuffle seed of the student paper: resume and review must
+        reproduce the exact question/option order of the attempt they belong to. An open attempt
+        always wins (only one may exist at a time and it is the paper being worked on), otherwise
+        the most recently ended/created attempt is returned.
+        """
+        return self.db.query(StudentExerciseAttempt).filter(
+            StudentExerciseAttempt.student_id == student_id,
+            StudentExerciseAttempt.assignment_id == assignment_id,
+            StudentExerciseAttempt.status != 'DELETED'
+        ).order_by(
+            StudentExerciseAttempt.is_finished.asc(),
+            func.coalesce(
+                StudentExerciseAttempt.end_time,
+                StudentExerciseAttempt.start_time,
+                StudentExerciseAttempt.created_at
+            ).desc(),
+            StudentExerciseAttempt.created_at.desc(),
+            StudentExerciseAttempt.attempt_id.desc()
+        ).first()
+
     def update(self, attempt: StudentExerciseAttempt) -> StudentExerciseAttempt:
         """Commit changes to an existing StudentExerciseAttempt."""
         self.db.commit()

@@ -77,6 +77,7 @@ export default function AdminLayout() {
     if (path.startsWith('/admin/classes')) return 'Quản lý trường lớp';
     if (path.startsWith('/admin/roles')) return 'Phân quyền & Vai trò';
     if (path.startsWith('/admin/reports')) return 'Báo cáo & Thống kê';
+    if (path.startsWith('/admin/monitoring')) return 'Giám sát hệ thống';
     if (path.startsWith('/admin/settings')) return 'Cài đặt hệ thống';
     return null;
   };

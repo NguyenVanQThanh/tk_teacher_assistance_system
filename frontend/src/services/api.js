@@ -431,6 +431,14 @@ export const adminDashboardApi = {
   },
 };
 
+// Admin-only realtime monitoring API. The SSE stream is consumed with fetch() in
+// AdminMonitoringPage because EventSource cannot attach the Authorization header.
+export const monitoringApi = {
+  getSummary: async (windowSeconds = 300) => (await api.get('/api/v1/admin/monitoring/summary', { params: { window_seconds: windowSeconds } })).data,
+  getRequests: async (params = {}) => (await api.get('/api/v1/admin/monitoring/requests', { params })).data,
+  getHealth: async () => (await api.get('/api/v1/admin/monitoring/health')).data,
+};
+
 export const studentApi = {
   getDashboard: async () => {
     const response = await api.get('/api/v1/student/dashboard');

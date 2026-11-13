@@ -2,6 +2,16 @@ FROM python:3.11-slim
 
 WORKDIR /app
 
+# Runtime hygiene for a memory-capped container:
+#  - unbuffered logs so docker logs are useful immediately
+#  - no .pyc writes (source is bind-mounted in dev)
+#  - MALLOC_ARENA_MAX=2 limits glibc per-thread arenas (less RSS fragmentation
+#    when FastAPI's threadpool runs blocking PDF/ETL work)
+ENV PYTHONUNBUFFERED=1 \
+    PYTHONDONTWRITEBYTECODE=1 \
+    MALLOC_ARENA_MAX=2 \
+    PIP_DISABLE_PIP_VERSION_CHECK=1
+
 # Install system dependencies (postgresql-client-16 provides pg_restore/psql for the SGK RAG load)
 RUN apt-get update && apt-get install -y --no-install-recommends \
     build-essential \

@@ -736,3 +736,278 @@ class TestReviewHardening:
         for leaked in ("topic_prompt", "document_ids", "part1_count"):
             assert leaked not in meta
         assert "SECRET PROMPT" not in resp.text
+
+
+# =====================================================================
+# DISPLAY SHUFFLE — per-attempt question/MultipleChoice-option order
+# (display-only alias; questions/answer_options rows in the DB never change)
+# =====================================================================
+
+def _create_shuffle_assignment(client: TestClient, setup: dict, max_attempts=None) -> str:
+    """Create an assignment for the fixture exercise, optionally overriding max_attempts."""
+    due_time = (datetime.now(timezone.utc) + timedelta(days=7)).isoformat()
+    payload = {"exercise_id": setup["exercise_id"], "due_at": due_time}
+    if max_attempts is not None:
+        payload["max_attempts"] = max_attempts
+    resp = client.post(
+        f"/api/v1/classes/{setup['class_id']}/assignments",
+        json=payload,
+        headers=setup["teacher_headers"],
+    )
+    assert resp.status_code == status.HTTP_201_CREATED, resp.text
+    return resp.json()["assignment_id"]
+
+
+def _add_multiple_choice_question(client: TestClient, setup: dict, index: int) -> str:
+    """Add one MultipleChoice question (2 options) to the fixture exercise."""
+    resp = client.post(
+        f"/api/v1/exercises/{setup['exercise_id']}/questions",
+        json={
+            "content": f"Shuffle question {index}",
+            "question_type": "MultipleChoice",
+            "display_order": 100 + index,
+            "answer_options": [
+                {"content": f"Q{index} option A", "is_correct": False, "display_order": 1},
+                {"content": f"Q{index} option B", "is_correct": True, "display_order": 2},
+            ],
+        },
+        headers=setup["teacher_headers"],
+    )
+    assert resp.status_code == status.HTTP_201_CREATED, resp.text
+    return resp.json()["question_id"]
+
+
+def _start_attempt(client: TestClient, assignment_id: str, headers: dict) -> str:
+    resp = client.post(f"/api/v1/assignments/{assignment_id}/attempts", headers=headers)
+    assert resp.status_code == status.HTTP_201_CREATED, resp.text
+    return resp.json()["attempt_id"]
+
+
+def _get_taking(client: TestClient, assignment_id: str, headers: dict) -> dict:
+    resp = client.get(f"/api/v1/assignments/{assignment_id}/taking", headers=headers)
+    assert resp.status_code == status.HTTP_200_OK, resp.text
+    return resp.json()
+
+
+def _display_signature(body: dict):
+    """Ordered question ids + ordered option ids per question, exactly as displayed."""
+    return (
+        [q["question_id"] for q in body["questions"]],
+        {
+            q["question_id"]: [o["option_id"] for o in q["answer_options"]]
+            for q in body["questions"]
+        },
+    )
+
+
+def _db_paper_order(db_session, exercise_id: str):
+    """Persisted order: question display_order, option display_order, and option order per question."""
+    from sqlalchemy.orm import joinedload
+    from models.models import Question
+
+    db_session.expire_all()
+    questions = (
+        db_session.query(Question)
+        .options(joinedload(Question.answer_options))
+        .filter(Question.exercise_id == uuid.UUID(exercise_id))
+        .all()
+    )
+    q_orders = {str(q.question_id): q.display_order for q in questions}
+    o_orders = {str(o.option_id): o.display_order for q in questions for o in q.answer_options}
+    o_by_q = {
+        str(q.question_id): [str(o.option_id) for o in q.answer_options]
+        for q in questions
+    }
+    return q_orders, o_orders, o_by_q
+
+
+class TestDisplayShuffle:
+    def test_shuffle_is_stable_for_same_attempt(self, client: TestClient, db_session, exam_setup: dict):
+        setup = exam_setup
+        sh = setup["student_headers"]
+        assignment_id = _create_shuffle_assignment(client, setup)
+        _start_attempt(client, assignment_id, sh)
+
+        first = _get_taking(client, assignment_id, sh)
+        second = _get_taking(client, assignment_id, sh)
+
+        # Same attempt -> identical question/option order on every reload.
+        assert _display_signature(first) == _display_signature(second)
+
+        # display_order is a 1-based alias over the shuffled display order.
+        assert [q["display_order"] for q in first["questions"]] == list(
+            range(1, len(first["questions"]) + 1)
+        )
+        for q in first["questions"]:
+            if q["question_type"] == "MultipleChoice":
+                assert [o["display_order"] for o in q["answer_options"]] == list(
+                    range(1, len(q["answer_options"]) + 1)
+                )
+
+        # Every DB question/option appears exactly once (nothing lost, nothing duplicated).
+        q_orders, _o_orders, o_by_q = _db_paper_order(db_session, setup["exercise_id"])
+        assert {q["question_id"] for q in first["questions"]} == set(q_orders)
+        for q in first["questions"]:
+            displayed = [o["option_id"] for o in q["answer_options"]]
+            assert len(displayed) == len(set(displayed))
+            assert set(displayed) == set(o_by_q[q["question_id"]])
+
+    def test_shuffle_differs_between_attempts(self, client: TestClient, db_session, exam_setup: dict):
+        setup = exam_setup
+        sh = setup["student_headers"]
+        # 7 MultipleChoice questions + 1 ShortAnswer: two independent seeds colliding on the exact
+        # same question+option order is ~1/8! * 1/2^7, i.e. effectively impossible.
+        for i in range(6):
+            _add_multiple_choice_question(client, setup, i)
+        assignment_id = _create_shuffle_assignment(client, setup, max_attempts=3)
+
+        att1 = _start_attempt(client, assignment_id, sh)
+        first = _get_taking(client, assignment_id, sh)
+        sub = client.put(f"/api/v1/attempts/{att1}/submit", json={"answers": []}, headers=sh)
+        assert sub.status_code == status.HTTP_200_OK, sub.text
+
+        att2 = _start_attempt(client, assignment_id, sh)
+        second = _get_taking(client, assignment_id, sh)
+
+        # Each attempt owns a random seed stored in the existing detailed_results JSON column.
+        from models.models import StudentExerciseAttempt
+
+        db_session.expire_all()
+        attempts = (
+            db_session.query(StudentExerciseAttempt)
+            .filter(StudentExerciseAttempt.attempt_id.in_([uuid.UUID(att1), uuid.UUID(att2)]))
+            .all()
+        )
+        seeds = {
+            str(a.attempt_id): (a.detailed_results or {}).get("shuffle_seed")
+            for a in attempts
+        }
+        assert seeds[att1] and seeds[att2]
+        assert seeds[att1] != seeds[att2]
+
+        assert _display_signature(first) != _display_signature(second)
+
+    def test_shuffle_review_keeps_attempt_order(self, client: TestClient, exam_setup: dict):
+        setup = exam_setup
+        sh = setup["student_headers"]
+        assignment_id = _create_shuffle_assignment(client, setup)
+        att = _start_attempt(client, assignment_id, sh)
+        during = _get_taking(client, assignment_id, sh)
+
+        sub = client.put(f"/api/v1/attempts/{att}/submit", json={"answers": []}, headers=sh)
+        assert sub.status_code == status.HTTP_200_OK, sub.text
+
+        # Reviewing the submitted attempt (paper endpoint) keeps the order seen while taking it.
+        paper = client.get(f"/api/v1/attempts/{att}/paper", headers=sh)
+        assert paper.status_code == status.HTTP_200_OK, paper.text
+        assert _display_signature(paper.json()) == _display_signature(during)
+
+        # The assignment paper of the same (now finished) attempt keeps it too.
+        review = _get_taking(client, assignment_id, sh)
+        assert _display_signature(review) == _display_signature(during)
+
+        # A teacher grade save (whose payload is rebuilt from the teacher view, i.e. without the
+        # internal seed) must not drop the seed either: review order stays identical.
+        teacher_view = client.get(f"/api/v1/attempts/{att}", headers=setup["teacher_headers"])
+        assert teacher_view.status_code == status.HTTP_200_OK, teacher_view.text
+        assert "shuffle_seed" not in (teacher_view.json().get("detailed_results") or {})
+        grade = client.put(
+            f"/api/v1/attempts/{att}/grade",
+            json={
+                "score": teacher_view.json()["score"],
+                "detailed_results": teacher_view.json()["detailed_results"],
+            },
+            headers=setup["teacher_headers"],
+        )
+        assert grade.status_code == status.HTTP_200_OK, grade.text
+        after_grade = client.get(f"/api/v1/attempts/{att}/paper", headers=sh)
+        assert after_grade.status_code == status.HTTP_200_OK, after_grade.text
+        assert _display_signature(after_grade.json()) == _display_signature(during)
+
+    def test_shuffle_does_not_change_db(self, client: TestClient, db_session, exam_setup: dict):
+        setup = exam_setup
+        sh = setup["student_headers"]
+        assignment_id = _create_shuffle_assignment(client, setup)
+        before = _db_paper_order(db_session, setup["exercise_id"])
+
+        _get_taking(client, assignment_id, sh)  # pre-start preview
+        assert _db_paper_order(db_session, setup["exercise_id"]) == before
+
+        _start_attempt(client, assignment_id, sh)
+        _get_taking(client, assignment_id, sh)  # attempt paper
+        assert _db_paper_order(db_session, setup["exercise_id"]) == before
+
+    def test_true_false_options_not_shuffled(self, client: TestClient, db_session, exam_setup: dict):
+        setup = exam_setup
+        tf_resp = client.post(
+            f"/api/v1/exercises/{setup['exercise_id']}/questions",
+            json={
+                "content": "True/False statements",
+                "question_type": "TrueFalse",
+                "display_order": 3,
+                "answer_options": [
+                    {"content": "a) Statement A", "is_correct": True, "display_order": 1},
+                    {"content": "b) Statement B", "is_correct": False, "display_order": 2},
+                    {"content": "c) Statement C", "is_correct": True, "display_order": 3},
+                    {"content": "d) Statement D", "is_correct": False, "display_order": 4},
+                ],
+            },
+            headers=setup["teacher_headers"],
+        )
+        assert tf_resp.status_code == status.HTTP_201_CREATED, tf_resp.text
+        tf_id = tf_resp.json()["question_id"]
+
+        sh = setup["student_headers"]
+        assignment_id = _create_shuffle_assignment(client, setup)
+        att = _start_attempt(client, assignment_id, sh)
+        body = _get_taking(client, assignment_id, sh)
+
+        # TrueFalse options keep the DB order (a/b/c/d labels are positional for grading).
+        tf = next(q for q in body["questions"] if q["question_id"] == tf_id)
+        _q_orders, o_orders, o_by_q = _db_paper_order(db_session, setup["exercise_id"])
+        assert [o["option_id"] for o in tf["answer_options"]] == o_by_q[tf_id]
+        assert [o["display_order"] for o in tf["answer_options"]] == [
+            o_orders[oid] for oid in o_by_q[tf_id]
+        ]
+
+        # Grading still maps a/b/c/d to the DB order -> the correct pattern scores full marks.
+        sub = client.put(
+            f"/api/v1/attempts/{att}/submit",
+            json={"answers": [{"question_id": tf_id, "answer_text": "a:true;b:false;c:true;d:false"}]},
+            headers=sh,
+        )
+        assert sub.status_code == status.HTTP_200_OK, sub.text
+        tf_result = next(
+            r for r in sub.json()["detailed_results"]["questions"] if r["question_id"] == tf_id
+        )
+        assert tf_result["is_correct"] is True
+        assert tf_result["points"] > 0
+
+    def test_shuffle_grading_still_correct(self, client: TestClient, exam_setup: dict):
+        setup = exam_setup
+        sh, th = setup["student_headers"], setup["teacher_headers"]
+        assignment_id = _create_shuffle_assignment(client, setup)
+        att = _start_attempt(client, assignment_id, sh)
+        body = _get_taking(client, assignment_id, sh)
+
+        # The answer key is only visible teacher-side; the student picks the displayed option id.
+        ex = client.get(f"/api/v1/exercises/{setup['exercise_id']}", headers=th).json()
+        mc = next(q for q in ex["questions"] if q["question_type"] == "MultipleChoice")
+        correct_option_id = next(o["option_id"] for o in mc["answer_options"] if o["is_correct"])
+
+        student_mc = next(q for q in body["questions"] if q["question_id"] == mc["question_id"])
+        displayed_ids = [o["option_id"] for o in student_mc["answer_options"]]
+        assert correct_option_id in displayed_ids
+
+        sub = client.put(
+            f"/api/v1/attempts/{att}/submit",
+            json={"answers": [{"question_id": mc["question_id"], "answer_option_id": correct_option_id}]},
+            headers=sh,
+        )
+        assert sub.status_code == status.HTTP_200_OK, sub.text
+        assert sub.json()["score"] > 0
+        result = next(
+            r for r in sub.json()["detailed_results"]["questions"]
+            if r["question_id"] == mc["question_id"]
+        )
+        assert result["is_correct"] is True

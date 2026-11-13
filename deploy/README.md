@@ -55,7 +55,7 @@ bash deploy/scripts/deploy.sh --proxy         # chỉ cần mở port 80 trên f
 
 Lúc đó:
 - Frontend: `http://<server-ip>/` (qua nginx) hoặc `http://<server-ip>:3000`
-- API: `http://<server-ip>/api/...` (qua nginx, đã strip prefix) — frontend được build với `VITE_API_BASE_URL=/api`
+- API: `http://<server-ip>/api/...` (qua nginx) — frontend được build với `VITE_API_BASE_URL=/api`; nginx chuẩn hoá `/api/api/v1/...` → `/api/v1/...` và chuyển nguyên path `/api/v1/...` cho FastAPI (các router đã có prefix `/api/v1`).
 - Health check: `curl http://<server-ip>/health`
 
 Nếu **không** dùng nginx proxy thì đổi `VITE_API_BASE_URL=http://<server-ip>:8000` trong `.env.prod` và publish port 8000/3000 trong compose.
@@ -89,3 +89,64 @@ bash deploy/scripts/deploy.sh --proxy        # build lại image rồi up -d
 - Đổi `SECRET_KEY` và mật khẩu DB mặc định (`123456` ở bản dev) trước khi lên production.
 - Prod compose không publish port 5432 ra ngoài; chỉ backend mới kết nối được với Postgres qua network nội bộ của compose.
 - Ảnh upload lưu ở named volume `backend_uploads` — nhớ backup volume này cùng với `postgres_data`.
+
+## Hiệu năng cho ~30 user đồng thời
+
+### RAM budget 5 GB
+
+Prod compose đặt `mem_limit` cho từng service (tổng 5.0 GB):
+
+| Service | Limit | Vai trò |
+|---|---:|---|
+| postgres | 1536 MB | shared_buffers + connection pool + pgvector |
+| backend | 2560 MB | Python/uvicorn + reportlab (PDF) + pypdfium2 (ETL) |
+| frontend | 896 MB | Node/Vite preview (thực tế dùng ít hơn) |
+| nginx | 128 MB | reverse proxy + buffer nhỏ |
+| **Tổng** | **5120 MB** | chừa thêm ~1 GB cho host OS/Docker |
+
+Nếu tăng limit của một service, phải giảm service khác — Docker OOM-kill container
+vượt limit, và backend bị kill sẽ làm rơi SSE stream + job ingest đang chạy.
+
+### Nginx (`deploy/nginx/nginx.conf`)
+
+- `gzip on` cho JSON/JS/CSS (không gzip `text/event-stream`).
+- SSE `/api/v1/sync/stream` và `/api/v1/admin/monitoring/stream`:
+  `proxy_buffering off`, `proxy_read_timeout 3600s`, `proxy_http_version 1.1`.
+- `client_max_body_size 50m` khớp `MAX_INGEST_BYTES`.
+- Ảnh `/uploads/` và `/sgk-images/` được trình duyệt cache 7 ngày
+  (`Cache-Control: public, max-age=604800, immutable`).
+- File này là server block (mount vào `conf.d`). `limit_req_zone` và
+  `proxy_cache_path` phải khai báo ở http context trong `/etc/nginx/nginx.conf`
+  nếu muốn rate limit/proxy cache ở edge; app đã rate-limit login trong
+  `app/core/rate_limit.py`.
+
+Với 30 user chỉ cần **1 Nginx reverse proxy + 1 backend worker**; không cần API
+gateway. Nếu scale lên 100+ user, tăng số uvicorn worker (mỗi worker có pool 50
+connection — kiểm tra `max_connections` của Postgres) hoặc chạy thêm backend
+replica sau Nginx. CDN chỉ nên dùng cho static assets (`/uploads/`, `/sgk-images/`,
+JS/CSS build), **không** cache API cá nhân (`Authorization`/`Cookie`).
+
+### Load test
+
+```bash
+cd backend
+..\.venv\Scripts\python.exe scripts\load_test.py \
+  --base-url http://localhost:8000 \
+  --users 30 --requests-per-user 20 \
+  --phone 0999000002 --password 'Teacher@1234'
+```
+
+Script in ra latency p50/p95/p99, RPS, error rate và JSON. Chạy trực tiếp vào backend
+(port 8000) để đo app; nếu đo qua Nginx, tắt/tăng rate limit trước.
+
+### Migration index
+
+Sau khi deploy code mới, chạy migration index (một lần):
+
+```bash
+cd backend
+..\.venv\Scripts\python.exe -m alembic upgrade head
+```
+
+Migration `f4b8c2d6e9a1_add_concurrency_indexes.py` chỉ thêm index
+(`IF NOT EXISTS`), không đổi schema; xem chi tiết trong `docs/performance.md`.

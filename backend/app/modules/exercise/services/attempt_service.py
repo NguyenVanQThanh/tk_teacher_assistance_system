@@ -6,8 +6,9 @@
 # Updated At: 2026-11-13
 # Updated By: AI Agent
 
+import secrets
 from datetime import datetime, timezone
-from typing import List, Optional
+from typing import Any, List, Optional
 from uuid import UUID
 from fastapi import HTTPException, status
 from sqlalchemy.orm import Session
@@ -29,6 +30,22 @@ class AttemptService:
         self.db = db
         self.repo = AttemptRepository(db)
         self.assignment_repo = AssignmentRepository(db)
+
+    @staticmethod
+    def _with_preserved_shuffle_seed(old_detailed: Any, new_detailed: Any) -> Any:
+        """Merge the attempt's display-shuffle seed into freshly written detailed_results.
+
+        Grading only returns {"questions": [...]}; without this merge the seed stored at start
+        would be lost on submit (or on a teacher grade save that rebuilds detailed_results) and
+        the review paper would fall back to a different order. Other keys are left untouched.
+        """
+        if not isinstance(new_detailed, dict):
+            return new_detailed
+        seed = old_detailed.get("shuffle_seed") if isinstance(old_detailed, dict) else None
+        if seed and "shuffle_seed" not in new_detailed:
+            new_detailed = dict(new_detailed)
+            new_detailed["shuffle_seed"] = seed
+        return new_detailed
 
     def start_attempt(self, assignment_id: UUID, current_user: User) -> StudentExerciseAttempt:
         """Start a new exercise attempt for a student."""
@@ -107,13 +124,20 @@ class AttemptService:
                 }
             )
 
-        # 4. Create new attempt
+        # 4. Create new attempt. The random display-shuffle seed is persisted in the existing
+        # detailed_results JSON column (no schema change) so every reload/resume/review of THIS
+        # attempt reproduces the same question/option order. Merge instead of overwriting so any
+        # other data already present in detailed_results survives.
         attempt = StudentExerciseAttempt(
             student_id=current_user.user_id,
             assignment_id=assignment_id,
             start_time=datetime.now(timezone.utc),
             is_finished=False,
             status='ACTIVE'
+        )
+        attempt.detailed_results = self._with_preserved_shuffle_seed(
+            attempt.detailed_results,
+            {"shuffle_seed": secrets.token_hex(16)}
         )
         return self.repo.create(attempt)
 
@@ -177,7 +201,9 @@ class AttemptService:
         attempt.end_time = now
         attempt.total_time_seconds = total_seconds
         attempt.score = score
-        attempt.detailed_results = detailed_results
+        # Keep the per-attempt shuffle seed so reviewing this submission after it is finished
+        # shows the same question/option order the student saw while taking it.
+        attempt.detailed_results = self._with_preserved_shuffle_seed(attempt.detailed_results, detailed_results)
         attempt.is_finished = True
 
         return self.repo.update(attempt)
@@ -219,6 +245,11 @@ class AttemptService:
         ex = getattr(getattr(attempt, "assignment", None), "exercise", None)
         is_exam = getattr(ex, "exercise_kind", "PRACTICE") == "EXAM"
         released = getattr(getattr(attempt, "assignment", None), "answers_released_at", None) is not None
+        if isinstance(out.detailed_results, dict) and "shuffle_seed" in out.detailed_results:
+            # The display-shuffle seed is internal server state; never expose it through the API.
+            out.detailed_results = {
+                k: v for k, v in out.detailed_results.items() if k != "shuffle_seed"
+            }
         if attempt.student_id == current_user.user_id and is_exam and not released and out.detailed_results:
             keep = ("question_id", "question_type", "student_answer_option_id", "student_answer_text")
             out.detailed_results = {
@@ -263,8 +294,12 @@ class AttemptService:
                 }
             )
 
-        # Reuses the student-safe builder (sanitized questions, open attempt attached).
-        return AssignmentService(self.db).build_student_paper(assignment, current_user.user_id)
+        # Reuses the student-safe builder (sanitized questions, open attempt attached). The attempt
+        # is pinned explicitly so reviewing an older attempt keeps ITS question/option order even
+        # when a newer attempt exists for the same assignment.
+        return AssignmentService(self.db).build_student_paper(
+            assignment, current_user.user_id, attempt=attempt
+        )
 
     def list_attempts(
         self,
@@ -421,6 +456,10 @@ class AttemptService:
                 detailed_results["teacher_total_score"] = score
             if payload.feedback is not None:
                 detailed_results["teacher_feedback"] = payload.feedback
+
+        # The grading UI may rebuild detailed_results from the paper it was shown; never drop the
+        # per-attempt shuffle seed, otherwise the review order would change after a grade save.
+        detailed_results = self._with_preserved_shuffle_seed(attempt.detailed_results, detailed_results)
 
         return self.repo.update_grade(
             attempt=attempt,

@@ -12,6 +12,7 @@ import {
   Building2, 
   ShieldCheck, 
   BarChart3, 
+  Activity,
   HelpCircle, 
   LogOut,
   GraduationCap
@@ -66,6 +67,13 @@ export default function AdminSidebar({ isMobileOpen, onCloseMobile }) {
       enLabel: 'Reports & Analytics',
       icon: BarChart3,
       path: '/admin/reports',
+    },
+    {
+      id: 'monitoring',
+      label: 'Giám sát hệ thống',
+      enLabel: 'System Monitoring',
+      icon: Activity,
+      path: '/admin/monitoring',
     },
   ];
 

@@ -5,6 +5,8 @@
 // sanitizer used when falling back to the raw exercise detail endpoint.
 // Created At: 2026-11-12
 // Created By: AI Agent
+// Updated At: 2026-11-13
+// Updated By: AI Agent
 
 import axios from 'axios';
 
@@ -39,14 +41,48 @@ studentTakingClient.interceptors.response.use(
   }
 );
 
+// In-flight de-duplication for the GET taking endpoint. Only signal-less, non-forced
+// calls share a promise: an aborted caller must never cancel another caller's request,
+// and a forced call (e.g. the refetch that runs right after an attempt is started) must
+// always hit the network because the backend re-shuffles the paper for the new seed.
+const inFlightTakingRequests = new Map();
+
 export const studentTakingApi = {
   /**
    * GET /api/v1/assignments/{assignmentId}/taking
    * Expected response: { assignment, exercise, questions (sanitized), open_attempt }
+   *
+   * @param {string} assignmentId
+   * @param {{ signal?: AbortSignal, force?: boolean }} [options]
+   *   signal — abort the HTTP request (axios CanceledError is rejected to the caller).
+   *   force  — bypass the in-flight de-dupe map; use after starting an attempt so the
+   *            response reflects that attempt's shuffle seed instead of the preview one.
    */
-  getAssignmentTaking: async (assignmentId) => {
-    const response = await studentTakingClient.get(`/api/v1/assignments/${assignmentId}/taking`);
-    return response.data;
+  getAssignmentTaking: async (assignmentId, { signal, force = false } = {}) => {
+    const cacheKey = String(assignmentId);
+    const canShare = !force && !signal;
+
+    if (canShare && inFlightTakingRequests.has(cacheKey)) {
+      return inFlightTakingRequests.get(cacheKey);
+    }
+
+    const request = studentTakingClient
+      .get(`/api/v1/assignments/${assignmentId}/taking`, { signal })
+      .then((response) => response.data);
+
+    if (canShare) {
+      inFlightTakingRequests.set(cacheKey, request);
+      const release = () => {
+        if (inFlightTakingRequests.get(cacheKey) === request) {
+          inFlightTakingRequests.delete(cacheKey);
+        }
+      };
+      // Both handlers release the slot; the derived promise always resolves so it
+      // never becomes an unhandled rejection.
+      request.then(release, release);
+    }
+
+    return request;
   },
 };
 
