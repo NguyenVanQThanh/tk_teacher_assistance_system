@@ -166,114 +166,25 @@ class TestExerciseBankModule:
         assert fail_ex.status_code == status.HTTP_403_FORBIDDEN
         assert fail_ex.json()["detail"]["code"] == "ERR-EXE-INVALID_SUBJECT_SCOPE"
 
-    def test_ai_exercise_generation_and_taking_flow(self, client: TestClient, monkeypatch):
-        # Stub the LLM: the generator no longer fabricates fallback questions.
-        def _fake(**kw):
-            qs = []
-            for i in range(kw["part1_count"]):
-                qs.append({"part": "Part1", "question_type": "MultipleChoice", "difficulty": "NhanBiet",
-                           "content": f"Q{i}", "answer_options": [
-                               {"content": c, "is_correct": c == "A", "display_order": n}
-                               for n, c in enumerate("ABCD")]})
-            for i in range(kw["part2_count"]):
-                qs.append({"part": "Part2", "question_type": "TrueFalse", "difficulty": "ThongHieu",
-                           "content": "TF", "segments": [{"key": k, "statement": k, "is_correct": True} for k in "abcd"]})
-            for i in range(kw["part3_count"]):
-                qs.append({"part": "Part3", "question_type": "ShortAnswer", "difficulty": "VanDung",
-                           "content": "SA", "correct_answer": "2"})
-            return qs
-        monkeypatch.setattr(
-            "app.modules.exercise.services.ai_generator_service.AiExerciseGeneratorService._call_gemini_generator",
-            lambda *a, **kw: _fake(**kw))
-        monkeypatch.setattr(
-            "app.modules.exercise.services.ai_generator_service.GeminiVisionParserService.get_api_key", lambda: "x")
-        src = [{"source": "sgk", "label": "Lich su 12, tr.3", "page": 3, "modality": "text",
-                "image_url": None, "document_id": None}]
-        monkeypatch.setattr(
-            "app.modules.exercise.services.exercise_service.RagContextService.build_context_with_sources",
-            lambda *a, **kw: ("ctx", src))
-        # 1. Login as Student
-        student_token = get_student_token(client)
-        student_headers = {"Authorization": f"Bearer {student_token}"}
-
-        # 2. Call POST /api/v1/exercises/ai-generate to generate and persist real exercise
-        payload = {
-            "subject_name": "Lịch sử",
-            "grade_name": "Lớp 12",
-            "topic_prompt": "Cách mạng tháng Tám năm 1945",
-            "part1_count": 4,
-            "part2_count": 1,
-            "part3_count": 1,
-            "duration_minutes": 45
-        }
-        gen_resp = client.post(
+    def test_student_cannot_use_teacher_ai_generate(self, client: TestClient):
+        """Student AI generation moved to /api/v1/ai-exercises/student; the teacher route rejects students."""
+        student_headers = {"Authorization": f"Bearer {get_student_token(client)}"}
+        resp = client.post(
             "/api/v1/exercises/ai-generate",
-            json=payload,
-            headers=student_headers
+            json={"subject_name": "History", "topic_prompt": "August Revolution",
+                  "part1_count": 1, "part2_count": 0, "part3_count": 0, "duration_minutes": 45},
+            headers=student_headers,
         )
-        assert gen_resp.status_code == status.HTTP_201_CREATED
-        gen_data = gen_resp.json()
+        assert resp.status_code == status.HTTP_403_FORBIDDEN
 
-        exercise_id = gen_data["exercise_id"]
-        assignment_id = gen_data["assignment_id"]
-        assert gen_data["total_questions"] == 6
-        assert "Lịch sử" in gen_data["title"]
-        assert gen_data["sources"] == src
-        ex_meta = client.get(f"/api/v1/exercises/{exercise_id}", headers=student_headers).json()["ai_metadata"]
-        assert ex_meta["sources"] == src and ex_meta["document_ids"] == []
-
-        # 3. Verify exercise details and questions exist in DB
-        detail_resp = client.get(
-            f"/api/v1/exercises/{exercise_id}",
-            headers=student_headers
-        )
-        assert detail_resp.status_code == status.HTTP_200_OK
-        ex_detail = detail_resp.json()
-        assert len(ex_detail["questions"]) == 6
-
-        # Check part 1 questions have answer options
-        mc_questions = [q for q in ex_detail["questions"] if q["question_type"] == "MultipleChoice"]
-        assert len(mc_questions) == 4
-        for q in mc_questions:
-            assert len(q["answer_options"]) == 4
-
-        # 4. Student starts attempt for this assignment
-        start_resp = client.post(
-            f"/api/v1/assignments/{assignment_id}/attempts",
-            headers=student_headers
-        )
-        assert start_resp.status_code == status.HTTP_201_CREATED
-        attempt_id = start_resp.json()["attempt_id"]
-
-        # 5. Student submits answers
-        # Pick first option for first MC question
-        q1 = mc_questions[0]
-        chosen_opt = q1["answer_options"][0]["option_id"]
-        submit_payload = {
-            "answers": [
-                {
-                    "question_id": q1["question_id"],
-                    "answer_option_id": chosen_opt
-                }
-            ]
-        }
-        sub_resp = client.put(
-            f"/api/v1/attempts/{attempt_id}/submit",
-            json=submit_payload,
-            headers=student_headers
-        )
-        assert sub_resp.status_code == status.HTTP_200_OK
-        sub_data = sub_resp.json()
-        assert sub_data["is_finished"] is True
-        assert sub_data["score"] is not None
-
-        # 6. Verify attempt appears in assignments feed and attempt list
-        att_list_resp = client.get(
-            "/api/v1/attempts",
-            headers=student_headers
-        )
-        assert att_list_resp.status_code == status.HTTP_200_OK
-        all_attempts = att_list_resp.json()
-        matched = next((a for a in all_attempts if a["attempt_id"] == attempt_id), None)
-        assert matched is not None
-        assert matched["is_finished"] is True
+    def test_student_sees_no_foreign_exercise(self, client: TestClient):
+        """Students may only read exercises they created; an admin exercise is hidden (404)."""
+        admin_headers = {"Authorization": f"Bearer {get_admin_token(client)}"}
+        student_headers = {"Authorization": f"Bearer {get_student_token(client)}"}
+        subject_id = client.post(
+            "/api/v1/subjects", json={"subject_name": f"Sci {uuid.uuid4().hex[:6]}"}, headers=admin_headers
+        ).json()["subject_id"]
+        ex_id = client.post(
+            "/api/v1/exercises", json={"title": "Admin only", "subject_id": subject_id}, headers=admin_headers
+        ).json()["exercise_id"]
+        assert client.get(f"/api/v1/exercises/{ex_id}", headers=student_headers).status_code == status.HTTP_404_NOT_FOUND

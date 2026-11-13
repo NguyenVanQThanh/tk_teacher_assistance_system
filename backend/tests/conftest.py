@@ -89,6 +89,12 @@ def setup_db() -> Generator[None, None, None]:
             name="Manage subjects",
             description="Allows admin to create, update, delete subjects"
         )
+        acad_subject_head_assign_perm = Permission(
+            permission_id=uuid.uuid4(),
+            permission_code="ACAD_SUBJECT_HEAD_ASSIGN",
+            name="Assign subject head",
+            description="Allows admin to assign the head of a subject department"
+        )
         acad_subject_view_perm = Permission(
             permission_id=uuid.uuid4(),
             permission_code="ACAD_SUBJECT_VIEW",
@@ -179,6 +185,7 @@ def setup_db() -> Generator[None, None, None]:
             pwd_change_perm,
             perm_manage_perm,
             acad_subject_manage_perm,
+            acad_subject_head_assign_perm,
             acad_subject_view_perm,
             acad_class_manage_perm,
             acad_class_view_perm,
@@ -203,6 +210,7 @@ def setup_db() -> Generator[None, None, None]:
             RolePermission(role_id=admin_role.role_id, permission_id=pwd_change_perm.permission_id),
             RolePermission(role_id=admin_role.role_id, permission_id=perm_manage_perm.permission_id),
             RolePermission(role_id=admin_role.role_id, permission_id=acad_subject_manage_perm.permission_id),
+            RolePermission(role_id=admin_role.role_id, permission_id=acad_subject_head_assign_perm.permission_id),
             RolePermission(role_id=admin_role.role_id, permission_id=acad_subject_view_perm.permission_id),
             RolePermission(role_id=admin_role.role_id, permission_id=acad_class_manage_perm.permission_id),
             RolePermission(role_id=admin_role.role_id, permission_id=acad_class_view_perm.permission_id),
@@ -378,3 +386,9 @@ def client(db_session: Session, monkeypatch) -> Generator[TestClient, None, None
     with TestClient(app) as test_client:
         yield test_client
     app.dependency_overrides.clear()
+
+
+@pytest.fixture(autouse=True)
+def _isolate_llm_keys(monkeypatch):
+    """Keep tests off real LLM APIs: generation tests mock the Gemini path, so Mistral must be disabled."""
+    monkeypatch.delenv("MISTRAL_API_KEY", raising=False)

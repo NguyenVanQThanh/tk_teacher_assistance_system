@@ -113,11 +113,44 @@ def _shuffle_student_questions(
     return shuffled
 
 
+def personal_visibility_clause(user: User):
+    """SQL filter: class-wide assignments (owner NULL) or personal ones owned by `user`."""
+    return or_(ClassAssignment.owner_student_id.is_(None), ClassAssignment.owner_student_id == user.user_id)
+
+
+def is_visible_assignment(assignment: ClassAssignment, user: User) -> bool:
+    """Python mirror of personal_visibility_clause for an already-loaded row."""
+    owner = getattr(assignment, "owner_student_id", None)
+    return owner is None or owner == user.user_id
+
+
+def _assignment_not_found() -> HTTPException:
+    return HTTPException(
+        status_code=status.HTTP_404_NOT_FOUND,
+        detail={"code": "ERR-EXE-ASSIGNMENT_NOT_FOUND", "message": "Class assignment record not found."}
+    )
+
+
 class AssignmentService:
     def __init__(self, db: Session):
         self.db = db
         self.repo = AssignmentRepository(db)
         self.exercise_repo = ExerciseRepository(db)
+
+    def _ensure_can_manage(self, assignment: ClassAssignment, current_user: User) -> None:
+        """404 for another student's personal assignment; 403 unless assigner or Admin; class access check."""
+        if not is_visible_assignment(assignment, current_user):
+            raise _assignment_not_found()
+        role_name = get_user_role_name(self.db, current_user)
+        if role_name != "Admin" and assignment.assigned_by != current_user.user_id:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail={
+                    "code": "ERR-AUTH-OWNER_ONLY",
+                    "message": "Only the teacher who created this assignment can modify it."
+                }
+            )
+        check_class_access(self.db, current_user, assignment.class_id, role_name)
 
     def create_assignment(self, class_id: UUID, payload: AssignmentCreate, current_user: User) -> ClassAssignment:
         role_name = get_user_role_name(self.db, current_user)
@@ -143,6 +176,19 @@ class AssignmentService:
                     "message": "Exercise not found."
                 }
             )
+
+        # 2b. Exercise must be visible to the caller (owner / head-of-department shared / Admin)
+        from app.modules.auth import access_policy
+        clause = access_policy.exercise_visibility_clause(self.db, current_user)
+        if clause is not None:
+            visible = self.db.query(Exercise.exercise_id).filter(
+                Exercise.exercise_id == exercise.exercise_id, clause
+            ).first()
+            if not visible:
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    detail={"code": "ERR-EXE-EXERCISE_NOT_FOUND", "message": "Exercise not found."}
+                )
 
         # 3. Scoping check for Teacher
         if role_name == "Teacher":
@@ -225,7 +271,8 @@ class AssignmentService:
         check_class_access(self.db, current_user, class_id)
 
         # 3. Retrieve active assignments
-        return self.repo.list_by_class_ids([class_id])
+        # Personal (student AI) assignments are never listed for the class.
+        return [a for a in self.repo.list_by_class_ids([class_id]) if is_visible_assignment(a, current_user)]
 
     def list_assignments_feed(
         self,
@@ -244,7 +291,8 @@ class AssignmentService:
             self.db.query(ClassAssignment)
             .join(ClassAssignment.class_obj)
             .join(ClassAssignment.exercise)
-            .filter(ClassAssignment.status != 'DELETED', Class.status != 'DELETED')
+            .filter(ClassAssignment.status != 'DELETED', Class.status != 'DELETED',
+                    personal_visibility_clause(current_user))
         )
 
         if accessible_class_ids is not None:
@@ -368,6 +416,9 @@ class AssignmentService:
                     "message": "Class assignment record not found."
                 }
             )
+
+        if not is_visible_assignment(assignment, current_user):
+            raise _assignment_not_found()
 
         role_name = get_user_role_name(self.db, current_user)
         if role_name == "Student":
@@ -550,6 +601,8 @@ class AssignmentService:
                 }
             )
 
+        self._ensure_can_manage(assignment, current_user)
+
         if self.repo.has_attempts(assignment_id):
             raise HTTPException(
                 status_code=status.HTTP_409_CONFLICT,
@@ -569,7 +622,7 @@ class AssignmentService:
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail={"code": "ERR-EXE-ASSIGNMENT_NOT_FOUND", "message": "Class assignment record not found."}
             )
-        check_class_access(self.db, current_user, assignment.class_id)
+        self._ensure_can_manage(assignment, current_user)
         assignment.answers_released_at = datetime.now(timezone.utc) if released else None
         self.db.commit()
         self.db.refresh(assignment)
@@ -586,6 +639,7 @@ class AssignmentService:
                 }
             )
 
+        self._ensure_can_manage(assignment, current_user)
         return self.repo.restore(assignment)
 
     def get_assignment_result_summary(
@@ -598,57 +652,56 @@ class AssignmentService:
         Retrieve assignment details, student attempt history, score, and cognitive level analytics.
         Scoped to student owner or authorized teacher/admin.
         """
+        role_name = get_user_role_name(self.db, current_user) or ""
+        is_student = "student" in role_name.lower()
+
         assignment = self.repo.get_by_id(assignment_id)
         if not assignment:
-            # Fallback 1: Check if assignment_id was provided as exercise_id
-            assignment = self.db.query(ClassAssignment).filter(
+            # Fallback 1: assignment_id given as exercise_id; only assignments the caller may see.
+            fb = self.db.query(ClassAssignment).filter(
                 ClassAssignment.exercise_id == assignment_id,
-                ClassAssignment.status != 'DELETED'
-            ).first()
+                ClassAssignment.status != 'DELETED',
+                personal_visibility_clause(current_user)
+            )
+            accessible = get_accessible_class_ids(self.db, current_user, role_name)
+            if accessible is not None:
+                fb = fb.filter(ClassAssignment.class_id.in_(accessible))
+            assignment = fb.first()
 
         if not assignment:
-            # Fallback 2: Check soft-deleted assignment
+            # Fallback 2: soft-deleted assignment (visibility and class access are checked below)
             assignment = self.repo.get_by_id(assignment_id, include_deleted=True)
 
         if not assignment:
-            # Fallback 3: Check Exercise table directly and return 200 with empty attempts if query is empty
-            exercise = self.db.query(Exercise).filter(Exercise.exercise_id == assignment_id).first()
-            if exercise:
-                questions = self.db.query(Question).filter(
-                    Question.exercise_id == exercise.exercise_id,
-                    Question.status != 'DELETED'
-                ).all()
-                total_q = len(questions) or (exercise.total_questions or 0)
-                subject_obj = self.db.query(Subject).filter(Subject.subject_id == exercise.subject_id).first() if exercise.subject_id else None
-                return AssignmentResultSummaryOut(
-                    assignment_id=assignment_id,
-                    exercise_id=exercise.exercise_id,
-                    class_id=None,
-                    title=exercise.title or "Bài tập được giao",
-                    subject_name=subject_obj.subject_name if subject_obj else "Môn học",
-                    grade_name="Lớp 12",
-                    teacher_name="Giáo viên bộ môn",
-                    duration_minutes=exercise.duration_minutes or 45,
-                    total_questions=total_q,
-                    due_at=None,
-                    deadline_text=None,
-                    status="active",
-                    max_attempts=1,
-                    attempts=[],
-                    best_attempt=None,
-                    latest_attempt=None
+            # Fallback 3: bare exercise id -> empty summary, only when the exercise is visible to the caller.
+            from app.modules.auth import access_policy
+            exercise = None
+            if not is_student:
+                query = self.db.query(Exercise).filter(
+                    Exercise.exercise_id == assignment_id, Exercise.status != 'DELETED'
                 )
-            # If completely not found in DB, return safe empty summary with 200 OK
+                clause = access_policy.exercise_visibility_clause(self.db, current_user)
+                if clause is not None:
+                    query = query.filter(clause)
+                exercise = query.first()
+            if not exercise:
+                raise _assignment_not_found()
+            questions = self.db.query(Question).filter(
+                Question.exercise_id == exercise.exercise_id,
+                Question.status != 'DELETED'
+            ).all()
+            total_q = len(questions) or (exercise.total_questions or 0)
+            subject_obj = self.db.query(Subject).filter(Subject.subject_id == exercise.subject_id).first() if exercise.subject_id else None
             return AssignmentResultSummaryOut(
                 assignment_id=assignment_id,
-                exercise_id=assignment_id,
+                exercise_id=exercise.exercise_id,
                 class_id=None,
-                title="Bài tập được giao",
-                subject_name="Môn học",
+                title=exercise.title or "Assigned exercise",
+                subject_name=subject_obj.subject_name if subject_obj else "Subject",
                 grade_name="Lớp 12",
                 teacher_name="Giáo viên bộ môn",
-                duration_minutes=45,
-                total_questions=0,
+                duration_minutes=exercise.duration_minutes or 45,
+                total_questions=total_q,
                 due_at=None,
                 deadline_text=None,
                 status="active",
@@ -658,14 +711,14 @@ class AssignmentService:
                 latest_attempt=None
             )
 
-        role_name = (get_user_role_name(self.db, current_user) or "").lower()
-        if "student" in role_name:
+        if not is_visible_assignment(assignment, current_user):
+            raise _assignment_not_found()
+
+        if is_student:
             target_student_id = current_user.user_id
         else:
-            try:
-                check_class_access(self.db, current_user, assignment.class_id)
-            except Exception:
-                pass
+            # Raises 403 when the caller has no access to the assignment's class.
+            check_class_access(self.db, current_user, assignment.class_id, role_name)
             target_student_id = student_id or current_user.user_id
 
         # 1. Fetch active questions for the exercise

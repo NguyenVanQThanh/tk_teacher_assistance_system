@@ -2,6 +2,8 @@
 # Description: Process-wide concurrency guards shared by heavy endpoints/background jobs.
 # Created At: 2026-11-13
 # Created By: AI Agent
+# Updated At: 2026-11-13
+# Updated By: AI Agent
 
 """Process-local semaphores for memory/CPU-heavy work.
 
@@ -36,6 +38,11 @@ PDF_EXPORT_ACQUIRE_TIMEOUT_SECONDS = 30
 PDF_EXPORT_SEMAPHORE = threading.BoundedSemaphore(PDF_EXPORT_CONCURRENCY)
 IMPORT_SEMAPHORE = threading.BoundedSemaphore(IMPORT_CONCURRENCY)
 ETL_SEMAPHORE = threading.BoundedSemaphore(ETL_CONCURRENCY)
+
+# AI exercise generation (RAG + several LLM calls per request); excess requests wait, then get 503.
+AI_GENERATE_CONCURRENCY = max(1, int(config.AI_GENERATE_CONCURRENCY))
+AI_GENERATE_ACQUIRE_TIMEOUT_SECONDS = 30
+AI_GENERATE_SEMAPHORE = threading.BoundedSemaphore(AI_GENERATE_CONCURRENCY)
 
 logger.info(
     "Resource limits: PDF_EXPORT_CONCURRENCY=%d IMPORT_CONCURRENCY=%d ETL_CONCURRENCY=%d MAX_INGEST_BYTES=%d",

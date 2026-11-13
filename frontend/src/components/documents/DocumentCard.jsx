@@ -19,7 +19,7 @@ import {
 } from 'lucide-react';
 import './DocumentCard.css';
 
-export default function DocumentCard({ doc, onPreview, onDownload, onEdit, onMore, onDelete, onRemove, onView }) {
+export default function DocumentCard({ doc, onPreview, onDownload, onEdit, onMore, onDelete, onRemove, onView, canModify = true }) {
   // Determine icon and color scheme based on file/document type
   const renderTypeIcon = () => {
     const type = doc.fileType?.toLowerCase();
@@ -74,6 +74,7 @@ export default function DocumentCard({ doc, onPreview, onDownload, onEdit, onMor
       {/* Top Header: Icon & Close / Delete Button */}
       <div className="doc-card-top">
         {renderTypeIcon()}
+        {canModify && (
         <button 
           type="button" 
           className="doc-more-btn doc-close-btn" 
@@ -92,6 +93,7 @@ export default function DocumentCard({ doc, onPreview, onDownload, onEdit, onMor
         >
           <X size={17} strokeWidth={2.2} />
         </button>
+        )}
       </div>
 
       {/* Document Title */}
@@ -122,6 +124,11 @@ export default function DocumentCard({ doc, onPreview, onDownload, onEdit, onMor
           {doc.authorInitial || 'GV'}
         </div>
         <span className="author-name">{doc.authorName}</span>
+        {!canModify && (
+          <span className="doc-grade-chip" data-testid="head-dept-badge" title="Tài liệu của tổ trưởng bộ môn (chỉ xem)">
+            Tổ trưởng bộ môn
+          </span>
+        )}
       </div>
 
       {/* Bottom Actions Bar */}
@@ -139,6 +146,7 @@ export default function DocumentCard({ doc, onPreview, onDownload, onEdit, onMor
         </button>
 
         <div className="doc-action-icons">
+          {canModify && (
           <button 
             type="button" 
             className="icon-action-btn"
@@ -150,6 +158,7 @@ export default function DocumentCard({ doc, onPreview, onDownload, onEdit, onMor
           >
             <Edit3 size={16} />
           </button>
+          )}
         </div>
       </div>
     </div>

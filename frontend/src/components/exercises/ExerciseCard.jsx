@@ -20,7 +20,7 @@ import {
 import AnswerReleaseButton from '../teacher/AnswerReleaseButton';
 import './ExerciseCard.css';
 
-export default function ExerciseCard({ exercise, onPreview, onEdit, onDownload, onMore, onDelete }) {
+export default function ExerciseCard({ exercise, onPreview, onEdit, onDownload, onMore, onDelete, canModify = true }) {
   const isQuiz = exercise.type === 'quiz' || exercise.type === 'test';
 
   return (
@@ -42,6 +42,7 @@ export default function ExerciseCard({ exercise, onPreview, onEdit, onDownload, 
             compact
           />
         )}
+        {canModify && (
         <button 
           type="button" 
           className="exercise-more-btn exercise-close-btn"
@@ -54,6 +55,7 @@ export default function ExerciseCard({ exercise, onPreview, onEdit, onDownload, 
         >
           <X size={17} strokeWidth={2.2} />
         </button>
+        )}
         </div>
       </div>
 
@@ -115,6 +117,7 @@ export default function ExerciseCard({ exercise, onPreview, onEdit, onDownload, 
         </button>
 
         <div className="exercise-action-icons">
+          {canModify ? (
           <button 
             type="button" 
             className="icon-action-btn edit-btn"
@@ -123,6 +126,11 @@ export default function ExerciseCard({ exercise, onPreview, onEdit, onDownload, 
           >
             <Edit3 size={16} />
           </button>
+          ) : (
+            <span data-testid="head-dept-badge" title="Bài tập của tổ trưởng bộ môn (chỉ xem)" style={{ fontSize: 11, color: '#6B7280', alignSelf: 'center' }}>
+              Tổ trưởng bộ môn
+            </span>
+          )}
 
             <button 
               type="button" 

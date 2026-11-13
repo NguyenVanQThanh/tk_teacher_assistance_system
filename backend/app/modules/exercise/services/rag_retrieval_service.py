@@ -3,14 +3,16 @@ File Name: rag_retrieval_service.py
 Description: Hybrid (dense + full-text, RRF-fused) retrieval over SGK textbook chunks and teacher document chunks.
 Created At: 2026-11-11
 Created By: AI Agent
-Updated At: 2026-11-11
+Updated At: 2026-11-13
 Updated By: AI Agent
 """
 import json
 import logging
 import os
 import re
+import threading
 import unicodedata
+from collections import OrderedDict
 from dataclasses import dataclass
 from typing import Any, Dict, List, Optional, Sequence, Tuple
 
@@ -113,17 +115,21 @@ def vector_literal(embedding: Sequence[float]) -> str:
     return "[" + ",".join(repr(float(x)) for x in embedding) + "]"
 
 
-def build_search_sql(source: str, scope: bool = False, filter_docs: bool = False) -> Tuple[str, str]:
+def build_search_sql(source: str, scope: bool = False, filter_docs: bool = False,
+                     chapters: bool = False) -> Tuple[str, str]:
     """Return (dense_sql, fts_sql) for 'sgk' or 'teacher'.
 
     Filters live inside the query so HNSW iterative scan can keep scanning until enough rows match.
     Bind params: :pool, :vec (dense) or :q (fts); :doc_ids for sgk; for teacher optionally
-    :document_ids, and :subject_id + :teacher_ids when scope is set.
+    :document_ids, and :subject_id + :teacher_ids when scope is set. For sgk, chapters=True also pushes
+    `c.chuong = ANY(:chapters)` into both queries.
     """
     if source == "sgk":
         cols = ("SELECT c.id AS cid, c.doc_id AS doc, c.page, c.modality, c.content, c.meta, "
                 "(SELECT s.title FROM sgk_docs s WHERE s.doc_id = c.doc_id) AS title FROM chunks c ")
         where = "WHERE c.doc_id = ANY(:doc_ids) "
+        if chapters:
+            where += "AND c.chuong = ANY(:chapters) "
     else:
         cols = ("SELECT c.chunk_id::text AS cid, c.document_id::text AS doc, c.page, c.modality, c.content, "
                 "c.meta, d.title AS title FROM document_chunks c "
@@ -148,20 +154,51 @@ def _gemini_key() -> Optional[str]:
     return os.environ.get("GEMINI_API_KEY") or os.environ.get("GOOGLE_API_KEY") or os.environ.get("GEMINI_KEY")
 
 
-def _embed(query: str) -> Optional[List[float]]:
-    """Embed a query with Mistral; None (FTS-only fallback) on any failure."""
-    key = _mistral_key()
-    if not key:
-        logger.warning("RAG embedding skipped: Mistral API key not configured")
-        return None
-    try:
-        from mistralai.client import Mistral
-        resp = Mistral(api_key=key).embeddings.create(model=config.MISTRAL_EMBED_MODEL, inputs=[query])
-        return list(resp.data[0].embedding)
-    except Exception as exc:  # noqa: BLE001 - degrade to FTS-only
-        logger.warning("RAG embedding failed, using full-text only: %s", exc)
-        return None
+# Query -> embedding cache (bounded LRU). Manual instead of functools.lru_cache so one batched API call
+# can fill several entries at once.
+_EMBED_CACHE_SIZE = 512
+_embed_cache: "OrderedDict[str, List[float]]" = OrderedDict()
+_embed_lock = threading.Lock()
 
+def _embed_many(queries: Sequence[str]) -> List[Optional[List[float]]]:
+    """Embed queries with ONE Mistral call for all cache misses; None entries mean FTS-only fallback."""
+    out: List[Optional[List[float]]] = [None] * len(queries)
+    missing: List[str] = []
+    with _embed_lock:
+        for i, q in enumerate(queries):
+            if q in _embed_cache:
+                _embed_cache.move_to_end(q)
+                out[i] = _embed_cache[q]
+            elif q not in missing:
+                missing.append(q)
+    if missing:
+        key = _mistral_key()
+        if not key:
+            logger.warning("RAG embedding skipped: Mistral API key not configured")
+            return out
+        try:
+            from mistralai.client import Mistral
+            resp = Mistral(api_key=key).embeddings.create(model=config.MISTRAL_EMBED_MODEL, inputs=list(missing))
+            fresh = {q: list(d.embedding) for q, d in zip(missing, resp.data)}
+        except Exception as exc:  # noqa: BLE001 - degrade to FTS-only
+            logger.warning("RAG embedding failed, using full-text only: %s", exc)
+            return out
+        with _embed_lock:
+            for q, emb in fresh.items():
+                _embed_cache[q] = emb
+                _embed_cache.move_to_end(q)
+            while len(_embed_cache) > _EMBED_CACHE_SIZE:
+                _embed_cache.popitem(last=False)
+        for i, q in enumerate(queries):
+            if out[i] is None:
+                out[i] = fresh.get(q)
+    return out
+
+def _embed(query: str) -> Optional[List[float]]:
+    """Embed one query (cached); None (FTS-only fallback) on any failure."""
+    return _embed_many([query])[0]
+
+_UNSET: Any = object()
 
 def _llm_text(prompt: str) -> Optional[str]:
     """One short LLM completion (Gemini first, then Mistral); None when no key is configured."""
@@ -198,13 +235,15 @@ class RagRetrievalService:
 
     @staticmethod
     def _hybrid(db: Session, source: str, query: str, params: Dict[str, Any], k: int,
-                scope: bool = False, filter_docs: bool = False) -> List[RagChunk]:
-        dense_sql, fts_sql = build_search_sql(source, scope=scope, filter_docs=filter_docs)
+                scope: bool = False, filter_docs: bool = False, chapters: bool = False,
+                embedding: Any = _UNSET) -> List[RagChunk]:
+        dense_sql, fts_sql = build_search_sql(source, scope=scope, filter_docs=filter_docs, chapters=chapters)
         params = {**params, "pool": POOL_SIZE}
         rows: Dict[str, Any] = {}
         rankings: List[List[str]] = []
 
-        embedding = _embed(query)
+        if embedding is _UNSET:
+            embedding = _embed(query)
         if embedding is not None:
             try:
                 # SET LOCAL lasts until the surrounding transaction ends; older pgvector lacks the setting.
@@ -247,16 +286,41 @@ class RagRetrievalService:
             ))
         return out
 
+    @staticmethod
+    def _embed_query(query: str) -> Optional[List[float]]:
+        """Embed once (cached) so several searches can share the vector."""
+        return _embed_many([query])[0]
+
+    @staticmethod
+    def list_chapters(db: Session, doc_ids: Sequence[str]) -> List[Dict[str, Any]]:
+        """Return [{chapter, doc_id, page_start}] for the given SGK docs, ordered by doc then first page."""
+        if not doc_ids:
+            return []
+        rows = db.execute(
+            text("SELECT doc_id, chuong, min(page) AS page_start FROM chunks "
+                 "WHERE doc_id = ANY(:ids) AND chuong IS NOT NULL GROUP BY doc_id, chuong "
+                 "ORDER BY doc_id, 3"),
+            {"ids": list(doc_ids)},
+        ).fetchall()
+        return [{"chapter": r[1], "doc_id": r[0], "page_start": r[2]} for r in rows]
+
     @classmethod
     def search_sgk(cls, db: Session, query: str, subject_name: Optional[str], grade: Any,
-                   k: int = 5) -> List[RagChunk]:
-        """Search textbook chunks for the given subject and grade; [] when no matching textbook."""
+                   k: int = 5, chapters: Optional[Sequence[str]] = None,
+                   embedding: Any = _UNSET) -> List[RagChunk]:
+        """Search textbook chunks for the given subject and grade; [] when no matching textbook.
+
+        chapters, when given, is pushed down into the SQL (`chuong = ANY(:chapters)`).
+        """
         if not (query or "").strip():
             return []
         doc_ids = cls.resolve_sgk_filter(db, subject_name, grade)
         if not doc_ids:
             return []
-        return cls._hybrid(db, "sgk", query, {"doc_ids": doc_ids}, k)
+        params: Dict[str, Any] = {"doc_ids": doc_ids}
+        if chapters:
+            params["chapters"] = list(chapters)
+        return cls._hybrid(db, "sgk", query, params, k, chapters=bool(chapters), embedding=embedding)
 
     @classmethod
     def search_documents(
@@ -266,6 +330,7 @@ class RagRetrievalService:
         document_ids: Optional[Sequence[Any]] = None,
         teacher_subject_scope: Optional[Tuple[Any, Sequence[Any]]] = None,
         k: int = 5,
+        embedding: Any = _UNSET,
     ) -> List[RagChunk]:
         """Search teacher document chunks (ACTIVE chunks of Uploaded documents).
 
@@ -287,7 +352,8 @@ class RagRetrievalService:
             if not document_ids:
                 return []
             params["document_ids"] = [str(d) for d in document_ids]
-        return cls._hybrid(db, "teacher", query, params, k, scope=scope, filter_docs=filter_docs)
+        return cls._hybrid(db, "teacher", query, params, k, scope=scope, filter_docs=filter_docs,
+                           embedding=embedding)
 
     @staticmethod
     def expand_query(topic_prompt: str) -> List[str]:

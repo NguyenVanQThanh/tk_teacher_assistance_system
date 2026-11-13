@@ -72,6 +72,7 @@ def seed_data():
             {"permission_code": "AUTH_PASSWORD_CHANGE", "name": "Change Password", "description": "Allows users to change their own password"},
             {"permission_code": "AUTH_PERM_MANAGE", "name": "Manage System Permissions", "description": "Allows administrators to manage user roles and permissions"},
             {"permission_code": "ACAD_SUBJECT_MANAGE", "name": "Manage Subjects", "description": "Allows Admin to create, edit, and delete subjects"},
+            {"permission_code": "ACAD_SUBJECT_HEAD_ASSIGN", "name": "Assign Subject Head", "description": "Allows Admin to assign the head of a subject department"},
             {"permission_code": "ACAD_SUBJECT_VIEW", "name": "View Subjects", "description": "Allows viewing subject list and details"},
             {"permission_code": "ACAD_CLASS_MANAGE", "name": "Manage Classes", "description": "Allows Admin to create, edit, and delete classes"},
             {"permission_code": "ACAD_CLASS_VIEW", "name": "View Classes", "description": "Allows viewing class list and details"},
@@ -118,7 +119,7 @@ def seed_data():
         mappings = {
             "Admin": [
                 "AUTH_ME_VIEW", "AUTH_PASSWORD_CHANGE", "AUTH_PERM_MANAGE",
-                "ACAD_SUBJECT_MANAGE", "ACAD_SUBJECT_VIEW",
+                "ACAD_SUBJECT_MANAGE", "ACAD_SUBJECT_VIEW", "ACAD_SUBJECT_HEAD_ASSIGN",
                 "ACAD_CLASS_MANAGE", "ACAD_CLASS_VIEW",
                 "ACAD_ENROLLMENT_MANAGE", "ACAD_ENROLLMENT_VIEW",
                 "ACAD_TEACHER_ASSIGN_MANAGE", "ACAD_TEACHER_ASSIGN_VIEW",

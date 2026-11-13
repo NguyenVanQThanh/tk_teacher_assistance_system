@@ -2,8 +2,8 @@
 # Description: Data Access Layer (Repository) for Exercise, Question, and AnswerOption models.
 # Created At: 2026-07-31
 # Created By: Tam Khang
-# Updated At: 2026-10-30
-# Updated By: Tam Khang
+# Updated At: 2026-11-13
+# Updated By: AI Agent
 
 from typing import List, Optional, Any, Tuple, Dict
 from uuid import UUID
@@ -67,6 +67,7 @@ class ExerciseRepository:
         cursor: Optional[str] = None,
         direction: str = "next",
         page_size: int = 6,
+        visibility_clause: Optional[Any] = None,
     ) -> Dict[str, Any]:
         """
         List exercises using Keyset / Cursor-based Pagination (zero OFFSET) for O(1) query performance.
@@ -76,6 +77,10 @@ class ExerciseRepository:
         if status is not None:
             base_query = base_query.filter(Exercise.status == status)
         
+        if visibility_clause is not None:
+            # RBAC clause from access_policy.exercise_visibility_clause (None = unrestricted).
+            base_query = base_query.filter(visibility_clause)
+
         if created_by and subject_ids is not None:
             base_query = base_query.filter(
                 (Exercise.created_by == created_by) | (Exercise.subject_id.in_(subject_ids))

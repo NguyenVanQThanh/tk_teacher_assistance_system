@@ -72,6 +72,8 @@ export default function CreateExerciseModal({ isOpen, onClose, onCreateSuccess }
   const toastTimerRef = useRef(null);
   const closeTimerRef = useRef(null);
   const [subjectsList, setSubjectsList] = useState([]);
+  // Subject selected by the teacher (falls back to the first subject until the list loads)
+  const selectedSubjectName = subjectsList.find((s) => String(s.subject_id) === String(subject))?.subject_name || subjectsList[0]?.subject_name || 'Toán học';
 
   // AI Generation Specific State
   const [aiPrompt, setAiPrompt] = useState('');
@@ -285,7 +287,8 @@ export default function CreateExerciseModal({ isOpen, onClose, onCreateSuccess }
 
     try {
       const payload = {
-        subject_name: subjectsList[0]?.subject_name || 'Toán học',
+        subject_id: subject,
+        subject_name: selectedSubjectName,
         grade_name: `Lớp ${grade}`,
         topic_prompt: aiPrompt.trim() || `Ôn tập kiến thức khối ${grade}`,
         duration_minutes: 45,
@@ -297,6 +300,13 @@ export default function CreateExerciseModal({ isOpen, onClose, onCreateSuccess }
       if (p1 > 0) payload.part1_count = p1;
       if (p2 > 0) payload.part2_count = p2;
       if (p3 > 0) payload.part3_count = p3;
+      // Full difficulty matrix (per type and cognitive level)
+      const lv = (c) => ({ NhanBiet: c.recognize, ThongHieu: c.understand, VanDung: c.apply });
+      payload.matrix = {
+        mcq: lv(questionCounts.mcq),
+        tf: lv(questionCounts.tf),
+        short: lv(questionCounts.shortAnswer),
+      };
 
       const res = await exercisesApi.generateAiExercise(payload);
 
@@ -316,7 +326,7 @@ export default function CreateExerciseModal({ isOpen, onClose, onCreateSuccess }
         type: type,
         grade: grade,
         subject: subject,
-        subjectName: subjectsList[0]?.subject_name || 'Toán học',
+        subjectName: selectedSubjectName,
         questionCount: `${res.total_questions || 0} câu hỏi`,
         duration: type === 'quiz' ? '15 phút' : '45 phút',
         date: new Date().toLocaleDateString('vi-VN'),
@@ -396,7 +406,7 @@ export default function CreateExerciseModal({ isOpen, onClose, onCreateSuccess }
       }, 280);
 
       const finalTitle = title.trim() || uploadedFile.name.replace(/\.[^/.]+$/, '');
-      const targetSubjectId = subjectsList.length > 0 ? subjectsList[0].subject_id : subject;
+      const targetSubjectId = subject;
 
       // Step 1: Create exercise container in DB
       const newEx = await exercisesApi.createExercise({
@@ -442,7 +452,7 @@ export default function CreateExerciseModal({ isOpen, onClose, onCreateSuccess }
         type: type,
         grade: grade,
         subject: 'math',
-        subjectName: subjectsList[0]?.subject_name || 'Toán học',
+        subjectName: selectedSubjectName,
         questionCount: `${importedQuestions.length || 0} câu hỏi`,
         duration: type === 'quiz' ? '15 phút' : '45 phút',
         date: new Date().toLocaleDateString('vi-VN'),
@@ -655,6 +665,17 @@ export default function CreateExerciseModal({ isOpen, onClose, onCreateSuccess }
                     <option value="10">Khối 10</option>
                     <option value="11">Khối 11</option>
                     <option value="12">Khối 12</option>
+                  </select>
+                  <select
+                    className="ai-grade-select"
+                    data-testid="exercise-subject-select"
+                    value={subject}
+                    onChange={(e) => setSubject(e.target.value)}
+                    title="Chọn môn học cho bài tập"
+                  >
+                    {subjectsList.map((s) => (
+                      <option key={s.subject_id} value={s.subject_id}>{s.subject_name}</option>
+                    ))}
                   </select>
                   <span className="ai-grade-hint">SGK của khối và môn đã chọn luôn được tự động sử dụng làm nguồn tham khảo. Khối đã chọn cũng lọc các tài liệu của Thầy/Cô bên dưới.</span>
                 </div>
@@ -1149,13 +1170,16 @@ export default function CreateExerciseModal({ isOpen, onClose, onCreateSuccess }
 
                 <div className="form-field-group">
                   <label className="input-field-label">Môn giảng dạy</label>
-                  <input
-                    type="text"
+                  <select
                     className="select-input"
-                    value={subjectsList[0]?.subject_name || 'Toán học'}
-                    readOnly
-                    style={{ backgroundColor: '#F3F4F6', color: '#1F2937', fontWeight: 600, cursor: 'default' }}
-                  />
+                    data-testid="exercise-subject-select"
+                    value={subject}
+                    onChange={(e) => setSubject(e.target.value)}
+                  >
+                    {subjectsList.map((s) => (
+                      <option key={s.subject_id} value={s.subject_id}>{s.subject_name}</option>
+                    ))}
+                  </select>
                 </div>
 
                 <div className="form-field-group">

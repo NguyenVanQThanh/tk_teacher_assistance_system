@@ -3,7 +3,7 @@ File Name: load_sgk_rag.py
 Description: Populate sgk_docs and load the SGK textbook RAG chunks (from RAG_SGK) into the main database.
 Created At: 2026-11-11
 Created By: AI Agent
-Updated At: 2026-11-11
+Updated At: 2026-11-13
 Updated By: AI Agent
 
 Prerequisite: run `alembic upgrade head` first (creates extension vector, chunks, sgk_docs).
@@ -153,6 +153,8 @@ def main(argv: Optional[List[str]] = None) -> int:
         else:
             logger.info("chunks loaded from csv: %d", load_csv(conn, Path(args.csv)))
         post_process(conn)
+        from app.scripts.backfill_sgk_chapters import backfill
+        logger.info("chapter backfill: %d chunks updated", sum(backfill(conn).values()))
         with conn.cursor() as cur:
             cur.execute("SELECT count(*) FROM chunks")
             logger.info("chunks rows: %d", cur.fetchone()[0])

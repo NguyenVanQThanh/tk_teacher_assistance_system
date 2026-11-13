@@ -293,6 +293,34 @@ def seed_academic_sample_data():
 
         session.commit()
 
+        print("--- [5b] Seeding Subject Department Heads (one head per subject) ---")
+        # Subject.head_teacher_id is a single column, so a subject can only ever have one head.
+        # Each head must be an active teacher who teaches the subject (same rule as the admin API).
+        department_heads = [
+            ("Toán học", "0999000002"),
+            ("Hóa học", "0999000005"),
+            ("Vật lý", "0999000004"),
+            ("Tiếng Anh", "0999000006"),
+            ("Ngữ văn", "0999000007"),
+            ("Sinh học", "0999000008"),
+            ("Lịch sử", "0999000009"),
+        ]
+        for s_name, t_phone in department_heads:
+            subject = subjects_dict[s_name]
+            teacher = teachers_dict[t_phone]
+            teaches = session.query(TeacherSubject).filter(
+                TeacherSubject.teacher_id == teacher.user_id,
+                TeacherSubject.subject_id == subject.subject_id,
+                TeacherSubject.status == "ACTIVE",
+            ).first()
+            if not teaches:
+                print(f"Skip head for {s_name}: {teacher.full_name} does not teach it")
+                continue
+            if subject.head_teacher_id != teacher.user_id:
+                subject.head_teacher_id = teacher.user_id
+                print(f"Head of {s_name} -> {teacher.full_name}")
+        session.commit()
+
         print("--- [6] Seeding Students (55 Students) ---")
         student_names = [
             # 12A1 (20 students)

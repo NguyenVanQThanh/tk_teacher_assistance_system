@@ -87,6 +87,8 @@ class Subject(Base):
     subject_name = Column(String(100), unique=True, nullable=False)
     description = Column(Text, nullable=True)
     status = Column(String(20), default='ACTIVE', nullable=False)
+    # Head of the subject department; their published documents/exercises are shared with teachers of the subject.
+    head_teacher_id = Column(UUID(as_uuid=True), ForeignKey('users.user_id', ondelete='SET NULL'), nullable=True, index=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
 
@@ -284,10 +286,12 @@ class ClassAssignment(Base):
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
     # Set by the teacher to reveal per-question results/answers of an exam to students; NULL = hidden.
     answers_released_at = Column(DateTime(timezone=True), nullable=True)
+    # Set for personal (student AI-generated) assignments; NULL means class-wide.
+    owner_student_id = Column(UUID(as_uuid=True), ForeignKey('users.user_id', ondelete='SET NULL'), nullable=True, index=True)
 
     class_obj = relationship("Class", backref="assignments")
     exercise = relationship("Exercise", backref="assignments")
-    assigner = relationship("User", backref="created_assignments")
+    assigner = relationship("User", foreign_keys=[assigned_by], backref="created_assignments")
 
 
 
