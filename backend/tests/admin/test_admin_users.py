@@ -287,3 +287,53 @@ class TestAdminUserLifecycleAndSoftDelete:
         assert "text/csv" in resp.headers["content-type"]
         # Must start with UTF-8 BOM for Excel compatibility
         assert resp.content.startswith(b"\xef\xbb\xbf")
+
+
+class TestAdminBulkImport:
+    """Bulk import from CSV/XLSX with template download."""
+
+    @staticmethod
+    def _phone():
+        return f"09{uuid.uuid4().int % 100000000:08d}"
+
+    def _post(self, client, name, data, ctype, dry=False):
+        h = {"Authorization": f"Bearer {get_admin_token(client)}"}
+        return client.post(f"/api/v1/admin/users/import-excel?dry_run={str(dry).lower()}",
+                           files={"file": (name, data, ctype)}, headers=h)
+
+    def test_template_downloads(self, client: TestClient):
+        h = {"Authorization": f"Bearer {get_admin_token(client)}"}
+        x = client.get("/api/v1/admin/users/import-template?format=xlsx", headers=h)
+        assert x.status_code == 200 and x.content.startswith(b"PK")
+        c = client.get("/api/v1/admin/users/import-template?format=csv", headers=h)
+        assert c.status_code == 200 and c.content.decode("utf-8-sig").startswith("full_name,role")
+
+    def test_csv_import_with_row_errors(self, client: TestClient):
+        p1, p2 = self._phone(), self._phone()
+        csv_text = ("full_name,role,phone,email\n"
+                    f"Nguyen Van A,Student,{p1},\n"
+                    f"Tran Thi B,Wizard,{p2},\n"
+                    f"Le Van C,Student,{p1},\n")
+        r = self._post(client, "u.csv", csv_text.encode(), "text/csv")
+        assert r.status_code == 200
+        body = r.json()
+        assert body["successful_count"] == 1 and body["failed_count"] == 2
+        assert body["created"][0]["temporary_password"]
+        assert {e["row"] for e in body["errors"]} == {3, 4}
+
+    def test_xlsx_import_and_dry_run(self, client: TestClient):
+        from io import BytesIO
+        from openpyxl import Workbook
+        wb = Workbook(); ws = wb.active
+        ws.append(["Họ và tên", "Vai trò", "Số điện thoại", "Ngày sinh"])
+        ws.append(["Pham Van D", "Học sinh", self._phone(), "2008-05-20"])
+        buf = BytesIO(); wb.save(buf)
+        ct = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+        dry = self._post(client, "u.xlsx", buf.getvalue(), ct, dry=True).json()
+        assert dry["valid_count"] == 1 and dry["successful_count"] == 0
+        real = self._post(client, "u.xlsx", buf.getvalue(), ct).json()
+        assert real["successful_count"] == 1
+
+    def test_rejects_bad_type_and_missing_column(self, client: TestClient):
+        assert self._post(client, "u.txt", b"x", "text/plain").status_code == 415
+        assert self._post(client, "u.csv", b"foo,bar\n1,2\n", "text/csv").status_code == 400

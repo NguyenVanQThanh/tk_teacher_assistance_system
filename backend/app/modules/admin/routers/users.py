@@ -1,4 +1,4 @@
-# File Name: users.py
+﻿# File Name: users.py
 # Description: API routers for Admin User Management (F-ADMIN-01).
 # Created At: 2026-09-29
 # Created By: Tam Khang
@@ -29,6 +29,7 @@ from app.modules.admin.schemas import (
 )
 from app.modules.admin.repository import AdminUserRepository
 from app.modules.admin.services.user_service import AdminUserService
+from app.modules.admin.services.user_import_service import UserImportService, MAX_IMPORT_BYTES
 
 router = APIRouter(prefix="/api/v1/admin/users", tags=["admin-users"])
 
@@ -132,66 +133,36 @@ def export_users_csv(
     )
 
 
+@router.get("/import-template", dependencies=[Depends(require_admin_privilege)])
+def download_import_template(fmt: str = Query("xlsx", alias="format", pattern="^(xlsx|csv)$")):
+    """Downloads a sample file (header + example rows) the admin fills in and imports."""
+    if fmt == "csv":
+        return Response(
+            content=UserImportService.build_template_csv(),
+            media_type="text/csv; charset=utf-8",
+            headers={"Content-Disposition": "attachment; filename=user_import_template.csv"},
+        )
+    return Response(
+        content=UserImportService.build_template_xlsx(),
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": "attachment; filename=user_import_template.xlsx"},
+    )
+
+
 @router.post("/import-excel", dependencies=[Depends(require_admin_privilege)])
 def import_users_excel(
     file: UploadFile = File(...),
+    dry_run: bool = Query(False),
     db: Session = Depends(get_db)
 ):
     """
-    Imports users from a CSV file with line-by-line validation.
-    Generates default passwords and dispatches notifications for all valid entries.
-
-    Plain ``def`` on purpose: CSV parsing and the per-row ``create_user`` DB
-    commits are synchronous. FastAPI runs this in the threadpool, and
-    IMPORT_SEMAPHORE bounds concurrent imports so they cannot block the event
-    loop or exhaust the connection pool.
+    Imports users from a .csv or .xlsx file (columns matched by header name).
+    With dry_run=true rows are validated only. Plain ``def`` on purpose: parsing and per-row
+    commits are synchronous; IMPORT_SEMAPHORE bounds concurrent imports.
     """
-    contents = file.file.read()
+    contents = file.file.read(MAX_IMPORT_BYTES + 1)
     with IMPORT_SEMAPHORE:
-        try:
-            decoded = contents.decode("utf-8-sig")
-        except UnicodeDecodeError:
-            decoded = contents.decode("latin-1")
-
-        reader = csv.reader(io.StringIO(decoded))
-        rows = list(reader)
-        if not rows:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail={"code": "ERR-ADMIN-EMPTY_FILE", "message": "Uploaded file is empty."}
-            )
-
-        # Expect header in row 0
-        header = [h.strip().lower() for h in rows[0]]
-        successful = 0
-        errors = []
-
-        for idx, row in enumerate(rows[1:], start=2):
-            if not any(row):
-                continue
-            try:
-                full_name = row[0].strip() if len(row) > 0 else ""
-                role_name = row[1].strip() if len(row) > 1 else "Student"
-                phone = row[2].strip() if len(row) > 2 else None
-                email = row[3].strip() if len(row) > 3 else None
-
-                payload = AdminUserCreateRequest(
-                    full_name=full_name,
-                    role=role_name,
-                    phone=phone,
-                    email=email,
-                    is_active_immediately=True
-                )
-                AdminUserService.create_user(db=db, payload=payload)
-                successful += 1
-            except Exception as e:
-                errors.append({"row": idx, "error": str(e)})
-
-        return {
-            "total_processed": len(rows) - 1,
-            "successful_count": successful,
-            "errors": errors
-        }
+        return UserImportService.import_users(db, file.filename or "", contents, dry_run=dry_run)
 
 
 @router.get("/generate-code", dependencies=[Depends(require_admin_privilege)])
@@ -312,3 +283,4 @@ def reset_user_password(
     Resets user password, generating a default password and dispatching via SMS / system notification.
     """
     return AdminUserService.reset_password(db=db, user_id=user_id, custom_password=payload.new_password)
+

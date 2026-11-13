@@ -409,6 +409,13 @@ export const adminUsersApi = {
     });
     return response.data;
   },
+  downloadImportTemplate: async (format = 'xlsx') => {
+    const response = await api.get('/api/v1/admin/users/import-template', {
+      params: { format },
+      responseType: 'blob',
+    });
+    return response.data;
+  },
   importExcel: async (formData) => {
     const response = await api.post('/api/v1/admin/users/import-excel', formData, {
       headers: {

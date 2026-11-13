@@ -346,6 +346,7 @@ export default function AdminUsersPage() {
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [isImportModalOpen, setIsImportModalOpen] = useState(false);
+  const [importResult, setImportResult] = useState(null);
   const [isExportModalOpen, setIsExportModalOpen] = useState(false);
   const [toastMessage, setToastMessage] = useState(null);
 
@@ -867,18 +868,48 @@ export default function AdminUsersPage() {
     formData.append('file', file);
 
     setLoading(true);
+    setImportResult(null);
     showToast('Đang tiến hành nhập dữ liệu người dùng...');
     try {
       const res = await adminUsersApi.importExcel(formData);
-      setIsImportModalOpen(false);
+      setImportResult(res);
       showToast(`Nhập dữ liệu hoàn tất! Thành công: ${res.successful_count}/${res.total_processed} tài khoản.`);
       await fetchUsers();
     } catch (err) {
-      const errMsg = err.response?.data?.detail?.message || 'Lỗi khi nhập file Excel.';
+      const errMsg = err.response?.data?.detail?.message || 'Lỗi khi nhập file.';
       showToast(`Lỗi: ${errMsg}`);
     } finally {
+      e.target.value = '';
       setLoading(false);
     }
+  };
+
+  const saveBlob = (blob, filename) => {
+    const url = window.URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.setAttribute('download', filename);
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    window.URL.revokeObjectURL(url);
+  };
+
+  const handleDownloadTemplate = async (format) => {
+    try {
+      const blob = await adminUsersApi.downloadImportTemplate(format);
+      saveBlob(blob, `user_import_template.${format}`);
+    } catch (err) {
+      showToast('Lỗi khi tải file mẫu.');
+    }
+  };
+
+  const handleDownloadCredentials = () => {
+    const esc = (v) => `"${String(v ?? '').replace(/"/g, '""')}"`;
+    const lines = ['full_name,role,phone,email,temporary_password'].concat(
+      importResult.created.map((c) => [c.full_name, c.role, c.phone, c.email, c.temporary_password].map(esc).join(','))
+    );
+    saveBlob(new Blob(['﻿' + lines.join('\n')], { type: 'text/csv;charset=utf-8;' }), 'temporary_passwords.csv');
   };
 
   // Selection handlers
@@ -1452,14 +1483,14 @@ export default function AdminUsersPage() {
           <button 
             type="button" 
             className="btn-sync-download-template"
-            onClick={handleExportSubmit}
+            onClick={() => handleDownloadTemplate('xlsx')}
           >
             Tải file mẫu Excel / CSV
           </button>
           <button 
             type="button" 
             className="btn-sync-import-excel"
-            onClick={() => setIsImportModalOpen(true)}
+            onClick={() => { setImportResult(null); setIsImportModalOpen(true); }}
           >
             <FileSpreadsheet size={16} />
             <span>Nhập Excel</span>
@@ -1930,7 +1961,7 @@ export default function AdminUsersPage() {
                   className="btn-link-import-excel"
                   onClick={() => {
                     setIsAddModalOpen(false);
-                    setIsImportModalOpen(true);
+                    setImportResult(null); setIsImportModalOpen(true);
                   }}
                 >
                   <span>Nhập từ Excel / CSV</span>
@@ -2106,7 +2137,7 @@ export default function AdminUsersPage() {
                 <p>hoặc nhấn để chọn tệp tin từ máy tính</p>
                 <input 
                   type="file" 
-                  accept=".csv, .xlsx, .xls" 
+                  accept=".csv,.xlsx" 
                   style={{ display: 'none' }} 
                   id="excel-file-input" 
                   onChange={handleImportFileChange}
@@ -2117,11 +2148,39 @@ export default function AdminUsersPage() {
               <div className="excel-instructions">
                 <h5>Lưu ý định dạng:</h5>
                 <ul>
-                  <li>Hỗ trợ tệp CSV hoặc bảng tính chuẩn SMAS, VnEdu.</li>
-                  <li>Cột dữ liệu: Họ và tên, Vai trò (Student/Teacher), Số điện thoại, Email.</li>
-                  <li>Hệ thống sẽ tự động khởi tạo mật khẩu mặc định an toàn và gửi thông báo SMS cho từng người dùng hợp lệ.</li>
+                  <li>Hỗ trợ tệp .xlsx hoặc .csv (tối đa 2MB, 1000 dòng). Cột nhận theo tên tiêu đề.</li>
+                  <li>Cột: full_name, role (Student/Teacher), phone, email, birthday, code, class_name, department. Bắt buộc: Họ và tên, Vai trò.</li>
+                  <li>Mật khẩu được tạo tự động; danh sách mật khẩu tạm thời hiển thị bên dưới sau khi nhập.</li>
                 </ul>
+                <button type="button" data-testid="download-template-xlsx" onClick={() => handleDownloadTemplate('xlsx')}>Tải mẫu .xlsx</button>{' '}
+                <button type="button" data-testid="download-template-csv" onClick={() => handleDownloadTemplate('csv')}>Tải mẫu .csv</button>
               </div>
+
+              {importResult && (
+                <div data-testid="import-result" style={{ marginTop: 12 }}>
+                  <p>
+                    Tổng: {importResult.total_processed} | Thành công: {importResult.successful_count} | Lỗi: {importResult.failed_count}
+                  </p>
+                  {importResult.errors.length > 0 && (
+                    <table style={{ width: '100%' }} data-testid="import-errors">
+                      <thead><tr><th>Dòng</th><th>Họ tên</th><th>Lỗi</th></tr></thead>
+                      <tbody>
+                        {importResult.errors.map((er) => (
+                          <tr key={er.row}><td>{er.row}</td><td>{er.name}</td><td style={{ color: '#b91c1c' }}>{er.error}</td></tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  )}
+                  {importResult.created.length > 0 && (
+                    <>
+                      <button type="button" data-testid="download-passwords" onClick={handleDownloadCredentials}>
+                        Tải danh sách mật khẩu tạm (.csv)
+                      </button>
+                      <p style={{ fontSize: 12 }}>Chỉ hiển thị một lần. Hãy lưu lại trước khi đóng.</p>
+                    </>
+                  )}
+                </div>
+              )}
 
               <div className="admin-modal-footer">
                 <button type="button" className="admin-btn-cancel" onClick={() => setIsImportModalOpen(false)}>

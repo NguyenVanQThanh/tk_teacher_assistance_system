@@ -22,6 +22,7 @@ async function loginAsAdmin(page) {
 test.describe('Admin Subjects & Department Heads', () => {
   test('TC-SUBJ-01: page lists subjects with a head selector and sidebar link', async ({ page }) => {
     await loginAsAdmin(page);
+    await page.waitForLoadState("networkidle");
     await page.locator('.admin-sidebar .admin-nav-item:has-text("Môn học & Tổ trưởng")').click();
     await page.waitForURL('**/admin/subjects');
     await expect(page.getByTestId('admin-subjects-page')).toBeVisible();
