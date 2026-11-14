@@ -6,6 +6,7 @@
 # Updated By: Tam Khang
 
 import uuid
+from datetime import datetime, timedelta, timezone
 from typing import List, Optional, Tuple, Dict, Any
 from uuid import UUID
 from sqlalchemy.orm import Session
@@ -344,7 +345,7 @@ class AdminDashboardRepository:
             Document.status != "DELETED"
         ).scalar() or 0
         doc_count = db.query(Document).filter(Document.status != "DELETED").count()
-        lecture_views = int(doc_views) if int(doc_views) > 0 else (doc_count if doc_count > 0 else 14200)
+        lecture_views = int(doc_views) if int(doc_views) > 0 else doc_count
 
         attempt_count = db.query(StudentExerciseAttempt).filter(
             StudentExerciseAttempt.status != "DELETED"
@@ -353,19 +354,29 @@ class AdminDashboardRepository:
             StudentExerciseAttempt.status != "DELETED",
             StudentExerciseAttempt.is_finished.is_(True)
         ).count()
-        assignments_submitted = attempt_count if attempt_count > 0 else 3489
+        assignments_submitted = attempt_count
+        # No attendance data exists; report the real completion rate of attempts instead.
         attendance_rate = (
-            round(90.0 + (finished_attempts / attempt_count) * 10.0, 1)
-            if attempt_count > 0
-            else 96.8
+            round((finished_attempts / attempt_count) * 100, 1) if attempt_count > 0 else None
         )
 
-        if total_students == 0:
-            total_students = 2450
-        if total_teachers == 0:
-            total_teachers = 128
-        if total_classes == 0:
-            total_classes = 64
+        def _growth(model, extra_filters=()):
+            """Percent change in rows created in the last 30 days vs the 30 days before."""
+            now = datetime.now(timezone.utc)
+            cur_start = now - timedelta(days=30)
+            prev_start = now - timedelta(days=60)
+            base = [model.status != "DELETED", *extra_filters]
+            current = db.query(model).filter(*base, model.created_at >= cur_start).count()
+            previous = db.query(model).filter(
+                *base, model.created_at >= prev_start, model.created_at < cur_start
+            ).count()
+            if previous == 0:
+                return None
+            return round((current - previous) * 100.0 / previous, 1)
+
+        student_growth = _growth(User, [User.role_id == student_role.role_id]) if student_role else None
+        teacher_growth = _growth(User, [User.role_id == teacher_role.role_id]) if teacher_role else None
+        classes_growth = _growth(Class)
 
         return {
             "total_students": total_students,
@@ -374,10 +385,10 @@ class AdminDashboardRepository:
             "attendance_rate": attendance_rate,
             "lecture_views": lecture_views,
             "assignments_submitted": assignments_submitted,
-            "student_growth": 12.5,
-            "teacher_growth": 4.2,
-            "attendance_growth": 0.8,
-            "classes_growth": 6.0
+            "student_growth": student_growth,
+            "teacher_growth": teacher_growth,
+            "attendance_growth": None,
+            "classes_growth": classes_growth,
         }
 
     @staticmethod

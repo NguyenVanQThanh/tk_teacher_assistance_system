@@ -119,7 +119,7 @@ def get_activity_chart(
     db: Session = Depends(get_db),
 ):
     """
-    Retrieve activity metrics for the area curve chart from live database records with baseline fallback.
+    Retrieve activity metrics for the area curve chart from live database records.
     """
     from datetime import datetime, timedelta, timezone
     from sqlalchemy import func, or_
@@ -135,73 +135,45 @@ def get_activity_chart(
             return None
         return dt.replace(tzinfo=timezone.utc) if dt.tzinfo is None else dt.astimezone(timezone.utc)
 
-    attempt_timestamps = [
-        _to_utc(row[0])
-        for row in db.query(StudentExerciseAttempt.created_at)
-        .filter(StudentExerciseAttempt.status != "DELETED")
-        .all()
-        if row[0] is not None
-    ]
-    doc_rows = (
-        db.query(Document.created_at, Document.download_count)
-        .filter(Document.status != "DELETED")
-        .all()
-    )
-    user_timestamps = [
-        _to_utc(row[0])
-        for row in db.query(User.created_at)
-        .filter(User.status != "DELETED")
-        .all()
-        if row[0] is not None
-    ]
-    audit_timestamps = [
-        _to_utc(row[0])
-        for row in db.query(AuditLog.created_at)
-        .filter(
-            AuditLog.status != "DELETED",
-            or_(AuditLog.ip_address.is_(None), AuditLog.ip_address != "INTERNAL_STATE"),
-            or_(AuditLog.title.is_(None), func.substr(AuditLog.title, 1, 2) != "__"),
+    # Only load rows inside the chart window; totals are computed with COUNT/SUM in the DB.
+    def _window(col, *extra):
+        return [ts for (ts,) in db.query(col).filter(col >= since, *extra).all() if ts is not None]
+
+    attempt_ok = StudentExerciseAttempt.status != "DELETED"
+    doc_ok = Document.status != "DELETED"
+    recent_events = [
+        _to_utc(ts)
+        for ts in (
+            _window(StudentExerciseAttempt.created_at, attempt_ok)
+            + _window(Document.created_at, doc_ok)
+            + _window(User.created_at, User.status != "DELETED")
+            + _window(
+                AuditLog.created_at,
+                AuditLog.status != "DELETED",
+                or_(AuditLog.ip_address.is_(None), AuditLog.ip_address != "INTERNAL_STATE"),
+                or_(AuditLog.title.is_(None), func.substr(AuditLog.title, 1, 2) != "__"),
+            )
         )
-        .all()
-        if row[0] is not None
     ]
 
-    recent_events = (
-        [ts for ts in attempt_timestamps if ts >= since]
-        + [ts for row_dt, _ in doc_rows if (ts := _to_utc(row_dt)) is not None and ts >= since]
-        + [ts for ts in user_timestamps if ts >= since]
-        + [ts for ts in audit_timestamps if ts >= since]
-    )
-
-    total_doc_downloads = sum(int(dl or 0) for _, dl in doc_rows)
-    total_docs = len(doc_rows)
-    total_attempts = len(attempt_timestamps)
-
-    if is_month:
-        lecture_views = total_doc_downloads if total_doc_downloads > 0 else (total_docs if total_docs > 0 else 62200)
-        assignments_submitted = total_attempts if total_attempts > 0 else 14350
-    else:
-        lecture_views = total_doc_downloads if total_doc_downloads > 0 else (total_docs if total_docs > 0 else 14200)
-        assignments_submitted = total_attempts if total_attempts > 0 else 3489
+    total_doc_downloads = int(db.query(func.coalesce(func.sum(Document.download_count), 0)).filter(doc_ok).scalar() or 0)
+    total_docs = db.query(Document).filter(doc_ok).count()
+    total_attempts = db.query(StudentExerciseAttempt).filter(attempt_ok).count()
+    lecture_views = total_doc_downloads if total_doc_downloads > 0 else total_docs
+    assignments_submitted = total_attempts
 
     if not recent_events:
+        # No real activity: return zeroed points instead of fabricated sample data.
         if is_month:
-            points = [
-                ActivityChartPoint(day="Tuần 1", visits=12400, x=70, y=170),
-                ActivityChartPoint(day="Tuần 2", visits=15800, x=210, y=125),
-                ActivityChartPoint(day="Tuần 3 (Đỉnh)", visits=19400, x=380, y=65, is_peak=True),
-                ActivityChartPoint(day="Tuần 4", visits=14600, x=550, y=140),
-            ]
+            labels = ["Tuần 1", "Tuần 2", "Tuần 3", "Tuần 4"]
+            x_coords = [70, 210, 380, 550]
         else:
-            points = [
-                ActivityChartPoint(day="T2", visits=850, x=50, y=190),
-                ActivityChartPoint(day="T3", visits=1450, x=140, y=155),
-                ActivityChartPoint(day="T4", visits=2250, x=230, y=105),
-                ActivityChartPoint(day="T5", visits=2350, x=320, y=100),
-                ActivityChartPoint(day="T6 (Đỉnh)", visits=2840, x=410, y=70, is_peak=True),
-                ActivityChartPoint(day="T7", visits=2200, x=500, y=110),
-                ActivityChartPoint(day="CN", visits=1250, x=590, y=165),
-            ]
+            labels = ["T2", "T3", "T4", "T5", "T6", "T7", "CN"]
+            x_coords = [50, 140, 230, 320, 410, 500, 590]
+        points = [
+            ActivityChartPoint(day=lbl, visits=0, x=x_coords[i], y=190)
+            for i, lbl in enumerate(labels)
+        ]
     else:
         if is_month:
             labels = ["Tuần 1", "Tuần 2", "Tuần 3", "Tuần 4"]
@@ -242,7 +214,7 @@ def get_activity_chart(
         points=points,
         lecture_views=lecture_views,
         assignments_submitted=assignments_submitted,
-        last_updated_relative="Just now" if recent_events else "10 minutes ago",
+        last_updated_relative="Just now",
     )
 
 

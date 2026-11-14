@@ -73,28 +73,28 @@ export default function AdminDashboard() {
 
   // Core stats state
   const [stats, setStats] = useState({
-    total_students: 2450,
-    total_teachers: 128,
-    total_classes: 64,
-    attendance_rate: 96.8,
-    lecture_views: 14200,
-    assignments_submitted: 3489
+    total_students: 0,
+    total_teachers: 0,
+    total_classes: 0,
+    attendance_rate: null,
+    lecture_views: 0,
+    assignments_submitted: 0
   });
 
   // Chart data state
   const [chartData, setChartData] = useState({
     points: [
-      { day: 'T2', visits: 850, x: 50, y: 190 },
-      { day: 'T3', visits: 1450, x: 140, y: 155 },
-      { day: 'T4', visits: 2250, x: 230, y: 105 },
-      { day: 'T5', visits: 2350, x: 320, y: 100 },
-      { day: 'T6 (Đỉnh)', visits: 2840, x: 410, y: 70, isPeak: true },
-      { day: 'T7', visits: 2200, x: 500, y: 110 },
-      { day: 'CN', visits: 1250, x: 590, y: 165 },
+      { day: 'T2', visits: 0, x: 50, y: 190 },
+      { day: 'T3', visits: 0, x: 140, y: 190 },
+      { day: 'T4', visits: 0, x: 230, y: 190 },
+      { day: 'T5', visits: 0, x: 320, y: 190 },
+      { day: 'T6', visits: 0, x: 410, y: 190 },
+      { day: 'T7', visits: 0, x: 500, y: 190 },
+      { day: 'CN', visits: 0, x: 590, y: 190 },
     ],
-    lectureViews: 14200,
-    assignmentsSubmitted: 3489,
-    lastUpdated: '10 phút trước'
+    lectureViews: 0,
+    assignmentsSubmitted: 0,
+    lastUpdated: 'Đang tải...'
   });
 
   // Approval requests state
@@ -160,7 +160,7 @@ export default function AdminDashboard() {
           points: res.points,
           lectureViews: res.lecture_views,
           assignmentsSubmitted: res.assignments_submitted,
-          lastUpdated: res.last_updated_relative === '10 minutes ago' ? '10 phút trước' : res.last_updated_relative
+          lastUpdated: res.last_updated_relative === 'Just now' ? 'Vừa xong' : res.last_updated_relative
         });
       }
     } catch (err) {
@@ -449,11 +449,11 @@ export default function AdminDashboard() {
             <div className="chart-legend-items">
               <div className="legend-item">
                 <span className="legend-dot purple"></span>
-                <span>Lượt xem bài giảng: <strong>{chartData.lectureViews ? chartData.lectureViews.toLocaleString() : '14,200'}</strong></span>
+                <span>Lượt xem bài giảng: <strong>{(chartData.lectureViews || 0).toLocaleString()}</strong></span>
               </div>
               <div className="legend-item">
                 <span className="legend-dot blue"></span>
-                <span>Bài tập đã nộp: <strong>{chartData.assignmentsSubmitted ? chartData.assignmentsSubmitted.toLocaleString() : '3,489'}</strong></span>
+                <span>Bài tập đã nộp: <strong>{(chartData.assignmentsSubmitted || 0).toLocaleString()}</strong></span>
               </div>
             </div>
             <div className="chart-update-time">
