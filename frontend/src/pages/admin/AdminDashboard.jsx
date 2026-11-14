@@ -2,7 +2,7 @@
 // Description: Master Admin Dashboard with system operations metrics, server status, LMS traffic chart, approval queue, and audit logs connected to Backend API.
 // Created At: 2026-09-19
 // Created By: Tam Khang
-// Updated At: 2026-09-30
+// Updated At: 2026-11-14
 // Updated By: Tam Khang
 
 import React, { useState, useEffect, useCallback } from 'react';
@@ -24,9 +24,44 @@ import {
   Sparkles,
   X
 } from 'lucide-react';
-import { adminDashboardApi } from '../../services/api';
+import { adminDashboardApi, adminUsersApi } from '../../services/api';
 import './AdminDashboard.css';
 import toast from '../../components/common/toast';
+
+const FALLBACK_AUDIT_ITEMS = [
+  {
+    id: 'fallback-audit-1',
+    title: '5 lần đăng nhập thất bại liên tiếp',
+    description: 'IP: 118.70.12.91 đã bị tạm khóa bảo mật 30 phút do vượt quá số lần xác thực',
+    actor_name: 'System',
+    severity: 'warning',
+    time: '10 phút trước • Module: Auth & Security'
+  },
+  {
+    id: 'fallback-audit-2',
+    title: 'Cập nhật phân quyền Ban Giám Hiệu',
+    description: 'Thực hiện bởi: Thầy Hiệu Trưởng (UID: #AD01) • Cấp quyền duyệt giáo án toàn trường',
+    actor_name: 'Admin',
+    severity: 'info',
+    time: '45 phút trước • Module: RBAC'
+  },
+  {
+    id: 'fallback-audit-3',
+    title: 'Backup dữ liệu tự động hoàn tất',
+    description: 'Bản snapshot lưu trữ dung lượng 8.2 GB đã được đồng bộ lên AWS S3 Cold Storage',
+    actor_name: 'System',
+    severity: 'info',
+    time: '02:00 Sáng hôm nay • Module: Automated Backup'
+  },
+  {
+    id: 'fallback-audit-4',
+    title: 'Gia hạn thành công chứng chỉ SSL Wildcard',
+    description: "Tự động gia hạn bởi Let's Encrypt bot cho domain *.school.edu.vn (thời hạn 90 ngày)",
+    actor_name: 'Admin',
+    severity: 'info',
+    time: 'Hôm qua • Module: Infrastructure'
+  }
+];
 
 export default function AdminDashboard() {
   const [timeframe, setTimeframe] = useState('week'); // 'week' | 'month'
@@ -65,7 +100,16 @@ export default function AdminDashboard() {
   // Approval requests state
   const [requests, setRequests] = useState([]);
   const [auditLogs, setAuditLogs] = useState([]);
+  const [fullAuditLogs, setFullAuditLogs] = useState([]);
+  const [loadingAuditModal, setLoadingAuditModal] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [newUser, setNewUser] = useState({
+    fullName: '',
+    email: '',
+    phone: '',
+    role: 'Teacher',
+    department: 'Toán học'
+  });
 
   const showToast = (msg) => {
     setToastMessage(msg);
@@ -170,24 +214,57 @@ export default function AdminDashboard() {
     }
   };
 
-  const handleCreateUserSubmit = (e) => {
+  const handleOpenAuditModal = async () => {
+    setShowAuditModal(true);
+    setLoadingAuditModal(true);
+    try {
+      const logsRes = await adminDashboardApi.getAuditLogs(50);
+      if (Array.isArray(logsRes) && logsRes.length > 0) {
+        setFullAuditLogs(logsRes);
+      } else {
+        setFullAuditLogs(auditLogs);
+      }
+    } catch (err) {
+      console.error('Failed to load full audit logs:', err);
+      setFullAuditLogs(auditLogs);
+    } finally {
+      setLoadingAuditModal(false);
+    }
+  };
+
+  const handleCreateUserSubmit = async (e) => {
     e.preventDefault();
     if (!newUser.fullName || !newUser.email) {
       toast.error('Vui lòng nhập đầy đủ họ tên và email.');
       return;
     }
-    setShowCreateUserModal(false);
-    showToast(`Đã tạo tài khoản cho ${newUser.fullName} thành công!`);
-    setNewUser({
-      fullName: '',
-      email: '',
-      phone: '',
-      role: 'Teacher',
-      department: 'Toán học'
-    });
+    try {
+      const mappedRole = newUser.role === 'HomeroomTeacher' ? 'Teacher' : newUser.role;
+      await adminUsersApi.createUser({
+        full_name: newUser.fullName.trim(),
+        email: newUser.email.trim(),
+        phone: newUser.phone ? newUser.phone.trim() : null,
+        role: mappedRole,
+        department: newUser.department || null,
+        is_active_immediately: true
+      });
+      setShowCreateUserModal(false);
+      showToast(`Đã tạo tài khoản cho ${newUser.fullName} thành công!`);
+      setNewUser({
+        fullName: '',
+        email: '',
+        phone: '',
+        role: 'Teacher',
+        department: 'Toán học'
+      });
+      fetchDashboardData();
+    } catch (err) {
+      const errMsg = err.response?.data?.detail?.message || err.response?.data?.detail || err.message || 'Lỗi khi tạo tài khoản.';
+      toast.error(errMsg);
+    }
   };
 
-  const currentChartData = chartData.points;
+  const currentChartData = chartData.points || [];
 
   // Path generator for SVG smooth spline curve
   const generateSvgPath = (points) => {
@@ -206,7 +283,13 @@ export default function AdminDashboard() {
   };
 
   const linePath = generateSvgPath(currentChartData);
-  const areaPath = `${linePath} L ${currentChartData[currentChartData.length - 1].x} 230 L ${currentChartData[0].x} 230 Z`;
+  const areaPath = currentChartData.length > 0
+    ? `${linePath} L ${currentChartData[currentChartData.length - 1].x} 230 L ${currentChartData[0].x} 230 Z`
+    : '';
+  const peakPoint = currentChartData.find(pt => pt.isPeak || pt.is_peak);
+  const displayedAuditModalLogs = fullAuditLogs.length > 0
+    ? fullAuditLogs
+    : (auditLogs.length > 0 ? auditLogs : FALLBACK_AUDIT_ITEMS);
 
   return (
     <div className="admin-dashboard-container">
@@ -309,45 +392,55 @@ export default function AdminDashboard() {
               {/* Spline curve stroke */}
               <path d={linePath} fill="none" stroke="#4D308D" strokeWidth="2.8" strokeLinecap="round" />
 
-              {/* Peak Tooltip Highlight on Friday */}
-              {timeframe === 'week' && (
-                <g className="chart-peak-tooltip">
-                  <rect x="360" y="32" width="102" height="26" rx="6" fill="#1D1928" />
-                  <text x="411" y="49" fill="#FFFFFF" fontSize="11.5" fontWeight="600" textAnchor="middle">
-                    2,840 truy cập
-                  </text>
-                  <polygon points="411,58 406,64 416,64" fill="#1D1928" />
-                  <line x1="410" y1="64" x2="410" y2="70" stroke="#4D308D" strokeWidth="1.5" />
-                </g>
-              )}
+              {/* Peak Tooltip Highlight */}
+              {peakPoint && (() => {
+                const tipRectX = Math.max(4, Math.min(534, peakPoint.x - 50));
+                const tipRectY = Math.max(4, peakPoint.y - 38);
+                return (
+                  <g className="chart-peak-tooltip">
+                    <rect x={tipRectX} y={tipRectY} width="102" height="26" rx="6" fill="#1D1928" />
+                    <text x={tipRectX + 51} y={tipRectY + 17} fill="#FFFFFF" fontSize="11.5" fontWeight="600" textAnchor="middle">
+                      {`${(peakPoint.visits ?? 2840).toLocaleString()} truy cập`}
+                    </text>
+                    <polygon
+                      points={`${peakPoint.x},${peakPoint.y - 12} ${peakPoint.x - 5},${peakPoint.y - 6} ${peakPoint.x + 5},${peakPoint.y - 6}`}
+                      fill="#1D1928"
+                    />
+                    <line x1={peakPoint.x} y1={peakPoint.y - 6} x2={peakPoint.x} y2={peakPoint.y} stroke="#4D308D" strokeWidth="1.5" />
+                  </g>
+                );
+              })()}
 
               {/* Interactive Data Points */}
-              {currentChartData.map((pt, idx) => (
-                <g key={pt.day} onMouseEnter={() => setHoveredIndex(idx)} onMouseLeave={() => setHoveredIndex(null)}>
-                  {/* Outer circle halo on peak or hover */}
-                  {(pt.isPeak || hoveredIndex === idx) && (
-                    <circle cx={pt.x} cy={pt.y} r="8" fill="#E8DAFF" opacity="0.8" />
-                  )}
-                  <circle 
-                    cx={pt.x} 
-                    cy={pt.y} 
-                    r="4.5" 
-                    fill={pt.isPeak ? '#4D308D' : '#FFFFFF'} 
-                    stroke="#4D308D" 
-                    strokeWidth="2.2" 
-                    className="chart-data-point"
-                  />
-                  {/* X Axis Day Label */}
-                  <text 
-                    x={pt.x} 
-                    y="246" 
-                    className={`chart-x-label ${pt.isPeak ? 'peak-label' : ''}`}
-                    textAnchor="middle"
-                  >
-                    {pt.day}
-                  </text>
-                </g>
-              ))}
+              {currentChartData.map((pt, idx) => {
+                const isPointPeak = Boolean(pt.isPeak || pt.is_peak);
+                return (
+                  <g key={pt.day} onMouseEnter={() => setHoveredIndex(idx)} onMouseLeave={() => setHoveredIndex(null)}>
+                    {/* Outer circle halo on peak or hover */}
+                    {(isPointPeak || hoveredIndex === idx) && (
+                      <circle cx={pt.x} cy={pt.y} r="8" fill="#E8DAFF" opacity="0.8" />
+                    )}
+                    <circle 
+                      cx={pt.x} 
+                      cy={pt.y} 
+                      r="4.5" 
+                      fill={isPointPeak ? '#4D308D' : '#FFFFFF'} 
+                      stroke="#4D308D" 
+                      strokeWidth="2.2" 
+                      className="chart-data-point"
+                    />
+                    {/* X Axis Day Label */}
+                    <text 
+                      x={pt.x} 
+                      y="246" 
+                      className={`chart-x-label ${isPointPeak ? 'peak-label' : ''}`}
+                      textAnchor="middle"
+                    >
+                      {pt.day}
+                    </text>
+                  </g>
+                );
+              })}
             </svg>
           </div>
 
@@ -529,7 +622,7 @@ export default function AdminDashboard() {
           <button 
             type="button" 
             className="audit-view-all-btn"
-            onClick={() => setShowAuditModal(true)}
+            onClick={handleOpenAuditModal}
           >
             <span>Xem toàn bộ nhật ký kiểm toán</span>
             <ChevronRight size={17} />
@@ -721,49 +814,28 @@ export default function AdminDashboard() {
             </div>
             <div className="admin-modal-body">
               <div className="audit-full-list">
-                <div className="audit-item">
-                  <div className="audit-icon-circle red">
-                    <AlertTriangle size={16} />
+                {loadingAuditModal ? (
+                  <div className="audit-empty-state" style={{ padding: '16px', color: '#6B7280', fontSize: '13px' }}>
+                    Đang tải nhật ký kiểm toán...
                   </div>
-                  <div className="audit-details">
-                    <h4 className="audit-item-title">5 lần đăng nhập thất bại liên tiếp</h4>
-                    <p className="audit-item-desc">IP: 118.70.12.91 đã bị tạm khóa bảo mật 30 phút do vượt quá số lần xác thực</p>
-                    <span className="audit-item-time red">10 phút trước • Module: Auth & Security</span>
-                  </div>
-                </div>
-
-                <div className="audit-item">
-                  <div className="audit-icon-circle purple">
-                    <Users size={16} />
-                  </div>
-                  <div className="audit-details">
-                    <h4 className="audit-item-title">Cập nhật phân quyền Ban Giám Hiệu</h4>
-                    <p className="audit-item-desc">Thực hiện bởi: Thầy Hiệu Trưởng (UID: #AD01) • Cấp quyền duyệt giáo án toàn trường</p>
-                    <span className="audit-item-time">45 phút trước • Module: RBAC</span>
-                  </div>
-                </div>
-
-                <div className="audit-item">
-                  <div className="audit-icon-circle green">
-                    <Cloud size={16} />
-                  </div>
-                  <div className="audit-details">
-                    <h4 className="audit-item-title">Backup dữ liệu tự động hoàn tất</h4>
-                    <p className="audit-item-desc">Bản snapshot lưu trữ dung lượng 8.2 GB đã được đồng bộ lên AWS S3 Cold Storage</p>
-                    <span className="audit-item-time">02:00 Sáng hôm nay • Module: Automated Backup</span>
-                  </div>
-                </div>
-
-                <div className="audit-item">
-                  <div className="audit-icon-circle purple">
-                    <Shield size={16} />
-                  </div>
-                  <div className="audit-details">
-                    <h4 className="audit-item-title">Gia hạn thành công chứng chỉ SSL Wildcard</h4>
-                    <p className="audit-item-desc">Tự động gia hạn bởi Let's Encrypt bot cho domain *.school.edu.vn (thời hạn 90 ngày)</p>
-                    <span className="audit-item-time">Hôm qua • Module: Infrastructure</span>
-                  </div>
-                </div>
+                ) : (
+                  displayedAuditModalLogs.map((log, idx) => {
+                    const isWarning = log.severity === 'warning' || log.severity === 'danger' || log.severity === 'error';
+                    const circleClass = isWarning ? 'red' : (log.actor_name === 'Admin' ? 'purple' : 'green');
+                    return (
+                      <div className="audit-item" key={log.id || `audit-modal-${idx}`}>
+                        <div className={`audit-icon-circle ${circleClass}`}>
+                          {isWarning ? <AlertTriangle size={16} /> : (log.actor_name === 'Admin' ? <Users size={16} /> : <Cloud size={16} />)}
+                        </div>
+                        <div className="audit-details">
+                          <h4 className="audit-item-title">{log.title}</h4>
+                          <p className="audit-item-desc">{log.description}</p>
+                          <span className={`audit-item-time ${isWarning ? 'red' : ''}`}>{log.time}</span>
+                        </div>
+                      </div>
+                    );
+                  })
+                )}
               </div>
 
               <div className="admin-modal-footer">

@@ -2,7 +2,7 @@
 # Description: Service layer for Class business logic — duplicate check, homeroom teacher validation, RBAC Data Scoping, CRUD, and restore operations.
 # Created At: 2026-07-22
 # Created By: Tam Khang
-# Updated At: 2026-07-26
+# Updated At: 2026-11-14
 # Updated By: Tam Khang
 
 import logging
@@ -233,3 +233,175 @@ class ClassService:
         ClassRepository.restore(db, cls)
         logger.info("Domain Event: EVT-ACAD-CLASS_RESTORED - class_id: %s", class_id)
         return cls
+
+    @staticmethod
+    def _class_meta_key(class_id: UUID) -> str:
+        return f"__CLASS_META__:{class_id}"
+
+    @staticmethod
+    def save_class_metadata(
+        db: Session,
+        class_id: UUID,
+        room_name: Optional[str] = None,
+        specialization: Optional[str] = None,
+        update_room: bool = False,
+        update_specialization: bool = False,
+    ) -> None:
+        """
+        Persist extended class metadata (room_name, specialization) in the shared state store.
+        """
+        if not update_room and not update_specialization:
+            return
+        from app.modules.admin.state_store import get_latest_state, upsert_state
+
+        key = ClassService._class_meta_key(class_id)
+        current = get_latest_state(db, key) or {}
+        if update_room:
+            current["room_name"] = room_name.strip() if room_name else None
+        if update_specialization:
+            current["specialization"] = specialization.strip() if specialization else None
+        upsert_state(db, key, current, actor_name="System")
+
+    @staticmethod
+    def enrich_classes_out(db: Session, classes: List[Class]):
+        """
+        Convert Class ORM objects into enriched ClassOut schemas with teacher info,
+        active student counts, room_name, and specialization without triggering N+1 queries.
+        """
+        from sqlalchemy import func
+        from models.models import StudentClass, User
+        from app.modules.academic.schemas import ClassOut
+        from app.modules.admin.state_store import list_state_items
+
+        if not classes:
+            return []
+
+        class_ids = [c.class_id for c in classes]
+        teacher_ids = list({c.homeroom_teacher_id for c in classes if c.homeroom_teacher_id})
+
+        # 1. Batch count active students per class
+        count_rows = (
+            db.query(StudentClass.class_id, func.count(StudentClass.student_id))
+            .filter(
+                StudentClass.class_id.in_(class_ids),
+                func.upper(StudentClass.status) != "DELETED",
+            )
+            .group_by(StudentClass.class_id)
+            .all()
+        )
+        counts_map = {cid: int(cnt) for cid, cnt in count_rows}
+
+        # 2. Batch load homeroom teachers
+        teachers_map = {}
+        if teacher_ids:
+            teacher_rows = db.query(User).filter(User.user_id.in_(teacher_ids)).all()
+            teachers_map = {t.user_id: t for t in teacher_rows}
+
+        # 3. Batch load optional class metadata (room_name, specialization)
+        meta_rows = list_state_items(db, "__CLASS_META__:", prefix_match=True)
+        meta_map = {}
+        for row, payload in meta_rows:
+            cid_str = row.title.split("__CLASS_META__:", 1)[-1]
+            meta_map[cid_str] = payload
+
+        enriched: List[ClassOut] = []
+        for cls in classes:
+            teacher = teachers_map.get(cls.homeroom_teacher_id) if cls.homeroom_teacher_id else None
+            teacher_name = teacher.full_name if teacher else None
+            teacher_code = (
+                f"GV-{str(teacher.user_id).replace('-', '')[:6].upper()}"
+                if teacher
+                else None
+            )
+            meta = meta_map.get(str(cls.class_id), {})
+            enriched.append(
+                ClassOut(
+                    class_id=cls.class_id,
+                    class_name=cls.class_name,
+                    school_year=cls.academic_year,
+                    homeroom_teacher_id=cls.homeroom_teacher_id,
+                    homeroom_teacher_name=teacher_name,
+                    homeroom_teacher_code=teacher_code,
+                    student_count=counts_map.get(cls.class_id, 0),
+                    room_name=meta.get("room_name"),
+                    specialization=meta.get("specialization"),
+                    status=cls.status,
+                    created_at=cls.created_at,
+                    updated_at=cls.updated_at,
+                )
+            )
+        return enriched
+
+    @staticmethod
+    def enrich_class_out(db: Session, cls: Class):
+        """
+        Enrich a single Class ORM object into ClassOut.
+        """
+        return ClassService.enrich_classes_out(db, [cls])[0]
+
+    @staticmethod
+    def export_classes_csv(
+        db: Session,
+        status_val: Optional[str] = None,
+        current_user: Optional[User] = None,
+        grade: Optional[str] = None,
+        school_year: Optional[str] = None,
+        search: Optional[str] = None,
+    ) -> bytes:
+        """
+        Export filtered classes as UTF-8 BOM CSV bytes.
+        """
+        import csv
+        import io
+
+        classes = ClassService.list_classes(db=db, status_val=status_val, current_user=current_user)
+        enriched = ClassService.enrich_classes_out(db, classes)
+
+        if grade and grade.strip() and grade.strip().lower() != "all":
+            g = grade.strip().lower()
+            for prefix in ("khối", "khoi", "grade", "k"):
+                if g.startswith(prefix):
+                    g = g[len(prefix):].strip()
+                    break
+            enriched = [c for c in enriched if c.class_name.lower().startswith(g)]
+
+        if school_year and school_year.strip() and school_year.strip().lower() != "all":
+            sy = school_year.strip().lower()
+            enriched = [c for c in enriched if (c.school_year or "").lower() == sy]
+
+        if search and search.strip():
+            term = search.strip().lower()
+            enriched = [
+                c for c in enriched
+                if term in c.class_name.lower()
+                or term in (c.homeroom_teacher_name or "").lower()
+                or term in (c.room_name or "").lower()
+            ]
+
+        buf = io.StringIO()
+        writer = csv.writer(buf)
+        writer.writerow([
+            "Class ID",
+            "Class Name",
+            "Academic Year",
+            "Homeroom Teacher",
+            "Teacher Code",
+            "Student Count",
+            "Room",
+            "Specialization",
+            "Status",
+        ])
+        for item in enriched:
+            writer.writerow([
+                str(item.class_id),
+                item.class_name,
+                item.school_year or "",
+                item.homeroom_teacher_name or "",
+                item.homeroom_teacher_code or "",
+                item.student_count,
+                item.room_name or "",
+                item.specialization or "",
+                item.status.value if hasattr(item.status, "value") else str(item.status),
+            ])
+
+        return b"\xef\xbb\xbf" + buf.getvalue().encode("utf-8")
