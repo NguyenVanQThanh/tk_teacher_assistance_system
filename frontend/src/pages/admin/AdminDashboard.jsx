@@ -28,41 +28,6 @@ import { adminDashboardApi, adminUsersApi } from '../../services/api';
 import './AdminDashboard.css';
 import toast from '../../components/common/toast';
 
-const FALLBACK_AUDIT_ITEMS = [
-  {
-    id: 'fallback-audit-1',
-    title: '5 lần đăng nhập thất bại liên tiếp',
-    description: 'IP: 118.70.12.91 đã bị tạm khóa bảo mật 30 phút do vượt quá số lần xác thực',
-    actor_name: 'System',
-    severity: 'warning',
-    time: '10 phút trước • Module: Auth & Security'
-  },
-  {
-    id: 'fallback-audit-2',
-    title: 'Cập nhật phân quyền Ban Giám Hiệu',
-    description: 'Thực hiện bởi: Thầy Hiệu Trưởng (UID: #AD01) • Cấp quyền duyệt giáo án toàn trường',
-    actor_name: 'Admin',
-    severity: 'info',
-    time: '45 phút trước • Module: RBAC'
-  },
-  {
-    id: 'fallback-audit-3',
-    title: 'Backup dữ liệu tự động hoàn tất',
-    description: 'Bản snapshot lưu trữ dung lượng 8.2 GB đã được đồng bộ lên AWS S3 Cold Storage',
-    actor_name: 'System',
-    severity: 'info',
-    time: '02:00 Sáng hôm nay • Module: Automated Backup'
-  },
-  {
-    id: 'fallback-audit-4',
-    title: 'Gia hạn thành công chứng chỉ SSL Wildcard',
-    description: "Tự động gia hạn bởi Let's Encrypt bot cho domain *.school.edu.vn (thời hạn 90 ngày)",
-    actor_name: 'Admin',
-    severity: 'info',
-    time: 'Hôm qua • Module: Infrastructure'
-  }
-];
-
 export default function AdminDashboard() {
   const [timeframe, setTimeframe] = useState('week'); // 'week' | 'month'
   const [hoveredIndex, setHoveredIndex] = useState(null);
@@ -289,7 +254,7 @@ export default function AdminDashboard() {
   const peakPoint = currentChartData.find(pt => pt.isPeak || pt.is_peak);
   const displayedAuditModalLogs = fullAuditLogs.length > 0
     ? fullAuditLogs
-    : (auditLogs.length > 0 ? auditLogs : FALLBACK_AUDIT_ITEMS);
+    : auditLogs;
 
   return (
     <div className="admin-dashboard-container">

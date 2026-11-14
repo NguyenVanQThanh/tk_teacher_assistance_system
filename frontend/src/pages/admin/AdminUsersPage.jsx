@@ -59,6 +59,7 @@ const DEFAULT_DEPARTMENT_OPTIONS = [
 ];
 
 const USER_DRAFT_STORAGE_KEY = 'admin_user_draft';
+const DRAFT_MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000;
 const FULL_NAME_REGEX = /^[a-zA-Z\sàáảãạăắằẳẵặâấầẩẫậđèéẻẽẹêếềểễệìíỉĩịòóỏõọôốồổỗộơớờởỡợùúủũụưứừửữựỳýỷỹỵÀÁẢÃẠĂẮẰẲẴẶÂẤẦẨẪẬĐÈÉẺẼẸÊẾỀỂỄỆÌÍỈĨỊÒÓỎÕỌÔỐỒỔỖỘƠỚỜỞỠỢÙÚỦŨỤƯỨỪỬỮỰỲÝỶỸỴ]+$/;
 
 // Strict Calendar Date Validation (e.g. rejects 31/02/2020)
@@ -417,8 +418,11 @@ export default function AdminUsersPage() {
     const savedDraft = localStorage.getItem(USER_DRAFT_STORAGE_KEY);
     if (savedDraft) {
       try {
-        const parsedDraft = JSON.parse(savedDraft);
-        if (parsedDraft && typeof parsedDraft === 'object') {
+        const { savedAt, ...parsedDraft } = JSON.parse(savedDraft);
+        // Drop drafts older than 7 days so personal data does not linger in the browser.
+        if (!savedAt || Date.now() - savedAt > DRAFT_MAX_AGE_MS) {
+          localStorage.removeItem(USER_DRAFT_STORAGE_KEY);
+        } else if (parsedDraft && typeof parsedDraft === 'object') {
           setNewUserForm(prev => ({ ...prev, ...parsedDraft }));
         }
       } catch {
@@ -718,7 +722,7 @@ export default function AdminUsersPage() {
     setBirthDateError(null);
   };
 
-  const buildCreateUserPayload = (trimmedName, forceInactiveDraft = false) => {
+  const buildCreateUserPayload = (trimmedName) => {
     const isStudent = newUserForm.roleType === 'student';
     const matchedClass = isStudent
       ? classesCatalog.find(c => (c.class_name || c.name) === newUserForm.classRoom)
@@ -727,7 +731,7 @@ export default function AdminUsersPage() {
     const emailToUse = isStudent
       ? `${slugName}.${(newUserForm.code || 'hs').toLowerCase()}@student.clarity.edu.vn`
       : (newUserForm.teacherEmail?.trim() || `${slugName}@clarity.edu.vn`);
-    const isActive = forceInactiveDraft ? false : newUserForm.isActiveImmediately;
+    const isActive = newUserForm.isActiveImmediately;
 
     return {
       full_name: trimmedName,
@@ -752,7 +756,7 @@ export default function AdminUsersPage() {
 
     setLoading(true);
     try {
-      const res = await adminUsersApi.createUser(buildCreateUserPayload(trimmedName, false));
+      const res = await adminUsersApi.createUser(buildCreateUserPayload(trimmedName));
       localStorage.removeItem(USER_DRAFT_STORAGE_KEY);
       setIsAddModalOpen(false);
       showToast(`Tạo thành công ${res.role === 'Student' ? 'Học sinh' : 'Giáo viên'} "${res.full_name}". Mật khẩu mặc định đã tự động sinh và gửi qua SMS / hệ thống.`);
@@ -766,31 +770,18 @@ export default function AdminUsersPage() {
     }
   };
 
-  const handleSaveDraft = async () => {
-    const { valid, trimmedName } = validateNewUserForm(false);
-    if (!valid) {
-      localStorage.setItem(USER_DRAFT_STORAGE_KEY, JSON.stringify(newUserForm));
-      setIsAddModalOpen(false);
-      showToast(`Đã lưu bản nháp thông tin người dùng "${newUserForm.fullName || newUserForm.code}".`);
+  // Draft is kept only in this browser; it never creates an account on the server.
+  const handleSaveDraft = () => {
+    try {
+      // Do not persist the auto-generated code: it may be consumed by the time the draft is reopened.
+      const { code: _code, ...draftWithoutCode } = newUserForm;
+      localStorage.setItem(USER_DRAFT_STORAGE_KEY, JSON.stringify({ ...draftWithoutCode, savedAt: Date.now() }));
+    } catch {
+      showToast('Không thể lưu bản nháp trên trình duyệt này.');
       return;
     }
-
-    setLoading(true);
-    try {
-      const res = await adminUsersApi.createUser(buildCreateUserPayload(trimmedName, true));
-      localStorage.removeItem(USER_DRAFT_STORAGE_KEY);
-      setIsAddModalOpen(false);
-      showToast(`Đã lưu hồ sơ chờ kích hoạt cho "${res.full_name}".`);
-      resetNewUserForm();
-      await fetchUsers();
-    } catch (err) {
-      localStorage.setItem(USER_DRAFT_STORAGE_KEY, JSON.stringify(newUserForm));
-      const errMsg = err.response?.data?.detail?.message || err.response?.data?.detail || err.message || 'Không thể lưu lên máy chủ, đã lưu tạm trên trình duyệt.';
-      setIsAddModalOpen(false);
-      showToast(`Đã lưu bản nháp cục bộ (${errMsg}).`);
-    } finally {
-      setLoading(false);
-    }
+    setIsAddModalOpen(false);
+    showToast(`Đã lưu bản nháp thông tin người dùng "${newUserForm.fullName || 'chưa đặt tên'}" trên trình duyệt này.`);
   };
 
   const getDeactivateReasonsByRole = (roleKey) => {
