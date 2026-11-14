@@ -2,10 +2,10 @@
 // Description: Comprehensive System Settings screen for Admin portal with modular use cases: General, AI Assistant, Grading, Security, Notifications, and Backup.
 // Created At: 2026-09-20
 // Created By: Tam Khang
-// Updated At: 2026-09-20
+// Updated At: 2026-11-14
 // Updated By: Tam Khang
 
-import React, { useState } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { 
   Settings, 
   Building2, 
@@ -20,19 +20,86 @@ import {
   AlertCircle, 
   Eye, 
   EyeOff, 
-  Lock, 
-  Sliders, 
-  Server, 
-  Clock, 
-  Key, 
-  Send, 
-  Download, 
   Power, 
   FileText,
-  HelpCircle,
-  Cpu
+  Send, 
+  Download
 } from 'lucide-react';
+import { adminSettingsApi } from '../../services/api';
 import './AdminSettingsPage.css';
+
+const YEAR_VALUE_MAP = {
+  '2025-2026': '2025 - 2026',
+  '2024-2025': '2024 - 2025',
+  '2023-2024': '2023 - 2024',
+};
+
+const SEMESTER_VALUE_MAP = {
+  HK1: 'Học kỳ I',
+  HK2: 'Học kỳ II',
+  HK_HE: 'Học kỳ Hè',
+};
+
+const PROVIDER_VALUE_MAP = {
+  google_gemini: 'Google Gemini AI',
+  openai: 'OpenAI GPT-4o',
+  anthropic: 'Anthropic Claude',
+};
+
+const STORAGE_VALUE_MAP = {
+  local_db_snapshot: 'Local Server',
+};
+
+const normalizeGeneralSettings = (raw = {}) => ({
+  ...raw,
+  academicYear: YEAR_VALUE_MAP[raw.academicYear] || raw.academicYear,
+  semester: SEMESTER_VALUE_MAP[raw.semester] || raw.semester,
+});
+
+const normalizeAiSettings = (raw = {}) => ({
+  ...raw,
+  provider: PROVIDER_VALUE_MAP[raw.provider] || raw.provider,
+});
+
+const normalizeGradingSettings = (raw = {}) => {
+  const next = { ...raw };
+  if (raw.gradingScale === 10 || raw.gradingScale === '10') next.gradingScale = 'scale10';
+  else if (raw.gradingScale === 4 || raw.gradingScale === '4') next.gradingScale = 'gpa4';
+
+  if (raw.roundingPrecision === 1 || raw.roundingPrecision === '1') next.roundingPrecision = '0.1';
+  else if (raw.roundingPrecision === 2 || raw.roundingPrecision === '2') next.roundingPrecision = '0.01';
+  else if (raw.roundingPrecision !== undefined && raw.roundingPrecision !== null) {
+    next.roundingPrecision = String(raw.roundingPrecision);
+  }
+  return next;
+};
+
+const normalizeMaintenanceSettings = (raw = {}) => ({
+  ...raw,
+  backupStorageLocation:
+    STORAGE_VALUE_MAP[raw.backupStorageLocation] || raw.backupStorageLocation,
+});
+
+const formatSnapshotTime = (isoOrText) => {
+  if (!isoOrText) return '';
+  const dt = new Date(isoOrText);
+  if (Number.isNaN(dt.getTime())) return String(isoOrText);
+  return dt.toLocaleString('vi-VN');
+};
+
+const triggerBlobDownload = (blobData, filename) => {
+  const blob = blobData instanceof Blob
+    ? blobData
+    : new Blob([blobData], { type: 'application/json;charset=utf-8;' });
+  const url = window.URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.setAttribute('download', filename);
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  window.URL.revokeObjectURL(url);
+};
 
 export default function AdminSettingsPage() {
   const [activeTab, setActiveTab] = useState('general'); // 'general' | 'ai' | 'grading' | 'security' | 'notifications' | 'maintenance'
@@ -41,6 +108,8 @@ export default function AdminSettingsPage() {
   const [pingStatus, setPingStatus] = useState(null);
   const [showApiKey, setShowApiKey] = useState(false);
   const [isTestingSmtp, setIsTestingSmtp] = useState(false);
+  const [isCreatingBackup, setIsCreatingBackup] = useState(false);
+  const [downloadingBackupId, setDownloadingBackupId] = useState(null);
 
   // 1. General Settings State
   const [generalSettings, setGeneralSettings] = useState({
@@ -131,24 +200,118 @@ export default function AdminSettingsPage() {
     }, 3500);
   };
 
-  const handleSaveSettings = () => {
+  const applySettingsResponse = useCallback((res) => {
+    if (!res || typeof res !== 'object') return;
+    if (res.general) {
+      setGeneralSettings((prev) => ({ ...prev, ...normalizeGeneralSettings(res.general) }));
+    }
+    if (res.ai) {
+      setAiSettings((prev) => ({ ...prev, ...normalizeAiSettings(res.ai) }));
+    }
+    if (res.grading) {
+      setGradingSettings((prev) => ({ ...prev, ...normalizeGradingSettings(res.grading) }));
+    }
+    if (res.security) {
+      setSecuritySettings((prev) => ({ ...prev, ...res.security }));
+    }
+    if (res.maintenance) {
+      setMaintenanceSettings((prev) => ({ ...prev, ...normalizeMaintenanceSettings(res.maintenance) }));
+    }
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    const loadInitialSettings = async () => {
+      try {
+        const [settingsRes, backupsRes] = await Promise.all([
+          adminSettingsApi.getSettings().catch((err) => {
+            console.error('Failed to load system settings:', err);
+            return null;
+          }),
+          adminSettingsApi.getBackups().catch((err) => {
+            console.error('Failed to load backup snapshots:', err);
+            return null;
+          }),
+        ]);
+        if (cancelled) return;
+        if (settingsRes) {
+          applySettingsResponse(settingsRes);
+        }
+        if (backupsRes && Array.isArray(backupsRes.items)) {
+          setBackupSnapshots(backupsRes.items);
+        }
+      } catch (err) {
+        console.error('Error initializing admin settings:', err);
+      }
+    };
+
+    loadInitialSettings();
+    return () => {
+      cancelled = true;
+    };
+  }, [applySettingsResponse]);
+
+  const handleSaveSettings = async () => {
+    if (activeTab === 'notifications') {
+      setIsSaving(true);
+      setTimeout(() => {
+        setIsSaving(false);
+        showToast('Đã lưu cấu hình cài đặt hệ thống thành công!');
+      }, 400);
+      return;
+    }
+
     setIsSaving(true);
-    setTimeout(() => {
-      setIsSaving(false);
+    try {
+      const res = await adminSettingsApi.updateSettings({
+        section: activeTab,
+        general: generalSettings,
+        ai: aiSettings,
+        grading: gradingSettings,
+        security: securitySettings,
+        maintenance: maintenanceSettings,
+      });
+      applySettingsResponse(res);
       showToast('Đã lưu cấu hình cài đặt hệ thống thành công!');
-    }, 600);
+    } catch (err) {
+      console.error('Failed to update system settings:', err);
+      const errMsg = err.response?.data?.detail?.message || err.message || 'Không thể lưu cấu hình hệ thống.';
+      showToast(`Lỗi: ${errMsg}`);
+    } finally {
+      setIsSaving(false);
+    }
   };
 
-  const handlePingAi = () => {
+  const handlePingAi = async () => {
     setPingStatus('testing');
-    setTimeout(() => {
-      setPingStatus({
-        status: 'online',
-        latency: '115ms',
-        model: aiSettings.defaultModel
+    try {
+      const res = await adminSettingsApi.pingAi({
+        provider: aiSettings.provider,
+        model: aiSettings.defaultModel,
       });
-      showToast('Kiểm tra API AI Gemini thành công! Độ trễ: 115ms (Ổn định)');
-    }, 800);
+      const latencyMs = res?.latency_ms ?? 1;
+      const statusText = res?.status || 'configured';
+      const resolvedModel = res?.model || aiSettings.defaultModel;
+      setPingStatus({
+        status: statusText,
+        configured: res?.configured !== false,
+        latencyMs,
+        provider: res?.provider || aiSettings.provider,
+        model: resolvedModel,
+        checkedAt: res?.checked_at || null,
+      });
+      if (res?.configured === false) {
+        showToast('Chưa cấu hình API key cho nhà cung cấp AI.');
+      } else {
+        showToast(`Kiểm tra cấu hình AI thành công (${statusText})! Độ trễ: ${latencyMs}ms`);
+      }
+    } catch (err) {
+      console.error('Failed to ping AI endpoint:', err);
+      setPingStatus(null);
+      const errMsg = err.response?.data?.detail?.message || err.message || 'Không thể kết nối tới API AI.';
+      showToast(`Lỗi kiểm tra API AI: ${errMsg}`);
+    }
   };
 
   const handleTestSmtp = () => {
@@ -159,20 +322,40 @@ export default function AdminSettingsPage() {
     }, 900);
   };
 
-  const handleCreateBackupNow = () => {
+  const handleCreateBackupNow = async () => {
+    if (isCreatingBackup) return;
+    setIsCreatingBackup(true);
     showToast('Đang tạo bản sao lưu dữ liệu toàn hệ thống...');
-    setTimeout(() => {
-      const now = new Date();
-      const newSnap = {
-        id: `snap-${Date.now()}`,
-        filename: `smartlms_db_snapshot_manual_${now.toISOString().slice(0, 10)}.sql.gz`,
-        size: '144 MB',
-        createdAt: `${now.toISOString().slice(0, 10)} ${now.toLocaleTimeString('vi-VN')}`,
-        status: 'completed'
-      };
-      setBackupSnapshots(prev => [newSnap, ...prev]);
-      showToast('Tạo bản sao lưu dữ liệu thành công!');
-    }, 1200);
+    try {
+      const res = await adminSettingsApi.createBackup();
+      const createdSnap = res?.item || res;
+      if (createdSnap && createdSnap.id) {
+        setBackupSnapshots((prev) => [createdSnap, ...prev]);
+      }
+      showToast(`Tạo bản sao lưu "${createdSnap?.filename || 'snapshot'}" thành công!`);
+    } catch (err) {
+      console.error('Failed to create backup snapshot:', err);
+      const errMsg = err.response?.data?.detail?.message || err.message || 'Không thể tạo bản sao lưu.';
+      showToast(`Lỗi: ${errMsg}`);
+    } finally {
+      setIsCreatingBackup(false);
+    }
+  };
+
+  const handleDownloadBackup = async (snap) => {
+    if (!snap?.id || downloadingBackupId) return;
+    setDownloadingBackupId(snap.id);
+    try {
+      const blob = await adminSettingsApi.downloadBackup(snap.id);
+      triggerBlobDownload(blob, snap.filename || `smartlms_backup_${snap.id}.json`);
+      showToast(`Đã tải xuống bản sao lưu ${snap.filename || snap.id}!`);
+    } catch (err) {
+      console.error('Failed to download backup snapshot:', err);
+      const errMsg = err.response?.data?.detail?.message || err.message || 'Không thể tải xuống bản sao lưu.';
+      showToast(`Lỗi: ${errMsg}`);
+    } finally {
+      setDownloadingBackupId(null);
+    }
   };
 
   return (
@@ -444,13 +627,23 @@ export default function AdminSettingsPage() {
             {pingStatus && pingStatus !== 'testing' && (
               <div className="ai-status-banner">
                 <div className="ai-banner-left">
-                  <CheckCircle2 size={18} className="text-green" />
+                  {pingStatus.configured ? (
+                    <CheckCircle2 size={18} className="text-green" />
+                  ) : (
+                    <AlertCircle size={18} className="text-amber" />
+                  )}
                   <div>
-                    <h5 className="ai-banner-title">Kết nối API Gemini hoạt động tốt</h5>
-                    <p className="ai-banner-desc">Độ trễ máy chủ: <strong>{pingStatus.latency}</strong> • Model phản hồi: <strong>{pingStatus.model}</strong></p>
+                    <h5 className="ai-banner-title">
+                      Kết nối API {pingStatus.provider} ({pingStatus.status})
+                    </h5>
+                    <p className="ai-banner-desc">
+                      Độ trễ máy chủ: <strong>{pingStatus.latencyMs}ms</strong> • Model phản hồi: <strong>{pingStatus.model}</strong> • Trạng thái: <strong>{pingStatus.status}</strong>
+                    </p>
                   </div>
                 </div>
-                <span className="status-pill green">Sẵn sàng</span>
+                <span className={`status-pill ${pingStatus.configured ? 'green' : 'red'}`}>
+                  {pingStatus.configured ? 'Sẵn sàng' : 'Thiếu API Key'}
+                </span>
               </div>
             )}
 
@@ -475,8 +668,13 @@ export default function AdminSettingsPage() {
                   value={aiSettings.defaultModel}
                   onChange={e => setAiSettings(p => ({ ...p, defaultModel: e.target.value }))}
                 >
+                  <option value="gemini-2.5-flash">Gemini 2.5 Flash (Mặc định hệ thống)</option>
                   <option value="gemini-1.5-pro-latest">Gemini 1.5 Pro (Độ chính xác cao, phân tích sâu)</option>
                   <option value="gemini-1.5-flash-latest">Gemini 1.5 Flash (Tốc độ cực nhanh, tiết kiệm chi phí)</option>
+                  {aiSettings.defaultModel &&
+                    !['gemini-2.5-flash', 'gemini-1.5-pro-latest', 'gemini-1.5-flash-latest'].includes(aiSettings.defaultModel) && (
+                      <option value={aiSettings.defaultModel}>{aiSettings.defaultModel}</option>
+                    )}
                 </select>
               </div>
 
@@ -982,9 +1180,10 @@ export default function AdminSettingsPage() {
                   type="button" 
                   className="btn-backup-now"
                   onClick={handleCreateBackupNow}
+                  disabled={isCreatingBackup}
                 >
                   <Database size={16} />
-                  <span>Tạo bản sao lưu ngay</span>
+                  <span>{isCreatingBackup ? 'Đang tạo sao lưu...' : 'Tạo bản sao lưu ngay'}</span>
                 </button>
               </div>
             </div>
@@ -1064,31 +1263,40 @@ export default function AdminSettingsPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {backupSnapshots.map(snap => (
-                    <tr key={snap.id}>
-                      <td className="font-semibold text-dark">
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                          <FileText size={16} className="text-purple" />
-                          <span>{snap.filename}</span>
-                        </div>
-                      </td>
-                      <td>{snap.size}</td>
-                      <td className="text-muted">{snap.createdAt}</td>
-                      <td className="text-center">
-                        <span className="status-pill green">Thành công</span>
-                      </td>
-                      <td className="text-right">
-                        <button 
-                          type="button" 
-                          className="btn-download-backup"
-                          onClick={() => showToast(`Bắt đầu tải xuống bản sao lưu ${snap.filename}...`)}
-                        >
-                          <Download size={14} />
-                          <span>Tải xuống</span>
-                        </button>
+                  {backupSnapshots.length === 0 ? (
+                    <tr>
+                      <td colSpan={5} className="text-center text-muted" style={{ padding: '20px' }}>
+                        Chưa có bản sao lưu hệ thống nào.
                       </td>
                     </tr>
-                  ))}
+                  ) : (
+                    backupSnapshots.map(snap => (
+                      <tr key={snap.id}>
+                        <td className="font-semibold text-dark">
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                            <FileText size={16} className="text-purple" />
+                            <span>{snap.filename}</span>
+                          </div>
+                        </td>
+                        <td>{snap.size}</td>
+                        <td className="text-muted">{formatSnapshotTime(snap.createdAt)}</td>
+                        <td className="text-center">
+                          <span className="status-pill green">Thành công</span>
+                        </td>
+                        <td className="text-right">
+                          <button
+                            type="button"
+                            className="btn-download-backup"
+                            onClick={() => handleDownloadBackup(snap)}
+                            disabled={downloadingBackupId === snap.id}
+                          >
+                            <Download size={14} />
+                            <span>{downloadingBackupId === snap.id ? 'Đang tải...' : 'Tải xuống'}</span>
+                          </button>
+                        </td>
+                      </tr>
+                    ))
+                  )}
                 </tbody>
               </table>
             </div>
