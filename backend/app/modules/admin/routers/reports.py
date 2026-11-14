@@ -10,6 +10,7 @@ import html
 import io
 import json
 import logging
+import re
 from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, List, Optional
 from uuid import UUID
@@ -94,15 +95,17 @@ class ReportScheduleCreateRequest(BaseModel):
     enabled: bool = True
 
 
+def _escape_like(value: str) -> str:
+    """Escape LIKE wildcards so user input is matched literally."""
+    return value.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+
 def _normalize_grade_prefix(grade: Optional[str]) -> Optional[str]:
     if not grade or grade.strip().lower() in ("", "all"):
         return None
     val = grade.strip().lower()
-    for prefix in ("khối", "khoi", "grade", "k"):
-        if val.startswith(prefix):
-            val = val[len(prefix):].strip()
-            break
-    return val or None
+    # Strip a grade label only when a number follows, so values like "khoa" stay intact.
+    m = re.match(r"^(?:khối|khoi|grade|k)\s*(\d+)$", val)
+    return (m.group(1) if m else val) or None
 
 
 def _to_utc(dt: Optional[datetime]) -> Optional[datetime]:
@@ -139,7 +142,7 @@ def _compute_analytics(
     # 2. Classes (filtered by grade and optionally academic_year)
     class_query = db.query(Class).filter(func.upper(Class.status) != "DELETED")
     if norm_grade:
-        class_query = class_query.filter(Class.class_name.ilike(f"{norm_grade}%"))
+        class_query = class_query.filter(Class.class_name.ilike(_escape_like(norm_grade) + "%", escape="\\"))
     all_matching_classes = class_query.all()
     year_filter_active = bool(academic_year and academic_year.strip().lower() != "all")
     if year_filter_active:

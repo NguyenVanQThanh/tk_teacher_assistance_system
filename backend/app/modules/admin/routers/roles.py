@@ -477,7 +477,10 @@ def create_role(
     )
 
     state = _build_roles_and_matrix(db)
-    role_dto = next(r for r in state["roles"] if r["code"] == raw_code)
+    role_dto = next((r for r in state["roles"] if r["code"] == raw_code), None)
+    if role_dto is None:
+        # Role was created; only the display DTO could not be resolved, so avoid a 500.
+        role_dto = {"role_id": str(new_role.role_id), "code": raw_code, "name": payload.name.strip()}
     return {
         **role_dto,
         "role": role_dto,
@@ -546,7 +549,7 @@ def update_role_permissions(
             detail={"code": "ERR-ADMIN-ADMIN_PERMS_LOCKED", "message": "Admin role permissions cannot be modified."},
         )
 
-    raw_perms = payload.get("permissions") if isinstance(payload.get("permissions"), dict) else payload
+    raw_perms = payload.get("permissions") if "permissions" in payload else payload
     if not isinstance(raw_perms, dict):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,

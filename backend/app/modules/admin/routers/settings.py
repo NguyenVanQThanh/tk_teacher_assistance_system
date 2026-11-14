@@ -134,10 +134,8 @@ def _mask_secret(raw: Optional[str]) -> str:
     stripped = str(raw).strip()
     if not stripped:
         return ""
-    if _MASK_CHAR in stripped:
-        return stripped
-    tail = stripped[-4:] if len(stripped) > 4 else ""
-    return ("•" * 8) + tail
+    # Never reveal any part of the secret, including its last characters.
+    return _MASK_CHAR * 12
 
 
 def _load_raw_settings(db: Session) -> Dict[str, Dict[str, Any]]:
@@ -258,8 +256,8 @@ def ping_ai_configuration(
 
     elapsed_ms = max(1, int(round((time.perf_counter() - start) * 1000)))
     return {
-        # Readiness check only; no provider call is made.
-        "status": "connected" if has_configured_key else "not_configured",
+        # Readiness check only; no provider call is made, so never report "connected".
+        "status": "configured" if has_configured_key else "not_configured",
         "configured": has_configured_key,
         "latency_ms": elapsed_ms,
         "provider": provider,
