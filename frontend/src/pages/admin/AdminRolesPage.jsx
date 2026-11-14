@@ -2,33 +2,235 @@
 // Description: Comprehensive Roles & Permissions management screen for Admin portal with master-detail layout, module grouping, and interactive toggle matrix.
 // Created At: 2026-09-19
 // Created By: Tam Khang
-// Updated At: 2026-09-20
+// Updated At: 2026-11-14
 // Updated By: Tam Khang
 
-import React, { useState } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { 
   ShieldCheck, 
   Shield, 
   Key, 
   Users, 
-  RotateCcw, 
   Download, 
   Plus, 
   UserCheck, 
   CheckCircle2, 
-  AlertCircle, 
   BookOpen, 
   FileText, 
-  ChevronRight, 
   UserPlus, 
   Save, 
   X, 
-  GraduationCap, 
-  HelpCircle,
-  Clock,
-  Sparkles
+  GraduationCap
 } from 'lucide-react';
+import { adminRolesApi, adminUsersApi } from '../../services/api';
 import './AdminRolesPage.css';
+
+const ROLE_VISUAL_MAP = {
+  admin: {
+    nameVi: 'Quản trị viên',
+    descriptionVi: 'Toàn quyền quản trị hệ thống',
+    icon: Shield,
+    iconBg: '#F3ECFF',
+    iconColor: '#4D308D',
+  },
+  head_teacher: {
+    nameVi: 'Tổ trưởng chuyên môn',
+    descriptionVi: 'Duyệt giáo án, giám sát bộ môn',
+    icon: ShieldCheck,
+    iconBg: '#EDE9FE',
+    iconColor: '#6D28D9',
+  },
+  subject_teacher: {
+    nameVi: 'Giáo viên bộ môn',
+    descriptionVi: 'Lớp phụ trách, Chấm bài & Soạn đề',
+    icon: UserCheck,
+    iconBg: '#F3ECFF',
+    iconColor: '#4D308D',
+  },
+  academic_staff: {
+    nameVi: 'Giáo vụ đào tạo',
+    descriptionVi: 'Hồ sơ học sinh & Điểm danh lớp',
+    icon: BookOpen,
+    iconBg: '#FEF3C7',
+    iconColor: '#D97706',
+  },
+  student_parent: {
+    nameVi: 'Học sinh & Phụ huynh',
+    descriptionVi: 'Học tập trực tuyến, Nộp bài tập',
+    icon: GraduationCap,
+    iconBg: '#E6F8EE',
+    iconColor: '#059669',
+  },
+};
+
+const FALLBACK_ROLES = [
+  {
+    id: 'admin',
+    code: 'admin',
+    name: 'Quản trị viên',
+    description: 'Toàn quyền quản trị hệ thống',
+    memberCount: 16,
+    icon: Shield,
+    iconBg: '#F3ECFF',
+    iconColor: '#4D308D',
+    status: 'active',
+    isSystem: true,
+  },
+  {
+    id: 'head_teacher',
+    code: 'head_teacher',
+    name: 'Tổ trưởng chuyên môn',
+    description: 'Duyệt giáo án, giám sát bộ môn',
+    memberCount: 14,
+    icon: ShieldCheck,
+    iconBg: '#EDE9FE',
+    iconColor: '#6D28D9',
+    status: 'active',
+    isSystem: true,
+  },
+  {
+    id: 'subject_teacher',
+    code: 'subject_teacher',
+    name: 'Giáo viên bộ môn',
+    description: 'Lớp phụ trách, Chấm bài & Soạn đề',
+    memberCount: 112,
+    icon: UserCheck,
+    iconBg: '#F3ECFF',
+    iconColor: '#4D308D',
+    status: 'active',
+    isSystem: true,
+  },
+  {
+    id: 'academic_staff',
+    code: 'academic_staff',
+    name: 'Giáo vụ đào tạo',
+    description: 'Hồ sơ học sinh & Điểm danh lớp',
+    memberCount: 6,
+    icon: BookOpen,
+    iconBg: '#FEF3C7',
+    iconColor: '#D97706',
+    status: 'active',
+    isSystem: true,
+  },
+  {
+    id: 'student_parent',
+    code: 'student_parent',
+    name: 'Học sinh & Phụ huynh',
+    description: 'Học tập trực tuyến, Nộp bài tập',
+    memberCount: 2450,
+    icon: GraduationCap,
+    iconBg: '#E6F8EE',
+    iconColor: '#059669',
+    status: 'active',
+    isSystem: true,
+  },
+];
+
+const FALLBACK_PERMISSIONS = {
+  subject_teacher: {
+    view_schedule: true,
+    create_class: false,
+    assign_teaching: false,
+    ai_exercise: true,
+    auto_grade: true,
+    publish_exam: true,
+    edit_score_closed: false,
+    view_students: true,
+    edit_transcript: false,
+  },
+  admin: {
+    view_schedule: true,
+    create_class: true,
+    assign_teaching: true,
+    ai_exercise: true,
+    auto_grade: true,
+    publish_exam: true,
+    edit_score_closed: true,
+    view_students: true,
+    edit_transcript: true,
+  },
+  head_teacher: {
+    view_schedule: true,
+    create_class: false,
+    assign_teaching: true,
+    ai_exercise: true,
+    auto_grade: true,
+    publish_exam: true,
+    edit_score_closed: true,
+    view_students: true,
+    edit_transcript: false,
+  },
+  academic_staff: {
+    view_schedule: true,
+    create_class: true,
+    assign_teaching: false,
+    ai_exercise: false,
+    auto_grade: false,
+    publish_exam: false,
+    edit_score_closed: false,
+    view_students: true,
+    edit_transcript: true,
+  },
+  student_parent: {
+    view_schedule: true,
+    create_class: false,
+    assign_teaching: false,
+    ai_exercise: false,
+    auto_grade: false,
+    publish_exam: false,
+    edit_score_closed: false,
+    view_students: false,
+    edit_transcript: false,
+  },
+};
+
+const mapApiRoleToUi = (roleDto) => {
+  const code = roleDto.code || roleDto.id;
+  const visual = ROLE_VISUAL_MAP[code];
+  const isSystem = Boolean(roleDto.isSystem || visual);
+  return {
+    id: code,
+    code,
+    roleId: roleDto.role_id || null,
+    name: isSystem && visual ? visual.nameVi : (roleDto.name || code),
+    description: isSystem && visual
+      ? visual.descriptionVi
+      : (roleDto.description || 'Vai trò tùy chỉnh hệ thống'),
+    memberCount: typeof roleDto.memberCount === 'number' ? roleDto.memberCount : 0,
+    icon: visual?.icon || Key,
+    iconBg: visual?.iconBg || '#F3ECFF',
+    iconColor: visual?.iconColor || '#4D308D',
+    status: 'active',
+    isSystem,
+  };
+};
+
+const getInitials = (fullName) => {
+  if (!fullName) return 'ND';
+  const parts = String(fullName).trim().split(/\s+/);
+  if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
+  return `${parts[0][0]}${parts[parts.length - 1][0]}`.toUpperCase();
+};
+
+const formatMemberStatus = (status) => {
+  const normalized = String(status || 'ACTIVE').toUpperCase();
+  if (normalized === 'ACTIVE') return 'Đang hoạt động';
+  if (normalized === 'INACTIVE') return 'Chờ kích hoạt';
+  if (normalized === 'SUSPENDED') return 'Tạm khóa';
+  return normalized;
+};
+
+const triggerBlobDownload = (blobData, filename, mimeType) => {
+  const blob = blobData instanceof Blob ? blobData : new Blob([blobData], { type: mimeType });
+  const url = window.URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.setAttribute('download', filename);
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  window.URL.revokeObjectURL(url);
+};
 
 export default function AdminRolesPage() {
   const [activeRoleId, setActiveRoleId] = useState('subject_teacher');
@@ -40,12 +242,25 @@ export default function AdminRolesPage() {
   const [isViewMembersModalOpen, setIsViewMembersModalOpen] = useState(false);
   const [isExportModalOpen, setIsExportModalOpen] = useState(false);
 
+  // Async action states
+  const [isSaving, setIsSaving] = useState(false);
+  const [isCreatingRole, setIsCreatingRole] = useState(false);
+  const [isAssigningUser, setIsAssigningUser] = useState(false);
+  const [isExporting, setIsExporting] = useState(false);
+  const [exportFormat, setExportFormat] = useState('json');
+
+  // Role members and assignable users state
+  const [roleMembers, setRoleMembers] = useState([]);
+  const [isLoadingMembers, setIsLoadingMembers] = useState(false);
+  const [systemUsers, setSystemUsers] = useState([]);
+  const [isLoadingUsers, setIsLoadingUsers] = useState(false);
+
   // New role form state
   const [newRole, setNewRole] = useState({
     name: '',
     code: '',
     description: '',
-    cloneFrom: 'subject_teacher'
+    cloneFrom: 'subject_teacher',
   });
 
   const [newUserToAssign, setNewUserToAssign] = useState('');
@@ -57,123 +272,101 @@ export default function AdminRolesPage() {
     }, 3500);
   };
 
-  // Roles list matching the mockup
-  const [roles, setRoles] = useState([
-    {
-      id: 'admin',
-      name: 'Quản trị viên',
-      description: 'Toàn quyền quản trị hệ thống',
-      memberCount: 16,
-      icon: Shield,
-      iconBg: '#F3ECFF',
-      iconColor: '#4D308D',
-      status: 'active'
-    },
-    {
-      id: 'head_teacher',
-      name: 'Tổ trưởng chuyên môn',
-      description: 'Duyệt giáo án, giám sát bộ môn',
-      memberCount: 14,
-      icon: ShieldCheck,
-      iconBg: '#EDE9FE',
-      iconColor: '#6D28D9',
-      status: 'active'
-    },
-    {
-      id: 'subject_teacher',
-      name: 'Giáo viên bộ môn',
-      description: 'Lớp phụ trách, Chấm bài & Soạn đề',
-      memberCount: 112,
-      icon: UserCheck,
-      iconBg: '#F3ECFF',
-      iconColor: '#4D308D',
-      status: 'active'
-    },
-    {
-      id: 'academic_staff',
-      name: 'Giáo vụ đào tạo',
-      description: 'Hồ sơ học sinh & Điểm danh lớp',
-      memberCount: 6,
-      icon: BookOpen,
-      iconBg: '#FEF3C7',
-      iconColor: '#D97706',
-      status: 'active'
-    },
-    {
-      id: 'student_parent',
-      name: 'Học sinh & Phụ huynh',
-      description: 'Học tập trực tuyến, Nộp bài tập',
-      memberCount: 2450,
-      icon: GraduationCap,
-      iconBg: '#E6F8EE',
-      iconColor: '#059669',
-      status: 'active'
-    }
-  ]);
+  // Roles list with initial fallback so UI renders immediately
+  const [roles, setRoles] = useState(FALLBACK_ROLES);
 
   // Permission groups with permissions state for the currently active role
-  const [permissionsState, setPermissionsState] = useState({
-    subject_teacher: {
-      // Group 1
-      view_schedule: true,
-      create_class: false,
-      assign_teaching: false,
-      // Group 2
-      ai_exercise: true,
-      auto_grade: true,
-      publish_exam: true, // approval required
-      edit_score_closed: false,
-      // Group 3
-      view_students: true,
-      edit_transcript: false
-    },
-    admin: {
-      view_schedule: true,
-      create_class: true,
-      assign_teaching: true,
-      ai_exercise: true,
-      auto_grade: true,
-      publish_exam: true,
-      edit_score_closed: true,
-      view_students: true,
-      edit_transcript: true
-    },
-    head_teacher: {
-      view_schedule: true,
-      create_class: false,
-      assign_teaching: true,
-      ai_exercise: true,
-      auto_grade: true,
-      publish_exam: true,
-      edit_score_closed: true,
-      view_students: true,
-      edit_transcript: false
-    },
-    academic_staff: {
-      view_schedule: true,
-      create_class: true,
-      assign_teaching: false,
-      ai_exercise: false,
-      auto_grade: false,
-      publish_exam: false,
-      edit_score_closed: false,
-      view_students: true,
-      edit_transcript: true
-    },
-    student_parent: {
-      view_schedule: true,
-      create_class: false,
-      assign_teaching: false,
-      ai_exercise: false,
-      auto_grade: false,
-      publish_exam: false,
-      edit_score_closed: false,
-      view_students: false,
-      edit_transcript: false
+  const [permissionsState, setPermissionsState] = useState(FALLBACK_PERMISSIONS);
+
+  const fetchRoles = useCallback(async () => {
+    try {
+      const res = await adminRolesApi.getRoles();
+      if (res && Array.isArray(res.roles) && res.roles.length > 0) {
+        const mappedRoles = res.roles.map(mapApiRoleToUi);
+        setRoles(mappedRoles);
+        setActiveRoleId((prev) =>
+          mappedRoles.some((r) => r.id === prev) ? prev : mappedRoles[0].id
+        );
+      }
+      if (res && res.permissions_matrix && typeof res.permissions_matrix === 'object') {
+        setPermissionsState((prev) => ({
+          ...prev,
+          ...res.permissions_matrix,
+        }));
+      }
+    } catch (err) {
+      console.error('Failed to load RBAC roles and permissions:', err);
     }
-  });
+  }, []);
+
+  useEffect(() => {
+    fetchRoles();
+  }, [fetchRoles]);
+
+  // Fetch members when View Role Members modal opens
+  useEffect(() => {
+    if (!isViewMembersModalOpen || !activeRoleId) return;
+    let cancelled = false;
+
+    const loadMembers = async () => {
+      setIsLoadingMembers(true);
+      try {
+        const res = await adminRolesApi.getRoleMembers(activeRoleId);
+        if (!cancelled) {
+          setRoleMembers(Array.isArray(res?.items) ? res.items : []);
+        }
+      } catch (err) {
+        console.error('Failed to load role members:', err);
+        if (!cancelled) {
+          setRoleMembers([]);
+          showToast('Không thể tải danh sách thành viên của vai trò.');
+        }
+      } finally {
+        if (!cancelled) {
+          setIsLoadingMembers(false);
+        }
+      }
+    };
+
+    loadMembers();
+    return () => {
+      cancelled = true;
+    };
+  }, [isViewMembersModalOpen, activeRoleId]);
+
+  // Fetch assignable users when Assign User modal opens
+  useEffect(() => {
+    if (!isAddUserModalOpen) return;
+    let cancelled = false;
+
+    const loadUsers = async () => {
+      setIsLoadingUsers(true);
+      try {
+        const res = await adminUsersApi.getUsers({ page_size: 100 });
+        if (!cancelled) {
+          setSystemUsers(Array.isArray(res?.items) ? res.items : []);
+        }
+      } catch (err) {
+        console.error('Failed to load users for role assignment:', err);
+        if (!cancelled) {
+          setSystemUsers([]);
+          showToast('Không thể tải danh sách người dùng từ hệ thống.');
+        }
+      } finally {
+        if (!cancelled) {
+          setIsLoadingUsers(false);
+        }
+      }
+    };
+
+    loadUsers();
+    return () => {
+      cancelled = true;
+    };
+  }, [isAddUserModalOpen]);
 
   const activeRole = roles.find(r => r.id === activeRoleId) || roles[0];
+  const ActiveRoleIcon = activeRole?.icon || Shield;
   const currentPermissions = permissionsState[activeRoleId] || {};
 
   // Toggle a single permission
@@ -277,36 +470,105 @@ export default function AdminRolesPage() {
   };
 
   // Save changes handler
-  const handleSaveChanges = () => {
-    showToast(`Đã lưu cập nhật ma trận phân quyền cho vai trò "${activeRole.name}"!`);
+  const handleSaveChanges = async () => {
+    if (!activeRole || isSaving) return;
+    setIsSaving(true);
+    try {
+      const payloadPerms = permissionsState[activeRoleId] || {};
+      const res = await adminRolesApi.updatePermissions(activeRoleId, payloadPerms);
+      if (res && res.permissions) {
+        setPermissionsState((prev) => ({
+          ...prev,
+          [activeRoleId]: res.permissions,
+        }));
+      }
+      showToast(`Đã lưu cập nhật ma trận phân quyền cho vai trò "${activeRole.name}"!`);
+    } catch (err) {
+      console.error('Failed to update role permissions:', err);
+      const errMsg = err.response?.data?.detail?.message || err.message || 'Lỗi khi lưu phân quyền.';
+      showToast(`Lỗi: ${errMsg}`);
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   // Add new role submit
-  const handleAddRoleSubmit = (e) => {
+  const handleAddRoleSubmit = async (e) => {
     e.preventDefault();
-    if (!newRole.name || !newRole.code) return;
+    if (!newRole.name.trim() || !newRole.code.trim() || isCreatingRole) return;
 
-    const newId = newRole.code.toLowerCase().replace(/[^a-z0-9]/g, '_');
-    const roleItem = {
-      id: newId,
-      name: newRole.name,
-      description: newRole.description || 'Vai trò tùy chỉnh hệ thống',
-      memberCount: 0,
-      icon: Key,
-      iconBg: '#F3ECFF',
-      iconColor: '#4D308D',
-      status: 'active'
-    };
+    setIsCreatingRole(true);
+    try {
+      const res = await adminRolesApi.createRole({
+        name: newRole.name.trim(),
+        code: newRole.code.trim(),
+        description: newRole.description.trim(),
+        template_role_code: newRole.cloneFrom,
+      });
 
-    setRoles(prev => [...prev, roleItem]);
-    setPermissionsState(prev => ({
-      ...prev,
-      [newId]: { ...(prev[newRole.cloneFrom] || prev.subject_teacher) }
-    }));
-    setActiveRoleId(newId);
-    setIsAddRoleModalOpen(false);
-    showToast(`Đã tạo thành công vai trò "${roleItem.name}"!`);
-    setNewRole({ name: '', code: '', description: '', cloneFrom: 'subject_teacher' });
+      const createdDto = res?.role || res;
+      const roleItem = mapApiRoleToUi(createdDto);
+      setRoles((prev) => [...prev, roleItem]);
+      setPermissionsState((prev) => ({
+        ...prev,
+        [roleItem.id]: res?.permissions || { ...(prev[newRole.cloneFrom] || prev.subject_teacher || {}) },
+      }));
+      setActiveRoleId(roleItem.id);
+      setIsAddRoleModalOpen(false);
+      showToast(`Đã tạo thành công vai trò "${roleItem.name}"!`);
+      setNewRole({ name: '', code: '', description: '', cloneFrom: 'subject_teacher' });
+    } catch (err) {
+      console.error('Failed to create role:', err);
+      const errMsg = err.response?.data?.detail?.message || err.message || 'Không thể tạo vai trò mới.';
+      showToast(`Lỗi: ${errMsg}`);
+    } finally {
+      setIsCreatingRole(false);
+    }
+  };
+
+  // Assign user to active role submit
+  const handleAssignUserSubmit = async (e) => {
+    e.preventDefault();
+    if (!newUserToAssign || !activeRole || isAssigningUser) return;
+
+    setIsAssigningUser(true);
+    try {
+      const res = await adminRolesApi.assignRoleMember(activeRoleId, newUserToAssign);
+      const selectedUser = systemUsers.find(
+        (u) => String(u.id || u.user_id) === String(newUserToAssign)
+      );
+      const displayUserName = res?.full_name || selectedUser?.full_name || 'người dùng';
+      setIsAddUserModalOpen(false);
+      setNewUserToAssign('');
+      showToast(`Đã gán ${displayUserName} vào vai trò "${activeRole.name}"!`);
+      await fetchRoles();
+    } catch (err) {
+      console.error('Failed to assign user to role:', err);
+      const errMsg = err.response?.data?.detail?.message || err.message || 'Không thể gán người dùng.';
+      showToast(`Lỗi: ${errMsg}`);
+    } finally {
+      setIsAssigningUser(false);
+    }
+  };
+
+  // Export RBAC configuration file download
+  const handleExportRoles = async () => {
+    if (isExporting) return;
+    setIsExporting(true);
+    try {
+      const blob = await adminRolesApi.exportRoles(exportFormat);
+      const ext = exportFormat === 'json' ? 'json' : 'csv';
+      const mime = exportFormat === 'json' ? 'application/json;charset=utf-8;' : 'text/csv;charset=utf-8;';
+      triggerBlobDownload(blob, `roles_permissions_export.${ext}`, mime);
+      setIsExportModalOpen(false);
+      showToast('Đã tải xuống ma trận phân quyền RBAC thành công!');
+    } catch (err) {
+      console.error('Failed to export RBAC matrix:', err);
+      const errMsg = err.response?.data?.detail?.message || err.message || 'Không thể xuất cấu hình phân quyền.';
+      showToast(`Lỗi: ${errMsg}`);
+    } finally {
+      setIsExporting(false);
+    }
   };
 
   return (
@@ -449,7 +711,7 @@ export default function AdminRolesPage() {
           <div className="matrix-header-card">
             <div className="matrix-header-left">
               <div className="matrix-role-avatar">
-                <activeRole.icon size={22} />
+                <ActiveRoleIcon size={22} />
               </div>
               <div className="matrix-role-info">
                 <div className="matrix-role-title-row">
@@ -479,9 +741,10 @@ export default function AdminRolesPage() {
                 type="button" 
                 className="btn-matrix-save"
                 onClick={handleSaveChanges}
+                disabled={isSaving}
               >
                 <Save size={15} />
-                <span>Lưu thay đổi</span>
+                <span>{isSaving ? 'Đang lưu...' : 'Lưu thay đổi'}</span>
               </button>
             </div>
           </div>
@@ -603,10 +866,11 @@ export default function AdminRolesPage() {
                   value={newRole.cloneFrom}
                   onChange={e => setNewRole(p => ({ ...p, cloneFrom: e.target.value }))}
                 >
-                  <option value="subject_teacher">Giáo viên bộ môn (Khuyên dùng)</option>
-                  <option value="academic_staff">Giáo vụ đào tạo</option>
-                  <option value="head_teacher">Tổ trưởng chuyên môn</option>
-                  <option value="admin">Quản trị viên</option>
+                  {roles.map((r) => (
+                    <option key={r.id} value={r.id}>
+                      {r.name}{r.id === 'subject_teacher' ? ' (Khuyên dùng)' : ''}
+                    </option>
+                  ))}
                 </select>
               </div>
 
@@ -614,8 +878,8 @@ export default function AdminRolesPage() {
                 <button type="button" className="admin-btn-cancel" onClick={() => setIsAddRoleModalOpen(false)}>
                   Hủy
                 </button>
-                <button type="submit" className="admin-btn-primary">
-                  Tạo vai trò
+                <button type="submit" className="admin-btn-primary" disabled={isCreatingRole}>
+                  {isCreatingRole ? 'Đang tạo...' : 'Tạo vai trò'}
                 </button>
               </div>
             </form>
@@ -633,14 +897,7 @@ export default function AdminRolesPage() {
                 <X size={20} />
               </button>
             </div>
-            <form onSubmit={e => {
-              e.preventDefault();
-              if (!newUserToAssign) return;
-              setRoles(prev => prev.map(r => r.id === activeRoleId ? { ...r, memberCount: r.memberCount + 1 } : r));
-              setIsAddUserModalOpen(false);
-              showToast(`Đã gán ${newUserToAssign} vào vai trò "${activeRole.name}"!`);
-              setNewUserToAssign('');
-            }} className="admin-modal-body">
+            <form onSubmit={handleAssignUserSubmit} className="admin-modal-body">
               <p className="admin-modal-desc">
                 Tài khoản được gán sẽ ngay lập tức được hưởng các quyền hạn tương ứng của vai trò <strong>{activeRole.name}</strong>.
               </p>
@@ -651,13 +908,21 @@ export default function AdminRolesPage() {
                   className="admin-form-select"
                   value={newUserToAssign}
                   onChange={e => setNewUserToAssign(e.target.value)}
+                  disabled={isLoadingUsers}
                   required
                 >
-                  <option value="">-- Chọn tài khoản từ hệ thống --</option>
-                  <option value="ThS. Lê Nguyên (le.nguyen@clarity.edu.vn)">ThS. Lê Nguyên (le.nguyen@clarity.edu.vn)</option>
-                  <option value="Cô Mai Lan (lan.mai@clarity.edu.vn)">Cô Mai Lan (lan.mai@clarity.edu.vn)</option>
-                  <option value="Thầy Lê Phương Duy (duy.lp@clarity.edu.vn)">Thầy Lê Phương Duy (duy.lp@clarity.edu.vn)</option>
-                  <option value="Hoàng Mỹ Dung (dung.hm@clarity.edu.vn)">Hoàng Mỹ Dung (dung.hm@clarity.edu.vn)</option>
+                  <option value="">
+                    {isLoadingUsers ? '-- Đang tải danh sách người dùng... --' : '-- Chọn tài khoản từ hệ thống --'}
+                  </option>
+                  {systemUsers.map((u) => {
+                    const uid = u.id || u.user_id;
+                    const subInfo = [u.email, u.role].filter(Boolean).join(' • ');
+                    return (
+                      <option key={uid} value={uid}>
+                        {u.full_name}{subInfo ? ` (${subInfo})` : ''}
+                      </option>
+                    );
+                  })}
                 </select>
               </div>
 
@@ -665,8 +930,8 @@ export default function AdminRolesPage() {
                 <button type="button" className="admin-btn-cancel" onClick={() => setIsAddUserModalOpen(false)}>
                   Hủy
                 </button>
-                <button type="submit" className="admin-btn-primary" disabled={!newUserToAssign}>
-                  Xác nhận gán
+                <button type="submit" className="admin-btn-primary" disabled={!newUserToAssign || isAssigningUser}>
+                  {isAssigningUser ? 'Đang gán...' : 'Xác nhận gán'}
                 </button>
               </div>
             </form>
@@ -686,32 +951,24 @@ export default function AdminRolesPage() {
             </div>
             <div className="admin-modal-body">
               <div className="members-drawer-list">
-                <div className="member-drawer-item">
-                  <div className="member-drawer-avatar">LN</div>
-                  <div className="member-drawer-meta">
-                    <h4>ThS. Lê Nguyên</h4>
-                    <p>le.nguyen@clarity.edu.vn • Tổ Toán - Tin</p>
-                  </div>
-                  <span className="member-drawer-status">Đang hoạt động</span>
-                </div>
-
-                <div className="member-drawer-item">
-                  <div className="member-drawer-avatar">ML</div>
-                  <div className="member-drawer-meta">
-                    <h4>Cô Mai Lan</h4>
-                    <p>lan.mai@clarity.edu.vn • Tổ Toán - Tin</p>
-                  </div>
-                  <span className="member-drawer-status">Đang hoạt động</span>
-                </div>
-
-                <div className="member-drawer-item">
-                  <div className="member-drawer-avatar">PD</div>
-                  <div className="member-drawer-meta">
-                    <h4>Thầy Lê Phương Duy</h4>
-                    <p>duy.lp@clarity.edu.vn • Tổ Ngoại ngữ</p>
-                  </div>
-                  <span className="member-drawer-status">Đang hoạt động</span>
-                </div>
+                {isLoadingMembers ? (
+                  <p className="admin-modal-desc">Đang tải danh sách thành viên...</p>
+                ) : roleMembers.length === 0 ? (
+                  <p className="admin-modal-desc">Chưa có thành viên nào được gán vào vai trò này.</p>
+                ) : (
+                  roleMembers.map((member) => (
+                    <div key={member.user_id} className="member-drawer-item">
+                      <div className="member-drawer-avatar">{getInitials(member.full_name)}</div>
+                      <div className="member-drawer-meta">
+                        <h4>{member.full_name}</h4>
+                        <p>
+                          {[member.email || 'Chưa cập nhật email', member.phone].filter(Boolean).join(' • ')}
+                        </p>
+                      </div>
+                      <span className="member-drawer-status">{formatMemberStatus(member.status)}</span>
+                    </div>
+                  ))
+                )}
               </div>
 
               <div className="admin-modal-footer">
@@ -736,18 +993,30 @@ export default function AdminRolesPage() {
             </div>
             <div className="admin-modal-body">
               <p className="admin-modal-desc">
-                Tải xuống tập tin cấu hình ma trận phân quyền hệ thống cho cả 5 vai trò.
+                Tải xuống tập tin cấu hình ma trận phân quyền hệ thống cho toàn bộ {roles.length} vai trò.
               </p>
               <div className="admin-form-group">
                 <label className="admin-form-label">Định dạng xuất</label>
                 <div className="export-options-row">
                   <label className="export-option-box">
-                    <input type="radio" name="rbacExportFormat" defaultChecked />
+                    <input
+                      type="radio"
+                      name="rbacExportFormat"
+                      value="json"
+                      checked={exportFormat === 'json'}
+                      onChange={() => setExportFormat('json')}
+                    />
                     <span>Tệp cấu hình JSON (.json)</span>
                   </label>
                   <label className="export-option-box">
-                    <input type="radio" name="rbacExportFormat" />
-                    <span>Bảng ma trận Excel (.xlsx)</span>
+                    <input
+                      type="radio"
+                      name="rbacExportFormat"
+                      value="csv"
+                      checked={exportFormat === 'csv'}
+                      onChange={() => setExportFormat('csv')}
+                    />
+                    <span>Bảng ma trận CSV / Excel (.csv)</span>
                   </label>
                 </div>
               </div>
@@ -759,13 +1028,11 @@ export default function AdminRolesPage() {
                 <button 
                   type="button" 
                   className="admin-btn-primary"
-                  onClick={() => {
-                    setIsExportModalOpen(false);
-                    showToast('Đang tải xuống ma trận phân quyền RBAC...');
-                  }}
+                  onClick={handleExportRoles}
+                  disabled={isExporting}
                 >
                   <Download size={16} />
-                  <span>Tải xuống</span>
+                  <span>{isExporting ? 'Đang tải...' : 'Tải xuống'}</span>
                 </button>
               </div>
             </div>
