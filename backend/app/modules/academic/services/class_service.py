@@ -25,6 +25,12 @@ from app.modules.academic.scoping import (
 logger = logging.getLogger("class_service")
 
 
+def normalize_grade(grade: str) -> str:
+    """Lower-case a grade filter and strip a 'khoi'/'grade'/'k' label only when a number follows."""
+    g = grade.strip().lower()
+    m = re.match(r"^(?:khối|khoi|grade|k)\s*(\d+)$", g)
+    return m.group(1) if m else g
+
 def matches_grade(class_name: str, grade: str) -> bool:
     """Match a class name's leading digit run exactly (grade '1' must not match '10A1')."""
     name = class_name.strip().lower()
@@ -376,11 +382,7 @@ class ClassService:
         enriched = ClassService.enrich_classes_out(db, classes)
 
         if grade and grade.strip() and grade.strip().lower() != "all":
-            g = grade.strip().lower()
-            # Strip a grade label only when a number follows, so a bare "k" is not mangled.
-            m = re.match(r"^(?:khối|khoi|grade|k)\s*(\d+)$", g)
-            if m:
-                g = m.group(1)
+            g = normalize_grade(grade)
             enriched = [c for c in enriched if matches_grade(c.class_name, g)]
 
         if school_year and school_year.strip() and school_year.strip().lower() != "all":

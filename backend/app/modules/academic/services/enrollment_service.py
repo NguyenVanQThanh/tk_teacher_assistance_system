@@ -98,8 +98,7 @@ class EnrollmentService:
                 status="ACTIVE"
             )
             db.add(new_user)
-            db.commit()
-            db.refresh(new_user)
+            db.flush()
             student_id = new_user_id
 
         # 3. Validate student_id exists
@@ -172,15 +171,25 @@ class EnrollmentService:
         if status_val and status_val != "ACTIVE":
             kwargs["status"] = status_val
 
-        enrollment = EnrollmentRepository.create(
-            db=db,
-            class_id=class_id,
-            student_id=student_id,
-            student_code=student_code,
-            **kwargs
-        )
-        if gender and str(gender).strip():
-            EnrollmentService.save_student_metadata(db, student_id=student_id, gender=str(gender).strip())
+        # User (if auto-created), enrollment and metadata are committed together.
+        try:
+            enrollment = EnrollmentRepository.create(
+                db=db,
+                class_id=class_id,
+                student_id=student_id,
+                student_code=student_code,
+                commit=False,
+                **kwargs
+            )
+            if gender and str(gender).strip():
+                EnrollmentService.save_student_metadata(
+                    db, student_id=student_id, gender=str(gender).strip(), commit=False
+                )
+            db.commit()
+            db.refresh(enrollment)
+        except Exception:
+            db.rollback()
+            raise
         logger.info(
             "Domain Event: EVT-ACAD-STUDENT_ENROLLED - class_id: %s, student_id: %s",
             class_id, student_id

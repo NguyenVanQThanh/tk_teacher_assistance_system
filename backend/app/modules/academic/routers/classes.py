@@ -15,7 +15,7 @@ from app.core.database import get_db
 from models.models import User
 from app.modules.auth.dependencies import require_perm, get_current_user
 from app.modules.academic.schemas import ClassCreate, ClassUpdate, ClassOut, AcademicStatusEnum
-from app.modules.academic.services.class_service import ClassService, matches_grade
+from app.modules.academic.services.class_service import ClassService, matches_grade, normalize_grade
 
 router = APIRouter(prefix="/api/v1/classes", tags=["academic-classes"])
 
@@ -81,11 +81,7 @@ def list_classes(
     enriched = ClassService.enrich_classes_out(db, classes)
 
     if grade and grade.strip() and grade.strip().lower() != "all":
-        g = grade.strip().lower()
-        for prefix in ("khối", "khoi", "grade", "k"):
-            if g.startswith(prefix):
-                g = g[len(prefix):].strip()
-                break
+        g = normalize_grade(grade)
         enriched = [c for c in enriched if matches_grade(c.class_name, g)]
 
     if school_year and school_year.strip() and school_year.strip().lower() != "all":
@@ -106,7 +102,8 @@ def list_classes(
 
 @router.get(
     "/available-students",
-    dependencies=[Depends(require_perm("ACAD_CLASS_VIEW"))]
+    # Returns student PII, so it needs the enrollment management permission (not held by students).
+    dependencies=[Depends(require_perm("ACAD_ENROLLMENT_MANAGE"))]
 )
 def get_available_students(
     class_id: Optional[UUID] = Query(None, description="Target class ID to exclude already enrolled students"),

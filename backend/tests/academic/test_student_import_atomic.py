@@ -69,3 +69,27 @@ def test_soft_deleted_email_is_reported_not_crashing(db_session):
     )
     assert again.imported_count == 0
     assert "deleted account" in again.errors[0].message
+
+def test_enroll_student_metadata_failure_leaves_no_user_or_enrollment(db_session, monkeypatch):
+    """A metadata failure must roll back user and enrollment, not leave a half-enrolled student."""
+    import pytest
+    cls = _make_class(db_session)
+    class_id = cls.class_id
+    phone = _phone()
+
+    def boom(*args, **kwargs):
+        raise RuntimeError("metadata failure")
+
+    monkeypatch.setattr(EnrollmentService, "save_student_metadata", staticmethod(boom))
+    with pytest.raises(RuntimeError):
+        EnrollmentService.enroll_student(
+            db_session, class_id, student_name="Half Enrolled", phone=phone, gender="Male"
+        )
+    assert db_session.query(User).filter(User.phone == phone).count() == 0
+    assert db_session.query(StudentClass).filter(StudentClass.class_id == class_id).count() == 0
+
+def test_normalize_grade_keeps_non_numeric_input():
+    from app.modules.academic.services.class_service import normalize_grade
+    assert normalize_grade("Khối 10") == "10"
+    assert normalize_grade("k11") == "11"
+    assert normalize_grade("khoa") == "khoa"

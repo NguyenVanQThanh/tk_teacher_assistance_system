@@ -12,7 +12,7 @@ from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional, Tuple
 from uuid import UUID
 
-from sqlalchemy import func
+from sqlalchemy import func, text
 from sqlalchemy.orm import Session
 
 from models.models import AuditLog
@@ -62,6 +62,9 @@ def upsert_state(
     Create or update an active internal JSON state record identified by key_title.
     With commit=False the change is only flushed so the caller can commit it atomically.
     """
+    # Serialize concurrent upserts of the same key (no unique constraint exists on audit titles).
+    if db.get_bind().dialect.name == "postgresql":
+        db.execute(text("SELECT pg_advisory_xact_lock(hashtext(:k))"), {"k": key_title})
     existing = (
         db.query(AuditLog)
         .filter(
