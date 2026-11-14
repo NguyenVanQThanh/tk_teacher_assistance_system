@@ -729,9 +729,9 @@ class EnrollmentService:
                 # begin_nested already rolled back this row's savepoint; drop any leftover state.
                 db.rollback()
                 logger.warning("Row %d import failed for class %s: %s", row_num, class_id, exc)
-                errors.append(
-                    StudentImportErrorItem(row=row_num, message=str(exc))
-                )
+                # Expose only intentional HTTP error details; hide raw DB/internal errors from the response.
+                message = exc.detail if isinstance(exc, HTTPException) and isinstance(exc.detail, str) else "Row import failed due to an internal error"
+                errors.append(StudentImportErrorItem(row=row_num, message=message))
 
         enriched = EnrollmentService.enrich_enrollments_out(db, enrolled_orm)
         logger.info(

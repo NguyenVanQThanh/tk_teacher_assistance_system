@@ -377,10 +377,10 @@ class ClassService:
 
         if grade and grade.strip() and grade.strip().lower() != "all":
             g = grade.strip().lower()
-            for prefix in ("khối", "khoi", "grade", "k"):
-                if g.startswith(prefix):
-                    g = g[len(prefix):].strip()
-                    break
+            # Strip a grade label only when a number follows, so a bare "k" is not mangled.
+            m = re.match(r"^(?:khối|khoi|grade|k)\s*(\d+)$", g)
+            if m:
+                g = m.group(1)
             enriched = [c for c in enriched if matches_grade(c.class_name, g)]
 
         if school_year and school_year.strip() and school_year.strip().lower() != "all":
