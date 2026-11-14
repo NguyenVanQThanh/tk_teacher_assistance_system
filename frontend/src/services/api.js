@@ -1,8 +1,8 @@
 // File Name: api.js
-// Description: Centralized Axios API client configuration with token management, academic, assignment, and schedule service APIs.
+// Description: Centralized Axios API client configuration with token management, academic, assignment, admin, and schedule service APIs.
 // Created At: 2026-08-30
 // Created By: Tam Khang
-// Updated At: 2026-11-03
+// Updated At: 2026-11-14
 // Updated By: Tam Khang
 
 import axios from 'axios';
@@ -94,7 +94,27 @@ export const classesApi = {
     const response = await api.get(`/api/v1/classes/${classId}`);
     return response.data;
   },
+  createClass: async (data) => {
+    const response = await api.post('/api/v1/classes', data);
+    return response.data;
+  },
+  updateClass: async (classId, data) => {
+    const response = await api.put(`/api/v1/classes/${classId}`, data);
+    return response.data;
+  },
+  deleteClass: async (classId) => {
+    const response = await api.delete(`/api/v1/classes/${classId}`);
+    return response.data;
+  },
+  restoreClass: async (classId) => {
+    const response = await api.post(`/api/v1/classes/${classId}/restore`);
+    return response.data;
+  },
   getStudentsInClass: async (classId, params = {}) => {
+    const response = await api.get(`/api/v1/classes/${classId}/students`, { params });
+    return response.data;
+  },
+  getClassStudents: async (classId, params = {}) => {
     const response = await api.get(`/api/v1/classes/${classId}/students`, { params });
     return response.data;
   },
@@ -104,6 +124,30 @@ export const classesApi = {
   },
   enrollStudent: async (classId, data) => {
     const response = await api.post(`/api/v1/classes/${classId}/students`, data);
+    return response.data;
+  },
+  unenrollStudent: async (classId, studentId) => {
+    const response = await api.delete(`/api/v1/classes/${classId}/students/${studentId}`);
+    return response.data;
+  },
+  getAvailableStudents: async (classId) => {
+    const response = await api.get('/api/v1/classes/available-students', {
+      params: classId ? { class_id: classId } : {},
+    });
+    return response.data;
+  },
+  importStudentsExcel: async (classId, file) => {
+    const fd = new FormData();
+    fd.append('file', file);
+    const response = await api.post(`/api/v1/classes/${classId}/students/import-excel`, fd, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    });
+    return response.data;
+  },
+  exportClassesCsv: async () => {
+    const response = await api.get('/api/v1/classes/export-csv', {
+      responseType: 'blob',
+    });
     return response.data;
   },
 };
