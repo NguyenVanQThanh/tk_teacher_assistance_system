@@ -193,14 +193,22 @@ jobs:
           R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
           R2_BUCKET: ${{ secrets.R2_BUCKET }}
           R2_PUBLIC_BASE_URL: ${{ secrets.R2_PUBLIC_BASE_URL }}
+          NGINX_PORT: ${{ vars.NGINX_PORT }}
+          NGINX_BIND: ${{ vars.NGINX_BIND }}
         run: |
           set -euo pipefail
           umask 077
           : > /tmp/deploy.env
+          # Tunnel reaches nginx over the compose network, so the host port only needs
+          # to be free. 8080 is taken on this server (vnexus-staging-backend).
+          if [ "$PROFILE" = "tunnel" ]; then
+            NGINX_BIND="${NGINX_BIND:-127.0.0.1}"
+            NGINX_PORT="${NGINX_PORT:-18090}"
+          fi
           for name in IMAGE_TAG GHCR_USER GHCR_TOKEN PROFILE \
                       ADMIN_PHONE ADMIN_PASSWORD ADMIN_EMAIL ADMIN_FULL_NAME \
                       STORAGE_BACKEND R2_ACCOUNT_ID R2_ACCESS_KEY_ID R2_SECRET_ACCESS_KEY \
-                      R2_BUCKET R2_PUBLIC_BASE_URL; do
+                      R2_BUCKET R2_PUBLIC_BASE_URL NGINX_BIND NGINX_PORT; do
             val="${!name:-}"
             if [ -n "$val" ]; then
               printf '%s=%s\n' "$name" "$val" >> /tmp/deploy.env
