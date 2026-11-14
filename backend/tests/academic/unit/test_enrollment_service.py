@@ -166,7 +166,8 @@ class TestEnrollStudent:
                 db=db,
                 class_id=class_id,
                 student_id=student_id,
-                student_code=student_code
+                student_code=student_code,
+                commit=False
             )
 
 

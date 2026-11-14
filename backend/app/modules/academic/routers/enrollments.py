@@ -2,37 +2,32 @@
 # Description: API router for Enrollment & Restore endpoints strictly enforcing ACAD_ENROLLMENT_MANAGE permission (F-ACAD-03).
 # Created At: 2026-07-23
 # Created By: Tam Khang
-# Updated At: 2026-10-29
+# Updated At: 2026-11-14
 # Updated By: Tam Khang
 
 from uuid import UUID
 from typing import List, Optional
 
-from fastapi import APIRouter, Depends, Query, status, HTTPException
+from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile, status
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
 from models.models import User
 from app.modules.auth.dependencies import require_perm, get_current_user
-from app.modules.academic.schemas import EnrollmentCreate, EnrollmentOut, AcademicStatusEnum
+from app.modules.academic.schemas import (
+    AcademicStatusEnum,
+    EnrollmentCreate,
+    EnrollmentOut,
+    StudentImportExcelResponse,
+)
 from app.modules.academic.services.enrollment_service import EnrollmentService
 
 router = APIRouter(prefix="/api/v1/classes", tags=["academic-enrollment"])
 
 
-@router.post(
-    "/{class_id}/students",
-    response_model=EnrollmentOut,
-    status_code=status.HTTP_201_CREATED
-)
-def enroll_student(
-    class_id: UUID,
-    payload: EnrollmentCreate,
-    db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user)
-):
+def _ensure_enrollment_manage_access(db: Session, class_id: UUID, current_user: User) -> None:
     """
-    Ghi danh học sinh vào lớp. Yêu cầu quyền ACAD_ENROLLMENT_MANAGE hoặc là Giáo viên phụ trách/chủ nhiệm lớp.
+    Verify that current_user holds ACAD_ENROLLMENT_MANAGE permission or is the homeroom teacher of class_id.
     """
     from models.models import Class
     from app.modules.auth.services.permission_service import PermissionService
@@ -53,7 +48,24 @@ def enroll_student(
             detail={"code": "ERR-AUTH-PERMISSION_DENIED", "message": "You do not have permission to enroll students into this class."}
         )
 
-    return EnrollmentService.enroll_student(
+
+@router.post(
+    "/{class_id}/students",
+    response_model=EnrollmentOut,
+    status_code=status.HTTP_201_CREATED
+)
+def enroll_student(
+    class_id: UUID,
+    payload: EnrollmentCreate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """
+    Enroll a student into a class. Requires ACAD_ENROLLMENT_MANAGE or homeroom teacher access.
+    """
+    _ensure_enrollment_manage_access(db, class_id, current_user)
+
+    enrollment = EnrollmentService.enroll_student(
         db=db,
         class_id=class_id,
         student_id=payload.student_id,
@@ -64,7 +76,27 @@ def enroll_student(
         phone=payload.phone,
         gender=payload.gender
     )
+    return EnrollmentService.enrich_enrollment_out(db, enrollment)
 
+
+@router.post(
+    "/{class_id}/students/import-excel",
+    response_model=StudentImportExcelResponse
+)
+async def import_students_excel(
+    class_id: UUID,
+    file: UploadFile = File(...),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """
+    Bulk import and enroll students into a class from a CSV or XLSX upload.
+    """
+    from app.modules.admin.user_import import parse_tabular_upload
+
+    _ensure_enrollment_manage_access(db, class_id, current_user)
+    _, rows = await parse_tabular_upload(file)
+    return EnrollmentService.import_students_from_rows(db=db, class_id=class_id, rows=rows)
 
 
 @router.get(
@@ -74,17 +106,18 @@ def enroll_student(
 )
 def list_students_in_class(
     class_id: UUID,
-    status: Optional[AcademicStatusEnum] = Query(None, description="Lọc theo trạng thái (ACTIVE, INACTIVE, DRAFT, DELETED)"),
+    status: Optional[AcademicStatusEnum] = Query(None, description="Filter by status (ACTIVE, INACTIVE, DRAFT, DELETED)"),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
     """
-    Liệt kê học sinh trong một lớp theo phân quyền dữ liệu và trạng thái. Yêu cầu quyền ACAD_ENROLLMENT_VIEW.
+    List students enrolled in a class with RBAC scoping and optional status filter.
     """
     status_val = status.value if status else None
-    return EnrollmentService.list_students_in_class(
+    enrollments = EnrollmentService.list_students_in_class(
         db=db, class_id=class_id, status_val=status_val, current_user=current_user
     )
+    return EnrollmentService.enrich_enrollments_out(db, enrollments)
 
 
 @router.delete(
@@ -114,6 +147,7 @@ def restore_enrollment(
     db: Session = Depends(get_db)
 ):
     """
-    Khôi phục bản ghi ghi danh học sinh bị xóa mềm về ACTIVE (dành riêng cho Admin). Yêu cầu quyền ACAD_ENROLLMENT_MANAGE.
+    Restore a soft-deleted student enrollment record to ACTIVE status.
     """
-    return EnrollmentService.restore_enrollment(db=db, class_id=class_id, student_id=student_id)
+    enrollment = EnrollmentService.restore_enrollment(db=db, class_id=class_id, student_id=student_id)
+    return EnrollmentService.enrich_enrollment_out(db, enrollment)
