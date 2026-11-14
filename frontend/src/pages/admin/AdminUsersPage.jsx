@@ -2,7 +2,7 @@
 // Description: Comprehensive User Management screen for Admin portal with strict name, phone, and DD/MM/YYYY date validations, auto-generated unique identifier code, backend connection, and original layout aesthetics.
 // Created At: 2026-09-19
 // Created By: Tam Khang
-// Updated At: 2026-09-29
+// Updated At: 2026-11-14
 // Updated By: Tam Khang
 
 import React, { useState, useEffect, useCallback, useRef } from 'react';
@@ -36,9 +36,31 @@ import {
   Copy,
   Check
 } from 'lucide-react';
-import { adminUsersApi } from '../../services/api';
+import { adminUsersApi, classesApi, subjectsApi } from '../../services/api';
+import { useAuth } from '../../context/AuthContext';
 import './AdminUsersPage.css';
 import confirmDialog from '../../components/common/confirmDialog';
+
+const DEFAULT_CLASS_OPTIONS = [
+  'Lớp 12A1 (Chuyên Toán)',
+  'Lớp 12A2 (Chuyên Lý)',
+  'Lớp 11B1 (Cơ bản)',
+  'Lớp 10A3 (Ngoại ngữ)',
+];
+
+const DEFAULT_DEPARTMENT_OPTIONS = [
+  'Tổ Toán - Tin',
+  'Tổ Ngữ văn',
+  'Tổ Ngoại ngữ',
+  'Tổ Vật lý',
+  'Tổ Hóa học',
+  'Tổ Sinh học',
+  'Tổ Lịch sử',
+];
+
+const USER_DRAFT_STORAGE_KEY = 'admin_user_draft';
+const DRAFT_MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000;
+const FULL_NAME_REGEX = /^[a-zA-Z\sàáảãạăắằẳẵặâấầẩẫậđèéẻẽẹêếềểễệìíỉĩịòóỏõọôốồổỗộơớờởỡợùúủũụưứừửữựỳýỷỹỵÀÁẢÃẠĂẮẰẲẴẶÂẤẦẨẪẬĐÈÉẺẼẸÊẾỀỂỄỆÌÍỈĨỊÒÓỎÕỌÔỐỒỔỖỘƠỚỜỞỠỢÙÚỦŨỤƯỨỪỬỮỰỲÝỶỸỴ]+$/;
 
 // Strict Calendar Date Validation (e.g. rejects 31/02/2020)
 const validateCalendarDate = (dateStr) => {
@@ -318,6 +340,8 @@ function DateOfBirthInput({ value, onChange, roleType, error, onErrorChange }) {
 }
 
 export default function AdminUsersPage() {
+  const { user: authUser } = useAuth();
+  const isSelf = (u) => !!authUser && String(u?.id) === String(authUser.user_id);
   // State for tabs & filters
   const [activeTab, setActiveTab] = useState('all'); // 'all' | 'students' | 'teachers' | 'pending'
   const [searchQuery, setSearchQuery] = useState('');
@@ -365,6 +389,11 @@ export default function AdminUsersPage() {
   const [customDeactivateReason, setCustomDeactivateReason] = useState('');
   const [sendDeactivateEmail, setSendDeactivateEmail] = useState(true);
 
+  // Add User Modal dropdown options (real API classes & subjects merged with defaults)
+  const [classOptions, setClassOptions] = useState(DEFAULT_CLASS_OPTIONS);
+  const [classesCatalog, setClassesCatalog] = useState([]);
+  const [departmentOptions, setDepartmentOptions] = useState(DEFAULT_DEPARTMENT_OPTIONS);
+
   // Add User Form State matching the modal design
   const [newUserForm, setNewUserForm] = useState({
     roleType: 'student', // 'student' | 'teacher'
@@ -373,15 +402,74 @@ export default function AdminUsersPage() {
     birthDate: '', // Managed strictly as DD/MM/YYYY
     gender: 'Nam',
     phone: '',
-    classRoom: 'Lớp 12A1 (Chuyên Toán)',
+    classRoom: DEFAULT_CLASS_OPTIONS[0],
     academicYear: 'Niên khóa 2024 - 2025 (Hiện tại)',
     parentName: '',
     parentPhone: '',
-    department: 'Tổ Toán - Tin',
+    department: DEFAULT_DEPARTMENT_OPTIONS[0],
     qualification: 'Thạc sĩ Sư phạm',
     teacherEmail: '',
     isActiveImmediately: true
   });
+
+  // Load real classes, subjects, and any locally saved user draft on mount
+  useEffect(() => {
+    let isMounted = true;
+    const savedDraft = localStorage.getItem(USER_DRAFT_STORAGE_KEY);
+    if (savedDraft) {
+      try {
+        const { savedAt, ...parsedDraft } = JSON.parse(savedDraft);
+        // Drop drafts older than 7 days so personal data does not linger in the browser.
+        if (!savedAt || Date.now() - savedAt > DRAFT_MAX_AGE_MS) {
+          localStorage.removeItem(USER_DRAFT_STORAGE_KEY);
+        } else if (parsedDraft && typeof parsedDraft === 'object') {
+          setNewUserForm(prev => ({ ...prev, ...parsedDraft }));
+        }
+      } catch {
+        localStorage.removeItem(USER_DRAFT_STORAGE_KEY);
+      }
+    }
+
+    const loadDropdownOptions = async () => {
+      const [classesRes, subjectsRes] = await Promise.all([
+        classesApi.getClasses().catch(() => null),
+        subjectsApi.getSubjects().catch(() => null),
+      ]);
+      if (!isMounted) return;
+
+      const classItems = Array.isArray(classesRes)
+        ? classesRes
+        : (Array.isArray(classesRes?.items) ? classesRes.items : []);
+      if (classItems.length > 0) {
+        setClassesCatalog(classItems);
+        const fetchedClassNames = classItems
+          .map(c => c.class_name || c.name)
+          .filter(Boolean);
+        if (fetchedClassNames.length > 0) {
+          setClassOptions(Array.from(new Set([...fetchedClassNames, ...DEFAULT_CLASS_OPTIONS])));
+        }
+      }
+
+      const subjectItems = Array.isArray(subjectsRes)
+        ? subjectsRes
+        : (Array.isArray(subjectsRes?.items) ? subjectsRes.items : []);
+      const fetchedDepartments = subjectItems
+        .map(s => {
+          const sName = s.subject_name || s.name;
+          if (!sName) return null;
+          return sName.startsWith('Tổ ') ? sName : `Tổ ${sName}`;
+        })
+        .filter(Boolean);
+      if (fetchedDepartments.length > 0) {
+        setDepartmentOptions(Array.from(new Set([...fetchedDepartments, ...DEFAULT_DEPARTMENT_OPTIONS])));
+      }
+    };
+
+    loadDropdownOptions();
+    return () => {
+      isMounted = false;
+    };
+  }, []);
 
   const showToast = (msg) => {
     setToastMessage(msg);
@@ -556,98 +644,136 @@ export default function AdminUsersPage() {
     handleAutoGenerateCode(newUserForm.roleType);
   };
 
-  // Submit Add User with thorough validation
-  const handleCreateNewUser = async (e) => {
-    e.preventDefault();
-
-    // 1. Full name validation: must be at least 2 chars, letters and spaces only
+  const validateNewUserForm = (showFeedback = true) => {
     const trimmedName = newUserForm.fullName.trim();
     if (!trimmedName || trimmedName.length < 2) {
-      setNameError('Vui lòng nhập họ và tên đầy đủ (tối thiểu 2 ký tự).');
-      showToast('Vui lòng nhập họ và tên đầy đủ.');
-      return;
+      if (showFeedback) {
+        setNameError('Vui lòng nhập họ và tên đầy đủ (tối thiểu 2 ký tự).');
+        showToast('Vui lòng nhập họ và tên đầy đủ.');
+      }
+      return { valid: false, trimmedName };
     }
 
-    const nameRegex = /^[a-zA-Z\sàáảãạăắằẳẵặâấầẩẫậđèéẻẽẹêếềểễệìíỉĩịòóỏõọôốồổỗộơớờởỡợùúủũụưứừửữựỳýỷỹỵÀÁẢÃẠĂẮẰẲẴẶÂẤẦẨẪẬĐÈÉẺẼẸÊẾỀỂỄỆÌÍỈĨỊÒÓỎÕỌÔỐỒỔỖỘƠỚỜỞỠỢÙÚỦŨỤƯỨỪỬỮỰỲÝỶỸỴ]+$/;
-    if (!nameRegex.test(trimmedName)) {
-      setNameError('Họ và tên không được chứa chữ số hoặc ký tự đặc biệt.');
-      showToast('Họ và tên không được chứa chữ số hoặc ký tự đặc biệt.');
-      return;
+    if (!FULL_NAME_REGEX.test(trimmedName)) {
+      if (showFeedback) {
+        setNameError('Họ và tên không được chứa chữ số hoặc ký tự đặc biệt.');
+        showToast('Họ và tên không được chứa chữ số hoặc ký tự đặc biệt.');
+      }
+      return { valid: false, trimmedName };
     }
 
-    // 2. Birthday validation: format DD/MM/YYYY, calendar check, age check
+    // The identifier code is used in student emails, so wait until it has been generated.
+    if (!newUserForm.code) {
+      if (showFeedback) showToast('Mã định danh chưa được tạo. Vui lòng đợi hoặc bấm tạo lại mã.');
+      return { valid: false, trimmedName };
+    }
+
     const dateCheck = validateCalendarDate(newUserForm.birthDate);
     if (!dateCheck.valid) {
-      setBirthDateError(dateCheck.message);
-      showToast(dateCheck.message);
-      return;
+      if (showFeedback) {
+        setBirthDateError(dateCheck.message);
+        showToast(dateCheck.message);
+      }
+      return { valid: false, trimmedName };
     }
 
     const age = calculateAgeFromDMY(dateCheck.day, dateCheck.month, dateCheck.year);
     if (newUserForm.roleType === 'student' && age < 16) {
-      setBirthDateError(`Học sinh phải từ 16 tuổi trở lên (Tuổi hiện tại theo ngày sinh: ${age} tuổi).`);
-      showToast(`Học sinh phải từ 16 tuổi trở lên (Tuổi hiện tại theo ngày sinh: ${age} tuổi).`);
-      return;
+      const msg = `Học sinh phải từ 16 tuổi trở lên (Tuổi hiện tại theo ngày sinh: ${age} tuổi).`;
+      if (showFeedback) {
+        setBirthDateError(msg);
+        showToast(msg);
+      }
+      return { valid: false, trimmedName };
     }
     if (newUserForm.roleType === 'teacher' && age < 22) {
-      setBirthDateError(`Giáo viên phải từ 22 tuổi trở lên (Tuổi hiện tại theo ngày sinh: ${age} tuổi).`);
-      showToast(`Giáo viên phải từ 22 tuổi trở lên (Tuổi hiện tại theo ngày sinh: ${age} tuổi).`);
-      return;
+      const msg = `Giáo viên phải từ 22 tuổi trở lên (Tuổi hiện tại theo ngày sinh: ${age} tuổi).`;
+      if (showFeedback) {
+        setBirthDateError(msg);
+        showToast(msg);
+      }
+      return { valid: false, trimmedName };
     }
 
-    // 3. Phone validation: exactly 10 digits starting with 0
     if (!newUserForm.phone || !/^0\d{9}$/.test(newUserForm.phone)) {
-      setPhoneError('Số điện thoại phải gồm đúng 10 chữ số và bắt đầu bằng số 0 (ví dụ: 0912345678).');
-      showToast('Số điện thoại phải gồm đúng 10 chữ số và bắt đầu bằng số 0.');
-      return;
+      if (showFeedback) {
+        setPhoneError('Số điện thoại phải gồm đúng 10 chữ số và bắt đầu bằng số 0 (ví dụ: 0912345678).');
+        showToast('Số điện thoại phải gồm đúng 10 chữ số và bắt đầu bằng số 0.');
+      }
+      return { valid: false, trimmedName };
     }
+
+    return { valid: true, trimmedName };
+  };
+
+  const resetNewUserForm = () => {
+    setNewUserForm({
+      roleType: 'student',
+      code: '',
+      fullName: '',
+      birthDate: '',
+      gender: 'Nam',
+      phone: '',
+      classRoom: DEFAULT_CLASS_OPTIONS[0],
+      academicYear: 'Niên khóa 2024 - 2025 (Hiện tại)',
+      parentName: '',
+      parentPhone: '',
+      department: DEFAULT_DEPARTMENT_OPTIONS[0],
+      qualification: 'Thạc sĩ Sư phạm',
+      teacherEmail: '',
+      isActiveImmediately: true
+    });
+    setNameError(null);
+    setPhoneError(null);
+    setBirthDateError(null);
+  };
+
+  const buildCreateUserPayload = (trimmedName) => {
+    const isStudent = newUserForm.roleType === 'student';
+    const matchedClass = isStudent
+      ? classesCatalog.find(c => (c.class_name || c.name) === newUserForm.classRoom)
+      : null;
+    // ASCII-only slug: strip Vietnamese diacritics so generated emails are portable.
+    const slugName = trimmedName
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .replace(/đ/gi, 'd')
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, '.')
+      .replace(/^\.+|\.+$/g, '');
+    const emailToUse = isStudent
+      ? `${slugName}.${(newUserForm.code || 'hs').toLowerCase()}@student.clarity.edu.vn`
+      : (newUserForm.teacherEmail?.trim() || `${slugName}@clarity.edu.vn`);
+    const isActive = newUserForm.isActiveImmediately;
+
+    return {
+      full_name: trimmedName,
+      role: isStudent ? 'Student' : 'Teacher',
+      phone: newUserForm.phone,
+      email: emailToUse,
+      birthday: convertDMYtoISO(newUserForm.birthDate),
+      code: newUserForm.code,
+      department: isStudent ? null : newUserForm.department,
+      class_name: isStudent ? newUserForm.classRoom : null,
+      class_id: matchedClass ? (matchedClass.class_id || matchedClass.id || null) : null,
+      status: isActive ? 'ACTIVE' : 'INACTIVE',
+      is_active_immediately: isActive
+    };
+  };
+
+  // Submit Add User with thorough validation
+  const handleCreateNewUser = async (e) => {
+    e.preventDefault();
+    const { valid, trimmedName } = validateNewUserForm(true);
+    if (!valid) return;
 
     setLoading(true);
     try {
-      const isStudent = newUserForm.roleType === 'student';
-      const emailToUse = isStudent
-        ? `${trimmedName.toLowerCase().replace(/\s+/g, '.')}.${newUserForm.code.toLowerCase()}@student.clarity.edu.vn`
-        : `${trimmedName.toLowerCase().replace(/\s+/g, '.')}@clarity.edu.vn`;
-
-      const payload = {
-        full_name: trimmedName,
-        role: isStudent ? 'Student' : 'Teacher',
-        phone: newUserForm.phone,
-        email: emailToUse,
-        birthday: convertDMYtoISO(newUserForm.birthDate),
-        code: newUserForm.code,
-        department: isStudent ? null : newUserForm.department,
-        class_name: isStudent ? newUserForm.classRoom : null,
-        status: newUserForm.isActiveImmediately ? 'ACTIVE' : 'INACTIVE',
-        is_active_immediately: newUserForm.isActiveImmediately
-      };
-
-      const res = await adminUsersApi.createUser(payload);
-
+      const res = await adminUsersApi.createUser(buildCreateUserPayload(trimmedName));
+      localStorage.removeItem(USER_DRAFT_STORAGE_KEY);
       setIsAddModalOpen(false);
       showToast(`Tạo thành công ${res.role === 'Student' ? 'Học sinh' : 'Giáo viên'} "${res.full_name}". Mật khẩu mặc định đã tự động sinh và gửi qua SMS / hệ thống.`);
-
-      // Reset form
-      setNewUserForm({
-        roleType: 'student',
-        code: '',
-        fullName: '',
-        birthDate: '',
-        gender: 'Nam',
-        phone: '',
-        classRoom: 'Lớp 12A1 (Chuyên Toán)',
-        academicYear: 'Niên khóa 2024 - 2025 (Hiện tại)',
-        parentName: '',
-        parentPhone: '',
-        department: 'Tổ Toán - Tin',
-        qualification: 'Thạc sĩ Sư phạm',
-        teacherEmail: '',
-        isActiveImmediately: true
-      });
-      setNameError(null);
-      setPhoneError(null);
-      setBirthDateError(null);
-
+      resetNewUserForm();
       await fetchUsers();
     } catch (err) {
       const errMsg = err.response?.data?.detail?.message || err.response?.data?.detail || err.message || 'Lỗi khi tạo người dùng.';
@@ -657,9 +783,18 @@ export default function AdminUsersPage() {
     }
   };
 
+  // Draft is kept only in this browser; it never creates an account on the server.
   const handleSaveDraft = () => {
+    try {
+      // Do not persist the auto-generated code: it may be consumed by the time the draft is reopened.
+      const { code: _code, ...draftWithoutCode } = newUserForm;
+      localStorage.setItem(USER_DRAFT_STORAGE_KEY, JSON.stringify({ ...draftWithoutCode, savedAt: Date.now() }));
+    } catch {
+      showToast('Không thể lưu bản nháp trên trình duyệt này.');
+      return;
+    }
     setIsAddModalOpen(false);
-    showToast(`Đã lưu bản nháp thông tin người dùng "${newUserForm.fullName || newUserForm.code}".`);
+    showToast(`Đã lưu bản nháp thông tin người dùng "${newUserForm.fullName || 'chưa đặt tên'}" trên trình duyệt này.`);
   };
 
   const getDeactivateReasonsByRole = (roleKey) => {
@@ -693,6 +828,7 @@ export default function AdminUsersPage() {
   };
 
   const handleOpenDeactivateModal = (user) => {
+    if (isSelf(user)) return;
     setUserToDeactivate(user);
     const reasons = getDeactivateReasonsByRole(user.roleKey);
     setDeactivateReason(reasons[0]);
@@ -720,6 +856,7 @@ export default function AdminUsersPage() {
 
   // Quick toggle lock / unlock
   const handleToggleLockUser = async (user) => {
+    if (isSelf(user)) return;
     const isLocked = user.status === 'locked' || user.status === 'suspended';
     const targetStatus = isLocked ? 'ACTIVE' : 'SUSPENDED';
     try {
@@ -734,6 +871,7 @@ export default function AdminUsersPage() {
   // Soft delete user (updates status to 'DELETED')
   const handleSoftDeleteUser = async (user) => {
     setActiveMenuUserId(null);
+    if (user.roleKey === 'admin' || isSelf(user)) return;
     if (await confirmDialog(`Bạn có chắc chắn muốn xóa mềm (Soft Delete) tài khoản ${user.fullName}? Tài khoản sẽ chuyển sang trạng thái DELETED và bảo toàn lịch sử dữ liệu.`)) {
       try {
         await adminUsersApi.deleteUser(user.id);
@@ -1342,25 +1480,29 @@ export default function AdminUsersPage() {
                             <Key size={16} />
                           </button>
 
-                          {/* 4. Quick lock / unlock */}
-                          <button 
-                            type="button" 
-                            className={`table-action-icon-btn ${user.status === 'suspended' ? 'text-locked' : ''}`}
-                            title={user.status === 'suspended' ? 'Mở khóa tài khoản' : 'Tạm khóa tài khoản'}
-                            onClick={() => handleToggleLockUser(user)}
-                          >
-                            {user.status === 'suspended' ? <Lock size={16} /> : <Unlock size={16} />}
-                          </button>
+                          {/* 4. Quick lock / unlock (never offered for the signed-in admin's own account) */}
+                          {!isSelf(user) && (
+                            <button 
+                              type="button" 
+                              className={`table-action-icon-btn ${user.status === 'suspended' ? 'text-locked' : ''}`}
+                              title={user.status === 'suspended' ? 'Mở khóa tài khoản' : 'Tạm khóa tài khoản'}
+                              onClick={() => handleToggleLockUser(user)}
+                            >
+                              {user.status === 'suspended' ? <Lock size={16} /> : <Unlock size={16} />}
+                            </button>
+                          )}
 
-                          {/* 5. Soft delete user */}
-                          <button 
-                            type="button" 
-                            className="table-action-icon-btn text-danger" 
-                            title="Xóa mềm tài khoản"
-                            onClick={() => handleSoftDeleteUser(user)}
-                          >
-                            <Trash2 size={16} />
-                          </button>
+                          {/* 5. Soft delete user (never offered for Admin accounts) */}
+                          {user.roleKey !== 'admin' && !isSelf(user) && (
+                            <button 
+                              type="button" 
+                              className="table-action-icon-btn text-danger" 
+                              title="Xóa mềm tài khoản"
+                              onClick={() => handleSoftDeleteUser(user)}
+                            >
+                              <Trash2 size={16} />
+                            </button>
+                          )}
 
                           {/* 6. More options (3 dots dropdown menu) */}
                           <div className="table-action-menu-wrapper" ref={isMenuOpen ? menuRef : null}>
@@ -1376,17 +1518,19 @@ export default function AdminUsersPage() {
                             {/* Dropdown Menu */}
                             {isMenuOpen && (
                               <div className="table-action-menu-dropdown">
-                                <button 
-                                  type="button" 
-                                  className="table-action-menu-item"
-                                  onClick={() => {
-                                    setActiveMenuUserId(null);
-                                    handleOpenDeactivateModal(user);
-                                  }}
-                                >
-                                  <UserX size={14} />
-                                  <span>Vô hiệu hóa có lý do</span>
-                                </button>
+                                {!isSelf(user) && (
+                                  <button 
+                                    type="button" 
+                                    className="table-action-menu-item"
+                                    onClick={() => {
+                                      setActiveMenuUserId(null);
+                                      handleOpenDeactivateModal(user);
+                                    }}
+                                  >
+                                    <UserX size={14} />
+                                    <span>Vô hiệu hóa có lý do</span>
+                                  </button>
+                                )}
 
                                 {isDeleted && (
                                   <button 
@@ -1632,9 +1776,9 @@ export default function AdminUsersPage() {
                     onChange={e => setSelectedUser(p => ({ ...p, status: e.target.value }))}
                   >
                     <option value="active">Hoạt động (ACTIVE)</option>
-                    <option value="inactive">Chờ kích hoạt (INACTIVE)</option>
-                    <option value="suspended">Tạm khóa (SUSPENDED)</option>
-                    <option value="deleted">Đã xóa mềm (DELETED)</option>
+                    {!isSelf(selectedUser) && <option value="inactive">Chờ kích hoạt (INACTIVE)</option>}
+                    {!isSelf(selectedUser) && <option value="suspended">Tạm khóa (SUSPENDED)</option>}
+                    {selectedUser?.roleKey !== 'admin' && <option value="deleted">Đã xóa mềm (DELETED)</option>}
                   </select>
                 </div>
               </div>
@@ -1843,10 +1987,9 @@ export default function AdminUsersPage() {
                           value={newUserForm.classRoom}
                           onChange={e => setNewUserForm(p => ({ ...p, classRoom: e.target.value }))}
                         >
-                          <option value="Lớp 12A1 (Chuyên Toán)">Lớp 12A1 (Chuyên Toán)</option>
-                          <option value="Lớp 12A2 (Chuyên Lý)">Lớp 12A2 (Chuyên Lý)</option>
-                          <option value="Lớp 11B1 (Cơ bản)">Lớp 11B1 (Cơ bản)</option>
-                          <option value="Lớp 10A3 (Ngoại ngữ)">Lớp 10A3 (Ngoại ngữ)</option>
+                          {classOptions.map((clsOpt) => (
+                            <option key={clsOpt} value={clsOpt}>{clsOpt}</option>
+                          ))}
                         </select>
                       ) : (
                         <select 
@@ -1854,13 +1997,9 @@ export default function AdminUsersPage() {
                           value={newUserForm.department}
                           onChange={e => setNewUserForm(p => ({ ...p, department: e.target.value }))}
                         >
-                          <option value="Tổ Toán - Tin">Tổ Toán - Tin</option>
-                          <option value="Tổ Ngữ văn">Tổ Ngữ văn</option>
-                          <option value="Tổ Ngoại ngữ">Tổ Ngoại ngữ</option>
-                          <option value="Tổ Vật lý">Tổ Vật lý</option>
-                          <option value="Tổ Hóa học">Tổ Hóa học</option>
-                          <option value="Tổ Sinh học">Tổ Sinh học</option>
-                          <option value="Tổ Lịch sử">Tổ Lịch sử</option>
+                          {departmentOptions.map((deptOpt) => (
+                            <option key={deptOpt} value={deptOpt}>{deptOpt}</option>
+                          ))}
                         </select>
                       )}
                       <ChevronDown size={14} className="select-arrow-icon" />
