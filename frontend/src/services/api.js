@@ -539,6 +539,32 @@ export const adminRolesApi = {
   },
 };
 
+export const adminReportsApi = {
+  getAnalytics: async (params = {}) => {
+    const response = await api.get('/api/v1/admin/reports/analytics', { params });
+    return response.data;
+  },
+  exportReport: async (params = {}) => {
+    const response = await api.get('/api/v1/admin/reports/export', {
+      params,
+      responseType: 'blob',
+    });
+    return response.data;
+  },
+  createCustomReport: async (data) => {
+    const response = await api.post('/api/v1/admin/reports/custom', data);
+    return response.data;
+  },
+  getSchedules: async () => {
+    const response = await api.get('/api/v1/admin/reports/schedules');
+    return response.data;
+  },
+  createSchedule: async (data) => {
+    const response = await api.post('/api/v1/admin/reports/schedules', data);
+    return response.data;
+  },
+};
+
 // Admin-only realtime monitoring API. The SSE stream is consumed with fetch() in
 // AdminMonitoringPage because EventSource cannot attach the Authorization header.
 export const monitoringApi = {
