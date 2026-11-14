@@ -151,9 +151,10 @@ class ClassRepository:
         class_name: str,
         academic_year: Optional[str] = None,
         homeroom_teacher_id: Optional[UUID] = None,
-        status: str = "ACTIVE"
+        status: str = "ACTIVE",
+        commit: bool = True
     ) -> Class:
-        """Insert a new class record."""
+        """Insert a new class record (commit=False only flushes for atomic caller transactions)."""
         cls = Class(
             class_name=class_name,
             academic_year=academic_year,
@@ -161,8 +162,11 @@ class ClassRepository:
             status=status
         )
         db.add(cls)
-        db.commit()
-        db.refresh(cls)
+        if commit:
+            db.commit()
+            db.refresh(cls)
+        else:
+            db.flush()
         return cls
 
     @staticmethod
@@ -173,9 +177,10 @@ class ClassRepository:
         academic_year: Optional[str] = None,
         homeroom_teacher_id: Optional[UUID] = None,
         update_homeroom_teacher: bool = False,
-        status: Optional[str] = None
+        status: Optional[str] = None,
+        commit: bool = True
     ) -> Class:
-        """Update an existing class record."""
+        """Update an existing class record (commit=False only flushes)."""
         if class_name is not None:
             class_obj.class_name = class_name
         if academic_year is not None:
@@ -184,8 +189,11 @@ class ClassRepository:
             class_obj.homeroom_teacher_id = homeroom_teacher_id
         if status is not None:
             class_obj.status = status
-        db.commit()
-        db.refresh(class_obj)
+        if commit:
+            db.commit()
+            db.refresh(class_obj)
+        else:
+            db.flush()
         return class_obj
 
     @staticmethod
@@ -255,9 +263,10 @@ class EnrollmentRepository:
         class_id: UUID,
         student_id: UUID,
         student_code: Optional[str] = None,
-        status: str = "ACTIVE"
+        status: str = "ACTIVE",
+        commit: bool = True
     ) -> StudentClass:
-        """Insert a new student enrollment record."""
+        """Insert a new student enrollment record (commit=False only flushes)."""
         enrollment = StudentClass(
             class_id=class_id,
             student_id=student_id,
@@ -265,8 +274,11 @@ class EnrollmentRepository:
             status=status
         )
         db.add(enrollment)
-        db.commit()
-        db.refresh(enrollment)
+        if commit:
+            db.commit()
+            db.refresh(enrollment)
+        else:
+            db.flush()
         return enrollment
 
     @staticmethod

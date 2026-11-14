@@ -2,10 +2,10 @@
 // Description: Comprehensive School & Class Management screen for Admin portal with capacity indicators and teacher assignment.
 // Created At: 2026-09-19
 // Created By: Tam Khang
-// Updated At: 2026-09-20
+// Updated At: 2026-11-14
 // Updated By: Tam Khang
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import { 
   GraduationCap, 
   Download, 
@@ -38,9 +38,250 @@ import {
   Info,
   FileText
 } from 'lucide-react';
+import { classesApi, adminUsersApi } from '../../services/api';
 import './AdminClassesPage.css';
 import confirmDialog from '../../components/common/confirmDialog';
 import toast from '../../components/common/toast';
+
+const AVATAR_PALETTE = [
+  { avatarBg: '#EDE9FE', avatarColor: '#5B32A8' },
+  { avatarBg: '#E0F2FE', avatarColor: '#0284C7' },
+  { avatarBg: '#FCE7F3', avatarColor: '#BE185D' },
+  { avatarBg: '#DCFCE7', avatarColor: '#15803D' },
+  { avatarBg: '#FEF3C7', avatarColor: '#B45309' },
+  { avatarBg: '#E0E7FF', avatarColor: '#3730A3' },
+];
+
+const getInitialsAvatar = (fullName = '') => {
+  const parts = fullName.trim().split(/\s+/).filter(Boolean);
+  const firstChar = parts[0]?.[0] || 'U';
+  const lastChar = parts.length > 1 ? parts[parts.length - 1][0] : (parts[0]?.[1] || '');
+  const text = `${firstChar}${lastChar}`.toUpperCase() || 'HS';
+  const sum = Array.from(fullName).reduce((acc, ch) => acc + ch.charCodeAt(0), 0);
+  const palette = AVATAR_PALETTE[sum % AVATAR_PALETTE.length];
+  return { avatarText: text, ...palette };
+};
+
+const deriveGradeInfo = (className = '', rawGrade = '') => {
+  const source = `${rawGrade} ${className}`;
+  if (source.includes('12')) return { grade: 'Khối 12', gradeKey: 'k12' };
+  if (source.includes('11')) return { grade: 'Khối 11', gradeKey: 'k11' };
+  return { grade: 'Khối 10', gradeKey: 'k10' };
+};
+
+const formatIsoToDMY = (dateStr) => {
+  if (!dateStr) return '';
+  if (/^\d{2}\/\d{2}\/\d{4}$/.test(dateStr)) return dateStr;
+  const isoPart = String(dateStr).split('T')[0];
+  if (/^\d{4}-\d{2}-\d{2}$/.test(isoPart)) {
+    const [y, m, d] = isoPart.split('-');
+    return `${d}/${m}/${y}`;
+  }
+  return String(dateStr);
+};
+
+const convertDateToISO = (dateStr) => {
+  if (!dateStr) return null;
+  const trimmed = String(dateStr).trim();
+  if (/^\d{4}-\d{2}-\d{2}$/.test(trimmed)) return trimmed;
+  if (/^\d{2}\/\d{2}\/\d{4}$/.test(trimmed)) {
+    const [d, m, y] = trimmed.split('/');
+    return `${y}-${m}-${d}`;
+  }
+  return null;
+};
+
+const triggerBlobDownload = (blobData, filename) => {
+  const blob = blobData instanceof Blob ? blobData : new Blob([blobData], { type: 'text/csv;charset=utf-8;' });
+  const url = window.URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.setAttribute('download', filename);
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  window.URL.revokeObjectURL(url);
+};
+
+const mapApiClassToUi = (cls, teacherById = {}) => {
+  const id = cls.class_id || cls.id;
+  const name = cls.class_name || cls.name || 'Lớp học';
+  const { grade, gradeKey } = deriveGradeInfo(name, cls.grade);
+  const shortCode = cls.code || `LH${name.replace(/[^0-9A-Za-z]/g, '').toUpperCase().slice(0, 6) || String(id).slice(0, 6).toUpperCase()}`;
+  const teacherId = cls.homeroom_teacher_id || null;
+  const matchedTeacher = teacherId ? teacherById[String(teacherId)] : null;
+  const teacherName = cls.homeroom_teacher_name || matchedTeacher?.fullName || null;
+  const teacherObj = teacherName
+    ? {
+        id: teacherId,
+        name: teacherName,
+        sub: cls.teacher_department || matchedTeacher?.department || 'Giáo viên chủ nhiệm',
+        phone: matchedTeacher?.phone || 'Chưa cập nhật',
+        email: matchedTeacher?.email || '',
+        ...getInitialsAvatar(teacherName),
+      }
+    : null;
+  const rawStatus = cls.status || 'ACTIVE';
+  const isPendingTeacher = !teacherObj;
+  const statusLabel = rawStatus === 'INACTIVE'
+    ? 'Tạm dừng'
+    : (isPendingTeacher ? 'Chờ phân công GV' : 'Đang học');
+
+  return {
+    id,
+    code: shortCode,
+    name,
+    subSpecialty: cls.specialization || cls.room_name || cls.sub_specialty || cls.specialty || (cls.school_year ? `Niên khóa ${cls.school_year}` : 'Chương trình chuẩn'),
+    grade,
+    gradeKey,
+    homeroomTeacherId: teacherId,
+    teacher: teacherObj,
+    currentStudents: cls.student_count ?? cls.current_students ?? cls.enrolled_count ?? 0,
+    maxStudents: cls.capacity ?? cls.max_students ?? 45,
+    track: cls.track || (name.toLowerCase().includes('chuyên') ? 'Chuyên' : name.toLowerCase().includes('song ngữ') ? 'Song ngữ' : 'Chuẩn'),
+    trackKey: name.toLowerCase().includes('chuyên') ? 'specialized' : name.toLowerCase().includes('song ngữ') ? 'bilingual' : 'standard',
+    status: isPendingTeacher ? 'pending_teacher' : 'active',
+    rawStatus,
+    statusLabel,
+    academicYear: (cls.school_year || cls.academic_year || '2024-2025').replace('-', ' - '),
+  };
+};
+
+const mapApiStudentToUi = (st) => {
+  const id = st.student_id || st.user_id || st.id;
+  const name = st.student_name || st.full_name || st.name || 'Học sinh';
+  const code = st.student_code || st.code || `HS${String(id).slice(0, 6).toUpperCase()}`;
+  const gpaVal = Number(st.gpa ?? 0);
+  const safeGpa = Number.isFinite(gpaVal) ? gpaVal : 0;
+  return {
+    id,
+    code,
+    name,
+    email: st.email || '',
+    ...getInitialsAvatar(name),
+    birthDate: formatIsoToDMY(st.birthday || st.dob || st.birth_date) || 'Chưa cập nhật',
+    gender: st.gender || 'Nam',
+    phone: st.phone || '',
+    parentName: st.parent_name || 'Phụ huynh',
+    parentRole: st.parent_role || 'Phụ huynh',
+    parentPhone: st.parent_phone || st.phone || 'Chưa cập nhật',
+    currentGrade: st.current_grade || (st.current_class ? deriveGradeInfo(st.current_class).grade : 'Chưa xếp lớp'),
+    gpa: safeGpa,
+    rank: st.rank || (safeGpa >= 9 ? 'Xuất sắc' : safeGpa >= 8 ? 'Giỏi' : safeGpa > 0 ? 'Khá' : 'Đang học'),
+    role: st.role || 'Thành viên',
+    starred: Boolean(st.starred),
+  };
+};
+
+const FALLBACK_CLASSES = [
+  {
+    id: 'LH12A01',
+    code: 'LH12A01',
+    name: '12A1 - Chuyên Toán',
+    subSpecialty: 'Ban Khoa học Tự nhiên A',
+    grade: 'Khối 12',
+    gradeKey: 'k12',
+    homeroomTeacherId: null,
+    teacher: {
+      name: 'ThS. Nguyễn Văn A',
+      sub: 'Tổ Toán - Tin',
+      phone: '0912.345.678',
+      email: 'nguyenvana@academic.edu.vn',
+      ...getInitialsAvatar('Nguyễn Văn A'),
+    },
+    currentStudents: 45,
+    maxStudents: 45,
+    track: 'Chuyên',
+    trackKey: 'specialized',
+    status: 'active',
+    rawStatus: 'ACTIVE',
+    statusLabel: 'Đang học',
+    academicYear: '2024 - 2025',
+  },
+  {
+    id: 'LH11B01',
+    code: 'LH11B01',
+    name: '11B1 - Tự nhiên',
+    subSpecialty: 'Toán - Hóa - Sinh',
+    grade: 'Khối 11',
+    gradeKey: 'k11',
+    homeroomTeacherId: null,
+    teacher: {
+      name: 'Thầy Lê Nguyên',
+      sub: 'Tổ Hóa - Sinh',
+      phone: '0912.345.679',
+      email: 'lenguyen@academic.edu.vn',
+      ...getInitialsAvatar('Lê Nguyên'),
+    },
+    currentStudents: 44,
+    maxStudents: 45,
+    track: 'Chuẩn',
+    trackKey: 'standard',
+    status: 'active',
+    rawStatus: 'ACTIVE',
+    statusLabel: 'Đang học',
+    academicYear: '2024 - 2025',
+  },
+  {
+    id: 'LH10A03',
+    code: 'LH10A03',
+    name: '10A3 - Tiếng Anh IELTS',
+    subSpecialty: 'Tăng cường ngoại ngữ',
+    grade: 'Khối 10',
+    gradeKey: 'k10',
+    homeroomTeacherId: null,
+    teacher: null,
+    currentStudents: 38,
+    maxStudents: 40,
+    track: 'Song ngữ',
+    trackKey: 'bilingual',
+    status: 'pending_teacher',
+    rawStatus: 'ACTIVE',
+    statusLabel: 'Chờ phân công GV',
+    academicYear: '2024 - 2025',
+  },
+];
+
+const FALLBACK_CANDIDATES = [
+  {
+    id: 'HS2024201',
+    code: 'HS2024201',
+    name: 'Nguyễn Quỳnh Chi',
+    email: 'quynhchi.cand@academic.edu.vn',
+    avatarText: 'QC',
+    avatarBg: '#FCE7F3',
+    avatarColor: '#BE185D',
+    birthDate: '15/05/2007',
+    gender: 'Nữ',
+    parentName: 'Nguyễn Văn Nam',
+    parentRole: 'Bố',
+    parentPhone: '0988.112.334',
+    status: 'Chưa xếp lớp',
+    statusType: 'unassigned',
+    currentGrade: 'Khối 12',
+    gpa: 8.8,
+    rank: 'Giỏi',
+  },
+  {
+    id: 'HS2024204',
+    code: 'HS2024204',
+    name: 'Trịnh Đình Quang',
+    email: 'dinhquang.cand@academic.edu.vn',
+    avatarText: 'ĐQ',
+    avatarBg: '#DCFCE7',
+    avatarColor: '#15803D',
+    birthDate: '03/02/2007',
+    gender: 'Nam',
+    parentName: 'Trịnh Văn Quý',
+    parentRole: 'Bố',
+    parentPhone: '0912.445.667',
+    status: 'Chưa xếp lớp',
+    statusType: 'unassigned',
+    currentGrade: 'Khối 11',
+    gpa: 8.2,
+    rank: 'Khá',
+  },
+];
 
 export default function AdminClassesPage() {
   // State for tabs & filters
@@ -54,11 +295,11 @@ export default function AdminClassesPage() {
 
   // Active filter tags state
   const [filterTags, setFilterTags] = useState([
-    { id: 'grade', label: 'Tất cả khối lớp (64)' },
+    { id: 'grade', label: 'Tất cả khối lớp' },
     { id: 'year', label: 'Niên khóa: 2024 - 2025' }
   ]);
 
-  // Modals state
+  // Modals & loading state
   const [selectedClass, setSelectedClass] = useState(null);
   const [isViewModalOpen, setIsViewModalOpen] = useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
@@ -66,6 +307,9 @@ export default function AdminClassesPage() {
   const [isAssignModalOpen, setIsAssignModalOpen] = useState(false);
   const [isExportModalOpen, setIsExportModalOpen] = useState(false);
   const [toastMessage, setToastMessage] = useState(null);
+  const [loadingClasses, setLoadingClasses] = useState(false);
+  const [loadingStudents, setLoadingStudents] = useState(false);
+  const [teachers, setTeachers] = useState([]);
 
   // Helper for sorting Vietnamese names alphabetically by given name (Tên), then middle/family names (Họ và tên đệm)
   const compareVietnameseNames = (aName, bName) => {
@@ -900,7 +1144,7 @@ export default function AdminClassesPage() {
     }
   ];
 
-  const [classStudents, setClassStudents] = useState(defaultClassStudents);
+  const [classStudents, setClassStudents] = useState([]);
   const [studentSearch, setStudentSearch] = useState('');
   const [studentGenderFilter, setStudentGenderFilter] = useState('all');
   const [studentAcademicFilter, setStudentAcademicFilter] = useState('all');
@@ -916,6 +1160,7 @@ export default function AdminClassesPage() {
     birthDate: '',
     gender: 'Nam',
     email: '',
+    phone: '',
     parentName: '',
     parentRole: 'Bố',
     parentPhone: '',
@@ -926,198 +1171,7 @@ export default function AdminClassesPage() {
   // State for 'Thêm học sinh vào lớp' modal
   const [isAddStudentToClassModalOpen, setIsAddStudentToClassModalOpen] = useState(false);
   const [addStudentTab, setAddStudentTab] = useState('select'); // 'select' | 'create' | 'excel'
-  const [availableCandidates, setAvailableCandidates] = useState([
-    {
-      id: 'HS2024201',
-      code: 'HS2024201',
-      name: 'Nguyễn Quỳnh Chi',
-      email: 'quynhchi.cand@academic.edu.vn',
-      avatarText: 'QC',
-      avatarBg: '#FCE7F3',
-      avatarColor: '#BE185D',
-      birthDate: '15/05/2007',
-      gender: 'Nữ',
-      parentName: 'Nguyễn Văn Nam',
-      parentRole: 'Bố',
-      parentPhone: '0988.112.334',
-      status: 'Chưa xếp lớp',
-      statusType: 'unassigned',
-      currentGrade: 'Khối 12',
-      gpa: 8.8,
-      rank: 'Giỏi'
-    },
-    {
-      id: 'HS2024202',
-      code: 'HS2024202',
-      name: 'Phan Bảo Long',
-      email: 'baolong.cand@academic.edu.vn',
-      avatarText: 'BL',
-      avatarBg: '#E0F2FE',
-      avatarColor: '#0284C7',
-      birthDate: '22/08/2007',
-      gender: 'Nam',
-      parentName: 'Phan Quốc Bảo',
-      parentRole: 'Bố',
-      parentPhone: '0977.223.445',
-      status: 'Chưa xếp lớp',
-      statusType: 'unassigned',
-      currentGrade: 'Khối 12',
-      gpa: 8.5,
-      rank: 'Giỏi'
-    },
-    {
-      id: 'HS2024203',
-      code: 'HS2024203',
-      name: 'Đoàn Phương Trinh',
-      email: 'phuongtrinh.cand@academic.edu.vn',
-      avatarText: 'PT',
-      avatarBg: '#EDE9FE',
-      avatarColor: '#6D28D9',
-      birthDate: '10/11/2007',
-      gender: 'Nữ',
-      parentName: 'Đoàn Thế Vinh',
-      parentRole: 'Bố',
-      parentPhone: '0966.334.556',
-      status: 'Chưa xếp lớp',
-      statusType: 'unassigned',
-      currentGrade: 'Khối 12',
-      gpa: 9.1,
-      rank: 'Xuất sắc'
-    },
-    {
-      id: 'HS2024204',
-      code: 'HS2024204',
-      name: 'Trịnh Đình Quang',
-      email: 'dinhquang.cand@academic.edu.vn',
-      avatarText: 'ĐQ',
-      avatarBg: '#DCFCE7',
-      avatarColor: '#15803D',
-      birthDate: '03/02/2007',
-      gender: 'Nam',
-      parentName: 'Trịnh Văn Quý',
-      parentRole: 'Bố',
-      parentPhone: '0912.445.667',
-      status: 'Chưa xếp lớp',
-      statusType: 'unassigned',
-      currentGrade: 'Khối 11',
-      gpa: 8.2,
-      rank: 'Khá'
-    },
-    {
-      id: 'HS2024205',
-      code: 'HS2024205',
-      name: 'Vũ Minh Khôi',
-      email: 'minhkhoi.cand@academic.edu.vn',
-      avatarText: 'MK',
-      avatarBg: '#FEF3C7',
-      avatarColor: '#B45309',
-      birthDate: '18/06/2007',
-      gender: 'Nam',
-      parentName: 'Vũ Thành An',
-      parentRole: 'Bố',
-      parentPhone: '0903.556.778',
-      status: 'Chưa xếp lớp',
-      statusType: 'unassigned',
-      currentGrade: 'Khối 11',
-      gpa: 8.7,
-      rank: 'Giỏi'
-    },
-    {
-      id: 'HS2024206',
-      code: 'HS2024206',
-      name: 'Trần Ánh Tuyết',
-      email: 'anhtuyet.cand@academic.edu.vn',
-      avatarText: 'AT',
-      avatarBg: '#FCE7F3',
-      avatarColor: '#9D174D',
-      birthDate: '29/03/2007',
-      gender: 'Nữ',
-      parentName: 'Trần Văn Tùng',
-      parentRole: 'Bố',
-      parentPhone: '0934.667.889',
-      status: 'Chưa xếp lớp',
-      statusType: 'unassigned',
-      currentGrade: 'Khối 11',
-      gpa: 8.6,
-      rank: 'Giỏi'
-    },
-    {
-      id: 'HS2024207',
-      code: 'HS2024207',
-      name: 'Hoàng Gia Huy',
-      email: 'giahuy.cand@academic.edu.vn',
-      avatarText: 'GH',
-      avatarBg: '#E0E7FF',
-      avatarColor: '#3730A3',
-      birthDate: '14/09/2007',
-      gender: 'Nam',
-      parentName: 'Hoàng Văn Hải',
-      parentRole: 'Bố',
-      parentPhone: '0945.778.990',
-      status: 'Chưa xếp lớp',
-      statusType: 'unassigned',
-      currentGrade: 'Khối 10',
-      gpa: 8.9,
-      rank: 'Giỏi'
-    },
-    {
-      id: 'HS2024208',
-      code: 'HS2024208',
-      name: 'Phạm Bích Ngọc',
-      email: 'bichngoc.cand@academic.edu.vn',
-      avatarText: 'BN',
-      avatarBg: '#F3E8FF',
-      avatarColor: '#7E22CE',
-      birthDate: '07/12/2007',
-      gender: 'Nữ',
-      parentName: 'Phạm Xuân Trường',
-      parentRole: 'Bố',
-      parentPhone: '0926.889.001',
-      status: 'Chưa xếp lớp',
-      statusType: 'unassigned',
-      currentGrade: 'Khối 10',
-      gpa: 8.4,
-      rank: 'Khá'
-    },
-    {
-      id: 'HS2024209',
-      code: 'HS2024209',
-      name: 'Ngô Tuấn Kiệt',
-      email: 'tuankiet.cand@academic.edu.vn',
-      avatarText: 'TK',
-      avatarBg: '#CCFBF1',
-      avatarColor: '#0F766E',
-      birthDate: '21/04/2008',
-      gender: 'Nam',
-      parentName: 'Ngô Quốc Tuấn',
-      parentRole: 'Bố',
-      parentPhone: '0918.334.221',
-      status: 'Chưa xếp lớp',
-      statusType: 'unassigned',
-      currentGrade: 'Khối 10',
-      gpa: 8.8,
-      rank: 'Giỏi'
-    },
-    {
-      id: 'HS2024210',
-      code: 'HS2024210',
-      name: 'Lê Phương Linh',
-      email: 'phuonglinh.cand@academic.edu.vn',
-      avatarText: 'PL',
-      avatarBg: '#FFE4E6',
-      avatarColor: '#E11D48',
-      birthDate: '15/10/2008',
-      gender: 'Nữ',
-      parentName: 'Lê Hoàng Nam',
-      parentRole: 'Bố',
-      parentPhone: '0972.115.889',
-      status: 'Chưa xếp lớp',
-      statusType: 'unassigned',
-      currentGrade: 'Khối 10',
-      gpa: 9.0,
-      rank: 'Xuất sắc'
-    }
-  ]);
+  const [availableCandidates, setAvailableCandidates] = useState([]);
 
   const [selectedCandidateIds, setSelectedCandidateIds] = useState([]);
   const [candidateSearch, setCandidateSearch] = useState('');
@@ -1138,6 +1192,7 @@ export default function AdminClassesPage() {
   });
 
   const [uploadedFileName, setUploadedFileName] = useState('');
+  const [uploadedFile, setUploadedFile] = useState(null);
 
   // Form state for new class
   const [newClass, setNewClass] = useState({
@@ -1147,221 +1202,24 @@ export default function AdminClassesPage() {
     grade: 'Khối 10',
     track: 'Chuẩn',
     capacity: 45,
+    schoolYear: '2024-2025',
     teacher: ''
   });
 
-  // Assign teacher state
+  // Form state for editing an existing class
+  const [editClassForm, setEditClassForm] = useState({
+    id: '',
+    name: '',
+    schoolYear: '2024-2025',
+    homeroomTeacherId: '',
+    status: 'ACTIVE'
+  });
+
+  // Assign teacher state (stores selected teacher's user_id)
   const [teacherToAssign, setTeacherToAssign] = useState('');
 
-  // Classes list matching reference mockup
-  const [classes, setClasses] = useState([
-    {
-      id: 'LH12A01',
-      code: 'LH12A01',
-      name: '12A1 - Chuyên Toán',
-      subSpecialty: 'Ban Khoa học Tự nhiên A',
-      grade: 'Khối 12',
-      gradeKey: 'k12',
-      teacher: {
-        name: 'ThS. Nguyễn Văn A',
-        sub: 'Tổ Toán - Tin',
-        avatarUrl: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=120'
-      },
-      currentStudents: 45,
-      maxStudents: 45,
-      track: 'Chuyên',
-      trackKey: 'specialized',
-      status: 'active', // 'active' | 'pending_teacher'
-      statusLabel: 'Đang học',
-      academicYear: '2024 - 2025'
-    },
-    {
-      id: 'LH12A02',
-      code: 'LH12A02',
-      name: '12A2 - Chuyên Tin',
-      subSpecialty: 'Ban Công nghệ & Thuật toán',
-      grade: 'Khối 12',
-      gradeKey: 'k12',
-      teacher: {
-        name: 'Cô Mai Lan',
-        sub: 'Tổ Toán - Tin',
-        avatarText: 'ML',
-        avatarBg: '#EDE9FE',
-        avatarColor: '#6D28D9'
-      },
-      currentStudents: 42,
-      maxStudents: 45,
-      track: 'Chuyên',
-      trackKey: 'specialized',
-      status: 'active',
-      statusLabel: 'Đang học',
-      academicYear: '2024 - 2025'
-    },
-    {
-      id: 'LH11B01',
-      code: 'LH11B01',
-      name: '11B1 - Tự nhiên',
-      subSpecialty: 'Toán - Hóa - Sinh',
-      grade: 'Khối 11',
-      gradeKey: 'k11',
-      teacher: {
-        name: 'Thầy Lê Nguyên',
-        sub: 'Tổ Hóa - Sinh',
-        avatarText: 'LN',
-        avatarBg: '#F3ECFF',
-        avatarColor: '#5B32A8'
-      },
-      currentStudents: 44,
-      maxStudents: 45,
-      track: 'Chuẩn',
-      trackKey: 'standard',
-      status: 'active',
-      statusLabel: 'Đang học',
-      academicYear: '2024 - 2025'
-    },
-    {
-      id: 'LH11B02',
-      code: 'LH11B02',
-      name: '11B2 - Vật lý cơ bản',
-      subSpecialty: 'Toán - Lý - Anh',
-      grade: 'Khối 11',
-      gradeKey: 'k11',
-      teacher: {
-        name: 'Cô Thu Hương',
-        sub: 'Tổ Vật lý',
-        avatarText: 'TH',
-        avatarBg: '#E0E7FF',
-        avatarColor: '#3730A3'
-      },
-      currentStudents: 40,
-      maxStudents: 45,
-      track: 'Chuẩn',
-      trackKey: 'standard',
-      status: 'active',
-      statusLabel: 'Đang học',
-      academicYear: '2024 - 2025'
-    },
-    {
-      id: 'LH10A03',
-      code: 'LH10A03',
-      name: '10A3 - Tiếng Anh IELTS',
-      subSpecialty: 'Tăng cường ngoại ngữ',
-      grade: 'Khối 10',
-      gradeKey: 'k10',
-      teacher: {
-        name: 'Thầy Hoàng Nam',
-        sub: 'Tổ Ngoại ngữ',
-        avatarText: 'HN',
-        avatarBg: '#FCE7F3',
-        avatarColor: '#BE185D'
-      },
-      currentStudents: 38,
-      maxStudents: 40,
-      track: 'Song ngữ',
-      trackKey: 'bilingual',
-      status: 'active',
-      statusLabel: 'Đang học',
-      academicYear: '2024 - 2025'
-    },
-    {
-      id: 'LH10A08',
-      code: 'LH10A08',
-      name: '10A8 - Xã hội',
-      subSpecialty: 'Văn - Sử - Địa',
-      grade: 'Khối 10',
-      gradeKey: 'k10',
-      teacher: null, // Unassigned
-      currentStudents: 43,
-      maxStudents: 45,
-      track: 'Chuẩn',
-      trackKey: 'standard',
-      status: 'pending_teacher',
-      statusLabel: 'Chờ phân công GV',
-      academicYear: '2024 - 2025'
-    },
-    {
-      id: 'LH11B03',
-      code: 'LH11B03',
-      name: '11B3 - Xã hội D01',
-      subSpecialty: 'Văn - Sử - Địa',
-      grade: 'Khối 11',
-      gradeKey: 'k11',
-      teacher: {
-        name: 'Cô Trần Thị Mai',
-        sub: 'Tổ Ngữ văn',
-        avatarText: 'TM',
-        avatarBg: '#FCE7F3',
-        avatarColor: '#BE185D'
-      },
-      currentStudents: 41,
-      maxStudents: 45,
-      track: 'Chuẩn',
-      trackKey: 'standard',
-      status: 'active',
-      statusLabel: 'Đang học',
-      academicYear: '2024 - 2025'
-    },
-    {
-      id: 'LH12A03',
-      code: 'LH12A03',
-      name: '12A3 - Tiếng Anh D01',
-      subSpecialty: 'Toán - Văn - Anh',
-      grade: 'Khối 12',
-      gradeKey: 'k12',
-      teacher: {
-        name: 'Thầy Hoàng Nam',
-        sub: 'Tổ Ngoại ngữ',
-        avatarText: 'HN',
-        avatarBg: '#E0E7FF',
-        avatarColor: '#3730A3'
-      },
-      currentStudents: 44,
-      maxStudents: 45,
-      track: 'Song ngữ',
-      trackKey: 'bilingual',
-      status: 'active',
-      statusLabel: 'Đang học',
-      academicYear: '2024 - 2025'
-    },
-    {
-      id: 'LH10A01',
-      code: 'LH10A01',
-      name: '10A1 - Chuyên Hóa',
-      subSpecialty: 'Hóa học chuyên sâu',
-      grade: 'Khối 10',
-      gradeKey: 'k10',
-      teacher: {
-        name: 'Thầy Lê Nguyên',
-        sub: 'Tổ Hóa - Sinh',
-        avatarText: 'LN',
-        avatarBg: '#F3ECFF',
-        avatarColor: '#5B32A8'
-      },
-      currentStudents: 39,
-      maxStudents: 40,
-      track: 'Chuyên',
-      trackKey: 'specialized',
-      status: 'active',
-      statusLabel: 'Đang học',
-      academicYear: '2024 - 2025'
-    },
-    {
-      id: 'LH10A05',
-      code: 'LH10A05',
-      name: '10A5 - Tự nhiên',
-      subSpecialty: 'Toán - Lý - Hóa',
-      grade: 'Khối 10',
-      gradeKey: 'k10',
-      teacher: null, // Unassigned
-      currentStudents: 42,
-      maxStudents: 45,
-      track: 'Chuẩn',
-      trackKey: 'standard',
-      status: 'pending_teacher',
-      statusLabel: 'Chờ phân công GV',
-      academicYear: '2024 - 2025'
-    }
-  ]);
+  // Classes list loaded from Backend API (graceful fallback only on API error)
+  const [classes, setClasses] = useState([]);
 
   const showToast = (msg) => {
     setToastMessage(msg);
@@ -1369,6 +1227,173 @@ export default function AdminClassesPage() {
       setToastMessage(null);
     }, 3500);
   };
+
+  // Load classes and teachers from Backend API (graceful fallback only on API error)
+  const fetchClassesAndTeachers = useCallback(async () => {
+    setLoadingClasses(true);
+    try {
+      const [classesRes, teachersRes] = await Promise.all([
+        classesApi.getClasses(),
+        adminUsersApi.getUsers({ role: 'teacher', page_size: 100 }).catch(() => null),
+      ]);
+
+      const rawTeachers = Array.isArray(teachersRes)
+        ? teachersRes
+        : (Array.isArray(teachersRes?.items) ? teachersRes.items : []);
+      const normalizedTeachers = rawTeachers.map((t) => ({
+        id: t.user_id || t.id,
+        fullName: t.full_name || t.name || 'Giáo viên',
+        email: t.email || '',
+        phone: t.phone || '',
+        department: t.department || 'Giáo viên bộ môn',
+      }));
+      setTeachers(normalizedTeachers);
+
+      const teacherById = normalizedTeachers.reduce((acc, t) => {
+        if (t.id) acc[String(t.id)] = t;
+        return acc;
+      }, {});
+
+      const rawClasses = Array.isArray(classesRes)
+        ? classesRes
+        : (Array.isArray(classesRes?.items) ? classesRes.items : []);
+      const mappedClasses = rawClasses.map((c) => mapApiClassToUi(c, teacherById));
+      setClasses(mappedClasses);
+      setSelectedClass((prev) => {
+        if (!prev) return null;
+        return mappedClasses.find((m) => m.id === prev.id) || prev;
+      });
+    } catch (err) {
+      console.error('Failed to load classes from backend:', err);
+      setClasses(FALLBACK_CLASSES);
+      showToast('Không thể kết nối máy chủ lớp học, đang hiển thị dữ liệu dự phòng.');
+    } finally {
+      setLoadingClasses(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchClassesAndTeachers();
+  }, [fetchClassesAndTeachers]);
+
+  const fetchStudentsForClass = useCallback(async (classId) => {
+    if (!classId) return;
+    setLoadingStudents(true);
+    try {
+      const res = await classesApi.getClassStudents(classId);
+      const rawStudents = Array.isArray(res)
+        ? res
+        : (Array.isArray(res?.items) ? res.items : []);
+      const mapped = rawStudents.map(mapApiStudentToUi);
+      setClassStudents(mapped);
+      setClasses((prev) =>
+        prev.map((c) =>
+          c.id === classId && c.currentStudents === 0 && mapped.length > 0
+            ? { ...c, currentStudents: mapped.length }
+            : c
+        )
+      );
+      setSelectedClass((prev) =>
+        prev && prev.id === classId && prev.currentStudents === 0 && mapped.length > 0
+          ? { ...prev, currentStudents: mapped.length }
+          : prev
+      );
+    } catch (err) {
+      console.error('Failed to load class students:', err);
+      setClassStudents(defaultClassStudents);
+    } finally {
+      setLoadingStudents(false);
+    }
+  }, []);
+
+  const handleOpenViewClass = async (cls) => {
+    setSelectedClass(cls);
+    setStudentSearch('');
+    setStudentGenderFilter('all');
+    setStudentAcademicFilter('all');
+    setStudentSelectedIds([]);
+    setIsViewModalOpen(true);
+    await fetchStudentsForClass(cls.id);
+  };
+
+  const handleOpenEditClassModal = (cls) => {
+    setSelectedClass(cls);
+    setEditClassForm({
+      id: cls.id,
+      name: cls.name,
+      schoolYear: (cls.academicYear || '2024-2025').replace(/\s+/g, ''),
+      homeroomTeacherId: cls.homeroomTeacherId ? String(cls.homeroomTeacherId) : '',
+      status: cls.rawStatus || 'ACTIVE',
+    });
+    setIsEditModalOpen(true);
+  };
+
+  const handleEditClassSubmit = async (e) => {
+    e.preventDefault();
+    if (!editClassForm.name.trim()) {
+      toast.error('Vui lòng nhập tên lớp học.');
+      return;
+    }
+    try {
+      const normalizedYear = (editClassForm.schoolYear || '').replace(/\s+/g, '');
+      await classesApi.updateClass(editClassForm.id, {
+        class_name: editClassForm.name.trim(),
+        school_year: /^\d{4}-\d{4}$/.test(normalizedYear) ? normalizedYear : undefined,
+        homeroom_teacher_id: editClassForm.homeroomTeacherId || null,
+        status: editClassForm.status || 'ACTIVE',
+      });
+      await fetchClassesAndTeachers();
+      setIsEditModalOpen(false);
+      showToast(`Đã cập nhật thông tin lớp ${editClassForm.name.trim()} thành công!`);
+    } catch (err) {
+      const errMsg = err.response?.data?.detail?.message || err.response?.data?.detail || err.message || 'Lỗi khi cập nhật lớp học.';
+      toast.error(errMsg);
+    }
+  };
+
+  const handleDeleteClass = async (cls) => {
+    if (!(await confirmDialog(`Bạn có chắc chắn muốn lưu trữ hoặc vô hiệu hóa lớp ${cls.name}?`))) {
+      return;
+    }
+    try {
+      await classesApi.deleteClass(cls.id);
+      setSelectedIds((prev) => prev.filter((id) => id !== cls.id));
+      await fetchClassesAndTeachers();
+      showToast(`Lớp ${cls.name} đã được lưu trữ (Soft Delete).`);
+    } catch (err) {
+      const errMsg = err.response?.data?.detail?.message || err.response?.data?.detail || err.message || 'Lỗi khi xóa mềm lớp học.';
+      toast.error(errMsg);
+    }
+  };
+
+  const handleOpenAddStudentToClassModal = async () => {
+    if (!selectedClass) return;
+    setSelectedCandidateIds([]);
+    setCandidateSearch('');
+    setCandidateGradeFilter('all');
+    setUploadedFileName('');
+    setUploadedFile(null);
+    setAddStudentTab('select');
+    setIsAddStudentToClassModalOpen(true);
+
+    try {
+      const res = await classesApi.getAvailableStudents(selectedClass.id);
+      const rawCandidates = Array.isArray(res)
+        ? res
+        : (Array.isArray(res?.items) ? res.items : []);
+      setAvailableCandidates(rawCandidates.map(mapApiStudentToUi));
+    } catch (err) {
+      console.error('Failed to load available students:', err);
+      setAvailableCandidates(FALLBACK_CANDIDATES);
+    }
+  };
+
+  const tabCounts = useMemo(() => ({
+    all: classes.length,
+    k10: classes.filter(c => c.gradeKey === 'k10').length,
+    k11: classes.filter(c => c.gradeKey === 'k11').length,
+    k12: classes.filter(c => c.gradeKey === 'k12').length,
+  }), [classes]);
 
   // Filtered classes calculation
   const filteredClasses = useMemo(() => {
@@ -1393,10 +1418,10 @@ export default function AdminClassesPage() {
       // Search query filter
       if (searchQuery.trim()) {
         const q = searchQuery.trim().toLowerCase();
-        const matchCode = cls.code.toLowerCase().includes(q);
-        const matchName = cls.name.toLowerCase().includes(q);
-        const matchSub = cls.subSpecialty.toLowerCase().includes(q);
-        const matchTeacher = cls.teacher?.name.toLowerCase().includes(q);
+        const matchCode = (cls.code || '').toLowerCase().includes(q);
+        const matchName = (cls.name || '').toLowerCase().includes(q);
+        const matchSub = (cls.subSpecialty || '').toLowerCase().includes(q);
+        const matchTeacher = (cls.teacher?.name || '').toLowerCase().includes(q);
         if (!matchCode && !matchName && !matchSub && !matchTeacher) return false;
       }
 
@@ -1404,7 +1429,15 @@ export default function AdminClassesPage() {
     });
   }, [classes, activeTab, gradeFilter, teacherStatusFilter, searchQuery]);
 
-  // Paginated classes calculation (max 10 rows per page by default)
+  const totalPages = Math.max(1, Math.ceil(filteredClasses.length / pageSize));
+
+  useEffect(() => {
+    if (currentPage > totalPages) {
+      setCurrentPage(totalPages);
+    }
+  }, [currentPage, totalPages]);
+
+  // Paginated classes calculation
   const paginatedClasses = useMemo(() => {
     const startIndex = (currentPage - 1) * pageSize;
     return filteredClasses.slice(startIndex, startIndex + pageSize);
@@ -1430,21 +1463,29 @@ export default function AdminClassesPage() {
       if (studentAcademicFilter !== 'all' && st.rank !== studentAcademicFilter) return false;
       if (studentSearch.trim()) {
         const q = studentSearch.trim().toLowerCase();
-        const matchName = st.name.toLowerCase().includes(q);
-        const matchCode = st.code.toLowerCase().includes(q);
-        const matchParent = st.parentName.toLowerCase().includes(q);
-        const matchPhone = st.parentPhone.includes(q);
+        const matchName = (st.name || '').toLowerCase().includes(q);
+        const matchCode = (st.code || '').toLowerCase().includes(q);
+        const matchParent = (st.parentName || '').toLowerCase().includes(q);
+        const matchPhone = (st.parentPhone || '').includes(q);
         if (!matchName && !matchCode && !matchParent && !matchPhone) return false;
       }
       return true;
     }).sort((a, b) => {
       if (studentSortBy === 'gpa_desc') {
-        const gpaDiff = b.gpa - a.gpa;
+        const gpaDiff = (b.gpa || 0) - (a.gpa || 0);
         if (gpaDiff !== 0) return gpaDiff;
       }
       return compareVietnameseNames(a.name, b.name);
     });
   }, [classStudents, studentSearch, studentGenderFilter, studentAcademicFilter, studentSortBy]);
+
+  const classStudentStats = useMemo(() => {
+    const gpas = classStudents.map(s => Number(s.gpa)).filter(v => Number.isFinite(v) && v > 0);
+    const avgGpa = gpas.length > 0 ? (gpas.reduce((a, b) => a + b, 0) / gpas.length).toFixed(2) : '0.00';
+    const goodPlus = classStudents.filter(s => s.rank === 'Xuất sắc' || s.rank === 'Giỏi').length;
+    const fairCount = Math.max(0, classStudents.length - goodPlus);
+    return { avgGpa, goodPlus, fairCount };
+  }, [classStudents]);
 
   const handleToggleStarStudent = (studentId) => {
     setClassStudents(prev => prev.map(s => s.id === studentId ? { ...s, starred: !s.starred } : s));
@@ -1468,9 +1509,9 @@ export default function AdminClassesPage() {
       if (candidateGradeFilter !== 'all' && c.currentGrade !== candidateGradeFilter) return false;
       if (candidateSearch.trim()) {
         const q = candidateSearch.trim().toLowerCase();
-        const matchName = c.name.toLowerCase().includes(q);
-        const matchCode = c.code.toLowerCase().includes(q);
-        const matchPhone = c.parentPhone.includes(q);
+        const matchName = (c.name || '').toLowerCase().includes(q);
+        const matchCode = (c.code || '').toLowerCase().includes(q);
+        const matchPhone = (c.parentPhone || '').includes(q);
         if (!matchName && !matchCode && !matchPhone) return false;
       }
       return true;
@@ -1489,272 +1530,225 @@ export default function AdminClassesPage() {
     }
   };
 
-  const handleAddCandidatesToClass = () => {
+  const handleAddCandidatesToClass = async () => {
     if (selectedCandidateIds.length === 0 || !selectedClass) return;
 
     const toAdd = availableCandidates.filter(c => selectedCandidateIds.includes(c.id));
-    const newStudentsToAdd = toAdd.map(c => ({
-      id: c.id,
-      code: c.code,
-      name: c.name,
-      email: c.email,
-      avatarText: c.avatarText,
-      avatarBg: c.avatarBg,
-      avatarColor: c.avatarColor,
-      birthDate: c.birthDate,
-      gender: c.gender,
-      parentName: c.parentName,
-      parentRole: c.parentRole,
-      parentPhone: c.parentPhone,
-      gpa: c.gpa || 8.5,
-      rank: c.rank || 'Giỏi',
-      role: 'Thành viên',
-      starred: false
-    }));
+    try {
+      const results = await Promise.allSettled(
+        toAdd.map((cand) => classesApi.enrollStudent(selectedClass.id, { student_id: cand.id }))
+      );
+      const succeeded = results.filter(r => r.status === 'fulfilled').length;
+      if (succeeded === 0) {
+        const firstErr = results[0]?.reason;
+        const msg = firstErr?.response?.data?.detail?.message || firstErr?.response?.data?.detail || firstErr?.message || 'Không thể thêm học sinh vào lớp.';
+        toast.error(msg);
+        return;
+      }
 
-    setClassStudents(prev => [...prev, ...newStudentsToAdd]);
-    setAvailableCandidates(prev => prev.filter(c => !selectedCandidateIds.includes(c.id)));
-
-    setClasses(prev => prev.map(cls => cls.id === selectedClass.id ? {
-      ...cls,
-      currentStudents: cls.currentStudents + newStudentsToAdd.length
-    } : cls));
-
-    setSelectedCandidateIds([]);
-    setIsAddStudentToClassModalOpen(false);
-    showToast(`Đã thêm thành công ${newStudentsToAdd.length} học sinh vào lớp ${selectedClass.name}!`);
+      setSelectedCandidateIds([]);
+      setIsAddStudentToClassModalOpen(false);
+      await Promise.all([fetchStudentsForClass(selectedClass.id), fetchClassesAndTeachers()]);
+      showToast(`Đã thêm thành công ${succeeded} học sinh vào lớp ${selectedClass.name}!`);
+    } catch (err) {
+      const errMsg = err.response?.data?.detail?.message || err.response?.data?.detail || err.message || 'Lỗi khi ghi danh học sinh.';
+      toast.error(errMsg);
+    }
   };
 
-  const handleCreateAndAddStudent = (e) => {
+  const handleCreateAndAddStudent = async (e) => {
     e.preventDefault();
+    if (!selectedClass) return;
     if (!newStudentForm.name.trim() || !newStudentForm.parentPhone.trim()) {
       toast.error('Vui lòng điền đầy đủ họ tên học sinh và số điện thoại phụ huynh.');
       return;
     }
 
-    const nextNum = classStudents.length + 101;
-    const generatedCode = newStudentForm.code.trim() || `HS2024${nextNum}`;
-    const nameParts = newStudentForm.name.trim().split(/\s+/);
-    const lastNamePart = nameParts[nameParts.length - 1] || 'HS';
-    const firstTwoLetters = (nameParts[0]?.[0] || 'H') + (lastNamePart[0] || 'S');
+    try {
+      const cleanPhone = (newStudentForm.phone || newStudentForm.parentPhone || '').replace(/\D/g, '');
+      await classesApi.enrollStudent(selectedClass.id, {
+        student_name: newStudentForm.name.trim(),
+        birthday: convertDateToISO(newStudentForm.birthDate),
+        gender: newStudentForm.gender || 'Nam',
+        phone: cleanPhone || null,
+        student_code: newStudentForm.code.trim() || null,
+        status: 'ACTIVE',
+      });
 
-    const createdStudent = {
-      id: generatedCode,
-      code: generatedCode,
-      name: newStudentForm.name.trim(),
-      email: newStudentForm.email.trim() || `${lastNamePart.toLowerCase()}.${generatedCode.toLowerCase()}@academic.edu.vn`,
-      avatarText: firstTwoLetters.toUpperCase(),
-      avatarBg: '#EDE9FE',
-      avatarColor: '#5B32A8',
-      birthDate: newStudentForm.birthDate || '01/01/2007',
-      gender: newStudentForm.gender,
-      parentName: newStudentForm.parentName.trim() || 'Phụ huynh học sinh',
-      parentRole: newStudentForm.parentRole || 'Bố',
-      parentPhone: newStudentForm.parentPhone.trim(),
-      gpa: 8.5,
-      rank: 'Giỏi',
-      role: 'Thành viên',
-      starred: false
-    };
-
-    setClassStudents(prev => [...prev, createdStudent]);
-
-    setClasses(prev => prev.map(cls => cls.id === selectedClass.id ? {
-      ...cls,
-      currentStudents: cls.currentStudents + 1
-    } : cls));
-
-    setNewStudentForm({
-      code: '',
-      name: '',
-      birthDate: '',
-      gender: 'Nam',
-      email: '',
-      phone: '',
-      parentName: '',
-      parentRole: 'Bố',
-      parentPhone: '',
-      address: '',
-      notes: ''
-    });
-
-    setIsAddStudentToClassModalOpen(false);
-    showToast(`Đã tạo và thêm học sinh ${createdStudent.name} vào lớp ${selectedClass.name}!`);
+      const createdName = newStudentForm.name.trim();
+      setNewStudentForm({
+        code: '',
+        name: '',
+        birthDate: '',
+        gender: 'Nam',
+        email: '',
+        phone: '',
+        parentName: '',
+        parentRole: 'Bố',
+        parentPhone: '',
+        address: '',
+        notes: ''
+      });
+      setIsAddStudentToClassModalOpen(false);
+      await Promise.all([fetchStudentsForClass(selectedClass.id), fetchClassesAndTeachers()]);
+      showToast(`Đã tạo và thêm học sinh ${createdName} vào lớp ${selectedClass.name}!`);
+    } catch (err) {
+      const errMsg = err.response?.data?.detail?.message || err.response?.data?.detail || err.message || 'Lỗi khi tạo và ghi danh học sinh.';
+      toast.error(errMsg);
+    }
   };
 
-  const handleImportExcelStudents = () => {
-    if (!uploadedFileName) {
+  const handleImportExcelStudents = async () => {
+    if (!selectedClass) return;
+    if (!uploadedFile) {
       toast.error('Vui lòng chọn tập tin Excel (.xlsx, .csv).');
       return;
     }
 
-    const imported = [
-      {
-        id: `HS2024${classStudents.length + 101}`,
-        code: `HS2024${classStudents.length + 101}`,
-        name: 'Trần Gia Hưng',
-        email: `giahung.${selectedClass.name.split(' ')[0].toLowerCase()}@academic.edu.vn`,
-        avatarText: 'GH',
-        avatarBg: '#DCFCE7',
-        avatarColor: '#15803D',
-        birthDate: '14/05/2007',
-        gender: 'Nam',
-        parentName: 'Trần Văn Hoàng',
-        parentRole: 'Bố',
-        parentPhone: '0979.888.777',
-        gpa: 8.8,
-        rank: 'Giỏi',
-        role: 'Thành viên',
-        starred: false
-      },
-      {
-        id: `HS2024${classStudents.length + 102}`,
-        code: `HS2024${classStudents.length + 102}`,
-        name: 'Đặng Ngọc Diệp',
-        email: `ngocdiep.${selectedClass.name.split(' ')[0].toLowerCase()}@academic.edu.vn`,
-        avatarText: 'ND',
-        avatarBg: '#FCE7F3',
-        avatarColor: '#BE185D',
-        birthDate: '26/10/2007',
-        gender: 'Nữ',
-        parentName: 'Đặng Quốc Bảo',
-        parentRole: 'Bố',
-        parentPhone: '0988.666.555',
-        gpa: 9.1,
-        rank: 'Xuất sắc',
-        role: 'Thành viên',
-        starred: false
-      }
-    ];
-
-    setClassStudents(prev => [...prev, ...imported]);
-
-    setClasses(prev => prev.map(cls => cls.id === selectedClass.id ? {
-      ...cls,
-      currentStudents: cls.currentStudents + imported.length
-    } : cls));
-
-    setUploadedFileName('');
-    setIsAddStudentToClassModalOpen(false);
-    showToast(`Đã nhập thành công ${imported.length} học sinh từ tập tin ${uploadedFileName} vào lớp ${selectedClass.name}!`);
+    try {
+      const res = await classesApi.importStudentsExcel(selectedClass.id, uploadedFile);
+      const countText = res?.enrolled_count ?? res?.imported_count ?? res?.created_count ?? '';
+      const errorCount = Array.isArray(res?.errors) ? res.errors.length : 0;
+      const fileLabel = uploadedFileName;
+      setUploadedFileName('');
+      setUploadedFile(null);
+      setIsAddStudentToClassModalOpen(false);
+      await Promise.all([fetchStudentsForClass(selectedClass.id), fetchClassesAndTeachers()]);
+      const suffixErr = errorCount > 0 ? ` (${errorCount} dòng lỗi bỏ qua)` : '';
+      showToast(
+        countText !== ''
+          ? `Đã nhập thành công ${countText} học sinh từ tập tin ${fileLabel} vào lớp ${selectedClass.name}${suffixErr}!`
+          : `Đã nhập danh sách học sinh từ tập tin ${fileLabel} vào lớp ${selectedClass.name}${suffixErr}!`
+      );
+    } catch (err) {
+      const errMsg = err.response?.data?.detail?.message || err.response?.data?.detail || err.message || 'Lỗi khi nhập danh sách học sinh từ tập tin.';
+      toast.error(errMsg);
+    }
   };
 
   // Edit student handlers
   const handleOpenEditStudent = (student) => {
     setEditingStudent(student);
     setEditStudentForm({
-      name: student.name,
-      code: student.code,
-      birthDate: student.birthDate,
-      gender: student.gender,
-      email: student.email,
-      parentName: student.parentName,
-      parentRole: student.parentRole,
-      parentPhone: student.parentPhone,
-      gpa: student.gpa,
-      rank: student.rank
+      name: student.name || '',
+      code: student.code || '',
+      birthDate: student.birthDate === 'Chưa cập nhật' ? '' : (student.birthDate || ''),
+      gender: student.gender || 'Nam',
+      email: student.email || '',
+      phone: student.phone || '',
+      parentName: student.parentName || '',
+      parentRole: student.parentRole || 'Bố',
+      parentPhone: student.parentPhone || '',
+      gpa: student.gpa ?? 8.5,
+      rank: student.rank || 'Giỏi'
     });
     setIsEditStudentModalOpen(true);
   };
 
-  const handleSaveEditStudent = (e) => {
+  const handleSaveEditStudent = async (e) => {
     e.preventDefault();
     if (!editingStudent) return;
 
-    setClassStudents(prev => prev.map(s => {
-      if (s.id === editingStudent.id) {
-        return {
-          ...s,
-          name: editStudentForm.name.trim(),
-          birthDate: editStudentForm.birthDate,
-          gender: editStudentForm.gender,
-          email: editStudentForm.email.trim(),
-          parentName: editStudentForm.parentName.trim(),
-          parentRole: editStudentForm.parentRole,
-          parentPhone: editStudentForm.parentPhone.trim(),
-          gpa: Number(editStudentForm.gpa) || s.gpa,
-          rank: editStudentForm.rank
-        };
-      }
-      return s;
-    }));
+    const cleanPhone = (editStudentForm.phone || editStudentForm.parentPhone || '').replace(/\D/g, '');
+    const payload = {
+      full_name: editStudentForm.name.trim(),
+      email: editStudentForm.email.trim() || undefined,
+      birthday: convertDateToISO(editStudentForm.birthDate) || undefined,
+      ...(cleanPhone && /^0\d{9}$/.test(cleanPhone) ? { phone: cleanPhone } : {}),
+    };
 
-    setIsEditStudentModalOpen(false);
-    setEditingStudent(null);
-    showToast(`Đã cập nhật thông tin học sinh ${editStudentForm.name} thành công!`);
+    try {
+      await adminUsersApi.updateUser(editingStudent.id, payload);
+      setClassStudents(prev => prev.map(s => {
+        if (s.id === editingStudent.id) {
+          return {
+            ...s,
+            name: editStudentForm.name.trim(),
+            birthDate: editStudentForm.birthDate || s.birthDate,
+            gender: editStudentForm.gender,
+            email: editStudentForm.email.trim(),
+            parentName: editStudentForm.parentName.trim(),
+            parentRole: editStudentForm.parentRole,
+            parentPhone: editStudentForm.parentPhone.trim(),
+            gpa: Number(editStudentForm.gpa) || s.gpa,
+            rank: editStudentForm.rank
+          };
+        }
+        return s;
+      }));
+      setIsEditStudentModalOpen(false);
+      setEditingStudent(null);
+      showToast(`Đã cập nhật thông tin học sinh ${editStudentForm.name} thành công!`);
+    } catch (err) {
+      const errMsg = err.response?.data?.detail?.message || err.response?.data?.detail || err.message || 'Lỗi khi cập nhật thông tin học sinh.';
+      toast.error(errMsg);
+    }
   };
 
   // Assign teacher action
-  const handleAssignTeacherSubmit = (e) => {
+  const handleAssignTeacherSubmit = async (e) => {
     e.preventDefault();
     if (!teacherToAssign || !selectedClass) return;
 
-    setClasses(prev => prev.map(cls => {
-      if (cls.id === selectedClass.id) {
-        return {
-          ...cls,
-          teacher: {
-            name: teacherToAssign,
-            sub: 'Tổ Giáo viên Phân công',
-            avatarText: teacherToAssign.split(' ').slice(-1)[0][0] || 'GV',
-            avatarBg: '#EDE9FE',
-            avatarColor: '#5B32A8'
-          },
-          status: 'active',
-          statusLabel: 'Đang học'
-        };
-      }
-      return cls;
-    }));
-
-    setIsAssignModalOpen(false);
-    showToast(`Đã phân công ${teacherToAssign} làm GVCN lớp ${selectedClass.name}!`);
+    try {
+      await classesApi.updateClass(selectedClass.id, {
+        homeroom_teacher_id: teacherToAssign,
+      });
+      const matched = teachers.find(t => String(t.id) === String(teacherToAssign));
+      await fetchClassesAndTeachers();
+      setIsAssignModalOpen(false);
+      showToast(`Đã phân công ${matched?.fullName || 'giáo viên'} làm GVCN lớp ${selectedClass.name}!`);
+    } catch (err) {
+      const errMsg = err.response?.data?.detail?.message || err.response?.data?.detail || err.message || 'Lỗi khi phân công giáo viên chủ nhiệm.';
+      toast.error(errMsg);
+    }
   };
 
   // Add new class submit
-  const handleAddClassSubmit = (e) => {
+  const handleAddClassSubmit = async (e) => {
     e.preventDefault();
-    if (!newClass.name) {
+    if (!newClass.name.trim()) {
       toast.error('Vui lòng nhập tên lớp học.');
       return;
     }
 
-    const code = `LH${newClass.name.replace(/[^0-9A-Z]/gi, '').slice(0, 5) || '10A9'}`;
-    const created = {
-      id: code,
-      code: code,
-      name: newClass.name,
-      subSpecialty: newClass.specialty || 'Học tập chuẩn',
-      grade: newClass.grade,
-      gradeKey: newClass.grade.includes('10') ? 'k10' : newClass.grade.includes('11') ? 'k11' : 'k12',
-      teacher: newClass.teacher ? {
-        name: newClass.teacher,
-        sub: 'Tổ Phân công',
-        avatarText: newClass.teacher.split(' ').slice(-1)[0][0] || 'GV',
-        avatarBg: '#EDE9FE',
-        avatarColor: '#5B32A8'
-      } : null,
-      currentStudents: 0,
-      maxStudents: Number(newClass.capacity) || 45,
-      track: newClass.track,
-      trackKey: newClass.track === 'Chuyên' ? 'specialized' : newClass.track === 'Song ngữ' ? 'bilingual' : 'standard',
-      status: newClass.teacher ? 'active' : 'pending_teacher',
-      statusLabel: newClass.teacher ? 'Đang học' : 'Chờ phân công GV',
-      academicYear: '2024 - 2025'
-    };
+    try {
+      const created = await classesApi.createClass({
+        class_name: newClass.name.trim(),
+        school_year: newClass.schoolYear || '2024-2025',
+        homeroom_teacher_id: newClass.teacher || null,
+        specialization: newClass.specialty?.trim() || null,
+        status: 'ACTIVE',
+      });
+      await fetchClassesAndTeachers();
+      setIsAddModalOpen(false);
+      showToast(`Đã tạo thành công lớp học ${created?.class_name || newClass.name.trim()}!`);
+      setNewClass({
+        code: '',
+        name: '',
+        specialty: '',
+        grade: 'Khối 10',
+        track: 'Chuẩn',
+        capacity: 45,
+        schoolYear: '2024-2025',
+        teacher: ''
+      });
+    } catch (err) {
+      const errMsg = err.response?.data?.detail?.message || err.response?.data?.detail || err.message || 'Lỗi khi tạo lớp học mới.';
+      toast.error(errMsg);
+    }
+  };
 
-    setClasses(prev => [created, ...prev]);
-    setIsAddModalOpen(false);
-    showToast(`Đã tạo thành công lớp học ${created.name}!`);
-    setNewClass({
-      code: '',
-      name: '',
-      specialty: '',
-      grade: 'Khối 10',
-      track: 'Chuẩn',
-      capacity: 45,
-      teacher: ''
-    });
+  const handleExportClassesCsv = async () => {
+    try {
+      const blob = await classesApi.exportClassesCsv();
+      triggerBlobDownload(blob, 'danh_sach_lop_hoc.csv');
+      setIsExportModalOpen(false);
+      showToast('Đã xuất và tải xuống tập tin danh sách lớp học (.csv).');
+    } catch (err) {
+      const errMsg = err.response?.data?.detail?.message || err.response?.data?.detail || err.message || 'Không thể xuất danh sách lớp học.';
+      toast.error(errMsg);
+    }
   };
 
   const handleResetFilters = () => {
@@ -1762,6 +1756,7 @@ export default function AdminClassesPage() {
     setGradeFilter('all');
     setTeacherStatusFilter('all');
     setActiveTab('all');
+    setCurrentPage(1);
     showToast('Đã đặt lại tất cả bộ lọc về mặc định.');
   };
 
@@ -1818,30 +1813,30 @@ export default function AdminClassesPage() {
           <button 
             type="button" 
             className={`classes-tab-pill ${activeTab === 'all' ? 'active' : ''}`}
-            onClick={() => setActiveTab('all')}
+            onClick={() => { setActiveTab('all'); setCurrentPage(1); }}
           >
-            Tất cả lớp (64)
+            Tất cả lớp ({tabCounts.all})
           </button>
           <button 
             type="button" 
             className={`classes-tab-pill ${activeTab === 'k10' ? 'active' : ''}`}
-            onClick={() => setActiveTab('k10')}
+            onClick={() => { setActiveTab('k10'); setCurrentPage(1); }}
           >
-            Khối 10 (22)
+            Khối 10 ({tabCounts.k10})
           </button>
           <button 
             type="button" 
             className={`classes-tab-pill ${activeTab === 'k11' ? 'active' : ''}`}
-            onClick={() => setActiveTab('k11')}
+            onClick={() => { setActiveTab('k11'); setCurrentPage(1); }}
           >
-            Khối 11 (20)
+            Khối 11 ({tabCounts.k11})
           </button>
           <button 
             type="button" 
             className={`classes-tab-pill ${activeTab === 'k12' ? 'active' : ''}`}
-            onClick={() => setActiveTab('k12')}
+            onClick={() => { setActiveTab('k12'); setCurrentPage(1); }}
           >
-            Khối 12 (22)
+            Khối 12 ({tabCounts.k12})
           </button>
         </div>
 
@@ -1853,12 +1848,13 @@ export default function AdminClassesPage() {
             type="button" 
             className="classes-refresh-icon-btn" 
             title="Làm mới danh sách"
-            onClick={() => {
+            onClick={async () => {
               setSelectedIds([]);
+              await fetchClassesAndTeachers();
               showToast('Đã làm mới danh sách lớp học.');
             }}
           >
-            <RotateCw size={15} />
+            <RotateCw size={15} className={loadingClasses ? 'animate-spin' : ''} />
           </button>
         </div>
       </section>
@@ -1995,9 +1991,8 @@ export default function AdminClassesPage() {
                       key={cls.id} 
                       className={`classes-table-row ${isSelected ? 'row-selected' : ''}`}
                       onClick={(e) => {
-                        if (e.target.closest('.col-checkbox') || e.target.closest('.table-row-actions')) return;
-                        setSelectedClass(cls);
-                        setIsViewModalOpen(true);
+                        if (e.target.closest('.col-checkbox') || e.target.closest('.table-row-actions') || e.target.closest('.btn-unassigned-teacher-badge')) return;
+                        handleOpenViewClass(cls);
                       }}
                       title="Nhấn để xem chi tiết lớp học"
                     >
@@ -2016,10 +2011,7 @@ export default function AdminClassesPage() {
                         <button 
                           type="button" 
                           className="class-code-link"
-                          onClick={() => {
-                            setSelectedClass(cls);
-                            setIsViewModalOpen(true);
-                          }}
+                          onClick={() => handleOpenViewClass(cls)}
                         >
                           {cls.code}
                         </button>
@@ -2030,10 +2022,7 @@ export default function AdminClassesPage() {
                         <div className="class-name-block">
                           <span 
                             className="class-primary-name"
-                            onClick={() => {
-                              setSelectedClass(cls);
-                              setIsViewModalOpen(true);
-                            }}
+                            onClick={() => handleOpenViewClass(cls)}
                           >
                             {cls.name}
                           </span>
@@ -2073,6 +2062,7 @@ export default function AdminClassesPage() {
                             className="btn-unassigned-teacher-badge"
                             onClick={() => {
                               setSelectedClass(cls);
+                              setTeacherToAssign(cls.homeroomTeacherId ? String(cls.homeroomTeacherId) : '');
                               setIsAssignModalOpen(true);
                             }}
                           >
@@ -2115,10 +2105,7 @@ export default function AdminClassesPage() {
                             type="button" 
                             className="table-action-icon-btn" 
                             title="Xem chi tiết lớp học"
-                            onClick={() => {
-                              setSelectedClass(cls);
-                              setIsViewModalOpen(true);
-                            }}
+                            onClick={() => handleOpenViewClass(cls)}
                           >
                             <Eye size={17} />
                           </button>
@@ -2128,10 +2115,7 @@ export default function AdminClassesPage() {
                             type="button" 
                             className="table-action-icon-btn" 
                             title="Chỉnh sửa thông tin"
-                            onClick={() => {
-                              setSelectedClass(cls);
-                              setIsEditModalOpen(true);
-                            }}
+                            onClick={() => handleOpenEditClassModal(cls)}
                           >
                             <Edit2 size={16} />
                           </button>
@@ -2144,6 +2128,7 @@ export default function AdminClassesPage() {
                               title="Phân công GVCN"
                               onClick={() => {
                                 setSelectedClass(cls);
+                                setTeacherToAssign(cls.homeroomTeacherId ? String(cls.homeroomTeacherId) : '');
                                 setIsAssignModalOpen(true);
                               }}
                             >
@@ -2151,16 +2136,12 @@ export default function AdminClassesPage() {
                             </button>
                           )}
 
-                          {/* More options */}
+                          {/* Soft delete / archive class */}
                           <button 
                             type="button" 
                             className="table-action-icon-btn" 
-                            title="Tùy chọn khác"
-                            onClick={async () => {
-                              if (await confirmDialog(`Bạn có chắc chắn muốn lưu trữ hoặc vô hiệu hóa lớp ${cls.name}?`)) {
-                                showToast(`Lớp ${cls.name} đã được lưu trữ (Soft Delete).`);
-                              }
-                            }}
+                            title="Lưu trữ lớp học (Soft Delete)"
+                            onClick={() => handleDeleteClass(cls)}
                           >
                             <MoreVertical size={16} />
                           </button>
@@ -2177,7 +2158,7 @@ export default function AdminClassesPage() {
         {/* 7. Pagination Footer */}
         <div className="classes-pagination-footer">
           <div className="pagination-info">
-            Hiển thị <strong>{filteredClasses.length === 0 ? 0 : (currentPage - 1) * pageSize + 1}-{Math.min(currentPage * pageSize, filteredClasses.length)}</strong> trong số <strong>64</strong> lớp học
+            Hiển thị <strong>{filteredClasses.length === 0 ? 0 : (currentPage - 1) * pageSize + 1}-{Math.min(currentPage * pageSize, filteredClasses.length)}</strong> trong số <strong>{filteredClasses.length}</strong> lớp học
           </div>
 
           <div className="pagination-controls">
@@ -2185,7 +2166,7 @@ export default function AdminClassesPage() {
               <span>Hàng trên trang:</span>
               <select 
                 value={pageSize}
-                onChange={e => setPageSize(Number(e.target.value))}
+                onChange={e => { setPageSize(Number(e.target.value)); setCurrentPage(1); }}
                 className="page-size-select"
               >
                 <option value={10}>10</option>
@@ -2203,15 +2184,21 @@ export default function AdminClassesPage() {
               >
                 <ChevronLeft size={16} />
               </button>
-              <button type="button" className="page-num-btn active">1</button>
-              <button type="button" className="page-num-btn">2</button>
-              <button type="button" className="page-num-btn">3</button>
-              <span className="page-num-ellipsis">...</span>
-              <button type="button" className="page-num-btn">7</button>
+              {Array.from({ length: totalPages }, (_, idx) => idx + 1).map((pageNum) => (
+                <button
+                  key={pageNum}
+                  type="button"
+                  className={`page-num-btn ${currentPage === pageNum ? 'active' : ''}`}
+                  onClick={() => setCurrentPage(pageNum)}
+                >
+                  {pageNum}
+                </button>
+              ))}
               <button 
                 type="button" 
                 className="page-nav-btn"
-                onClick={() => setCurrentPage(p => p + 1)}
+                disabled={currentPage >= totalPages}
+                onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
               >
                 <ChevronRight size={16} />
               </button>
@@ -2322,14 +2309,30 @@ export default function AdminClassesPage() {
 
                 <div className="admin-form-group flex-1">
                   <label className="admin-form-label">Giáo viên chủ nhiệm (nếu có)</label>
-                  <input 
-                    type="text" 
-                    className="admin-form-input" 
-                    placeholder="Nhập tên giáo viên hoặc chọn sau" 
+                  <select 
+                    className="admin-form-select"
                     value={newClass.teacher}
                     onChange={e => setNewClass(p => ({ ...p, teacher: e.target.value }))}
-                  />
+                  >
+                    <option value="">-- Chọn sau / Chưa phân công --</option>
+                    {teachers.map(t => (
+                      <option key={t.id} value={t.id}>
+                        {t.fullName}{t.department ? ` (${t.department})` : ''}
+                      </option>
+                    ))}
+                  </select>
                 </div>
+              </div>
+
+              <div className="admin-form-group">
+                <label className="admin-form-label">Niên khóa (YYYY-YYYY)</label>
+                <input 
+                  type="text" 
+                  className="admin-form-input" 
+                  placeholder="2024-2025" 
+                  value={newClass.schoolYear}
+                  onChange={e => setNewClass(p => ({ ...p, schoolYear: e.target.value }))}
+                />
               </div>
 
               <div className="admin-modal-footer">
@@ -2338,6 +2341,82 @@ export default function AdminClassesPage() {
                 </button>
                 <button type="submit" className="admin-btn-primary">
                   Tạo lớp học
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL: Chỉnh sửa thông tin lớp học */}
+      {isEditModalOpen && selectedClass && (
+        <div className="admin-modal-backdrop" onClick={() => setIsEditModalOpen(false)}>
+          <div className="admin-modal-card" onClick={e => e.stopPropagation()}>
+            <div className="admin-modal-header">
+              <h3 className="admin-modal-title">Chỉnh sửa thông tin lớp học</h3>
+              <button type="button" className="admin-modal-close" onClick={() => setIsEditModalOpen(false)}>
+                <X size={20} />
+              </button>
+            </div>
+            <form onSubmit={handleEditClassSubmit} className="admin-modal-body">
+              <div className="admin-form-group">
+                <label className="admin-form-label">Tên lớp học *</label>
+                <input 
+                  type="text" 
+                  className="admin-form-input" 
+                  value={editClassForm.name}
+                  onChange={e => setEditClassForm(p => ({ ...p, name: e.target.value }))}
+                  required 
+                />
+              </div>
+
+              <div className="admin-form-row">
+                <div className="admin-form-group flex-1">
+                  <label className="admin-form-label">Niên khóa (YYYY-YYYY)</label>
+                  <input 
+                    type="text" 
+                    className="admin-form-input" 
+                    placeholder="2024-2025"
+                    value={editClassForm.schoolYear}
+                    onChange={e => setEditClassForm(p => ({ ...p, schoolYear: e.target.value }))}
+                  />
+                </div>
+
+                <div className="admin-form-group flex-1">
+                  <label className="admin-form-label">Trạng thái</label>
+                  <select 
+                    className="admin-form-select"
+                    value={editClassForm.status}
+                    onChange={e => setEditClassForm(p => ({ ...p, status: e.target.value }))}
+                  >
+                    <option value="ACTIVE">Đang hoạt động (ACTIVE)</option>
+                    <option value="INACTIVE">Tạm dừng (INACTIVE)</option>
+                  </select>
+                </div>
+              </div>
+
+              <div className="admin-form-group">
+                <label className="admin-form-label">Giáo viên chủ nhiệm</label>
+                <select 
+                  className="admin-form-select"
+                  value={editClassForm.homeroomTeacherId}
+                  onChange={e => setEditClassForm(p => ({ ...p, homeroomTeacherId: e.target.value }))}
+                >
+                  <option value="">-- Chưa phân công GVCN --</option>
+                  {teachers.map(t => (
+                    <option key={t.id} value={t.id}>
+                      {t.fullName}{t.department ? ` (${t.department})` : ''}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="admin-modal-footer">
+                <button type="button" className="admin-btn-cancel" onClick={() => setIsEditModalOpen(false)}>
+                  Hủy
+                </button>
+                <button type="submit" className="admin-btn-primary">
+                  Lưu thay đổi
                 </button>
               </div>
             </form>
@@ -2369,12 +2448,11 @@ export default function AdminClassesPage() {
                   required
                 >
                   <option value="">-- Chọn giáo viên từ danh sách --</option>
-                  <option value="ThS. Nguyễn Văn A">ThS. Nguyễn Văn A (Tổ Toán - Tin)</option>
-                  <option value="Cô Mai Lan">Cô Mai Lan (Tổ Toán - Tin)</option>
-                  <option value="Thầy Lê Nguyên">Thầy Lê Nguyên (Tổ Hóa - Sinh)</option>
-                  <option value="Cô Thu Hương">Cô Thu Hương (Tổ Vật lý)</option>
-                  <option value="Thầy Hoàng Nam">Thầy Hoàng Nam (Tổ Ngoại ngữ)</option>
-                  <option value="Cô Trần Thị Mai">Cô Trần Thị Mai (Tổ Ngữ văn)</option>
+                  {teachers.map(t => (
+                    <option key={t.id} value={t.id}>
+                      {t.fullName}{t.department ? ` (${t.department})` : ''}
+                    </option>
+                  ))}
                 </select>
               </div>
 
@@ -2429,7 +2507,7 @@ export default function AdminClassesPage() {
                 <button 
                   type="button" 
                   className="btn-dialog-export"
-                  onClick={() => showToast(`Đang xuất danh sách lớp ${selectedClass.name} (Excel/PDF)...`)}
+                  onClick={handleExportClassesCsv}
                 >
                   <Download size={15} />
                   <span>Xuất danh sách (Excel/PDF)</span>
@@ -2437,7 +2515,7 @@ export default function AdminClassesPage() {
                 <button 
                   type="button" 
                   className="btn-dialog-add-student"
-                  onClick={() => setIsAddStudentToClassModalOpen(true)}
+                  onClick={handleOpenAddStudentToClassModal}
                 >
                   <UserPlus size={15} />
                   <span>Thêm học sinh vào lớp</span>
@@ -2468,13 +2546,17 @@ export default function AdminClassesPage() {
                   )}
                   <div className="teacher-box-info">
                     <div className="teacher-box-title-row">
-                      <span className="teacher-box-name">{selectedClass.teacher ? selectedClass.teacher.name : 'ThS. Nguyễn Văn A'}</span>
+                      <span className="teacher-box-name">{selectedClass.teacher ? selectedClass.teacher.name : 'Chưa phân công GVCN'}</span>
                       <span className="teacher-box-badge">GVCN</span>
                     </div>
                     <div className="teacher-box-contact-row">
-                      <span>0912.345.678</span>
-                      <span className="contact-dot">•</span>
-                      <span>nguyenvana@academic.edu.vn</span>
+                      <span>{selectedClass.teacher?.phone || 'Chưa cập nhật'}</span>
+                      {selectedClass.teacher?.email && (
+                        <>
+                          <span className="contact-dot">•</span>
+                          <span>{selectedClass.teacher.email}</span>
+                        </>
+                      )}
                     </div>
                   </div>
                 </div>
@@ -2484,7 +2566,7 @@ export default function AdminClassesPage() {
                   <div className="metric-box-text">
                     <span className="metric-box-label">SĨ SỐ LỚP</span>
                     <span className="metric-box-value">
-                      <strong>{selectedClass.currentStudents || 45}</strong> / {selectedClass.maxStudents || 45} HS
+                      <strong>{selectedClass.currentStudents ?? classStudents.length}</strong> / {selectedClass.maxStudents ?? 45} HS
                     </span>
                   </div>
                   <div className="metric-box-icon purple">
@@ -2497,7 +2579,7 @@ export default function AdminClassesPage() {
                   <div className="metric-box-text">
                     <span className="metric-box-label">ĐIỂM TB LỚP</span>
                     <span className="metric-box-value purple">
-                      <strong>8.65</strong> / 10.0
+                      <strong>{classStudentStats.avgGpa}</strong> / 10.0
                     </span>
                   </div>
                   <div className="metric-box-icon purple">
@@ -2510,7 +2592,7 @@ export default function AdminClassesPage() {
                   <div className="metric-box-text">
                     <span className="metric-box-label">XẾP LOẠI HS</span>
                     <span className="metric-box-value">
-                      <strong>32 Giỏi</strong> • 13 Khá
+                      <strong>{classStudentStats.goodPlus} Giỏi</strong> • {classStudentStats.fairCount} Khác
                     </span>
                   </div>
                   <div className="metric-box-icon blue">
@@ -2591,7 +2673,13 @@ export default function AdminClassesPage() {
                     </tr>
                   </thead>
                   <tbody>
-                    {filteredClassStudents.length === 0 ? (
+                    {loadingStudents ? (
+                      <tr>
+                        <td colSpan="9" className="empty-students-cell">
+                          Đang tải danh sách học sinh...
+                        </td>
+                      </tr>
+                    ) : filteredClassStudents.length === 0 ? (
                       <tr>
                         <td colSpan="9" className="empty-students-cell">
                           Không tìm thấy học sinh nào phù hợp với bộ lọc hiện tại.
@@ -2724,10 +2812,7 @@ export default function AdminClassesPage() {
                 <button 
                   type="button" 
                   className="admin-btn-primary"
-                  onClick={() => {
-                    setIsExportModalOpen(false);
-                    showToast('Đang tạo và tải xuống tập tin danh sách lớp học...');
-                  }}
+                  onClick={handleExportClassesCsv}
                 >
                   <Download size={16} />
                   <span>Tải xuống</span>
@@ -2832,7 +2917,8 @@ export default function AdminClassesPage() {
                         { key: 'all', label: 'Tất cả khối' },
                         { key: 'Khối 10', label: 'Khối 10' },
                         { key: 'Khối 11', label: 'Khối 11' },
-                        { key: 'Khối 12', label: 'Khối 12' }
+                        { key: 'Khối 12', label: 'Khối 12' },
+                        { key: 'Chưa xếp lớp', label: 'Chưa xếp lớp' }
                       ].map(g => {
                         const count = g.key === 'all' 
                           ? availableCandidates.length 
@@ -3115,7 +3201,9 @@ export default function AdminClassesPage() {
                         style={{ display: 'none' }}
                         onChange={e => {
                           if (e.target.files && e.target.files[0]) {
-                            setUploadedFileName(e.target.files[0].name);
+                            const selectedFile = e.target.files[0];
+                            setUploadedFile(selectedFile);
+                            setUploadedFileName(selectedFile.name);
                           }
                         }}
                       />
@@ -3126,7 +3214,7 @@ export default function AdminClassesPage() {
                       <div className="uploaded-file-tag">
                         <FileSpreadsheet size={16} />
                         <span>{uploadedFileName}</span>
-                        <button type="button" onClick={() => setUploadedFileName('')}>
+                        <button type="button" onClick={() => { setUploadedFile(null); setUploadedFileName(''); }}>
                           <X size={14} />
                         </button>
                       </div>

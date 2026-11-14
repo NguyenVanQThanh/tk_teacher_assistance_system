@@ -1,8 +1,8 @@
 // File Name: api.js
-// Description: Centralized Axios API client configuration with token management, academic, assignment, and schedule service APIs.
+// Description: Centralized Axios API client configuration with token management, academic, assignment, admin, and schedule service APIs.
 // Created At: 2026-08-30
 // Created By: Tam Khang
-// Updated At: 2026-11-03
+// Updated At: 2026-11-14
 // Updated By: Tam Khang
 
 import axios from 'axios';
@@ -94,7 +94,27 @@ export const classesApi = {
     const response = await api.get(`/api/v1/classes/${classId}`);
     return response.data;
   },
+  createClass: async (data) => {
+    const response = await api.post('/api/v1/classes', data);
+    return response.data;
+  },
+  updateClass: async (classId, data) => {
+    const response = await api.put(`/api/v1/classes/${classId}`, data);
+    return response.data;
+  },
+  deleteClass: async (classId) => {
+    const response = await api.delete(`/api/v1/classes/${classId}`);
+    return response.data;
+  },
+  restoreClass: async (classId) => {
+    const response = await api.post(`/api/v1/classes/${classId}/restore`);
+    return response.data;
+  },
   getStudentsInClass: async (classId, params = {}) => {
+    const response = await api.get(`/api/v1/classes/${classId}/students`, { params });
+    return response.data;
+  },
+  getClassStudents: async (classId, params = {}) => {
     const response = await api.get(`/api/v1/classes/${classId}/students`, { params });
     return response.data;
   },
@@ -104,6 +124,30 @@ export const classesApi = {
   },
   enrollStudent: async (classId, data) => {
     const response = await api.post(`/api/v1/classes/${classId}/students`, data);
+    return response.data;
+  },
+  unenrollStudent: async (classId, studentId) => {
+    const response = await api.delete(`/api/v1/classes/${classId}/students/${studentId}`);
+    return response.data;
+  },
+  getAvailableStudents: async (classId) => {
+    const response = await api.get('/api/v1/classes/available-students', {
+      params: classId ? { class_id: classId } : {},
+    });
+    return response.data;
+  },
+  importStudentsExcel: async (classId, file) => {
+    const fd = new FormData();
+    fd.append('file', file);
+    const response = await api.post(`/api/v1/classes/${classId}/students/import-excel`, fd, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    });
+    return response.data;
+  },
+  exportClassesCsv: async () => {
+    const response = await api.get('/api/v1/classes/export-csv', {
+      responseType: 'blob',
+    });
     return response.data;
   },
 };
@@ -460,6 +504,91 @@ export const adminDashboardApi = {
   getAuditLogs: async (limit = 10) => {
     const response = await api.get('/api/v1/admin/dashboard/audit-logs', {
       params: { limit },
+    });
+    return response.data;
+  },
+};
+
+export const adminRolesApi = {
+  getRoles: async () => {
+    const response = await api.get('/api/v1/admin/roles');
+    return response.data;
+  },
+  createRole: async (data) => {
+    const response = await api.post('/api/v1/admin/roles', data);
+    return response.data;
+  },
+  updatePermissions: async (roleCode, permissions) => {
+    const response = await api.put(`/api/v1/admin/roles/${roleCode}/permissions`, { permissions });
+    return response.data;
+  },
+  getRoleMembers: async (roleCode) => {
+    const response = await api.get(`/api/v1/admin/roles/${roleCode}/members`);
+    return response.data;
+  },
+  assignRoleMember: async (roleCode, userId) => {
+    const response = await api.post(`/api/v1/admin/roles/${roleCode}/members`, { user_id: userId });
+    return response.data;
+  },
+  exportRoles: async (format = 'json') => {
+    const response = await api.get('/api/v1/admin/roles/export', {
+      params: { format },
+      responseType: 'blob',
+    });
+    return response.data;
+  },
+};
+
+export const adminReportsApi = {
+  getAnalytics: async (params = {}) => {
+    const response = await api.get('/api/v1/admin/reports/analytics', { params });
+    return response.data;
+  },
+  exportReport: async (params = {}) => {
+    const response = await api.get('/api/v1/admin/reports/export', {
+      params,
+      responseType: 'blob',
+    });
+    return response.data;
+  },
+  createCustomReport: async (data) => {
+    const response = await api.post('/api/v1/admin/reports/custom', data);
+    return response.data;
+  },
+  getSchedules: async () => {
+    const response = await api.get('/api/v1/admin/reports/schedules');
+    return response.data;
+  },
+  createSchedule: async (data) => {
+    const response = await api.post('/api/v1/admin/reports/schedules', data);
+    return response.data;
+  },
+};
+
+export const adminSettingsApi = {
+  getSettings: async () => {
+    const response = await api.get('/api/v1/admin/settings');
+    return response.data;
+  },
+  updateSettings: async (data) => {
+    const response = await api.put('/api/v1/admin/settings', data);
+    return response.data;
+  },
+  pingAi: async (data) => {
+    const response = await api.post('/api/v1/admin/settings/ai-ping', data);
+    return response.data;
+  },
+  getBackups: async () => {
+    const response = await api.get('/api/v1/admin/settings/backups');
+    return response.data;
+  },
+  createBackup: async () => {
+    const response = await api.post('/api/v1/admin/settings/backups');
+    return response.data;
+  },
+  downloadBackup: async (backupId) => {
+    const response = await api.get(`/api/v1/admin/settings/backups/${backupId}/download`, {
+      responseType: 'blob',
     });
     return response.data;
   },

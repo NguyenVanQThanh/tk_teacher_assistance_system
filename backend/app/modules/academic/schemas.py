@@ -2,7 +2,7 @@
 # Description: Pydantic schemas for the academic module with comprehensive validation, name sanitization, and AcademicStatusEnum.
 # Created At: 2026-07-21
 # Created By: Tam Khang
-# Updated At: 2026-09-27
+# Updated At: 2026-11-14
 # Updated By: Tam Khang
 
 import re
@@ -100,6 +100,8 @@ class ClassCreate(BaseModel):
     class_name: str = Field(..., min_length=1, max_length=50, description="Class name (must be unique)")
     school_year: Optional[str] = Field(None, max_length=20, description="Academic year (e.g., 2026-2027)")
     homeroom_teacher_id: Optional[UUID] = Field(None, description="UUID of Homeroom Teacher")
+    room_name: Optional[str] = Field(None, max_length=50, description="Assigned classroom code or room name")
+    specialization: Optional[str] = Field(None, max_length=100, description="Class specialization or track")
     status: AcademicStatusEnum = Field(AcademicStatusEnum.ACTIVE, description="Class status")
 
     @field_validator("class_name")
@@ -131,6 +133,8 @@ class ClassUpdate(BaseModel):
     class_name: Optional[str] = Field(None, min_length=1, max_length=50, description="New class name")
     school_year: Optional[str] = Field(None, max_length=20, description="New academic year")
     homeroom_teacher_id: Optional[UUID] = Field(None, description="UUID of new Homeroom Teacher")
+    room_name: Optional[str] = Field(None, max_length=50, description="Updated classroom code or room name")
+    specialization: Optional[str] = Field(None, max_length=100, description="Updated specialization or track")
     status: Optional[AcademicStatusEnum] = Field(None, description="New status")
 
     @field_validator("class_name")
@@ -164,11 +168,19 @@ class ClassOut(BaseModel):
     class_name: str
     school_year: Optional[str] = Field(None, validation_alias="academic_year")
     homeroom_teacher_id: Optional[UUID] = None
+    homeroom_teacher_name: Optional[str] = None
+    homeroom_teacher_code: Optional[str] = None
+    student_count: int = 0
+    room_name: Optional[str] = None
+    specialization: Optional[str] = None
     status: AcademicStatusEnum = AcademicStatusEnum.ACTIVE
     created_at: datetime
     updated_at: datetime
 
     model_config = {"from_attributes": True, "populate_by_name": True}
+
+
+ClassResponse = ClassOut
 
 
 class EnrollmentCreate(BaseModel):
@@ -197,9 +209,50 @@ class EnrollmentOut(BaseModel):
     class_id: UUID
     student_code: Optional[str] = None
     student_name: Optional[str] = None
+    email: Optional[str] = None
+    phone: Optional[str] = None
+    gender: Optional[str] = None
+    dob: Optional[str] = None
+    birthday: Optional[date] = None
     status: AcademicStatusEnum = AcademicStatusEnum.ACTIVE
 
     model_config = {"from_attributes": True}
+
+
+StudentInClassResponse = EnrollmentOut
+
+
+class AvailableStudentItem(BaseModel):
+    """Schema representing an active non-deleted student available for class enrollment."""
+    user_id: UUID
+    student_id: UUID
+    full_name: str
+    student_name: str
+    student_code: Optional[str] = None
+    email: Optional[str] = None
+    phone: Optional[str] = None
+    gender: Optional[str] = None
+    dob: Optional[str] = None
+    birthday: Optional[date] = None
+    status: str = "ACTIVE"
+
+
+class AvailableStudentsResponse(BaseModel):
+    """Response container for available students lookup."""
+    items: list[AvailableStudentItem]
+
+
+class StudentImportErrorItem(BaseModel):
+    """Row-level error reported during bulk class student import."""
+    row: int
+    message: str
+
+
+class StudentImportExcelResponse(BaseModel):
+    """Response schema for bulk CSV/XLSX student enrollment import."""
+    imported_count: int
+    enrolled_students: list[EnrollmentOut]
+    errors: list[StudentImportErrorItem]
 
 
 class TeacherAssignmentCreate(BaseModel):
