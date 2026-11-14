@@ -37,6 +37,7 @@ import {
   Check
 } from 'lucide-react';
 import { adminUsersApi, classesApi, subjectsApi } from '../../services/api';
+import { useAuth } from '../../context/AuthContext';
 import './AdminUsersPage.css';
 import confirmDialog from '../../components/common/confirmDialog';
 
@@ -338,6 +339,8 @@ function DateOfBirthInput({ value, onChange, roleType, error, onErrorChange }) {
 }
 
 export default function AdminUsersPage() {
+  const { user: authUser } = useAuth();
+  const isSelf = (u) => !!authUser && String(u?.id) === String(authUser.user_id);
   // State for tabs & filters
   const [activeTab, setActiveTab] = useState('all'); // 'all' | 'students' | 'teachers' | 'pending'
   const [searchQuery, setSearchQuery] = useState('');
@@ -821,6 +824,7 @@ export default function AdminUsersPage() {
   };
 
   const handleOpenDeactivateModal = (user) => {
+    if (isSelf(user)) return;
     setUserToDeactivate(user);
     const reasons = getDeactivateReasonsByRole(user.roleKey);
     setDeactivateReason(reasons[0]);
@@ -848,6 +852,7 @@ export default function AdminUsersPage() {
 
   // Quick toggle lock / unlock
   const handleToggleLockUser = async (user) => {
+    if (isSelf(user)) return;
     const isLocked = user.status === 'locked' || user.status === 'suspended';
     const targetStatus = isLocked ? 'ACTIVE' : 'SUSPENDED';
     try {
@@ -862,6 +867,7 @@ export default function AdminUsersPage() {
   // Soft delete user (updates status to 'DELETED')
   const handleSoftDeleteUser = async (user) => {
     setActiveMenuUserId(null);
+    if (user.roleKey === 'admin' || isSelf(user)) return;
     if (await confirmDialog(`Bạn có chắc chắn muốn xóa mềm (Soft Delete) tài khoản ${user.fullName}? Tài khoản sẽ chuyển sang trạng thái DELETED và bảo toàn lịch sử dữ liệu.`)) {
       try {
         await adminUsersApi.deleteUser(user.id);
@@ -1470,25 +1476,29 @@ export default function AdminUsersPage() {
                             <Key size={16} />
                           </button>
 
-                          {/* 4. Quick lock / unlock */}
-                          <button 
-                            type="button" 
-                            className={`table-action-icon-btn ${user.status === 'suspended' ? 'text-locked' : ''}`}
-                            title={user.status === 'suspended' ? 'Mở khóa tài khoản' : 'Tạm khóa tài khoản'}
-                            onClick={() => handleToggleLockUser(user)}
-                          >
-                            {user.status === 'suspended' ? <Lock size={16} /> : <Unlock size={16} />}
-                          </button>
+                          {/* 4. Quick lock / unlock (never offered for the signed-in admin's own account) */}
+                          {!isSelf(user) && (
+                            <button 
+                              type="button" 
+                              className={`table-action-icon-btn ${user.status === 'suspended' ? 'text-locked' : ''}`}
+                              title={user.status === 'suspended' ? 'Mở khóa tài khoản' : 'Tạm khóa tài khoản'}
+                              onClick={() => handleToggleLockUser(user)}
+                            >
+                              {user.status === 'suspended' ? <Lock size={16} /> : <Unlock size={16} />}
+                            </button>
+                          )}
 
-                          {/* 5. Soft delete user */}
-                          <button 
-                            type="button" 
-                            className="table-action-icon-btn text-danger" 
-                            title="Xóa mềm tài khoản"
-                            onClick={() => handleSoftDeleteUser(user)}
-                          >
-                            <Trash2 size={16} />
-                          </button>
+                          {/* 5. Soft delete user (never offered for Admin accounts) */}
+                          {user.roleKey !== 'admin' && !isSelf(user) && (
+                            <button 
+                              type="button" 
+                              className="table-action-icon-btn text-danger" 
+                              title="Xóa mềm tài khoản"
+                              onClick={() => handleSoftDeleteUser(user)}
+                            >
+                              <Trash2 size={16} />
+                            </button>
+                          )}
 
                           {/* 6. More options (3 dots dropdown menu) */}
                           <div className="table-action-menu-wrapper" ref={isMenuOpen ? menuRef : null}>
@@ -1504,17 +1514,19 @@ export default function AdminUsersPage() {
                             {/* Dropdown Menu */}
                             {isMenuOpen && (
                               <div className="table-action-menu-dropdown">
-                                <button 
-                                  type="button" 
-                                  className="table-action-menu-item"
-                                  onClick={() => {
-                                    setActiveMenuUserId(null);
-                                    handleOpenDeactivateModal(user);
-                                  }}
-                                >
-                                  <UserX size={14} />
-                                  <span>Vô hiệu hóa có lý do</span>
-                                </button>
+                                {!isSelf(user) && (
+                                  <button 
+                                    type="button" 
+                                    className="table-action-menu-item"
+                                    onClick={() => {
+                                      setActiveMenuUserId(null);
+                                      handleOpenDeactivateModal(user);
+                                    }}
+                                  >
+                                    <UserX size={14} />
+                                    <span>Vô hiệu hóa có lý do</span>
+                                  </button>
+                                )}
 
                                 {isDeleted && (
                                   <button 
@@ -1760,9 +1772,9 @@ export default function AdminUsersPage() {
                     onChange={e => setSelectedUser(p => ({ ...p, status: e.target.value }))}
                   >
                     <option value="active">Hoạt động (ACTIVE)</option>
-                    <option value="inactive">Chờ kích hoạt (INACTIVE)</option>
-                    <option value="suspended">Tạm khóa (SUSPENDED)</option>
-                    <option value="deleted">Đã xóa mềm (DELETED)</option>
+                    {!isSelf(selectedUser) && <option value="inactive">Chờ kích hoạt (INACTIVE)</option>}
+                    {!isSelf(selectedUser) && <option value="suspended">Tạm khóa (SUSPENDED)</option>}
+                    {selectedUser?.roleKey !== 'admin' && <option value="deleted">Đã xóa mềm (DELETED)</option>}
                   </select>
                 </div>
               </div>

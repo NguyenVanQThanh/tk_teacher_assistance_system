@@ -230,36 +230,39 @@ def get_user_detail(
 def update_user(
     user_id: UUID,
     payload: AdminUserUpdateRequest,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
 ):
     """
     Updates profile details for an existing user account.
     """
-    return AdminUserService.update_user(db=db, user_id=user_id, payload=payload)
+    return AdminUserService.update_user(db=db, user_id=user_id, payload=payload, acting_user_id=current_user.user_id)
 
 
 @router.patch("/{user_id}/status", dependencies=[Depends(require_admin_privilege)])
 def update_user_status(
     user_id: UUID,
     payload: AdminUserStatusUpdateRequest,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
 ):
     """
     Updates user account status (e.g. ACTIVE, INACTIVE, SUSPENDED).
     """
-    return AdminUserService.update_status(db=db, user_id=user_id, new_status=payload.status, reason=payload.reason)
+    return AdminUserService.update_status(db=db, user_id=user_id, new_status=payload.status, reason=payload.reason, acting_user_id=current_user.user_id)
 
 
 @router.delete("/{user_id}", dependencies=[Depends(require_admin_privilege)])
 def delete_user(
     user_id: UUID,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
 ):
     """
     Soft-deletes a user account by setting status to DELETED.
     Strictly prohibits hard-deleting records to protect historical data integrity.
     """
-    return AdminUserService.soft_delete_user(db=db, user_id=user_id)
+    return AdminUserService.soft_delete_user(db=db, user_id=user_id, acting_user_id=current_user.user_id)
 
 
 @router.post("/{user_id}/restore", dependencies=[Depends(require_admin_privilege)])

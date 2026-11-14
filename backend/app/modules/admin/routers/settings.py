@@ -17,13 +17,14 @@ from uuid import UUID
 
 from fastapi import APIRouter, Body, Depends, HTTPException, status
 from fastapi.responses import StreamingResponse
-from sqlalchemy import func
+from sqlalchemy import func, or_
 from sqlalchemy.orm import Session
 
 from app.core import config as app_config
 from app.core.database import get_db
 from app.modules.admin.routers.users import require_admin_privilege
 from app.modules.admin.state_store import (
+    INTERNAL_STATE_MARKER,
     append_state_item,
     get_latest_state,
     get_state_by_log_id,
@@ -139,13 +140,20 @@ def _mask_secret(raw: Optional[str]) -> str:
     return ("•" * 8) + tail
 
 
-def _load_settings(db: Session) -> Dict[str, Dict[str, Any]]:
+def _load_raw_settings(db: Session) -> Dict[str, Dict[str, Any]]:
+    """Load merged settings with the real (unmasked) AI key. Never return this to clients."""
     merged = copy.deepcopy(_default_settings_payload())
     saved = get_latest_state(db, "__SYS_SETTINGS__")
     if isinstance(saved, dict):
         for section in ("general", "ai", "grading", "security", "maintenance"):
             if isinstance(saved.get(section), dict):
                 merged[section].update(saved[section])
+    return merged
+
+
+def _load_settings(db: Session) -> Dict[str, Dict[str, Any]]:
+    """Load settings safe for API responses (AI key masked)."""
+    merged = _load_raw_settings(db)
     if merged["ai"].get("apiKey"):
         merged["ai"]["apiKey"] = _mask_secret(merged["ai"]["apiKey"])
     return merged
@@ -176,7 +184,7 @@ def update_system_settings(
     """
     Update system settings sections, persist to the store, and record an audit log entry.
     """
-    current = _load_settings(db)
+    current = _load_raw_settings(db)
     allowed_sections = ("general", "ai", "grading", "security", "maintenance")
 
     updated_sections = []
@@ -187,9 +195,9 @@ def update_system_settings(
         updated_sections.append(section)
         for key, value in incoming.items():
             if section == "ai" and key == "apiKey":
-                # Keep existing masked key if user leaves mask untouched; mask newly submitted keys
+                # Persist the real key; a value containing the mask means "unchanged".
                 if value and _MASK_CHAR not in str(value):
-                    current["ai"]["apiKey"] = _mask_secret(str(value))
+                    current["ai"]["apiKey"] = str(value).strip()
                 elif value == "":
                     current["ai"]["apiKey"] = ""
             elif key in current[section]:
@@ -201,6 +209,8 @@ def update_system_settings(
         payload=current,
         actor_name=current_user.full_name,
     )
+    # Mask the key before returning it to the client.
+    current = _load_settings(db)
 
     school_name = current["general"].get("schoolName", "")
     record_audit_event(
@@ -248,7 +258,8 @@ def ping_ai_configuration(
 
     elapsed_ms = max(1, int(round((time.perf_counter() - start) * 1000)))
     return {
-        "status": "connected",
+        # Readiness check only; no provider call is made.
+        "status": "connected" if has_configured_key else "not_configured",
         "configured": has_configured_key,
         "latency_ms": elapsed_ms,
         "provider": provider,
@@ -302,7 +313,12 @@ def create_backup_snapshot(
         "student_exercise_attempts": db.query(StudentExerciseAttempt)
         .filter(func.upper(StudentExerciseAttempt.status) != "DELETED")
         .count(),
-        "audit_logs": db.query(AuditLog).filter(func.upper(AuditLog.status) != "DELETED").count(),
+        "audit_logs": db.query(AuditLog)
+        .filter(
+            func.upper(AuditLog.status) != "DELETED",
+            or_(AuditLog.ip_address.is_(None), AuditLog.ip_address != INTERNAL_STATE_MARKER),
+        )
+        .count(),
     }
 
     settings_snapshot = _load_settings(db)

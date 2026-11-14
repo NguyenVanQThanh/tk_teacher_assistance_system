@@ -301,7 +301,11 @@ export default function AdminSettingsPage() {
         model: resolvedModel,
         checkedAt: res?.checked_at || null,
       });
-      showToast(`Kiểm tra API AI thành công (${statusText})! Độ trễ: ${latencyMs}ms`);
+      if (res?.configured === false) {
+        showToast('Chưa cấu hình API key cho nhà cung cấp AI.');
+      } else {
+        showToast(`Kiểm tra cấu hình AI thành công (${statusText})! Độ trễ: ${latencyMs}ms`);
+      }
     } catch (err) {
       console.error('Failed to ping AI endpoint:', err);
       setPingStatus(null);

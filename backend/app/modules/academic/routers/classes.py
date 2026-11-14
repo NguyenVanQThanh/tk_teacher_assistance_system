@@ -15,7 +15,7 @@ from app.core.database import get_db
 from models.models import User
 from app.modules.auth.dependencies import require_perm, get_current_user
 from app.modules.academic.schemas import ClassCreate, ClassUpdate, ClassOut, AcademicStatusEnum
-from app.modules.academic.services.class_service import ClassService
+from app.modules.academic.services.class_service import ClassService, matches_grade
 
 router = APIRouter(prefix="/api/v1/classes", tags=["academic-classes"])
 
@@ -77,7 +77,7 @@ def list_classes(
             if g.startswith(prefix):
                 g = g[len(prefix):].strip()
                 break
-        enriched = [c for c in enriched if c.class_name.lower().startswith(g)]
+        enriched = [c for c in enriched if matches_grade(c.class_name, g)]
 
     if school_year and school_year.strip() and school_year.strip().lower() != "all":
         sy = school_year.strip().lower()

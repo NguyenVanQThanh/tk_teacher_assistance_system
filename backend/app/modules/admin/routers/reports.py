@@ -31,6 +31,7 @@ from app.modules.admin.state_store import (
 from app.modules.auth.dependencies import get_current_user
 from models.models import (
     Class,
+    ClassAssignment,
     Exercise,
     Question,
     Role,
@@ -119,7 +120,7 @@ def _compute_analytics(
     timeframe: str = "week",
 ) -> Dict[str, Any]:
     """
-    Compute academic and AI adoption analytics from DB tables with populated baselines when empty.
+    Compute academic and AI adoption analytics from DB tables; empty data yields zeros.
     """
     norm_grade = _normalize_grade_prefix(grade)
     dept_key = department.strip().lower() if department else "all"
@@ -185,29 +186,39 @@ def _compute_analytics(
     ai_questions_real = sum(1 for q in questions if bool(q.is_ai_generated))
 
     # 5. Student Exercise Attempts & Score metrics
-    attempts = (
-        db.query(StudentExerciseAttempt)
-        .filter(func.upper(StudentExerciseAttempt.status) != "DELETED")
-        .all()
+    attempt_query = db.query(StudentExerciseAttempt).filter(
+        func.upper(StudentExerciseAttempt.status) != "DELETED"
     )
+    filtered_scope = norm_grade or dept_key not in ("", "all") or (
+        academic_year and academic_year.strip().lower() != "all"
+    )
+    if filtered_scope:
+        # Restrict attempts to assignments of the filtered classes and exercises.
+        attempt_query = attempt_query.join(
+                    ClassAssignment.assignment_id == StudentExerciseAttempt.assignment_id,
+        ).filter(
+            ClassAssignment.class_id.in_([c.class_id for c in classes] or [None]),
+            ClassAssignment.exercise_id.in_([e.exercise_id for e in exercises] or [None]),
+        )
+    attempts = attempt_query.all()
     scores = [float(a.score) for a in attempts if a.score is not None]
-    avg_score_real = round(sum(scores) / len(scores), 2) if scores else 7.85
+    avg_score_real = round(sum(scores) / len(scores), 2) if scores else 0.0
     finished_real = sum(1 for a in attempts if bool(a.is_finished))
     completion_rate = (
-        round((finished_real / len(attempts)) * 100, 1) if attempts else 88.4
+        round((finished_real / len(attempts)) * 100, 1) if attempts else 0.0
     )
 
-    total_exercises = len(exercises) if exercises else 517
-    ai_exercises = ai_exercises_real if exercises else 318
-    regular_exercises = regular_exercises_real if exercises else 199
-    total_questions = len(questions) if questions else 4820
-    ai_questions = ai_questions_real if questions else 2940
-    total_attempts = len(attempts) if attempts else 3489
-    total_students = real_students_total if real_students_total > 0 else 2450
-    total_classes = len(classes) if classes else 64
-    total_subjects = len(subjects) if subjects else 12
+    total_exercises = len(exercises)
+    ai_exercises = ai_exercises_real
+    regular_exercises = regular_exercises_real
+    total_questions = len(questions)
+    ai_questions = ai_questions_real
+    total_attempts = len(attempts)
+    total_students = real_students_total
+    total_classes = len(classes)
+    total_subjects = len(subjects)
     ai_adoption_rate = (
-        round((ai_exercises / total_exercises) * 100, 1) if total_exercises > 0 else 61.5
+        round((ai_exercises / total_exercises) * 100, 1) if total_exercises > 0 else 0.0
     )
 
     # 6. Grade distributions
@@ -219,7 +230,7 @@ def _compute_analytics(
                 class_grade_map[prefix].append(cls)
                 break
 
-    for g_code, g_num, g_label, base_students, base_exercises in _GRADE_SPECS:
+    for g_code, g_num, g_label, _unused_students, _unused_exercises in _GRADE_SPECS:
         if norm_grade and norm_grade != g_num:
             continue
         matched_classes = class_grade_map[g_num]
@@ -233,8 +244,8 @@ def _compute_analytics(
                 )
                 .count()
             )
-        students_count = enrolled_count if enrolled_count > 0 else base_students
-        ex_count = total_exercises // 3 if exercises else base_exercises
+        students_count = enrolled_count
+        ex_count = total_exercises // 3
 
         # Use real score distribution buckets when attempt scores exist
         if scores:
@@ -251,10 +262,10 @@ def _compute_analytics(
             ]
         else:
             segments = [
-                {"label": "Excellent", "count": int(round(students_count * 0.28)), "percent": 28.0, "color": "#10b981"},
-                {"label": "Good", "count": int(round(students_count * 0.42)), "percent": 42.0, "color": "#3b82f6"},
-                {"label": "Average", "count": int(round(students_count * 0.22)), "percent": 22.0, "color": "#f59e0b"},
-                {"label": "Needs Support", "count": int(round(students_count * 0.08)), "percent": 8.0, "color": "#ef4444"},
+                {"label": "Excellent", "count": 0, "percent": 0.0, "color": "#10b981"},
+                {"label": "Good", "count": 0, "percent": 0.0, "color": "#3b82f6"},
+                {"label": "Average", "count": 0, "percent": 0.0, "color": "#f59e0b"},
+                {"label": "Needs Support", "count": 0, "percent": 0.0, "color": "#ef4444"},
             ]
 
         grade_distributions.append(
@@ -277,68 +288,49 @@ def _compute_analytics(
         ex for ex in exercises
         if (ts := _to_utc(ex.created_at)) is not None and ts >= since
     ]
-    if not recent_ex:
-        if is_month:
-            time_series = [
-                {"day": "Week 1", "ai": 52, "regular": 34, "x": 80, "yAi": 135, "yReg": 160},
-                {"day": "Week 2", "ai": 68, "regular": 41, "x": 220, "yAi": 105, "yReg": 148},
-                {"day": "Week 3", "ai": 84, "regular": 46, "x": 360, "yAi": 75, "yReg": 138},
-                {"day": "Week 4", "ai": 76, "regular": 38, "x": 500, "yAi": 90, "yReg": 152},
-            ]
-        else:
-            time_series = [
-                {"day": "Mon", "ai": 18, "regular": 12, "x": 50, "yAi": 150, "yReg": 170},
-                {"day": "Tue", "ai": 26, "regular": 16, "x": 140, "yAi": 125, "yReg": 158},
-                {"day": "Wed", "ai": 34, "regular": 19, "x": 230, "yAi": 102, "yReg": 148},
-                {"day": "Thu", "ai": 31, "regular": 21, "x": 320, "yAi": 110, "yReg": 142},
-                {"day": "Fri", "ai": 44, "regular": 24, "x": 410, "yAi": 74, "yReg": 132},
-                {"day": "Sat", "ai": 29, "regular": 15, "x": 500, "yAi": 116, "yReg": 162},
-                {"day": "Sun", "ai": 14, "regular": 9, "x": 590, "yAi": 164, "yReg": 180},
-            ]
+    if is_month:
+        labels = ["Week 1", "Week 2", "Week 3", "Week 4"]
+        x_coords = [80, 220, 360, 500]
+        ai_buckets = [0, 0, 0, 0]
+        reg_buckets = [0, 0, 0, 0]
+        for ex in recent_ex:
+            ts = _to_utc(ex.created_at)
+            days_ago = max(0, (now - ts).days)
+            idx = min(3, 3 - min(3, days_ago // 7))
+            if ex.ai_metadata is not None or "ai" in (ex.exercise_kind or "").lower():
+                ai_buckets[idx] += 1
+            else:
+                reg_buckets[idx] += 1
     else:
-        if is_month:
-            labels = ["Week 1", "Week 2", "Week 3", "Week 4"]
-            x_coords = [80, 220, 360, 500]
-            ai_buckets = [0, 0, 0, 0]
-            reg_buckets = [0, 0, 0, 0]
-            for ex in recent_ex:
-                ts = _to_utc(ex.created_at)
-                days_ago = max(0, (now - ts).days)
-                idx = min(3, 3 - min(3, days_ago // 7))
-                if ex.ai_metadata is not None or "ai" in (ex.exercise_kind or "").lower():
-                    ai_buckets[idx] += 1
-                else:
-                    reg_buckets[idx] += 1
-        else:
-            labels = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
-            x_coords = [50, 140, 230, 320, 410, 500, 590]
-            ai_buckets = [0] * 7
-            reg_buckets = [0] * 7
-            for ex in recent_ex:
-                ts = _to_utc(ex.created_at)
-                idx = ts.weekday()
-                if ex.ai_metadata is not None or "ai" in (ex.exercise_kind or "").lower():
-                    ai_buckets[idx] += 1
-                else:
-                    reg_buckets[idx] += 1
+        labels = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
+        x_coords = [50, 140, 230, 320, 410, 500, 590]
+        ai_buckets = [0] * 7
+        reg_buckets = [0] * 7
+        for ex in recent_ex:
+            ts = _to_utc(ex.created_at)
+            idx = ts.weekday()
+            if ex.ai_metadata is not None or "ai" in (ex.exercise_kind or "").lower():
+                ai_buckets[idx] += 1
+            else:
+                reg_buckets[idx] += 1
 
-        max_val = max(max(ai_buckets), max(reg_buckets), 1)
-        time_series = []
-        for idx, label in enumerate(labels):
-            ai_c = ai_buckets[idx]
-            reg_c = reg_buckets[idx]
-            y_ai = int(round(190 - (ai_c / max_val) * 120))
-            y_reg = int(round(190 - (reg_c / max_val) * 120))
-            time_series.append(
-                {
-                    "day": label,
-                    "ai": ai_c,
-                    "regular": reg_c,
-                    "x": x_coords[idx],
-                    "yAi": y_ai,
-                    "yReg": y_reg,
-                }
-            )
+    max_val = max(max(ai_buckets), max(reg_buckets), 1)
+    time_series = []
+    for idx, label in enumerate(labels):
+        ai_c = ai_buckets[idx]
+        reg_c = reg_buckets[idx]
+        y_ai = int(round(190 - (ai_c / max_val) * 120))
+        y_reg = int(round(190 - (reg_c / max_val) * 120))
+        time_series.append(
+            {
+                "day": label,
+                "ai": ai_c,
+                "regular": reg_c,
+                "x": x_coords[idx],
+                "yAi": y_ai,
+                "yReg": y_reg,
+            }
+        )
 
     return {
         "filters": {

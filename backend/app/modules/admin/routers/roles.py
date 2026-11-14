@@ -672,6 +672,41 @@ def assign_user_to_role(
             detail={"code": "ERR-ADMIN-USER_NOT_FOUND", "message": "User not found or deleted."},
         )
 
+    # Policy: no new admins. Assigning the Admin role is forbidden.
+    if canonical == "admin" and target_user.role_id != role.role_id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail={"code": "ERR-ADMIN-ADMIN_ROLE_LOCKED", "message": "Admin accounts cannot be created or assigned."},
+        )
+
+    if target_user.user_id == current_user.user_id and target_user.role_id != role.role_id:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail={"code": "ERR-ADMIN-SELF_ROLE_CHANGE", "message": "You cannot change your own role."},
+        )
+
+    # Last-admin protection: never demote the only remaining active Admin.
+    admin_role = db.query(Role).filter(func.lower(Role.name) == "admin").first()
+    if (
+        admin_role
+        and target_user.role_id == admin_role.role_id
+        and role.role_id != admin_role.role_id
+    ):
+        other_admins = (
+            db.query(User)
+            .filter(
+                User.role_id == admin_role.role_id,
+                User.user_id != target_user.user_id,
+                func.upper(User.status) == "ACTIVE",
+            )
+            .count()
+        )
+        if other_admins == 0:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail={"code": "ERR-ADMIN-LAST_ADMIN", "message": "Cannot demote the last active Admin."},
+            )
+
     target_user.role_id = role.role_id
     db.commit()
     db.refresh(target_user)
@@ -681,7 +716,7 @@ def assign_user_to_role(
         title="Assigned User to Role",
         description=f"Assigned user '{target_user.full_name}' to role '{canonical}'.",
         actor_name=current_user.full_name,
-        severity="info",
+        severity="warning" if canonical == "admin" else "info",
     )
 
     return {

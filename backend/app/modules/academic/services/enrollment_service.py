@@ -6,6 +6,7 @@
 # Updated By: Tam Khang
 
 import logging
+import secrets
 from typing import List, Optional
 from uuid import UUID
 
@@ -92,7 +93,8 @@ class EnrollmentService:
                 phone=phone or None,
                 birthday=b_date_val,
                 role_id=student_role.role_id,
-                password_hash=get_password_hash("Student@1234"),
+                # Random unknown password; admin must issue a reset to enable login.
+                password_hash=get_password_hash(secrets.token_urlsafe(16)),
                 status="ACTIVE"
             )
             db.add(new_user)
@@ -668,12 +670,13 @@ class EnrollmentService:
                         phone=phone,
                         birthday=parsed_bday,
                         role_id=student_role.role_id,
-                        password_hash=get_password_hash("Student@1234"),
+                        # Random unknown password; admin must issue a reset to enable login.
+                        password_hash=get_password_hash(secrets.token_urlsafe(16)),
                         status="ACTIVE",
                     )
+                    # Flush only: EnrollmentRepository.create commits user and enrollment atomically.
                     db.add(new_user)
-                    db.commit()
-                    db.refresh(new_user)
+                    db.flush()
 
                     enrollment = EnrollmentRepository.create(
                         db=db,

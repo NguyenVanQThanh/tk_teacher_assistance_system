@@ -6,6 +6,7 @@
 # Updated By: Tam Khang
 
 import logging
+import re
 from typing import List, Optional
 from uuid import UUID
 
@@ -22,6 +23,15 @@ from app.modules.academic.scoping import (
 )
 
 logger = logging.getLogger("class_service")
+
+
+def matches_grade(class_name: str, grade: str) -> bool:
+    """Match a class name's leading digit run exactly (grade '1' must not match '10A1')."""
+    name = class_name.strip().lower()
+    if grade.isdigit():
+        m = re.match(r"\d+", name)
+        return bool(m) and m.group() == grade
+    return name.startswith(grade)
 
 
 class ClassService:
@@ -363,7 +373,7 @@ class ClassService:
                 if g.startswith(prefix):
                     g = g[len(prefix):].strip()
                     break
-            enriched = [c for c in enriched if c.class_name.lower().startswith(g)]
+            enriched = [c for c in enriched if matches_grade(c.class_name, g)]
 
         if school_year and school_year.strip() and school_year.strip().lower() != "all":
             sy = school_year.strip().lower()
