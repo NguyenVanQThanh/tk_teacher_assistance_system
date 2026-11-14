@@ -344,7 +344,7 @@ class AdminDashboardRepository:
             Document.status != "DELETED"
         ).scalar() or 0
         doc_count = db.query(Document).filter(Document.status != "DELETED").count()
-        lecture_views = int(doc_views) if int(doc_views) > 0 else (doc_count if doc_count > 0 else 14200)
+        lecture_views = int(doc_views) if int(doc_views) > 0 else doc_count
 
         attempt_count = db.query(StudentExerciseAttempt).filter(
             StudentExerciseAttempt.status != "DELETED"
@@ -353,19 +353,13 @@ class AdminDashboardRepository:
             StudentExerciseAttempt.status != "DELETED",
             StudentExerciseAttempt.is_finished.is_(True)
         ).count()
-        assignments_submitted = attempt_count if attempt_count > 0 else 3489
+        assignments_submitted = attempt_count
         attendance_rate = (
             round(90.0 + (finished_attempts / attempt_count) * 10.0, 1)
             if attempt_count > 0
-            else 96.8
+            else 0.0
         )
 
-        if total_students == 0:
-            total_students = 2450
-        if total_teachers == 0:
-            total_teachers = 128
-        if total_classes == 0:
-            total_classes = 64
 
         return {
             "total_students": total_students,

@@ -18,8 +18,14 @@ Fixed six review findings on the admin portal (roles, settings, reports, student
 - Grade filter matches the leading digit run exactly (grade 1 no longer matches 10A1).
 - Imported/manually created students get a random unknown password; admin must reset it to enable login.
 
+- Admin role permission matrix is read-only (403 `ERR-ADMIN-ADMIN_PERMS_LOCKED`) to prevent self-lockout.
+- Dashboard stats and activity chart return zeros when empty (no fabricated numbers); activity chart loads only window rows and uses COUNT/SUM for totals.
+- `list_state_items` prefix match escapes LIKE wildcards (`_`, `%`).
+
 ### Bug & Feature Context
 - Review report flagged: unrestricted admin role assignment; internal state rows leaking into audit counts; API key masked before save (real key lost) and ping always "connected"; shared default password `Student@1234` plus per-row commit leaving orphan users; `startswith` grade filter; fabricated report numbers.
+- Second review round: reports.py `.join()` lost its `ClassAssignment` target during a scripted edit (would 500 every default analytics request); fixed. Dashboard/repository fabricated fallbacks removed.
+- Known open item: `list_state_items(prefix_match=True)` still loads all class/student meta rows per list call (needs separate table or JSON column plus Alembic migration).
 - Seed scripts still use `Student@1234` (not changed). Admin accounts exist only via seeding.
 
 ### Solution & Technical Details
@@ -27,6 +33,7 @@ Fixed six review findings on the admin portal (roles, settings, reports, student
 - `backend/app/modules/admin/routers/settings.py`: `_load_raw_settings` vs `_load_settings`, ping status, backup count filter.
 - `backend/app/modules/admin/routers/reports.py`: removed baselines, attempts joined via `ClassAssignment`.
 - `backend/app/modules/admin/services/user_service.py`: `reject_admin_role`, `reject_self_block`, `_is_admin_user`.
+- `backend/app/modules/admin/routers/dashboard.py`, `backend/app/modules/admin/repository.py`, `backend/app/modules/admin/state_store.py`: fallback removal, windowed queries, LIKE escape.
 - `backend/app/modules/admin/routers/users.py`: passes `acting_user_id`.
 - `backend/app/modules/admin/services/user_import_service.py`: admin alias removed.
 - `backend/app/modules/academic/services/enrollment_service.py`: `secrets.token_urlsafe` password, flush + single commit.

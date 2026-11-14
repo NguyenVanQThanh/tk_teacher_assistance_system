@@ -195,7 +195,8 @@ def _compute_analytics(
     if filtered_scope:
         # Restrict attempts to assignments of the filtered classes and exercises.
         attempt_query = attempt_query.join(
-                    ClassAssignment.assignment_id == StudentExerciseAttempt.assignment_id,
+            ClassAssignment,
+            ClassAssignment.assignment_id == StudentExerciseAttempt.assignment_id,
         ).filter(
             ClassAssignment.class_id.in_([c.class_id for c in classes] or [None]),
             ClassAssignment.exercise_id.in_([e.exercise_id for e in exercises] or [None]),

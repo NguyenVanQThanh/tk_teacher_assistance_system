@@ -555,6 +555,13 @@ def update_role_permissions(
     role = _resolve_role(db, role_code)
     canonical = _canonical_role_code(role)
 
+    # Self-lockout protection: the Admin permission matrix is read-only.
+    if canonical == "admin":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail={"code": "ERR-ADMIN-ADMIN_PERMS_LOCKED", "message": "Admin role permissions cannot be modified."},
+        )
+
     raw_perms = payload.get("permissions") if isinstance(payload.get("permissions"), dict) else payload
     if not isinstance(raw_perms, dict):
         raise HTTPException(

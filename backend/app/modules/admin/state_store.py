@@ -135,7 +135,9 @@ def list_state_items(
         func.upper(AuditLog.status) != "DELETED",
     )
     if prefix_match:
-        query = query.filter(AuditLog.title.like(f"{key_title}%"))
+        # Escape LIKE wildcards so "_" in keys like "__CLASS_META__:" matches literally.
+        escaped = key_title.replace("\\", "\\\\").replace("_", "\\_").replace("%", "\\%")
+        query = query.filter(AuditLog.title.like(f"{escaped}%", escape="\\"))
     else:
         query = query.filter(AuditLog.title == key_title)
 
