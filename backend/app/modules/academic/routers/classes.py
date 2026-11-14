@@ -15,7 +15,7 @@ from app.core.database import get_db
 from models.models import User
 from app.modules.auth.dependencies import require_perm, get_current_user
 from app.modules.academic.schemas import ClassCreate, ClassUpdate, ClassOut, AcademicStatusEnum
-from app.modules.academic.services.class_service import ClassService
+from app.modules.academic.services.class_service import ClassService, matches_grade
 
 router = APIRouter(prefix="/api/v1/classes", tags=["academic-classes"])
 
@@ -33,21 +33,30 @@ def create_class(
     """
     Create a new class. Requires ACAD_CLASS_MANAGE permission.
     """
-    cls = ClassService.create_class(
-        db=db,
-        class_name=payload.class_name,
-        school_year=payload.school_year,
-        homeroom_teacher_id=payload.homeroom_teacher_id,
-        status_val=payload.status.value
-    )
-    ClassService.save_class_metadata(
-        db=db,
-        class_id=cls.class_id,
-        room_name=payload.room_name,
-        specialization=payload.specialization,
-        update_room="room_name" in payload.model_fields_set,
-        update_specialization="specialization" in payload.model_fields_set,
-    )
+    # Class row and its metadata commit together so a failure cannot leave them out of sync.
+    try:
+        cls = ClassService.create_class(
+            db=db,
+            class_name=payload.class_name,
+            school_year=payload.school_year,
+            homeroom_teacher_id=payload.homeroom_teacher_id,
+            status_val=payload.status.value,
+            commit=False
+        )
+        ClassService.save_class_metadata(
+            db=db,
+            class_id=cls.class_id,
+            room_name=payload.room_name,
+            specialization=payload.specialization,
+            update_room="room_name" in payload.model_fields_set,
+            update_specialization="specialization" in payload.model_fields_set,
+            commit=False,
+        )
+        db.commit()
+    except Exception:
+        db.rollback()
+        raise
+    db.refresh(cls)
     return ClassService.enrich_class_out(db, cls)
 
 
@@ -77,7 +86,7 @@ def list_classes(
             if g.startswith(prefix):
                 g = g[len(prefix):].strip()
                 break
-        enriched = [c for c in enriched if c.class_name.lower().startswith(g)]
+        enriched = [c for c in enriched if matches_grade(c.class_name, g)]
 
     if school_year and school_year.strip() and school_year.strip().lower() != "all":
         sy = school_year.strip().lower()
@@ -183,23 +192,31 @@ def update_class(
     """
     update_homeroom = "homeroom_teacher_id" in payload.model_fields_set
     status_val = payload.status.value if payload.status else None
-    cls = ClassService.update_class(
-        db=db,
-        class_id=class_id,
-        class_name=payload.class_name,
-        school_year=payload.school_year,
-        homeroom_teacher_id=payload.homeroom_teacher_id,
-        update_homeroom_teacher=update_homeroom,
-        status_val=status_val
-    )
-    ClassService.save_class_metadata(
-        db=db,
-        class_id=cls.class_id,
-        room_name=payload.room_name,
-        specialization=payload.specialization,
-        update_room="room_name" in payload.model_fields_set,
-        update_specialization="specialization" in payload.model_fields_set,
-    )
+    try:
+        cls = ClassService.update_class(
+            db=db,
+            class_id=class_id,
+            class_name=payload.class_name,
+            school_year=payload.school_year,
+            homeroom_teacher_id=payload.homeroom_teacher_id,
+            update_homeroom_teacher=update_homeroom,
+            status_val=status_val,
+            commit=False
+        )
+        ClassService.save_class_metadata(
+            db=db,
+            class_id=cls.class_id,
+            room_name=payload.room_name,
+            specialization=payload.specialization,
+            update_room="room_name" in payload.model_fields_set,
+            update_specialization="specialization" in payload.model_fields_set,
+            commit=False,
+        )
+        db.commit()
+    except Exception:
+        db.rollback()
+        raise
+    db.refresh(cls)
     return ClassService.enrich_class_out(db, cls)
 
 
