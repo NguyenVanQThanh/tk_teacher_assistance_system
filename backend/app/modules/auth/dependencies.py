@@ -5,23 +5,26 @@
 # Updated At: 2026-07-17
 # Updated By: Tam Khang
 
+from typing import Optional
+
 from fastapi import Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer
 from sqlalchemy.orm import Session
 from jose import jwt, JWTError
 from uuid import UUID
 
-from app.core.security import SECRET_KEY, ALGORITHM
+from app.core.security import SECRET_KEY, ALGORITHM, STREAM_TICKET_TYPE
 from app.core.database import get_db
-from models.models import User
+from models.models import User, Role
 from app.modules.auth.services.permission_service import PermissionService
 
 # Configure OAuth2PasswordBearer, auto_error=False to allow custom error envelopes for missing tokens
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="api/v1/auth/login", auto_error=False)
 
-def get_current_user(token: str = Depends(oauth2_scheme), db: Session = Depends(get_db)) -> User:
+def resolve_user_from_token(token: Optional[str], db: Session, expect_ticket: bool = False) -> User:
     """
-    Dependency to authenticate and return the current active user from the JWT token.
+    Resolve the active user from a raw JWT string. Shared by get_current_user (header)
+    and get_current_user_query_ok (header or ?token= query, used by SSE/EventSource).
     Raises standardized HTTPExceptions for missing, invalid, or expired tokens, and blocked or inactive accounts.
     """
     if not token:
@@ -35,7 +38,7 @@ def get_current_user(token: str = Depends(oauth2_scheme), db: Session = Depends(
     try:
         payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
         user_id = payload.get("sub")
-        if user_id is None:
+        if user_id is None or (payload.get("typ") == STREAM_TICKET_TYPE) != expect_ticket:
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 detail={
@@ -62,7 +65,11 @@ def get_current_user(token: str = Depends(oauth2_scheme), db: Session = Depends(
                 "message": "Invalid authentication token."
             }
         )
-        
+    return ensure_active_user(db, user_uuid)
+
+
+def ensure_active_user(db: Session, user_uuid: UUID) -> User:
+    """Load the user and reject missing, blocked, or inactive accounts (401/403)."""
     user = db.query(User).filter(User.user_id == user_uuid).first()
     if not user:
         raise HTTPException(
@@ -89,8 +96,41 @@ def get_current_user(token: str = Depends(oauth2_scheme), db: Session = Depends(
                 "message": "Account has not been activated."
             }
         )
-        
+
     return user
+
+
+def get_current_user(token: str = Depends(oauth2_scheme), db: Session = Depends(get_db)) -> User:
+    """
+    Dependency to authenticate and return the current active user from the JWT token
+    carried in the Authorization: Bearer header.
+    Note: JWTs must only travel in the Authorization header, never in the URL query string
+    (query strings leak into access logs/proxies/history). Endpoints that browsers reach
+    via EventSource (which cannot set headers) authenticate separately with their own
+    short-lived session instead of a shared query-token dependency.
+    """
+    return resolve_user_from_token(token, db)
+
+def require_roles(*role_names: str):
+    """
+    Enforces that the current authenticated user holds one of the given roles (case-insensitive).
+    Returns a callable dependency that yields the current user.
+    """
+    allowed = {name.lower() for name in role_names}
+
+    def dependency(user: User = Depends(get_current_user), db: Session = Depends(get_db)) -> User:
+        role = db.query(Role).filter(Role.role_id == user.role_id).first()
+        if not role or role.name.lower() not in allowed:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail={
+                    "code": "ERR-AUTH-FORBIDDEN",
+                    "message": "You do not have permission to access this resource."
+                }
+            )
+        return user
+    return dependency
+
 
 def require_perm(permission_code: str):
     """

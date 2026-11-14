@@ -212,9 +212,12 @@ export default function AdminReportsPage() {
             <select value={deptFilter} onChange={e => setDeptFilter(e.target.value)} className="report-select">
               <option value="all">Tất cả bộ môn</option>
               <option value="math">Toán học</option>
-              <option value="literature">Ngữ văn</option>
-              <option value="english">Tiếng Anh</option>
               <option value="physics">Vật lý</option>
+              <option value="chemistry">Hóa học</option>
+              <option value="biology">Sinh học</option>
+              <option value="literature">Ngữ văn</option>
+              <option value="history">Lịch sử</option>
+              <option value="english">Tiếng Anh</option>
             </select>
             <ChevronDown size={13} className="select-icon" />
           </div>

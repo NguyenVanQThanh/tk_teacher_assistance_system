@@ -19,14 +19,20 @@ import {
   Clock,
   Trash2,
   CheckCircle2,
-  ExternalLink
+  ExternalLink,
+  Download
 } from 'lucide-react';
 import { Link, useParams, useNavigate } from 'react-router-dom';
 import StudentDetailModal from '../../components/teacher/StudentDetailModal';
-import { classesApi, subjectsApi, assignmentsApi } from '../../services/api';
+import AnswerReleaseButton from '../../components/teacher/AnswerReleaseButton';
+import { classesApi, subjectsApi, assignmentsApi, attemptsApi } from '../../services/api';
 import { useAuth } from '../../context/AuthContext';
 import { getTeacherSubjectInfo, getSubjectIdByName } from '../../utils/teacherSubjectHelper';
 import './TeacherClassDetailPage.css';
+import confirmDialog from '../../components/common/confirmDialog';
+import AssignExercisesDialog from '../../components/teacher/AssignExercisesDialog';
+import { downloadGradebookCsv } from '../../utils/gradebookExport';
+import toast from '../../components/common/toast';
 
 export default function TeacherClassDetailPage() {
   const { classId } = useParams();
@@ -45,6 +51,20 @@ export default function TeacherClassDetailPage() {
   const [error, setError] = useState(null);
   const [actionSuccess, setActionSuccess] = useState('');
   const [deletingId, setDeletingId] = useState(null);
+  const [showAssignDialog, setShowAssignDialog] = useState(false);
+
+  // Export whole-class gradebook limited to the teacher's own subject
+  const handleExportClass = async () => {
+    try {
+      const res = await attemptsApi.getAttempts({ class_id: classId });
+      const items = (Array.isArray(res) ? res : res?.items || []).filter(
+        (a) => !classInfo?.subjectName || getSubjectIdByName(a.subject_name || '') === getSubjectIdByName(classInfo.subjectName)
+      );
+      downloadGradebookCsv(items, `gradebook_${classInfo?.name || classId}.csv`);
+    } catch (err) {
+      toast.error('Could not export the gradebook.');
+    }
+  };
 
   const navigate = useNavigate();
 
@@ -169,7 +189,7 @@ export default function TeacherClassDetailPage() {
   }, [assignments, searchAssignment]);
 
   const handleDeleteAssignment = async (assignmentId, title) => {
-    if (!window.confirm(`Bạn có chắc chắn muốn hủy giao bài tập "${title || 'này'}" không?`)) {
+    if (!(await confirmDialog(`Bạn có chắc chắn muốn hủy giao bài tập "${title || 'này'}" không?`))) {
       return;
     }
 
@@ -182,7 +202,7 @@ export default function TeacherClassDetailPage() {
     } catch (err) {
       const detail = err.response?.data?.detail;
       const msg = typeof detail === 'string' ? detail : detail?.message || 'Không thể hủy bài tập.';
-      alert(msg);
+      toast.error(msg);
     } finally {
       setDeletingId(null);
     }
@@ -229,11 +249,15 @@ export default function TeacherClassDetailPage() {
             <button
               type="button"
               className="btn-header-assign-new"
-              onClick={() => navigate('/teacher/exercises')}
-              title="Mở Kho bài tập để chọn và giao bài mới cho lớp"
+              onClick={() => setShowAssignDialog(true)}
+              title="Chọn bài tập theo khối để giao cho lớp"
             >
               <Plus size={16} />
               <span>Giao bài tập mới</span>
+            </button>
+            <button type="button" className="btn-header-assign-new" onClick={handleExportClass} title="Export class gradebook">
+              <Download size={16} />
+              <span>Export gradebook</span>
             </button>
           </div>
         </div>
@@ -373,18 +397,21 @@ export default function TeacherClassDetailPage() {
             <table className="roster-table">
               <thead>
                 <tr>
-                  <th className="th-name" style={{ width: '40%' }}>Tên đề bài tập</th>
-                  <th style={{ width: '15%' }}>Số câu hỏi</th>
-                  <th style={{ width: '18%' }}>Thời gian giao</th>
-                  <th style={{ width: '18%' }}>Hạn nộp bài</th>
-                  <th style={{ width: '15%' }}>Trạng thái</th>
-                  <th style={{ width: '10%', textAlign: 'center' }}>Thao tác</th>
+                  <th className="th-name" style={{ width: '32%' }}>Tên đề bài tập</th>
+                  <th style={{ width: '12%' }}>Số câu hỏi</th>
+                  <th style={{ width: '15%' }}>Hạn nộp bài</th>
+                  <th style={{ width: '16%' }}>Tiến độ nộp bài</th>
+                  <th style={{ width: '13%' }}>Trạng thái</th>
+                  <th style={{ width: '12%', textAlign: 'center' }}>Thao tác</th>
                 </tr>
               </thead>
               <tbody>
                 {filteredAssignments.length > 0 ? (
                   filteredAssignments.map((assign) => {
                     const expired = isDueExpired(assign.due_at);
+                    const subCount = assign.submission_count ?? 0;
+                    const totCount = assign.total_students || students.length || 0;
+                    const pct = totCount > 0 ? Math.round((subCount / totCount) * 100) : 0;
                     return (
                       <tr key={assign.assignment_id} className="roster-row">
                         <td className="td-name">
@@ -400,11 +427,18 @@ export default function TeacherClassDetailPage() {
                             {assign.total_questions ? `${assign.total_questions} câu` : '--'}
                           </span>
                         </td>
-                        <td style={{ fontSize: '13px', color: '#4b5563' }}>
-                          {formatDateTime(assign.assigned_at)}
-                        </td>
                         <td style={{ fontSize: '13px', color: expired ? '#dc2626' : '#1e293b', fontWeight: expired ? 600 : 500 }}>
                           {formatDateTime(assign.due_at)}
+                        </td>
+                        <td>
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                            <span style={{ fontSize: '12px', fontWeight: 600, color: '#374151' }}>
+                              {subCount}/{totCount} ({pct}%)
+                            </span>
+                            <div style={{ width: '80px', height: '6px', background: '#e5e7eb', borderRadius: '3px', overflow: 'hidden' }}>
+                              <div style={{ width: `${pct}%`, height: '100%', background: '#6366f1', borderRadius: '3px' }} />
+                            </div>
+                          </div>
                         </td>
                         <td>
                           <span className={`status-pill ${expired ? 'pill-expired' : 'pill-active'}`}>
@@ -412,6 +446,12 @@ export default function TeacherClassDetailPage() {
                           </span>
                         </td>
                         <td style={{ textAlign: 'center' }}>
+                          {assign.category === 'exam' && (
+                            <AnswerReleaseButton
+                              assignmentId={assign.assignment_id}
+                              released={assign.answers_released}
+                            />
+                          )}
                           <button
                             type="button"
                             className="btn-cancel-assignment"
@@ -443,7 +483,7 @@ export default function TeacherClassDetailPage() {
                         <button
                           type="button"
                           className="btn-go-to-exercises"
-                          onClick={() => navigate('/teacher/exercises')}
+                          onClick={() => setShowAssignDialog(true)}
                         >
                           <Plus size={15} />
                           <span>Đến Kho bài tập</span>
@@ -457,6 +497,14 @@ export default function TeacherClassDetailPage() {
           </div>
         </div>
       )}
+
+      <AssignExercisesDialog
+        isOpen={showAssignDialog}
+        onClose={() => setShowAssignDialog(false)}
+        classId={classId}
+        grade={classInfo?.gradeText?.replace(/\D/g, '')}
+        onAssigned={fetchClassData}
+      />
 
       {/* Full-screen Student Performance Analytics Modal */}
       {selectedStudent && (

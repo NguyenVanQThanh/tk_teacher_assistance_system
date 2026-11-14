@@ -1,0 +1,153 @@
+# Production compose — KHÔNG dùng cho dev local (dev dùng docker-compose.yml ở repo root)
+#
+# Chạy từ repo root:
+#   docker compose --project-directory . --env-file deploy/.env.prod \
+#     -f deploy/docker-compose.prod.yml up -d --build
+# hoặc dùng script:  bash deploy/scripts/deploy.sh
+#
+# Yêu cầu trước khi chạy: đã tạo deploy/.env.prod từ deploy/.env.prod.example
+#
+# Khác bản dev:
+#  - không mount source code vào container (dùng code đã build sẵn trong image)
+#  - backend chạy không --reload
+#  - không publish port Postgres/Backend ra ngoài (chỉ nginx publish 80 khi bật profile proxy)
+#  - secret đọc từ deploy/.env.prod thay vì hardcode
+#
+# RAM budget (target <= 5 GB cho toàn bộ stack, kể cả nginx):
+#   postgres 1.5 GB + backend 2.5 GB + frontend 0.875 GB + nginx 0.125 GB = 5.0 GB
+# Backend là phần tốn RAM nhất (Python + reportlab + pypdfium2 + ETL). Nếu tăng
+# một service, phải giảm service khác; Docker sẽ OOM-kill container vượt limit.
+
+services:
+  postgres:
+    image: pgvector/pgvector:pg16
+    container_name: smartlms_postgres
+    restart: unless-stopped
+    mem_limit: 1536m
+    env_file:
+      - ./deploy/.env.prod
+    expose:
+      - "5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      # Chỉ chạy khi volume còn RỖNG: tạo extension unaccent (exercise search) + vector.
+      # Volume đã có dữ liệu thì phải tự chạy CREATE EXTENSION (xem deploy/README.md).
+      - ./postgres-init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: smartlms_backend
+    restart: unless-stopped
+    mem_limit: 2560m
+    env_file:
+      - ./deploy/.env.prod
+    environment:
+      # override giá trị theo môi trường container (còn lại đọc từ .env.prod)
+      DB_HOST: postgres
+      DB_PORT: "5432"
+      TZ: Asia/Ho_Chi_Minh
+      # marker-pdf (torch) đã bị loại khỏi requirements.txt; khoá cứng ở trạng thái tắt
+      ENABLE_MARKER_PDF: "0"
+      # Connection pool: 20 + 30 overflow = tối đa 50 connection vật lý/process.
+      # Code default là 20 + 30; phần dư bù cho session ngắn hạn của middleware
+      # X-Data-Version trong lúc 30 request đang giữ session riêng.
+      # Prod chạy 1 uvicorn worker nên vẫn dưới max_connections mặc định (100).
+      DB_POOL_SIZE: "20"
+      DB_MAX_OVERFLOW: "30"
+      DB_POOL_TIMEOUT: "10"
+      DB_POOL_RECYCLE: "1800"
+      DB_STATEMENT_TIMEOUT_MS: "30000"
+      # Heavy-work guards (xem backend/app/core/resource_limits.py).
+      PDF_EXPORT_CONCURRENCY: "2"
+      IMPORT_CONCURRENCY: "2"
+      ETL_CONCURRENCY: "1"
+      MAX_INGEST_BYTES: "52428800"
+    expose:
+      - "8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    volumes:
+      - backend_uploads:/app/uploads
+      # SGK RAG data: put vectors.dump (+ images.tar) in ./sgk_data on the server
+      - ./sgk_data:/sgk_data:ro
+    # prod: không --reload. 1 worker là đủ cho 30 user (async I/O + threadpool);
+    # --limit-concurrency chặn runaway connection (30 SSE + API vẫn còn headroom).
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --limit-concurrency 128
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health', timeout=3)\""]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+  frontend:
+    build:
+      context: ./frontend
+      # Dockerfile prod nằm trong deploy/, tham chiếu tương đối từ context ./frontend
+      dockerfile: ../deploy/docker/Dockerfile.frontend.prod
+      args:
+        VITE_API_BASE_URL: ${VITE_API_BASE_URL:-/api}
+    container_name: smartlms_frontend
+    restart: unless-stopped
+    mem_limit: 896m
+    expose:
+      - "3000"
+    depends_on:
+      backend:
+        condition: service_healthy
+
+  # Reverse proxy tuỳ chọn — bật bằng --profile proxy (hoặc tự bật khi dùng --profile tunnel):
+  #   docker compose --project-directory . --env-file deploy/.env.prod \
+  #     -f deploy/docker-compose.prod.yml --profile proxy up -d
+  # Bind/port cấu hình qua .env.prod (NGINX_BIND / NGINX_PORT) để không đụng nginx host.
+  nginx:
+    image: nginx:alpine
+    container_name: smartlms_nginx
+    restart: unless-stopped
+    mem_limit: 128m
+    profiles: ["proxy", "tunnel", "quick"]
+    ports:
+      - "${NGINX_BIND:-0.0.0.0}:${NGINX_PORT:-80}:80"
+    volumes:
+      - ./deploy/nginx/nginx.conf:/etc/nginx/conf.d/default.conf:ro
+    depends_on:
+      - frontend
+      - backend
+
+  # Cloudflare Tunnel — xem chú thích trong deploy/docker-compose.images.yml.
+  # Public hostname trên Zero Trust dashboard trỏ vào http://nginx:80
+  cloudflared:
+    image: cloudflare/cloudflared:latest
+    container_name: smartlms_cloudflared
+    restart: unless-stopped
+    mem_limit: 128m
+    profiles: ["tunnel"]
+    command: tunnel --no-autoupdate run
+    environment:
+      TUNNEL_TOKEN: ${CLOUDFLARE_TUNNEL_TOKEN:-}
+    depends_on:
+      - nginx
+
+  # Quick tunnel 0 đồng (không cần domain/token) — chỉ để demo.
+  # Bật bằng --profile quick; URL nằm trong docker logs smartlms_cloudflared_quick
+  cloudflared-quick:
+    image: cloudflare/cloudflared:latest
+    container_name: smartlms_cloudflared_quick
+    restart: unless-stopped
+    mem_limit: 128m
+    profiles: ["quick"]
+    command: tunnel --no-autoupdate --url http://nginx:80
+    depends_on:
+      - nginx
+
+volumes:
+  postgres_data:
+  backend_uploads:

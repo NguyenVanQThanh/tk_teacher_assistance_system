@@ -1,14 +1,14 @@
 # File Name: schemas.py
-# Description: Pydantic schemas for the academic module with comprehensive validation and AcademicStatusEnum.
+# Description: Pydantic schemas for the academic module with comprehensive validation, name sanitization, and AcademicStatusEnum.
 # Created At: 2026-07-21
 # Created By: Tam Khang
-# Updated At: 2026-09-01
+# Updated At: 2026-09-27
 # Updated By: Tam Khang
 
 import re
 from enum import Enum
 from uuid import UUID
-from datetime import datetime
+from datetime import datetime, date
 from typing import Optional
 from pydantic import BaseModel, Field, field_validator
 
@@ -68,12 +68,27 @@ class SubjectUpdate(BaseModel):
         return v
 
 
+class HeadTeacherAssign(BaseModel):
+    """Schema for assigning (or clearing, with null) the head of a subject department."""
+    teacher_id: Optional[UUID] = Field(None, description="Active teacher teaching the subject; null clears the head")
+
+
+class HeadTeacherCandidate(BaseModel):
+    """A teacher eligible to be head of a subject department."""
+    user_id: UUID
+    full_name: str
+    phone: Optional[str] = None
+
+    model_config = {"from_attributes": True}
+
+
 class SubjectOut(BaseModel):
     """Schema for subject response output."""
     subject_id: UUID
     subject_name: str
     description: Optional[str]
     status: AcademicStatusEnum = AcademicStatusEnum.ACTIVE
+    head_teacher_id: Optional[UUID] = None
     created_at: datetime
     updated_at: datetime
 
@@ -93,7 +108,10 @@ class ClassCreate(BaseModel):
         v = v.strip()
         if not v:
             raise ValueError("Class name cannot be empty or blank.")
-        return v
+        clean = re.sub(r'[^a-zA-Z0-9\sÀ-ỹ_-]', '', v).strip()
+        if not clean:
+            raise ValueError("Class name must contain valid alphanumeric characters and no special symbols.")
+        return clean
 
     @field_validator("school_year")
     @classmethod
@@ -122,7 +140,10 @@ class ClassUpdate(BaseModel):
             v = v.strip()
             if not v:
                 raise ValueError("Class name cannot be empty or blank.")
-            return v
+            clean = re.sub(r'[^a-zA-Z0-9\sÀ-ỹ_-]', '', v).strip()
+            if not clean:
+                raise ValueError("Class name must contain valid alphanumeric characters and no special symbols.")
+            return clean
 
     @field_validator("school_year")
     @classmethod
@@ -151,8 +172,12 @@ class ClassOut(BaseModel):
 
 
 class EnrollmentCreate(BaseModel):
-    """Schema for enrolling a student into a class."""
-    student_id: UUID = Field(..., description="UUID of Student")
+    """Schema for enrolling a student into a class, with optional automatic student creation."""
+    student_id: Optional[UUID] = Field(None, description="UUID of existing Student (if already registered)")
+    student_name: Optional[str] = Field(None, max_length=150, description="Full name of student to create/enroll")
+    birthday: Optional[date] = Field(None, description="Student birthday (must be >= 16 years old)")
+    gender: Optional[str] = Field(None, max_length=20, description="Gender (Nam, Nữ, Khác)")
+    phone: Optional[str] = Field(None, max_length=20, description="Contact phone number")
     student_code: Optional[str] = Field(None, max_length=50, description="Student code (unique if provided)")
     status: AcademicStatusEnum = Field(AcademicStatusEnum.ACTIVE, description="Enrollment status")
 
@@ -163,6 +188,7 @@ class EnrollmentCreate(BaseModel):
             v = v.strip()
             return v if v else None
         return v
+
 
 
 class EnrollmentOut(BaseModel):

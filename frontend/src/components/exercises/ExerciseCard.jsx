@@ -15,12 +15,12 @@ import {
   X, 
   Eye, 
   Edit3, 
-  Share2, 
   Download 
 } from 'lucide-react';
+import AnswerReleaseButton from '../teacher/AnswerReleaseButton';
 import './ExerciseCard.css';
 
-export default function ExerciseCard({ exercise, onPreview, onEdit, onShare, onDownload, onMore, onDelete }) {
+export default function ExerciseCard({ exercise, onPreview, onEdit, onDownload, onMore, onDelete, canModify = true }) {
   const isQuiz = exercise.type === 'quiz' || exercise.type === 'test';
 
   return (
@@ -34,6 +34,15 @@ export default function ExerciseCard({ exercise, onPreview, onEdit, onShare, onD
             <FileText size={20} strokeWidth={2.2} />
           )}
         </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginLeft: 'auto' }}>
+        {exercise.raw?.exercise_kind === 'EXAM' && (
+          <AnswerReleaseButton
+            exerciseId={exercise.id}
+            released={exercise.raw?.answers_released}
+            compact
+          />
+        )}
+        {canModify && (
         <button 
           type="button" 
           className="exercise-more-btn exercise-close-btn"
@@ -46,12 +55,24 @@ export default function ExerciseCard({ exercise, onPreview, onEdit, onShare, onD
         >
           <X size={17} strokeWidth={2.2} />
         </button>
+        )}
+        </div>
       </div>
 
       {/* Exercise Title */}
       <h3 className="exercise-title" title={exercise.title}>
         {exercise.title}
       </h3>
+      <span
+        className="badge-tag"
+        style={{
+          alignSelf: 'flex-start', fontSize: 11, fontWeight: 600, padding: '2px 8px', borderRadius: 6,
+          background: exercise.raw?.exercise_kind === 'EXAM' ? '#FEE2E2' : '#E0E7FF',
+          color: exercise.raw?.exercise_kind === 'EXAM' ? '#B91C1C' : '#4338CA',
+        }}
+      >
+        {exercise.raw?.exercise_kind === 'EXAM' ? 'Đề thi' : 'Luyện tập'}
+      </span>
 
       {/* Meta items */}
       <div className="exercise-meta-list">
@@ -96,6 +117,7 @@ export default function ExerciseCard({ exercise, onPreview, onEdit, onShare, onD
         </button>
 
         <div className="exercise-action-icons">
+          {canModify ? (
           <button 
             type="button" 
             className="icon-action-btn edit-btn"
@@ -104,17 +126,12 @@ export default function ExerciseCard({ exercise, onPreview, onEdit, onShare, onD
           >
             <Edit3 size={16} />
           </button>
-
-          {exercise.hasShare ? (
-            <button 
-              type="button" 
-              className="icon-action-btn share-btn"
-              onClick={() => onShare && onShare(exercise)}
-              title="Chia sẻ / Giao bài cho lớp"
-            >
-              <Share2 size={16} />
-            </button>
           ) : (
+            <span data-testid="head-dept-badge" title="Bài tập của tổ trưởng bộ môn (chỉ xem)" style={{ fontSize: 11, color: '#6B7280', alignSelf: 'center' }}>
+              Tổ trưởng bộ môn
+            </span>
+          )}
+
             <button 
               type="button" 
               className="icon-action-btn download-btn"
@@ -123,7 +140,6 @@ export default function ExerciseCard({ exercise, onPreview, onEdit, onShare, onD
             >
               <Download size={16} />
             </button>
-          )}
         </div>
       </div>
     </div>

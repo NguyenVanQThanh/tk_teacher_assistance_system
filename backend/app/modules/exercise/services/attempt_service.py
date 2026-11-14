@@ -1,19 +1,24 @@
 # File Name: attempt_service.py
-# Description: Service layer for StudentExerciseAttempt operations (start, submit, grade, view).
+# Description: Service layer for StudentExerciseAttempt operations (start, submit, grade, view)
+#              plus the student-safe sanitized "paper" of an owned attempt.
 # Created At: 2026-08-05
 # Created By: Tam Khang
-# Updated At: 2026-08-05
-# Updated By: Tam Khang
+# Updated At: 2026-11-13
+# Updated By: AI Agent
 
+import secrets
 from datetime import datetime, timezone
-from typing import List, Optional
+from typing import Any, List, Optional
 from uuid import UUID
 from fastapi import HTTPException, status
 from sqlalchemy.orm import Session
 
-from models.models import User, ClassAssignment, StudentClass, StudentExerciseAttempt
-from app.modules.exercise.schemas import AttemptSubmitRequest, AttemptListItemOut, AttemptGradeUpdateRequest
+from models.models import User, Subject, Exercise, ClassAssignment, StudentClass, StudentExerciseAttempt
+from app.modules.exercise.schemas import (
+    AttemptSubmitRequest, AttemptListItemOut, AttemptGradeUpdateRequest, AssignmentTakingOut, AttemptOut
+)
 from app.modules.exercise.repository import AttemptRepository, AssignmentRepository
+from app.modules.exercise.services.assignment_service import AssignmentService, open_attempt_deadline
 from app.modules.exercise.services.grading_service import GradingService
 from app.modules.academic.scoping import get_user_role_name, check_class_access, get_accessible_class_ids
 
@@ -26,6 +31,22 @@ class AttemptService:
         self.repo = AttemptRepository(db)
         self.assignment_repo = AssignmentRepository(db)
 
+    @staticmethod
+    def _with_preserved_shuffle_seed(old_detailed: Any, new_detailed: Any) -> Any:
+        """Merge the attempt's display-shuffle seed into freshly written detailed_results.
+
+        Grading only returns {"questions": [...]}; without this merge the seed stored at start
+        would be lost on submit (or on a teacher grade save that rebuilds detailed_results) and
+        the review paper would fall back to a different order. Other keys are left untouched.
+        """
+        if not isinstance(new_detailed, dict):
+            return new_detailed
+        seed = old_detailed.get("shuffle_seed") if isinstance(old_detailed, dict) else None
+        if seed and "shuffle_seed" not in new_detailed:
+            new_detailed = dict(new_detailed)
+            new_detailed["shuffle_seed"] = seed
+        return new_detailed
+
     def start_attempt(self, assignment_id: UUID, current_user: User) -> StudentExerciseAttempt:
         """Start a new exercise attempt for a student."""
         # 1. Verify assignment exists and is ACTIVE
@@ -37,6 +58,13 @@ class AttemptService:
                     "code": "ERR-EXE-ASSIGNMENT_NOT_FOUND",
                     "message": "Class assignment record not found."
                 }
+            )
+
+        # Another student's personal assignment is invisible.
+        if assignment.owner_student_id is not None and assignment.owner_student_id != current_user.user_id:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail={"code": "ERR-EXE-ASSIGNMENT_NOT_FOUND", "message": "Class assignment record not found."}
             )
 
         # 2. Verify student is enrolled in the assigned class
@@ -62,17 +90,61 @@ class AttemptService:
                 status_code=status.HTTP_409_CONFLICT,
                 detail={
                     "code": "ERR-EXE-ATTEMPT_ALREADY_OPEN",
-                    "message": "You already have an open attempt for this assignment."
+                    "message": "An in-progress attempt already exists for this assignment.",
+                    "attempt_id": str(open_attempt.attempt_id)
                 }
             )
 
-        # 4. Create new attempt
+        # 3b. Availability window: a new attempt may not start after the due date.
+        due_at = assignment.due_at
+        if due_at is not None:
+            if due_at.tzinfo is None:
+                due_at = due_at.replace(tzinfo=timezone.utc)
+            if datetime.now(timezone.utc) > due_at:
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail={
+                        "code": "ERR-EXE-ASSIGNMENT_EXPIRED",
+                        "message": "This assignment is past its due date."
+                    }
+                )
+
+        # 3c. Attempt limit: max_attempts comes from the exercise metadata (exams default to 1).
+        exercise = self.db.query(Exercise).filter(
+            Exercise.exercise_id == assignment.exercise_id,
+            Exercise.status != 'DELETED'
+        ).first()
+        ai_meta = (exercise.ai_metadata or {}) if exercise else {}
+        is_exam = (exercise.exercise_kind == "EXAM") if exercise else False
+        max_attempts = int(ai_meta.get("max_attempts", 1 if is_exam else 3))
+        attempt_count = self.db.query(StudentExerciseAttempt).filter(
+            StudentExerciseAttempt.student_id == current_user.user_id,
+            StudentExerciseAttempt.assignment_id == assignment_id,
+            StudentExerciseAttempt.status != 'DELETED'
+        ).count()
+        if attempt_count >= max_attempts:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail={
+                    "code": "ERR-EXE-ATTEMPT_LIMIT_REACHED",
+                    "message": "You have used all allowed attempts for this assignment."
+                }
+            )
+
+        # 4. Create new attempt. The random display-shuffle seed is persisted in the existing
+        # detailed_results JSON column (no schema change) so every reload/resume/review of THIS
+        # attempt reproduces the same question/option order. Merge instead of overwriting so any
+        # other data already present in detailed_results survives.
         attempt = StudentExerciseAttempt(
             student_id=current_user.user_id,
             assignment_id=assignment_id,
             start_time=datetime.now(timezone.utc),
             is_finished=False,
             status='ACTIVE'
+        )
+        attempt.detailed_results = self._with_preserved_shuffle_seed(
+            attempt.detailed_results,
+            {"shuffle_seed": secrets.token_hex(16)}
         )
         return self.repo.create(attempt)
 
@@ -110,6 +182,17 @@ class AttemptService:
                 }
             )
 
+        # 3b. Same window as resuming: no submission after due_at + paper duration.
+        deadline = open_attempt_deadline(assignment, getattr(assignment, "exercise", None))
+        if deadline is not None and datetime.now(timezone.utc) > deadline:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail={
+                    "code": "ERR-EXE-ASSIGNMENT_EXPIRED",
+                    "message": "The submission window for this assignment has closed."
+                }
+            )
+
         # 4. Run auto-grading
         grading_service = GradingService(self.db)
         score, detailed_results = grading_service.grade_attempt(assignment.exercise_id, payload.answers)
@@ -125,7 +208,9 @@ class AttemptService:
         attempt.end_time = now
         attempt.total_time_seconds = total_seconds
         attempt.score = score
-        attempt.detailed_results = detailed_results
+        # Keep the per-attempt shuffle seed so reviewing this submission after it is finished
+        # shows the same question/option order the student saw while taking it.
+        attempt.detailed_results = self._with_preserved_shuffle_seed(attempt.detailed_results, detailed_results)
         attempt.is_finished = True
 
         return self.repo.update(attempt)
@@ -144,6 +229,12 @@ class AttemptService:
 
         # Check permission scoping
         if attempt.student_id != current_user.user_id:
+            # Students may only read their own attempts (classmates share class access but not results)
+            if (get_user_role_name(self.db, current_user) or "").lower() == "student":
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail={"code": "ERR-EXE-ATTEMPT_ACCESS_DENIED", "message": "You cannot access another student's attempt."}
+                )
             # If user is not the attempt owner, check if user is teacher/admin with class access
             assignment = self.assignment_repo.get_by_id(attempt.assignment_id)
             if not assignment:
@@ -158,13 +249,79 @@ class AttemptService:
 
         return attempt
 
+    @staticmethod
+    def redact_for_owner(attempt: StudentExerciseAttempt, current_user: User) -> AttemptOut:
+        """Serialize an attempt; for the owning student of an EXAM exercise (exercise_kind) strip
+        per-question verdicts until the teacher releases answers (assignment.answers_released_at).
+        The total score and the student's own answers stay. Works on a copy: nothing is persisted."""
+        out = AttemptOut.model_validate(attempt)
+        ex = getattr(getattr(attempt, "assignment", None), "exercise", None)
+        is_exam = getattr(ex, "exercise_kind", "PRACTICE") == "EXAM"
+        released = getattr(getattr(attempt, "assignment", None), "answers_released_at", None) is not None
+        if isinstance(out.detailed_results, dict) and "shuffle_seed" in out.detailed_results:
+            # The display-shuffle seed is internal server state; never expose it through the API.
+            out.detailed_results = {
+                k: v for k, v in out.detailed_results.items() if k != "shuffle_seed"
+            }
+        if attempt.student_id == current_user.user_id and is_exam and not released and out.detailed_results:
+            keep = ("question_id", "question_type", "student_answer_option_id", "student_answer_text")
+            out.detailed_results = {
+                "questions": [
+                    {k: r[k] for k in keep if k in r}
+                    for r in (out.detailed_results.get("questions") or [])
+                ]
+            }
+        return out
+
+    def get_attempt_paper(self, attempt_id: UUID, current_user: User) -> AssignmentTakingOut:
+        """
+        Return the sanitized paper (questions without answer key) of an attempt owned by the
+        current student. Only the attempt owner may access it (403 otherwise).
+        """
+        attempt = self.repo.get_by_id(attempt_id)
+        if not attempt:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail={
+                    "code": "ERR-EXE-ATTEMPT_NOT_FOUND",
+                    "message": "Exercise attempt record not found."
+                }
+            )
+
+        if attempt.student_id != current_user.user_id:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail={
+                    "code": "ERR-EXE-ATTEMPT_NOT_OWNER",
+                    "message": "You can only view the paper of your own attempt."
+                }
+            )
+
+        assignment = self.assignment_repo.get_by_id(attempt.assignment_id)
+        if not assignment:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail={
+                    "code": "ERR-EXE-ASSIGNMENT_NOT_FOUND",
+                    "message": "Associated assignment record not found."
+                }
+            )
+
+        # Reuses the student-safe builder (sanitized questions, open attempt attached). The attempt
+        # is pinned explicitly so reviewing an older attempt keeps ITS question/option order even
+        # when a newer attempt exists for the same assignment.
+        return AssignmentService(self.db).build_student_paper(
+            assignment, current_user.user_id, attempt=attempt
+        )
+
     def list_attempts(
         self,
         current_user: User,
         class_id: Optional[UUID] = None,
         assignment_id: Optional[UUID] = None,
         is_finished: Optional[bool] = None,
-        search: Optional[str] = None
+        search: Optional[str] = None,
+        student_id: Optional[UUID] = None
     ) -> List[AttemptListItemOut]:
         """List attempts with RBAC data scoping for Teacher / Student / Admin."""
         role_name = get_user_role_name(self.db, current_user)
@@ -194,6 +351,7 @@ class AttemptService:
             attempts = self.repo.list_attempts(
                 class_ids=target_class_ids,
                 assignment_id=assignment_id,
+                student_id=student_id,
                 is_finished=is_finished,
                 search=search
             )
@@ -203,10 +361,12 @@ class AttemptService:
             attempts = self.repo.list_attempts(
                 class_ids=target_class_ids,
                 assignment_id=assignment_id,
+                student_id=student_id,
                 is_finished=is_finished,
                 search=search
             )
 
+        subject_names = {sid: name for sid, name in self.db.query(Subject.subject_id, Subject.subject_name).all()}
         items: List[AttemptListItemOut] = []
         for att in attempts:
             student_name = att.student.full_name if att.student else "Học sinh"
@@ -215,6 +375,7 @@ class AttemptService:
             class_name = att.assignment.class_obj.class_name if (att.assignment and att.assignment.class_obj) else "Lớp"
             exercise_id = att.assignment.exercise_id if att.assignment else att.attempt_id
             exercise_title = att.assignment.exercise.title if (att.assignment and att.assignment.exercise) else "Bài tập"
+            is_exam_kind = bool(att.assignment and att.assignment.exercise and att.assignment.exercise.exercise_kind == "EXAM")
             subject_id = att.assignment.exercise.subject_id if (att.assignment and att.assignment.exercise) else None
 
             items.append(
@@ -228,13 +389,17 @@ class AttemptService:
                     class_name=class_name,
                     exercise_id=exercise_id,
                     exercise_title=exercise_title,
+                    assignment_title=exercise_title,
                     subject_id=subject_id,
+                    subject_name=subject_names.get(subject_id),
                     score=float(att.score) if att.score is not None else None,
                     is_finished=att.is_finished,
                     start_time=att.start_time,
                     end_time=att.end_time,
                     total_time_seconds=att.total_time_seconds,
-                    status=att.status
+                    status=att.status,
+                    is_exam=is_exam_kind,
+                    answers_released=bool(att.assignment and att.assignment.answers_released_at)
                 )
             )
 
@@ -270,9 +435,161 @@ class AttemptService:
         # Enforce class access scoping for Teacher
         check_class_access(self.db, current_user, assignment.class_id)
 
+        detailed_results = payload.detailed_results
+        if payload.manual_marks:
+            # Persist teacher verdicts on short answers so later regrades keep them.
+            base = dict(detailed_results if isinstance(detailed_results, dict) else (attempt.detailed_results or {}))
+            marks = {str(k).lower(): bool(v) for k, v in payload.manual_marks.items()}
+            questions = []
+            for r in base.get("questions", []):
+                r = dict(r)
+                verdict = marks.get(str(r.get("question_id", "")).lower())
+                if verdict is not None:
+                    r.update(is_correct=verdict, manual_override=True, pending_manual_grade=False)
+                questions.append(r)
+            base["questions"] = questions
+            if payload.feedback is not None:
+                base["teacher_feedback"] = payload.feedback
+            detailed_results = base
+
+        # The grading UI sends the (auto-recomputed) total on every save, so only a total that
+        # differs from the server's own rescore is a real teacher override. Only overrides are
+        # pinned in detailed_results['teacher_total_score'] (preserved by regrade_exercise).
+        score = float(payload.score)
+        grader = GradingService(self.db)
+        exercise = grader.exercise_repo.get_by_id(assignment.exercise_id)
+        base = detailed_results if isinstance(detailed_results, dict) else attempt.detailed_results
+        if exercise and isinstance(base, dict):
+            auto_score, detailed_results = grader.rescore(exercise, base)
+            # 0.05 tolerance: the UI rounds the total to one decimal.
+            if auto_score is not None and abs(auto_score - score) <= 0.051:
+                score = auto_score
+                detailed_results.pop("teacher_total_score", None)
+            else:
+                detailed_results["teacher_total_score"] = score
+            if payload.feedback is not None:
+                detailed_results["teacher_feedback"] = payload.feedback
+
+        # The grading UI may rebuild detailed_results from the paper it was shown; never drop the
+        # per-attempt shuffle seed, otherwise the review order would change after a grade save.
+        detailed_results = self._with_preserved_shuffle_seed(attempt.detailed_results, detailed_results)
+
         return self.repo.update_grade(
             attempt=attempt,
-            score=payload.score,
+            score=score,
             feedback=payload.feedback,
-            detailed_results=payload.detailed_results
+            detailed_results=detailed_results,
+            status=payload.status
         )
+
+    def update_answer_key_and_regrade(self, exercise_id: UUID, keys: dict, current_user: User) -> dict:
+        """Apply a new MultipleChoice answer key and persist recomputed scores for ALL submissions of the exercise."""
+        from app.modules.exercise.services.exercise_service import ExerciseService
+        # Scoping check (raises 404 when the teacher cannot access the exercise)
+        exercise = ExerciseService(self.db).get_exercise_detail(current_user, exercise_id)
+        # The answer key is shared by every class the exercise is assigned to, so only its owner
+        # (or an Admin) may change it, and then ALL submissions are rescored to stay consistent.
+        if get_user_role_name(self.db, current_user) != "Admin" and exercise.created_by != current_user.user_id:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail={
+                    "code": "ERR-EXE-ANSWER_KEY_OWNER_ONLY",
+                    "message": "Only the exercise owner or an administrator can change the answer key."
+                }
+            )
+        grader = GradingService(self.db)
+        updated = grader.apply_answer_key(exercise_id, list(keys.items()))
+        regraded = grader.regrade_exercise(exercise_id)
+        return {"updated_questions": updated, "regraded_attempts": regraded}
+
+    def get_grading_dashboard(
+        self, current_user: User, attempts: Optional[List[AttemptListItemOut]] = None
+    ) -> "GradingDashboardOut":
+        """Compute aggregate metrics and breakdown statistics for grading dashboard.
+        Callers that already hold the scoped attempt list pass it to avoid a second load."""
+        from app.modules.exercise.schemas import (
+            GradingDashboardOut, GradingScoreDistribution, GradingClassSummary
+        )
+
+        if attempts is None:
+            attempts = self.list_attempts(current_user=current_user)
+
+        total_submissions = len(attempts)
+        known_statuses = ("pending_grading", "pending_review", "approved")
+
+        def resolve_status(a) -> str:
+            # Same rule as the Grading page: trust lifecycle status, otherwise infer from score
+            st = getattr(a, 'status', None)
+            if st in known_statuses:
+                return st
+            return 'approved' if a.score is not None else 'pending_grading'
+
+        resolved = [resolve_status(a) for a in attempts]
+        pending_grading_count = resolved.count('pending_grading')
+        pending_review_count = resolved.count('pending_review')
+        graded_count = resolved.count('approved')
+
+        need_feedback = pending_grading_count
+
+        scores = [a.score for a in attempts if a.score is not None]
+        avg_score = round(sum(scores) / len(scores), 2) if scores else 0.0
+
+        under_5 = sum(1 for s in scores if s < 5.0)
+        from_5_to_6_5 = sum(1 for s in scores if 5.0 <= s < 6.5)
+        from_6_5_to_8 = sum(1 for s in scores if 6.5 <= s < 8.0)
+        from_8_to_10 = sum(1 for s in scores if s >= 8.0)
+
+        distribution = GradingScoreDistribution(
+            under_5=under_5,
+            from_5_to_6_5=from_5_to_6_5,
+            from_6_5_to_8=from_6_5_to_8,
+            from_8_to_10=from_8_to_10
+        )
+
+        # Class breakdown
+        class_map = {}
+        for a in attempts:
+            cid = a.class_id
+            if cid not in class_map:
+                class_map[cid] = {
+                    "class_id": cid,
+                    "class_name": a.class_name,
+                    "total": 0,
+                    "graded": 0,
+                    "pending": 0,
+                    "scores": []
+                }
+            class_map[cid]["total"] += 1
+            if a.score is not None:
+                class_map[cid]["graded"] += 1
+                class_map[cid]["scores"].append(a.score)
+            else:
+                class_map[cid]["pending"] += 1
+
+        by_class = []
+        for cdata in class_map.values():
+            c_scores = cdata["scores"]
+            c_avg = round(sum(c_scores) / len(c_scores), 2) if c_scores else 0.0
+            by_class.append(
+                GradingClassSummary(
+                    class_id=cdata["class_id"],
+                    class_name=cdata["class_name"],
+                    total_submissions=cdata["total"],
+                    graded_count=cdata["graded"],
+                    pending_count=cdata["pending"],
+                    avg_score=c_avg
+                )
+            )
+
+        return GradingDashboardOut(
+            total_submissions=total_submissions,
+            pending_grading_count=pending_grading_count,
+            pending_review_count=pending_review_count,
+            graded_count=graded_count,
+            need_feedback_count=need_feedback,
+            avg_score=avg_score,
+            score_distribution=distribution,
+            by_class=by_class,
+            recent_submissions=attempts[:10]
+        )
+

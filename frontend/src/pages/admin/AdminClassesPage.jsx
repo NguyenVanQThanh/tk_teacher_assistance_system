@@ -39,6 +39,8 @@ import {
   FileText
 } from 'lucide-react';
 import './AdminClassesPage.css';
+import confirmDialog from '../../components/common/confirmDialog';
+import toast from '../../components/common/toast';
 
 export default function AdminClassesPage() {
   // State for tabs & filters
@@ -1526,7 +1528,7 @@ export default function AdminClassesPage() {
   const handleCreateAndAddStudent = (e) => {
     e.preventDefault();
     if (!newStudentForm.name.trim() || !newStudentForm.parentPhone.trim()) {
-      alert('Vui lòng điền đầy đủ họ tên học sinh và số điện thoại phụ huynh.');
+      toast.error('Vui lòng điền đầy đủ họ tên học sinh và số điện thoại phụ huynh.');
       return;
     }
 
@@ -1582,7 +1584,7 @@ export default function AdminClassesPage() {
 
   const handleImportExcelStudents = () => {
     if (!uploadedFileName) {
-      alert('Vui lòng chọn tập tin Excel (.xlsx, .csv).');
+      toast.error('Vui lòng chọn tập tin Excel (.xlsx, .csv).');
       return;
     }
 
@@ -1713,7 +1715,7 @@ export default function AdminClassesPage() {
   const handleAddClassSubmit = (e) => {
     e.preventDefault();
     if (!newClass.name) {
-      alert('Vui lòng nhập tên lớp học.');
+      toast.error('Vui lòng nhập tên lớp học.');
       return;
     }
 
@@ -2154,8 +2156,8 @@ export default function AdminClassesPage() {
                             type="button" 
                             className="table-action-icon-btn" 
                             title="Tùy chọn khác"
-                            onClick={() => {
-                              if (window.confirm(`Bạn có chắc chắn muốn lưu trữ hoặc vô hiệu hóa lớp ${cls.name}?`)) {
+                            onClick={async () => {
+                              if (await confirmDialog(`Bạn có chắc chắn muốn lưu trữ hoặc vô hiệu hóa lớp ${cls.name}?`)) {
                                 showToast(`Lớp ${cls.name} đã được lưu trữ (Soft Delete).`);
                               }
                             }}

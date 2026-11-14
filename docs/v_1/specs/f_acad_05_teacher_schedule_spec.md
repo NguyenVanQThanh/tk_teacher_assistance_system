@@ -28,20 +28,19 @@
 
 ## A.1 Feature Summary
 
-Cung cấp công cụ quản lý lịch giảng dạy, thời khóa biểu và ghi chú công việc sư phạm cho Giáo viên:
-1. **Thời khóa biểu trực quan**: Hiển thị các tiết dạy trong tuần/tháng theo lớp, phòng học, môn học và thời gian bắt đầu/kết thúc.
-2. **Phân loại mức độ ưu tiên & khẩn cấp (Urgency Tagging)**: Đánh dấu màu sắc trực quan theo tính chất sự kiện (`critical`, `high`, `teaching`, `ai`, `meeting`).
-3. **Phát hiện trùng lịch (Conflict Detection)**: Tự động chặn trùng giờ dạy của giáo viên hoặc trùng phòng học.
-4. **Ghi chú nhắc nhở học sinh (Teacher Notes)**: Tạo các ghi chú công việc nhanh (nhắc lớp nộp bài, chuẩn bị đề kiểm tra) theo từng ngày.
+Cung cấp công cụ quản lý lịch kiểm tra, khảo thí và ghi chú công việc sư phạm cho Giáo viên:
+1. **Lịch kiểm tra trực quan**: Hiển thị các lịch kiểm tra trong tuần/tháng theo lớp, môn học và thời gian bắt đầu/kết thúc.
+2. **Phân loại mức độ ưu tiên & khẩn cấp (Urgency Tagging)**: Đánh dấu màu sắc trực quan theo tính chất sự kiện (`critical`, `high`, `teaching`).
+3. **Phát hiện trùng lịch (Conflict Detection)**: Tự động phát hiện và chặn trùng giờ kiểm tra của giáo viên.
+4. **Ghi chú nhắc nhở sư phạm (Teacher Notes)**: Tạo các ghi chú công việc nhanh (nhắc lớp nộp bài, chuẩn bị đề in sẵn) theo từng ngày.
 
 ## A.2 User Stories
 
 | Story ID | As (Role) | I Want (Capability) | So That (Value) |
 |---|---|---|---|
-| **US-01** | Teacher | Xem lịch dạy hàng tuần và chi tiết từng ngày | Chủ động sắp xếp giáo án và lịch lên lớp. |
-| **US-02** | Teacher | Thêm mới hoặc điều chỉnh ca dạy / tiết phụ đạo | Theo dõi tiến độ giảng dạy của các lớp phụ trách. |
+| **US-01** | Teacher | Xem lịch kiểm tra hàng tuần và chi tiết từng ngày theo lớp | Chủ động chuẩn bị đề thi và kế hoạch kiểm tra cho các lớp. |
+| **US-02** | Teacher | Thêm mới hoặc điều chỉnh lịch kiểm tra và mức độ khẩn cấp | Quản lý tiến độ khảo thí và kiểm tra đánh giá của học sinh. |
 | **US-03** | Teacher | Lưu ghi chú công việc gắn với ngày cụ thể và đánh dấu hoàn thành | Không bỏ sót các đầu việc sư phạm quan trọng. |
-
 ---
 
 # PART B — Technical Specifications & API Contracts
@@ -54,7 +53,7 @@ Cung cấp công cụ quản lý lịch giảng dạy, thời khóa biểu và g
   * `year`: int (mặc định: năm hiện tại, vd: 2026)
   * `month`: int (1..12)
   * `grade`: str (tùy chọn: `10` | `11` | `12` | `all`)
-  * `urgency`: str (tùy chọn: `critical` | `high` | `teaching` | `ai` | `meeting`)
+  * `urgency`: str (tùy chọn: `critical` | `high` | `teaching`)
 * **Response `200 OK`**:
 ```json
 [
@@ -64,7 +63,6 @@ Cung cấp công cụ quản lý lịch giảng dạy, thời khóa biểu và g
     "class_id": "3ba85f64-5717-4562-b3fc-2c963f66af11",
     "class_name": "10A1",
     "grade": "10",
-    "room": "P.302 - Nhà A",
     "schedule_date": "2026-10-15",
     "start_time": "07:30",
     "end_time": "09:00",
@@ -85,14 +83,12 @@ Cung cấp công cụ quản lý lịch giảng dạy, thời khóa biểu và g
   "schedule_date": "2026-10-16",
   "start_time": "08:15",
   "end_time": "09:00",
-  "room": "P.302 - Nhà A",
   "urgency": "critical",
   "notes": "Chuẩn bị đề in sẵn"
 }
 ```
 * **Validation**:
-  * Nếu trùng giờ dạy của giáo viên -> Lỗi `ERR-SCHED-TIME_CONFLICT` (`409 Conflict`).
-  * Nếu phòng học đã có lớp khác học trong giờ đó -> Lỗi `ERR-SCHED-ROOM_OCCUPIED` (`409 Conflict`).
+  * Nếu trùng giờ kiểm tra của giáo viên -> Lỗi `ERR-SCHED-TIME_CONFLICT` (`409 Conflict`).
 * **Response `201 Created`**: Schedule Object.
 
 ### 3. `DELETE /api/v1/teacher/schedules/{schedule_id}`

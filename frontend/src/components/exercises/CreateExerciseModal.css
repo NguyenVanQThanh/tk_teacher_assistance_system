@@ -996,3 +996,193 @@ Updated By: Tam Khang
   0%, 100% { transform: scale(1); opacity: 0.9; }
   50% { transform: scale(1.15); opacity: 1; }
 }
+
+/* Khối (grade) filter row inside the document picker dropdown */
+.doc-filter-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  border-bottom: 1px solid #F1F5F9;
+  background-color: #F8FAFC;
+}
+
+.doc-filter-row .doc-search-box {
+  flex: 1;
+  min-width: 0;
+  padding: 4px 6px;
+  border-bottom: none;
+  background: transparent;
+}
+
+.doc-grade-filter {
+  flex-shrink: 0;
+  border: 1px solid #E2E8F0;
+  border-radius: 8px;
+  background-color: #FFFFFF;
+  font-size: 12px;
+  font-weight: 500;
+  color: #334155;
+  padding: 5px 8px;
+  outline: none;
+  cursor: pointer;
+  font-family: 'Be Vietnam Pro', -apple-system, BlinkMacSystemFont, sans-serif;
+}
+
+.doc-grade-filter:focus {
+  border-color: #7C3AED;
+  box-shadow: 0 0 0 2px rgba(124, 58, 237, 0.12);
+}
+
+.doc-grade-badge {
+  font-size: 10.5px;
+  font-weight: 600;
+  color: #6D28D9;
+  background-color: #F5EEFF;
+  border: 1px solid #DDD6FE;
+  padding: 1px 7px;
+  border-radius: 999px;
+  white-space: nowrap;
+}
+
+/* Khối lớp selector (rieng) ở đầu form tạo bài AI */
+.ai-grade-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.ai-grade-select {
+  border: 1px solid #E2E8F0;
+  border-radius: 8px;
+  background-color: #FFFFFF;
+  font-size: 13px;
+  font-weight: 600;
+  color: #6D28D9;
+  padding: 8px 12px;
+  outline: none;
+  cursor: pointer;
+  font-family: 'Be Vietnam Pro', -apple-system, BlinkMacSystemFont, sans-serif;
+}
+
+.ai-grade-select:focus {
+  border-color: #7C3AED;
+  box-shadow: 0 0 0 2px rgba(124, 58, 237, 0.12);
+}
+
+.ai-grade-hint {
+  font-size: 12px;
+  color: #94A3B8;
+  font-style: italic;
+}
+
+/* Tên bài tập input trong form AI */
+.ai-title-input {
+  width: 100%;
+  box-sizing: border-box;
+  border: 1px solid #E2E8F0;
+  border-radius: 8px;
+  background-color: #FFFFFF;
+  font-size: 13px;
+  color: #0F172A;
+  padding: 9px 12px;
+  outline: none;
+  font-family: 'Be Vietnam Pro', -apple-system, BlinkMacSystemFont, sans-serif;
+}
+
+.ai-title-input:focus {
+  border-color: #7C3AED;
+  box-shadow: 0 0 0 2px rgba(124, 58, 237, 0.12);
+}
+
+/* Toast notification trong modal */
+.ai-toast {
+  position: absolute;
+  top: 14px;
+  right: 14px;
+  z-index: 200;
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  max-width: 340px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  box-shadow: 0 8px 24px rgba(15, 23, 42, 0.18);
+  font-size: 12.5px;
+  animation: toastSlideIn 0.2s ease-out;
+}
+
+.ai-toast.toast-error {
+  background-color: #FEF2F2;
+  border: 1px solid #FECACA;
+  color: #B91C1C;
+}
+
+.ai-toast.toast-success {
+  background-color: #F0FDF4;
+  border: 1px solid #BBF7D0;
+  color: #15803D;
+}
+
+.ai-toast.toast-info {
+  background-color: #EFF6FF;
+  border: 1px solid #BFDBFE;
+  color: #1D4ED8;
+}
+
+.ai-toast-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.ai-toast-text strong {
+  font-size: 12.5px;
+}
+
+.ai-toast-text span {
+  color: inherit;
+  opacity: 0.9;
+}
+
+.ai-toast-close {
+  border: none;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  padding: 2px;
+  flex-shrink: 0;
+}
+
+@keyframes toastSlideIn {
+  from {
+    opacity: 0;
+    transform: translateX(12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+/* RAG sources (AI result step) */
+.btn-ai-retry {
+  margin-left: auto;
+  border: 1px solid currentColor;
+  background: transparent;
+  color: inherit;
+  border-radius: 6px;
+  padding: 4px 10px;
+  font-size: 12px;
+  cursor: pointer;
+}
+.ai-sources summary { cursor: pointer; font-weight: 600; font-size: 13px; }
+.ai-sources summary:focus-visible, .btn-ai-retry:focus-visible { outline: 2px solid #7C3AED; outline-offset: 2px; }
+.ai-sources-list { list-style: none; margin: 8px 0 0; padding: 0; display: flex; flex-direction: column; gap: 8px; max-height: 280px; overflow-y: auto; }
+.ai-source-item { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; font-size: 12.5px; color: #0F172A; }
+.ai-source-badge { border-radius: 999px; padding: 2px 8px; font-size: 11px; font-weight: 600; }
+.ai-source-badge.sgk { background: #DBEAFE; color: #1D4ED8; }
+.ai-source-badge.teacher { background: #EDE9FE; color: #6D28D9; }
+.ai-source-page { color: #64748B; }
+.ai-source-thumb { height: 48px; border: 1px solid #E2E8F0; border-radius: 6px; display: block; }

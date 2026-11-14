@@ -2,7 +2,7 @@
 /* Description: Styles for the grading and feedback modal with split answer/grading panels, AI generation controls, and scoring buttons. */
 /* Created At: 2026-09-01 */
 /* Created By: Tam Khang */
-/* Updated At: 2026-09-01 */
+/* Updated At: 2026-10-30 */
 /* Updated By: Tam Khang */
 
 .grading-modal-overlay {
@@ -25,13 +25,14 @@
 
 .grading-modal-window {
   background-color: #FFFFFF;
-  border-radius: 16px;
-  width: 100%;
-  max-width: 1100px;
-  max-height: 92vh;
+  border-radius: 18px;
+  width: 95%;
+  max-width: 1280px;
+  height: 90vh;
+  max-height: 94vh;
   display: flex;
   flex-direction: column;
-  box-shadow: 0 20px 40px -10px rgba(0, 0, 0, 0.2);
+  box-shadow: 0 25px 50px -12px rgba(15, 23, 42, 0.28);
   border: 1px solid #E2E8F0;
   overflow: hidden;
   font-family: 'Be Vietnam Pro', -apple-system, BlinkMacSystemFont, sans-serif;
@@ -157,9 +158,10 @@
 /* Modal Body */
 .grading-modal-body {
   display: grid;
-  grid-template-columns: 1.15fr 0.85fr;
+  grid-template-columns: 1.22fr 0.88fr;
   flex: 1;
   overflow: hidden;
+  height: calc(100% - 64px);
 }
 
 /* Left Panel */
@@ -602,6 +604,39 @@
   font-weight: 700;
   color: #0F172A;
   margin: 2px 0;
+}
+
+.short-answer-expected-key {
+  font-size: 12px;
+  color: #059669;
+  background-color: #ECFDF5;
+  border: 1px solid #A7F3D0;
+  padding: 3px 8px;
+  border-radius: 6px;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.short-answer-expected-key strong {
+  font-weight: 700;
+  color: #047857;
+}
+
+.undefined-key-notice-box {
+  background-color: #FFFBEB;
+  border: 1px solid #FCD34D;
+  border-radius: 6px;
+  padding: 6px 10px;
+  font-size: 12px;
+  color: #B45309;
+  margin-bottom: 8px;
+}
+
+.manual-grade-alert-pill.warning-key-pill {
+  background-color: #FEF3C7;
+  color: #B45309;
+  border-color: #FCD34D;
 }
 
 /* Right Panel: Grading Actions */

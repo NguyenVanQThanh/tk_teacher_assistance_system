@@ -2,7 +2,7 @@
 // Description: Teacher Profile and Security Settings page with tabs for Personal Information and Password/Security Management.
 // Created At: 2026-09-01
 // Created By: Tam Khang
-// Updated At: 2026-09-01
+// Updated At: 2026-11-11
 // Updated By: Tam Khang
 
 import React, { useState, useEffect } from 'react';
@@ -35,6 +35,7 @@ import { useAuth } from '../../context/AuthContext';
 import { getTeacherProfileDefaults } from '../../utils/teacherSubjectHelper';
 import { authApi } from '../../services/api';
 import './TeacherProfilePage.css';
+import toast from '../../components/common/toast';
 
 export default function TeacherProfilePage() {
   const { user } = useAuth();
@@ -142,10 +143,19 @@ export default function TeacherProfilePage() {
   const [twoFactorEnabled, setTwoFactorEnabled] = useState(true);
 
   // Save profile changes
-  const handleSaveProfile = (e) => {
+  const handleSaveProfile = async (e) => {
     e.preventDefault();
-    setIsEditingProfile(false);
-    setToastMessage('Đã cập nhật thông tin hồ sơ cá nhân thành công!');
+    try {
+      await authApi.updateProfile({
+        full_name: profileForm.fullName,
+        email: profileForm.email,
+        phone: profileForm.phone
+      });
+      setIsEditingProfile(false);
+      setToastMessage('Đã cập nhật thông tin hồ sơ cá nhân thành công!');
+    } catch (err) {
+      setToastMessage('Lỗi khi cập nhật hồ sơ cá nhân.');
+    }
     setTimeout(() => setToastMessage(null), 3500);
   };
 
@@ -241,7 +251,7 @@ export default function TeacherProfilePage() {
                 type="button" 
                 className="btn-camera-upload" 
                 title="Thay đổi ảnh đại diện"
-                onClick={() => alert('Chọn ảnh mới từ thiết bị của bạn')}
+                onClick={() => toast.info('Chọn ảnh mới từ thiết bị của bạn')}
               >
                 <Camera size={15} />
               </button>
@@ -385,17 +395,6 @@ export default function TeacherProfilePage() {
                 </div>
 
                 <div className="profile-form-grid-3">
-                  <div className="profile-field-item">
-                    <label className="field-title">Email công vụ</label>
-                    <input
-                      type="email"
-                      disabled={!isEditingProfile}
-                      value={profileForm.email}
-                      onChange={(e) => setProfileForm({ ...profileForm, email: e.target.value })}
-                      className="profile-input-control"
-                    />
-                  </div>
-
                   <div className="profile-field-item">
                     <label className="field-title">Số điện thoại</label>
                     <input

@@ -22,7 +22,10 @@ import {
 } from 'lucide-react';
 import StudentTranscriptPrintModal from './StudentTranscriptPrintModal';
 import { getSubjectIdByName } from '../../utils/teacherSubjectHelper';
+import { attemptsApi } from '../../services/api';
+import { downloadGradebookCsv } from '../../utils/gradebookExport';
 import './StudentDetailModal.css';
+import toast from '../../components/common/toast';
 
 // Dynamic N-axis SVG Radar Chart Component (supports 3-criteria or 8-subject radar)
 function DynamicRadarChart({
@@ -310,8 +313,60 @@ export default function StudentDetailModal({
     application: (baseScore * 0.88).toFixed(1),
   };
 
+  const [realAttempts, setRealAttempts] = useState([]);
+
+  useEffect(() => {
+    let isMounted = true;
+    async function loadStudentAttempts() {
+      if (!student?.id) return;
+      try {
+        const res = await attemptsApi.getAttempts({ student_id: student.id, ...(classInfo?.id ? { class_id: classInfo.id } : {}) });
+        const items = Array.isArray(res) ? res : res?.items;
+        if (isMounted && Array.isArray(items)) {
+          setRealAttempts(items);
+        }
+      } catch (err) {
+        // Fallback to sample data
+      }
+    }
+    loadStudentAttempts();
+    return () => { isMounted = false; };
+  }, [student?.id, classInfo?.id]);
+
   // Comprehensive Classroom Assignments list across all subjects
-  const allMasterClassroomAssignments = [
+  const mappedRealAssignments = useMemo(() => {
+    if (!realAttempts.length) return [];
+    const fmt = (d) => (d ? new Date(d).toLocaleString('vi-VN') : '--');
+    const groups = new Map();
+    realAttempts.forEach((att) => {
+      if (!groups.has(att.assignment_id)) groups.set(att.assignment_id, []);
+      groups.get(att.assignment_id).push(att);
+    });
+    const hasScore = (a) => a.score !== null && a.score !== undefined;
+    // A student does one exercise at a time: only the most recent unfinished, unscored attempt is in progress
+    const activeAttempt = [...realAttempts]
+      .filter((a) => !a.is_finished && !hasScore(a))
+      .sort((x, y) => new Date(y.start_time || 0) - new Date(x.start_time || 0))[0];
+    return [...groups.entries()].map(([assignmentId, list]) => {
+      const sorted = [...list].sort((x, y) => new Date(x.start_time || 0) - new Date(y.start_time || 0));
+      const scored = sorted.filter(hasScore);
+      const subjId = getSubjectIdByName(sorted[0].subject_name || '');
+      const isActive = !!activeAttempt && activeAttempt.assignment_id === assignmentId;
+      return {
+        id: assignmentId,
+        subjectId: subjId,
+        subjectName: sorted[0].subject_name || '--',
+        badgeColor: '#7C3AED',
+        title: sorted[0].assignment_title || sorted[0].exercise_title || 'Bài tập',
+        attemptsCount: sorted.length,
+        attemptsDetails: scored.map((a, i) => ({ attempt: i + 1, score: Number(a.score), submittedAt: fmt(a.end_time || a.start_time) })),
+        bestScore: scored.length ? Math.max(...scored.map((a) => Number(a.score))) : null,
+        status: scored.length ? 'Đã hoàn thành' : isActive ? 'Đang làm' : 'Chưa hoàn thành',
+      };
+    });
+  }, [realAttempts]);
+
+  const defaultMasterClassroomAssignments = [
     {
       id: 1,
       subjectId: 'math',
@@ -460,6 +515,10 @@ export default function StudentDetailModal({
       status: 'Đã hoàn thành',
     },
   ];
+
+  const allMasterClassroomAssignments = useMemo(() => {
+    return mappedRealAssignments;
+  }, [mappedRealAssignments]);
 
   // Comprehensive AI-Generated Assignments list across all subjects
   const allMasterAiAssignments = [
@@ -716,7 +775,7 @@ export default function StudentDetailModal({
           <div className="modal-title-row">
             <div className="title-text-group">
               <h1 className="modal-page-title">
-                Bảng theo dõi năng lực học sinh: Học kỳ 1, 2023–2024
+                Bảng theo dõi năng lực học sinh: Học kỳ 1, {(classInfo?.term || '2025-2026').replace('-', '–')}
               </h1>
               <p className="modal-page-subtitle">
                 {isHomeroom && selectedSubject === 'all'
@@ -939,7 +998,7 @@ export default function StudentDetailModal({
                         </td>
                         <td>
                           <span className="score-pill pill-purple">
-                            {item.bestScore.toFixed(1)}
+                            {item.bestScore === null ? '--' : item.bestScore.toFixed(1)}
                           </span>
                         </td>
                         <td>
@@ -1183,6 +1242,23 @@ export default function StudentDetailModal({
                 >
                   <Printer size={14} />
                   <span>Xuất bảng điểm</span>
+                </button>
+
+                {/* Export gradebook CSV across all subjects */}
+                <button
+                  type="button"
+                  className="btn-print-transcript"
+                  onClick={async () => {
+                    try {
+                      const res = await attemptsApi.getAttempts({ student_id: student.id });
+                      downloadGradebookCsv(Array.isArray(res) ? res : res?.items || [], `gradebook_${student.code || student.id}.csv`);
+                    } catch (e) {
+                      toast.error('Could not export the gradebook.');
+                    }
+                  }}
+                  title="Export gradebook (all subjects) as CSV"
+                >
+                  <span>Export CSV (all subjects)</span>
                 </button>
               </div>
             </div>

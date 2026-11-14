@@ -12,6 +12,7 @@ import {
   Building2, 
   ShieldCheck, 
   BarChart3, 
+  Activity,
   HelpCircle, 
   LogOut,
   GraduationCap
@@ -19,6 +20,7 @@ import {
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import './AdminSidebar.css';
+import toast from '../../components/common/toast';
 
 export default function AdminSidebar({ isMobileOpen, onCloseMobile }) {
   const navigate = useNavigate();
@@ -53,6 +55,13 @@ export default function AdminSidebar({ isMobileOpen, onCloseMobile }) {
       path: '/admin/classes',
     },
     {
+      id: 'subjects',
+      label: 'Môn học & Tổ trưởng',
+      enLabel: 'Subjects & Heads',
+      icon: Building2,
+      path: '/admin/subjects',
+    },
+    {
       id: 'permissions',
       label: 'Phân quyền & Vai trò',
       enLabel: 'Roles & Permissions',
@@ -65,6 +74,13 @@ export default function AdminSidebar({ isMobileOpen, onCloseMobile }) {
       enLabel: 'Reports & Analytics',
       icon: BarChart3,
       path: '/admin/reports',
+    },
+    {
+      id: 'monitoring',
+      label: 'Giám sát hệ thống',
+      enLabel: 'System Monitoring',
+      icon: Activity,
+      path: '/admin/monitoring',
     },
   ];
 
@@ -117,7 +133,7 @@ export default function AdminSidebar({ isMobileOpen, onCloseMobile }) {
         <button
           type="button"
           className="admin-footer-btn"
-          onClick={() => alert('Trung tâm Trợ giúp & Hỗ trợ kỹ thuật LMS')}
+          onClick={() => toast.info('Trung tâm Trợ giúp & Hỗ trợ kỹ thuật LMS')}
         >
           <HelpCircle size={19} strokeWidth={1.8} />
           <span>Trợ giúp & Hỗ trợ</span>

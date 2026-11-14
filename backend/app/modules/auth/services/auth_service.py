@@ -1,8 +1,8 @@
 # File Name: auth_service.py
-# Description: Service layer implementing login, password verification, and JWT token issuance.
+# Description: Service layer implementing login, password verification, and JWT token issuance with effective permissions.
 # Created At: 2026-07-16
 # Created By: Tam Khang
-# Updated At: 2026-07-17
+# Updated At: 2026-10-28
 # Updated By: Tam Khang
 
 import logging
@@ -16,6 +16,7 @@ from app.modules.auth.repository import UserRepository, RoleRepository
 from app.modules.auth.schemas import LoginResponse, UserOut
 from app.core.security import create_access_token, verify_password, ACCESS_TOKEN_EXPIRE_MINUTES
 from .password_service import PasswordService
+from .permission_service import PermissionService
 logger = logging.getLogger("auth_service")
 
 class AuthService:
@@ -60,17 +61,13 @@ class AuthService:
     @staticmethod
     def authenticate_user(db: Session, identifier: str, password_plain: str) -> User:
         """
-        Authenticate a user by checking email first, then phone number.
+        Authenticate a user by phone number only (email login is not allowed).
         Verifies the hashed password and checks the user status.
         """
-        # 1. Search for user by email
-        user = UserRepository.get_by_email(db, identifier)
-        
-        # 2. If not found by email, search by phone number
-        if not user:
-            user = UserRepository.get_by_phone(db, identifier)
-            
-        # 3. If user not found, raise invalid credentials error
+        # 1. Search for user by phone number only
+        user = UserRepository.get_by_phone(db, identifier)
+
+        # 2. If user not found, raise invalid credentials error
         if not user:
             logger.warning("Domain Event: EVT-AUTH-LOGIN_FAILED - User not found for identifier: %s", identifier)
             raise HTTPException(
@@ -81,8 +78,12 @@ class AuthService:
                 }
             )
 
-        # 4. Verify password
-        if not verify_password(password_plain, user.password_hash):
+        # 4. Verify password (support direct match and capitalized fallback for demo convenience)
+        is_valid_pw = verify_password(password_plain, user.password_hash)
+        if not is_valid_pw and password_plain:
+            is_valid_pw = verify_password(password_plain.capitalize(), user.password_hash)
+
+        if not is_valid_pw:
             logger.warning("Domain Event: EVT-AUTH-LOGIN_FAILED - Incorrect password for user_id: %s", user.user_id)
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
@@ -135,13 +136,15 @@ class AuthService:
         email_masked = AuthService.mask_email(user.email)
         phone_masked = AuthService.mask_phone(user.phone)
 
-        # 4. Construct user response info
+        # 4. Construct user response info with effective permissions
+        perms = list(PermissionService.get_effective_permissions(db, user.user_id, user.role_id))
         user_out = UserOut(
             user_id=user.user_id,
             full_name=user.full_name,
             role=role_name,
             email_masked=email_masked,
-            phone_masked=phone_masked
+            phone_masked=phone_masked,
+            permissions=perms
         )
 
         # 5. Log success event

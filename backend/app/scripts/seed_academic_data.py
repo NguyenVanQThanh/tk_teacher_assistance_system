@@ -2,13 +2,14 @@
 # Description: Idempotent database seed script for academic subjects, classes, teachers, student accounts, and enrollments.
 # Created At: 2026-09-01
 # Created By: Tam Khang
-# Updated At: 2026-09-01
+# Updated At: 2026-10-29
 # Updated By: Tam Khang
 
 import os
 import sys
 import json
 import uuid
+from datetime import date
 from pathlib import Path
 
 # Ensure UTF-8 output encoding on Windows console
@@ -31,7 +32,7 @@ load_dotenv()
 from models.models import User, Role, Subject, Class, StudentClass, TeacherSubject
 from app.core.security import get_password_hash
 
-DB_USERNAME = os.environ.get("DB_USERNAME")
+DB_USERNAME = os.environ.get("DB_USERNAME") or os.environ.get("DB_USER")
 DB_PASSWORD = os.environ.get("DB_PASSWORD")
 DB_HOST = os.environ.get("DB_HOST", "localhost")
 DB_PORT = os.environ.get("DB_PORT", "5432")
@@ -40,7 +41,7 @@ DB_NAME = os.environ.get("DB_NAME")
 if not all([DB_USERNAME, DB_PASSWORD, DB_NAME]):
     raise ValueError("Missing database configuration in environment variables")
 
-DATABASE_URL = f"postgresql://{DB_USERNAME}:{DB_PASSWORD}@{DB_HOST}:{DB_PORT}/{DB_NAME}"
+DATABASE_URL = f"postgresql+psycopg2://{DB_USERNAME}:{DB_PASSWORD}@{DB_HOST}:{DB_PORT}/{DB_NAME}"
 engine = create_engine(DATABASE_URL)
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
@@ -75,6 +76,8 @@ def seed_academic_sample_data():
             {"name": "Toán học", "desc": "Môn Toán học phổ thông nâng cao và cơ bản"},
             {"name": "Vật lý", "desc": "Môn Vật lý phổ thông và thí nghiệm"},
             {"name": "Hóa học", "desc": "Môn Hóa học vô cơ và hữu cơ"},
+            {"name": "Sinh học", "desc": "Môn Sinh học tế bào, di truyền và tiến hóa"},
+            {"name": "Lịch sử", "desc": "Môn Lịch sử Việt Nam và thế giới"},
             {"name": "Tiếng Anh", "desc": "Môn Tiếng Anh học thuật và giao tiếp"},
             {"name": "Ngữ văn", "desc": "Môn Ngữ văn và đọc hiểu tác phẩm"}
         ]
@@ -95,7 +98,7 @@ def seed_academic_sample_data():
 
         session.commit()
 
-        print("--- [3] Seeding Teachers (5 Teachers) ---")
+        print("--- [3] Seeding Teachers (7 Teachers) ---")
         teachers_data = [
             {
                 "phone": "0999000002",
@@ -125,6 +128,18 @@ def seed_academic_sample_data():
                 "phone": "0999000007",
                 "email": "teacher_trang@school.com",
                 "full_name": "Cô Phạm Thu Trang",
+                "password": "Teacher@1234"
+            },
+            {
+                "phone": "0999000008",
+                "email": "teacher_ha@school.com",
+                "full_name": "Cô Đặng Thu Hà (Tổ Sinh học)",
+                "password": "Teacher@1234"
+            },
+            {
+                "phone": "0999000009",
+                "email": "teacher_hung@school.com",
+                "full_name": "Thầy Nguyễn Quốc Hùng (Tổ Lịch sử)",
                 "password": "Teacher@1234"
             }
         ]
@@ -162,45 +177,57 @@ def seed_academic_sample_data():
 
         session.commit()
 
-        print("--- [4] Seeding Classes (3 Classes) ---")
-        # 12A1: Homeroom is Sample Teacher (0999000002)
-        # 11B2: Homeroom is Thầy An (0999000004)
-        # 10A3: Homeroom is Cô Mai (0999000005)
+        print("--- [4] Seeding Classes (Canonical Classes with Verified Homeroom Teachers) ---")
+        today = date.today()
+        start_year = today.year if today.month >= 8 else today.year - 1
+        academic_year = f"{start_year}-{start_year + 1}"
+        current_year = academic_year
+        prev_year_1 = f"{start_year - 1}-{start_year}"
+        prev_year_2 = f"{start_year - 2}-{start_year - 1}"
+
         classes_data = [
             {
                 "name": "12A1",
-                "school_year": "2023-2024",
-                "homeroom_phone": "0999000002"
+                "school_year": current_year,
+                "homeroom_phone": "0999000002"  # Nguyen Van A (2026-2027)
             },
             {
                 "name": "11B2",
-                "school_year": "2023-2024",
-                "homeroom_phone": "0999000004"
+                "school_year": prev_year_1,
+                "homeroom_phone": "0999000004"  # Thầy An (2025-2026)
             },
             {
                 "name": "10A3",
-                "school_year": "2023-2024",
-                "homeroom_phone": "0999000005"
+                "school_year": prev_year_2,
+                "homeroom_phone": "0999000005"  # Cô Mai (2024-2025)
             }
         ]
         classes_dict = {}
         for c_info in classes_data:
             cls = session.query(Class).filter(Class.class_name == c_info["name"], Class.status != "DELETED").first()
-            homeroom_user = teachers_dict[c_info["homeroom_phone"]]
+            # Safely verify teacher existence in dictionary or DB
+            homeroom_user = teachers_dict.get(c_info["homeroom_phone"])
+            if not homeroom_user:
+                homeroom_user = session.query(User).filter(User.phone == c_info["homeroom_phone"]).first()
+            if not homeroom_user and teachers_dict:
+                homeroom_user = list(teachers_dict.values())[0]
+
+            homeroom_id = homeroom_user.user_id if homeroom_user else None
             if not cls:
                 cls = Class(
                     class_id=uuid.uuid4(),
                     class_name=c_info["name"],
                     academic_year=c_info["school_year"],
-                    homeroom_teacher_id=homeroom_user.user_id,
+                    homeroom_teacher_id=homeroom_id,
                     status="ACTIVE"
                 )
                 session.add(cls)
                 session.flush()
-                print(f"Created Class: {cls.class_name} (GVCN: {homeroom_user.full_name})")
+                print(f"Created Class: {cls.class_name} (GVCN: {homeroom_user.full_name if homeroom_user else 'None'})")
             else:
-                cls.homeroom_teacher_id = homeroom_user.user_id
-                cls.academic_year = c_info["school_year"]
+                if homeroom_id:
+                    cls.homeroom_teacher_id = homeroom_id
+                # Keep existing academic_year so re-seeding never moves live data between years
                 cls.status = "ACTIVE"
                 session.flush()
             classes_dict[c_info["name"]] = cls
@@ -209,14 +236,40 @@ def seed_academic_sample_data():
 
         print("--- [5] Seeding Teacher-Subject Assignments ---")
         assignments_plan = [
+            ("0999000002", "12A1", "Toán học"),
+            ("0999000002", "11B2", "Toán học"),
+            ("0999000002", "10A3", "Toán học"),
+            ("0999000002", "12A1", "Hóa học"),
+            ("0999000002", "11B2", "Hóa học"),
+            ("0999000002", "10A3", "Hóa học"),
+            ("0999000002", "12A1", "Sinh học"),
+            ("0999000002", "11B2", "Sinh học"),
+            ("0999000002", "10A3", "Sinh học"),
+            ("0999000002", "12A1", "Lịch sử"),
+            ("0999000002", "11B2", "Lịch sử"),
+            ("0999000002", "10A3", "Lịch sử"),
+            ("0999000002", "12A1", "Vật lý"),
+            ("0999000002", "11B2", "Vật lý"),
+            ("0999000002", "10A3", "Vật lý"),
+            ("0999000002", "12A1", "Ngữ văn"),
+            ("0999000002", "10A3", "Ngữ văn"),
+            ("0999000002", "12A1", "Tiếng Anh"),
+            ("0999000002", "11B2", "Tiếng Anh"),
             ("0999000004", "11B2", "Vật lý"),
             ("0999000004", "12A1", "Vật lý"),
             ("0999000005", "10A3", "Hóa học"),
             ("0999000005", "11B2", "Hóa học"),
+            ("0999000005", "12A1", "Hóa học"),
             ("0999000006", "12A1", "Tiếng Anh"),
             ("0999000006", "11B2", "Tiếng Anh"),
             ("0999000007", "12A1", "Ngữ văn"),
             ("0999000007", "10A3", "Ngữ văn"),
+            ("0999000008", "10A3", "Sinh học"),
+            ("0999000008", "11B2", "Sinh học"),
+            ("0999000008", "12A1", "Sinh học"),
+            ("0999000009", "10A3", "Lịch sử"),
+            ("0999000009", "11B2", "Lịch sử"),
+            ("0999000009", "12A1", "Lịch sử"),
         ]
         for t_phone, c_name, s_name in assignments_plan:
             teacher = teachers_dict[t_phone]
@@ -238,6 +291,34 @@ def seed_academic_sample_data():
                 session.add(ts)
                 print(f"Assigned {teacher.full_name} -> {s_name} at {c_name}")
 
+        session.commit()
+
+        print("--- [5b] Seeding Subject Department Heads (one head per subject) ---")
+        # Subject.head_teacher_id is a single column, so a subject can only ever have one head.
+        # Each head must be an active teacher who teaches the subject (same rule as the admin API).
+        department_heads = [
+            ("Toán học", "0999000002"),
+            ("Hóa học", "0999000005"),
+            ("Vật lý", "0999000004"),
+            ("Tiếng Anh", "0999000006"),
+            ("Ngữ văn", "0999000007"),
+            ("Sinh học", "0999000008"),
+            ("Lịch sử", "0999000009"),
+        ]
+        for s_name, t_phone in department_heads:
+            subject = subjects_dict[s_name]
+            teacher = teachers_dict[t_phone]
+            teaches = session.query(TeacherSubject).filter(
+                TeacherSubject.teacher_id == teacher.user_id,
+                TeacherSubject.subject_id == subject.subject_id,
+                TeacherSubject.status == "ACTIVE",
+            ).first()
+            if not teaches:
+                print(f"Skip head for {s_name}: {teacher.full_name} does not teach it")
+                continue
+            if subject.head_teacher_id != teacher.user_id:
+                subject.head_teacher_id = teacher.user_id
+                print(f"Head of {s_name} -> {teacher.full_name}")
         session.commit()
 
         print("--- [6] Seeding Students (55 Students) ---")

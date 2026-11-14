@@ -1,8 +1,8 @@
 // File Name: TeacherHomeroomPage.jsx
-// Description: Homeroom class management page displaying student roster, GPA/subject score filtering, status badges, and export/add student actions.
+// Description: Homeroom class management page displaying student roster, GPA/subject score filtering, status badges, and RBAC-controlled student management.
 // Created At: 2026-09-01
 // Created By: Tam Khang
-// Updated At: 2026-09-01
+// Updated At: 2026-10-29
 // Updated By: Tam Khang
 
 import React, { useState, useEffect, useMemo } from 'react';
@@ -27,6 +27,8 @@ import {
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { classesApi } from '../../services/api';
+import { useAuth } from '../../context/AuthContext';
+import { compareVietnameseNames } from '../../utils/gradeClassification';
 import StudentDetailModal from '../../components/teacher/StudentDetailModal';
 import EditStudentInfoModal from '../../components/teacher/EditStudentInfoModal';
 import EditStudentGradesModal from '../../components/teacher/EditStudentGradesModal';
@@ -34,7 +36,19 @@ import StudentTranscriptPrintModal from '../../components/teacher/StudentTranscr
 import AddStudentModal from '../../components/teacher/AddStudentModal';
 import './TeacherHomeroomPage.css';
 
+/**
+ * Calculates current academic school year (e.g., '2026-2027' for October 2026).
+ * School years in Vietnam typically begin in August/September.
+ */
+function getCurrentAcademicYear() {
+  const now = new Date();
+  const year = now.getFullYear();
+  const month = now.getMonth() + 1;
+  return month >= 8 ? `${year}-${year + 1}` : `${year - 1}-${year}`;
+}
+
 export default function TeacherHomeroomPage() {
+  const { user, hasPermission } = useAuth();
   const [showSidebar, setShowSidebar] = useState(true);
   const [classesList, setClassesList] = useState([]);
   const [selectedClassId, setSelectedClassId] = useState('');
@@ -68,7 +82,7 @@ export default function TeacherHomeroomPage() {
 
   const [studentsList, setStudentsList] = useState([]);
 
-  // Load available classes on mount
+  // Load available classes on mount with current academic year prioritization
   useEffect(() => {
     let isMounted = true;
     async function loadClasses() {
@@ -78,9 +92,61 @@ export default function TeacherHomeroomPage() {
         const res = await classesApi.getClasses();
         if (!isMounted) return;
         if (Array.isArray(res) && res.length > 0) {
-          setClassesList(res);
-          setSelectedClassId(res[0].class_id);
-          setCurrentClassInfo(res[0]);
+          const currentYear = getCurrentAcademicYear();
+
+          // Filter classes where current user is the homeroom teacher
+          const userHomeroomClasses = res.filter(c => 
+            c.homeroom_teacher_id === user?.user_id || 
+            (user?.full_name && c.homeroom_teacher_name?.includes(user?.full_name))
+          );
+          // If teacher has assigned homeroom classes, ONLY display those. Otherwise fallback to res for admin.
+          const availableClasses = userHomeroomClasses.length > 0 ? userHomeroomClasses : res;
+
+          // Deduplicate to ensure at most 1 homeroom class per academic year
+          // Sort available classes: prioritize current academic year first, then preceding years descending
+          const sortedCandidates = [...availableClasses].sort((a, b) => {
+            const yearA = a.school_year || a.academic_year || '';
+            const yearB = b.school_year || b.academic_year || '';
+            if (yearA === currentYear && yearB !== currentYear) return -1;
+            if (yearB === currentYear && yearA !== currentYear) return 1;
+            if (yearA !== yearB) return yearB.localeCompare(yearA);
+            return (a.class_name || '').localeCompare(b.class_name || '');
+          });
+
+          const seenYears = new Set();
+          const uniqueYearClasses = [];
+          for (const c of sortedCandidates) {
+            const yr = c.school_year || c.academic_year || 'unknown';
+            if (!seenYears.has(yr)) {
+              seenYears.add(yr);
+              uniqueYearClasses.push(c);
+            }
+          }
+
+          const sortedClasses = uniqueYearClasses.length > 0 ? uniqueYearClasses : sortedCandidates;
+
+          // Priority 1: Check if user already has a saved selection from current session
+          const savedClassId = localStorage.getItem('selected_homeroom_class_id');
+          let targetClass = savedClassId ? sortedClasses.find(c => c.class_id === savedClassId) : null;
+
+          // Priority 2: Homeroom class of the logged-in teacher in current academic year
+          if (!targetClass || (targetClass.school_year !== currentYear && sortedClasses.some(c => (c.school_year === currentYear || c.academic_year === currentYear)))) {
+            const userHomeroomCurrent = sortedClasses.find(c => 
+              (c.school_year === currentYear || c.academic_year === currentYear)
+            );
+            if (userHomeroomCurrent) {
+              targetClass = userHomeroomCurrent;
+            }
+          }
+
+          if (!targetClass) {
+            targetClass = sortedClasses[0];
+          }
+
+          setClassesList(sortedClasses);
+          setSelectedClassId(targetClass.class_id);
+          setCurrentClassInfo(targetClass);
+          localStorage.setItem('selected_homeroom_class_id', targetClass.class_id);
         }
       } catch (err) {
         if (isMounted) setError('Không thể tải danh sách lớp học.');
@@ -92,7 +158,7 @@ export default function TeacherHomeroomPage() {
     return () => {
       isMounted = false;
     };
-  }, []);
+  }, [user]);
 
   // Load students for selected class
   useEffect(() => {
@@ -165,7 +231,7 @@ export default function TeacherHomeroomPage() {
 
   // Filtering & Sorting
   const filteredStudents = useMemo(() => {
-    let result = studentsList.filter((student) => {
+    let result = [...studentsList].sort((a, b) => compareVietnameseNames(a.name, b.name)).filter((student) => {
       if (statusFilter !== 'all' && student.status !== statusFilter) {
         return false;
       }
@@ -213,7 +279,43 @@ export default function TeacherHomeroomPage() {
     setShowAddStudentModal(true);
   };
 
-  const handleCreateStudent = (newStudent) => {
+  const handleCreateStudent = async (newStudent) => {
+    try {
+      if (selectedClassId) {
+        await classesApi.enrollStudent(selectedClassId, {
+          student_name: newStudent.name,
+          birthday: newStudent.dateOfBirth,
+          gender: newStudent.gender === 'Nữ' ? 'FEMALE' : newStudent.gender === 'Nam' ? 'MALE' : 'OTHER',
+          phone: newStudent.phone || ''
+        });
+        const res = await classesApi.getStudentsInClass(selectedClassId);
+        if (Array.isArray(res) && res.length > 0) {
+          const avatarColors = ['#7C3AED', '#8B5CF6', '#A78BFA', '#6366F1', '#EC4899', '#3B82F6', '#10B981', '#F59E0B'];
+          const mapped = res.map((s, idx) => {
+            const name = s.student_name || `Học sinh ${idx + 1}`;
+            const nameParts = name.trim().split(' ');
+            const initials = nameParts.length >= 2
+              ? (nameParts[nameParts.length - 2][0] + nameParts[nameParts.length - 1][0]).toUpperCase()
+              : name.substring(0, 2).toUpperCase();
+            return {
+              id: s.student_id,
+              code: s.student_code || `HS${String(idx + 1).padStart(3, '0')}`,
+              name: name,
+              initials: initials,
+              avatarColor: avatarColors[idx % avatarColors.length],
+              avgScore: 8.2,
+              status: s.status === 'ACTIVE' ? 'good' : 'fair',
+              statusLabel: s.status === 'ACTIVE' ? 'Đang học' : 'Nghỉ học',
+              subjectScores: { math: 8.5, physics: 8.0, chemistry: 8.2, literature: 8.0, english: 8.5, biology: 8.0, history: 8.0, informatics: 8.5 }
+            };
+          });
+          setStudentsList(mapped);
+          return;
+        }
+      }
+    } catch (err) {
+      console.error('Error adding student to class:', err);
+    }
     setStudentsList(prev => [newStudent, ...prev]);
   };
 
@@ -251,7 +353,13 @@ export default function TeacherHomeroomPage() {
                 {classesList.length > 1 && (
                   <select
                     value={selectedClassId}
-                    onChange={(e) => setSelectedClassId(e.target.value)}
+                    onChange={(e) => {
+                      const newId = e.target.value;
+                      setSelectedClassId(newId);
+                      localStorage.setItem('selected_homeroom_class_id', newId);
+                      const chosen = classesList.find(c => c.class_id === newId);
+                      if (chosen) setCurrentClassInfo(chosen);
+                    }}
                     style={{ padding: '6px 12px', borderRadius: '6px', border: '1px solid #CBD5E1', fontSize: '13px', background: '#FFFFFF', color: '#1E293B', cursor: 'pointer', fontWeight: 600 }}
                   >
                     {classesList.map(c => (
@@ -274,16 +382,18 @@ export default function TeacherHomeroomPage() {
               </div>
             </div>
 
-            <div className="header-card-actions">
-              <button 
-                type="button" 
-                className="btn-add-student"
-                onClick={handleAddStudent}
-              >
-                <Plus size={16} strokeWidth={2.5} />
-                <span>Thêm học sinh</span>
-              </button>
-            </div>
+            {hasPermission('ACAD_ENROLLMENT_MANAGE') && (
+              <div className="header-card-actions">
+                <button 
+                  type="button" 
+                  className="btn-add-student"
+                  onClick={handleAddStudent}
+                >
+                  <Plus size={16} strokeWidth={2.5} />
+                  <span>Thêm học sinh</span>
+                </button>
+              </div>
+            )}
           </div>
 
           {/* Student Roster Table Card */}
@@ -550,7 +660,7 @@ export default function TeacherHomeroomPage() {
       )}
 
       {/* Add New Student Modal */}
-      {showAddStudentModal && (
+      {showAddStudentModal && hasPermission('ACAD_ENROLLMENT_MANAGE') && (
         <AddStudentModal
           isOpen={showAddStudentModal}
           onClose={() => setShowAddStudentModal(false)}

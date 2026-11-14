@@ -3,7 +3,7 @@ File Name: StudentScheduleDetailCard.css
 Description: Styling for Student daily schedule detail and interactive notes widget matching Image 2.
 Created At: 2026-09-13
 Created By: Tam Khang
-Updated At: 2026-09-13
+Updated At: 2026-09-27
 Updated By: Tam Khang
 */
 
@@ -14,32 +14,31 @@ Updated By: Tam Khang
   width: 100%;
 }
 
-/* Top Action Button */
-.schedule-detail-top-action-bar {
+.btn-bottom-add-schedule {
+  margin-top: 16px;
+  width: 100%;
   display: flex;
-  justify-content: flex-end;
-}
-
-.btn-add-schedule-purple {
-  display: inline-flex;
   align-items: center;
+  justify-content: center;
   gap: 8px;
-  background-color: #6D28D9;
-  color: #FFFFFF;
-  border: none;
+  padding: 11px 16px;
+  background-color: #F8F5FE;
+  color: #6D28D9;
+  border: 1.5px dashed #C4B5FD;
   border-radius: 12px;
-  padding: 10px 20px;
-  font-size: 14.5px;
+  font-size: 13.5px;
   font-weight: 600;
   cursor: pointer;
-  box-shadow: 0 4px 14px rgba(109, 40, 217, 0.28);
   transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  font-family: inherit;
 }
 
-.btn-add-schedule-purple:hover {
-  background-color: #5B21B6;
+.btn-bottom-add-schedule:hover {
+  background-color: #EDE9FE;
+  border-color: #7C3AED;
+  color: #5B21B6;
   transform: translateY(-1px);
-  box-shadow: 0 6px 18px rgba(109, 40, 217, 0.35);
+  box-shadow: 0 4px 12px rgba(109, 40, 217, 0.15);
 }
 
 /* Card 1: Lịch dạy hôm nay */
@@ -51,47 +50,70 @@ Updated By: Tam Khang
   box-shadow: 0 2px 10px rgba(0, 0, 0, 0.02);
   display: flex;
   flex-direction: column;
+  box-sizing: border-box;
+  width: 100%;
+  min-width: 0;
+  overflow: hidden;
 }
 
 .schedule-today-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  margin-bottom: 18px;
+  margin-bottom: 14px;
+  gap: 8px;
+  width: 100%;
+  min-width: 0;
 }
 
 .schedule-today-title {
-  font-size: 17px;
+  font-size: 16px;
   font-weight: 700;
   color: #1E293B;
   margin: 0;
   letter-spacing: -0.2px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
 }
 
 .schedule-date-badge {
   background-color: #F3E8FF;
   color: #7C3AED;
-  font-size: 13px;
+  font-size: 12px;
   font-weight: 600;
-  padding: 4px 12px;
+  padding: 3px 10px;
   border-radius: 8px;
+  white-space: nowrap;
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
 }
 
 .schedule-today-items-list {
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 10px;
+  width: 100%;
+  min-width: 0;
 }
 
 .schedule-item-box {
   background-color: #FAFAFC;
   border: 1px solid #E2E8F0;
   border-radius: 12px;
-  padding: 14px 16px;
+  padding: 12px 14px;
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 8px;
   transition: transform 0.15s ease, box-shadow 0.15s ease;
+  box-sizing: border-box;
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  overflow: hidden;
 }
 
 .schedule-item-box:hover {
@@ -113,38 +135,53 @@ Updated By: Tam Khang
 
 .schedule-item-top-row {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   justify-content: space-between;
   gap: 8px;
+  width: 100%;
+  min-width: 0;
 }
 
 .schedule-item-name {
-  font-size: 15px;
+  font-size: 13.5px;
   font-weight: 700;
   color: #0F172A;
   margin: 0;
+  flex: 1;
+  min-width: 0;
+  line-height: 1.4;
+  word-break: break-word;
+  overflow-wrap: anywhere;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .schedule-item-tags {
   display: flex;
   align-items: center;
   gap: 6px;
+  flex-shrink: 0;
 }
 
 .class-code-tag {
   background-color: #F1F5F9;
   color: #475569;
-  font-size: 12px;
+  font-size: 11.5px;
   font-weight: 600;
-  padding: 2px 8px;
+  padding: 2px 7px;
   border-radius: 6px;
+  white-space: nowrap;
 }
 
 .status-type-badge {
-  font-size: 12px;
+  font-size: 11.5px;
   font-weight: 600;
-  padding: 2px 8px;
+  padding: 2px 7px;
   border-radius: 6px;
+  white-space: nowrap;
 }
 
 .status-type-badge.badge-blue {
@@ -162,12 +199,24 @@ Updated By: Tam Khang
   color: #059669;
 }
 
+.status-type-badge.badge-red {
+  background-color: #FEE2E2;
+  color: #DC2626;
+}
+
+.schedule-time-card.card-accent-red,
+.schedule-item-box.border-accent-red {
+  border-left: 4px solid #EF4444;
+}
+
 .schedule-item-meta-row {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  font-size: 13px;
+  font-size: 12.5px;
   color: #64748B;
+  width: 100%;
+  min-width: 0;
 }
 
 .schedule-meta-point {
@@ -213,43 +262,45 @@ Updated By: Tam Khang
 }
 
 .notes-counter-badge {
-  background-color: #F3E8FF;
-  color: #7C3AED;
-  font-size: 12px;
+  background-color: #EDE9FE;
+  color: #6D28D9;
+  font-size: 11.5px;
   font-weight: 700;
-  width: 22px;
-  height: 22px;
-  border-radius: 50%;
-  display: flex;
+  padding: 2px 8px;
+  border-radius: 9999px;
+  display: inline-flex;
   align-items: center;
   justify-content: center;
+  font-family: inherit;
 }
 
 .quick-add-note-form {
   display: flex;
   align-items: center;
-  background-color: #FAFAFC;
-  border: 1px solid #E2E8F0;
-  border-radius: 10px;
+  gap: 8px;
+  background-color: #F8FAFC;
+  border: 1.5px solid #E2E8F0;
+  border-radius: 8px;
   padding: 4px 6px 4px 12px;
-  margin-bottom: 16px;
-  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+  margin-bottom: 14px;
+  transition: all 0.2s ease;
 }
 
 .quick-add-note-form:focus-within {
-  border-color: #7C3AED;
   background-color: #FFFFFF;
-  box-shadow: 0 0 0 3px rgba(124, 58, 237, 0.12);
+  border-color: #7C3AED;
+  box-shadow: 0 0 0 3px rgba(124, 58, 237, 0.1);
 }
 
 .quick-add-note-input {
   flex: 1;
   border: none;
   background: transparent;
-  font-size: 13.5px;
+  font-size: 13px;
   color: #1E293B;
   outline: none;
   font-family: inherit;
+  font-weight: 500;
 }
 
 .quick-add-note-input::placeholder {
@@ -259,7 +310,7 @@ Updated By: Tam Khang
 .btn-submit-quick-note {
   width: 28px;
   height: 28px;
-  border-radius: 8px;
+  border-radius: 6px;
   background-color: #7C3AED;
   color: #FFFFFF;
   border: none;
@@ -267,78 +318,219 @@ Updated By: Tam Khang
   align-items: center;
   justify-content: center;
   cursor: pointer;
-  transition: background-color 0.15s ease;
+  transition: all 0.15s ease;
+  flex-shrink: 0;
   padding: 0;
 }
 
 .btn-submit-quick-note:hover:not(:disabled) {
   background-color: #6D28D9;
+  transform: scale(1.05);
 }
 
 .btn-submit-quick-note:disabled {
-  background-color: #CBD5E1;
+  opacity: 0.5;
   cursor: not-allowed;
 }
 
-.notes-items-list {
+.schedule-notes-list {
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 6px;
 }
 
-.note-item-row {
+.single-note-item {
   display: flex;
   align-items: flex-start;
-  justify-content: space-between;
   gap: 10px;
-  padding: 6px 0;
+  padding: 8px 10px;
+  border-radius: 8px;
+  transition: all 0.15s ease;
 }
 
-.note-item-left {
-  display: flex;
-  align-items: baseline;
-  gap: 8px;
+.single-note-item:hover {
+  background-color: #F8FAFC;
+}
+
+.single-note-item .note-bullet {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background-color: #7C3AED;
+  margin-top: 7px;
+  flex-shrink: 0;
+}
+
+.single-note-item .note-text {
   flex: 1;
-}
-
-.note-purple-bullet {
-  color: #7C3AED;
-  font-size: 20px;
-  line-height: 1;
-  font-weight: 900;
-}
-
-.note-text-content {
-  font-size: 13.5px;
-  color: #1E293B;
-  line-height: 1.45;
-  margin: 0;
+  font-size: 13px;
+  color: #334155;
+  line-height: 1.5;
+  font-family: inherit;
+  font-weight: 500;
+  min-width: 0;
   word-break: break-word;
+  overflow-wrap: break-word;
 }
 
-.btn-delete-note {
-  background: transparent;
+.single-note-item .btn-delete-note {
   border: none;
-  color: #CBD5E1;
+  background: transparent;
+  color: #94A3B8;
   cursor: pointer;
   padding: 4px;
+  border-radius: 6px;
   display: flex;
   align-items: center;
   justify-content: center;
-  border-radius: 6px;
   transition: all 0.15s ease;
-  margin-top: -2px;
+  opacity: 0.6;
+  margin-top: 2px;
 }
 
-.btn-delete-note:hover {
+.single-note-item .btn-delete-note:hover {
   color: #EF4444;
-  background-color: #FEF2F2;
+  background-color: #FEE2E2;
+  opacity: 1;
 }
 
-.notes-empty-state {
-  padding: 16px;
+.empty-notes-hint {
+  padding: 12px;
   text-align: center;
-  font-size: 13px;
+  font-size: 12.5px;
   color: #94A3B8;
-  font-style: italic;
+  background-color: #F8FAFC;
+  border-radius: 8px;
 }
+
+/* Add schedule modal overlay */
+.add-schedule-modal-overlay {
+  position: fixed;
+  inset: 0;
+  background-color: rgba(15, 23, 42, 0.45);
+  backdrop-filter: blur(3px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  padding: 20px;
+}
+
+.add-schedule-modal-box {
+  background-color: #FFFFFF;
+  border-radius: 16px;
+  width: 100%;
+  max-width: 440px;
+  padding: 22px 24px;
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.15);
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  animation: modalScaleUp 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes modalScaleUp {
+  from { transform: scale(0.95); opacity: 0; }
+  to { transform: scale(1); opacity: 1; }
+}
+
+.modal-header-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.modal-title {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 700;
+  color: #1E293B;
+}
+
+.btn-close-modal {
+  border: none;
+  background: transparent;
+  color: #94A3B8;
+  cursor: pointer;
+  padding: 4px;
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.modal-schedule-form {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.form-group-item {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  flex: 1;
+}
+
+.form-group-item label {
+  font-size: 12.5px;
+  font-weight: 600;
+  color: #475569;
+}
+
+.form-group-item input {
+  padding: 9px 12px;
+  border: 1.5px solid #E2E8F0;
+  border-radius: 8px;
+  font-size: 13.5px;
+  outline: none;
+  font-family: inherit;
+  transition: border-color 0.2s;
+}
+
+.form-group-item input:focus {
+  border-color: #7C3AED;
+}
+
+.form-group-row {
+  display: flex;
+  gap: 12px;
+}
+
+.modal-actions-row {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 6px;
+}
+
+.btn-cancel-modal {
+  padding: 8px 16px;
+  border: 1px solid #E2E8F0;
+  background: #FFFFFF;
+  color: #64748B;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.btn-submit-modal {
+  padding: 8px 16px;
+  border: none;
+  background: #7C3AED;
+  color: #FFFFFF;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.btn-submit-modal:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+

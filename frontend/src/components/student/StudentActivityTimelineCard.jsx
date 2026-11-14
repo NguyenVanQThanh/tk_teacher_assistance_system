@@ -14,6 +14,7 @@ import {
   MoreVertical 
 } from 'lucide-react';
 import './StudentActivityTimelineCard.css';
+import toast from '../../components/common/toast';
 
 export default function StudentActivityTimelineCard() {
   const activities = [
@@ -83,7 +84,7 @@ export default function StudentActivityTimelineCard() {
       <button 
         type="button" 
         className="btn-view-all-activities"
-        onClick={() => alert('Đang hiển thị toàn bộ lịch sử hoạt động học tập.')}
+        onClick={() => toast.info('Đang hiển thị toàn bộ lịch sử hoạt động học tập.')}
       >
         Xem toàn bộ hoạt động
       </button>

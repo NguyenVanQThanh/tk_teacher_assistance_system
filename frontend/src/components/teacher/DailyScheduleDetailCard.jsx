@@ -2,7 +2,7 @@
 // Description: Right sidebar details card showing detailed schedule for the selected date with period info.
 // Created At: 2026-09-07
 // Created By: Tam Khang
-// Updated At: 2026-09-20
+// Updated At: 2026-10-25
 // Updated By: Tam Khang
 
 import React from 'react';
@@ -12,7 +12,7 @@ import { useAuth } from '../../context/AuthContext';
 import { getTeacherSubjectInfo } from '../../utils/teacherSubjectHelper';
 import './DailyScheduleDetailCard.css';
 
-export default function DailyScheduleDetailCard({ selectedDay = 5 }) {
+export default function DailyScheduleDetailCard({ selectedDay = 5, scheduleItems }) {
   const { user } = useAuth();
   const navigate = useNavigate();
 
@@ -115,19 +115,42 @@ export default function DailyScheduleDetailCard({ selectedDay = 5 }) {
     },
   };
 
-  const currentSchedule = scheduleData[selectedDay] || {
-    dayTitle: `Ngày ${selectedDay}/10`,
-    classes: [
-      {
-        id: `cls-def-${selectedDay}`,
-        title: `${teacherSubject} 10A1`,
-        time: '08:00 - 09:30',
-        period: 'Tiết 2 - 3',
-        dotColor: '#3B82F6',
-        timeBadgeVariant: 'blue',
-      },
-    ],
-  };
+  // If scheduleItems is provided, dynamically map classes for selectedDay
+  const dynamicClasses = (scheduleItems && scheduleItems.length > 0)
+    ? scheduleItems
+        .filter(item => {
+          const itemDay = item.day || (item.date_str ? parseInt(item.date_str.split('-')[2], 10) : (item.date_number ? parseInt(item.date_number, 10) : null));
+          return itemDay === selectedDay;
+        })
+        .map(item => ({
+          id: item.id,
+          title: item.title,
+          time: item.time,
+          period: item.period || 'Tiết học',
+          dotColor: item.urgency === 'critical' ? '#EF4444' : item.urgency === 'high' ? '#F59E0B' : '#7C3AED',
+          timeBadgeVariant: item.theme || 'purple',
+          room: item.room,
+        }))
+    : [];
+
+  const currentSchedule = dynamicClasses.length > 0
+    ? {
+        dayTitle: `Ngày ${selectedDay}/10`,
+        classes: dynamicClasses,
+      }
+    : (scheduleData[selectedDay] || {
+        dayTitle: `Ngày ${selectedDay}/10`,
+        classes: [
+          {
+            id: `cls-def-${selectedDay}`,
+            title: `${teacherSubject} 12A1`,
+            time: '08:00 - 09:30',
+            period: 'Tiết 1 - 2',
+            dotColor: '#3B82F6',
+            timeBadgeVariant: 'blue',
+          },
+        ],
+      });
 
   return (
     <div className="daily-schedule-detail-card">

@@ -2,17 +2,18 @@
 // Description: Compact widget displaying the latest student submissions and status pills.
 // Created At: 2026-09-07
 // Created By: Tam Khang
-// Updated At: 2026-09-07
+// Updated At: 2026-10-25
 // Updated By: Tam Khang
 
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
+import AnswerReleaseButton from './AnswerReleaseButton';
 import './RecentSubmissionsSummaryCard.css';
 
-export default function RecentSubmissionsSummaryCard() {
+export default function RecentSubmissionsSummaryCard({ recentSubmissions }) {
   const navigate = useNavigate();
 
-  const recentList = [
+  const defaultList = [
     {
       id: 'sub-1',
       studentName: 'Trần Thị Bích Ngọc',
@@ -35,6 +36,22 @@ export default function RecentSubmissionsSummaryCard() {
     },
   ];
 
+  const recentList = (recentSubmissions && recentSubmissions.length > 0)
+    ? recentSubmissions.map(item => ({
+        id: item.id,
+        studentName: item.student_name || item.studentName,
+        className: item.class_name ? `Lớp ${item.class_name}` : item.className,
+        initials: item.avatar_initial || item.initials,
+        status: item.status,
+        statusLabel: item.status_label || item.statusLabel,
+        avatarBg: item.avatar_bg || item.avatarBg || '#E0E7FF',
+        avatarColor: item.avatar_color || item.avatarColor || '#4338CA',
+        assignmentId: item.assignment_id,
+        isExam: Boolean(item.is_exam),
+        answersReleased: Boolean(item.answers_released),
+      }))
+    : defaultList;
+
   return (
     <div className="recent-submissions-summary-card">
       <div className="recent-card-header">
@@ -51,7 +68,9 @@ export default function RecentSubmissionsSummaryCard() {
           <div 
             key={item.id} 
             className="recent-item-row"
-            onClick={() => navigate('/teacher/grading')}
+            onClick={() => item.id ? navigate(`/teacher/grading?attempt_id=${item.id}`) : navigate('/teacher/grading')}
+            title="Bấm để xem chi tiết bài nộp và chấm điểm"
+            style={{ cursor: 'pointer' }}
           >
             <div className="student-profile-cell">
               <div 
@@ -65,6 +84,10 @@ export default function RecentSubmissionsSummaryCard() {
                 <span className="student-class-label">{item.className}</span>
               </div>
             </div>
+
+            {item.isExam && item.assignmentId && (
+              <AnswerReleaseButton assignmentId={item.assignmentId} released={item.answersReleased} />
+            )}
 
             <div className="status-badge-cell">
               <span className={`recent-status-pill status-${item.status}`}>

@@ -1,0 +1,21 @@
+# Production image cho frontend: build static bằng Vite rồi serve bằng `vite preview`.
+# Dùng từ deploy/docker-compose.prod.yml (context: ./frontend, dockerfile: ../deploy/docker/Dockerfile.frontend.prod)
+FROM node:20-alpine
+
+WORKDIR /app
+
+# Tách layer install để tận dụng Docker cache (package*.json ít đổi)
+COPY package*.json ./
+RUN npm ci
+
+COPY . .
+
+# URL API được baked vào bundle lúc build (đọc từ build arg của compose)
+ARG VITE_API_BASE_URL=/api
+ENV VITE_API_BASE_URL=$VITE_API_BASE_URL
+
+RUN npm run build
+
+EXPOSE 3000
+# vite preview có sẵn SPA fallback (phục vụ index.html cho mọi route client-side)
+CMD ["npm", "run", "preview", "--", "--host", "0.0.0.0", "--port", "3000"]

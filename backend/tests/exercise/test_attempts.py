@@ -188,8 +188,8 @@ class TestStudentSubmissionModule:
         attempt_result = submit_resp.json()
 
         assert attempt_result["is_finished"] is True
-        # Score calculation: 2 MC questions = 5.0 points per question. 1 correct -> 5.0 score.
-        assert attempt_result["score"] == 5.0
+        # Score calculation: MC part (3) + short-answer part (3) share 10 points -> 2 MC questions = 2.5 each. 1 correct -> 2.5.
+        assert attempt_result["score"] == 2.5
         assert attempt_result["total_time_seconds"] is not None
 
         detailed = attempt_result["detailed_results"]["questions"]

@@ -2,7 +2,7 @@ File Name: business_overview.md
 Description: Tong hop nghiep vu (business), toan bo so do luong quy trinh hoat dong (Mermaid workflows) va anh xa sprint tu SRS den thuc te trien khai
 Created At: 2026-07-18
 Created By: Tam Khang
-Updated At: 2026-09-18
+Updated At: 2026-09-30
 Updated By: Tam Khang
 
 # Tổng quan Nghiệp vụ & Quy trình Luồng hoạt động (Workflows) — SmartLMS
@@ -271,3 +271,63 @@ graph LR
 - **Chi tiết Sprint 1**: [sprint_1_overview.md](sprints/sprint_1_overview.md)
 - **Chi tiết Sprint 2**: [sprint_2_overview.md](sprints/sprint_2_overview.md)
 - **Đặc tả AI Gemini Vision OCR**: [f_exe_06_gemini_vision_ocr_spec.md](specs/f_exe_06_gemini_vision_ocr_spec.md)
+
+---
+
+## 7. Báo cáo Rà soát Hiện trạng Thực thi & Khoảng cách Kỹ thuật BE — FE (Implementation Gap Audit)
+
+> **Cập nhật ngày:** `2026-09-30` · **Người thực hiện:** `Tam Khang`  
+> **Căn cứ rà soát:** Đối chiếu toàn diện giữa tài liệu Nghiệp vụ (`business_overview.md`), Mô hình CSDL (`models.py`), Router API Backend (`FastAPI`) và các Trang giao diện Frontend (`React Vite`).
+
+### 7.1. Bảng Tổng hợp Tình trạng Triển khai các Chức năng Nghiệp vụ
+
+| STT | Phân hệ / Nghiệp vụ trong Business Overview | Trạng thái BE | Trạng thái FE | Đã nối API? | Đánh giá & Khoảng cách Kỹ thuật |
+|---|---|:---:|:---:|:---:|---|
+| **1** | **Xác thực & RBAC Cơ bản** (`/api/v1/auth`) | ✅ Sẵn sàng | ✅ Sẵn sàng | 🟢 Đã nối 100% | Đăng nhập JWT, lấy thông tin cá nhân (`/auth/me`), đổi mật khẩu, đăng xuất. |
+| **2** | **Bảng điều khiển Quản trị** (`/admin`) | ✅ Sẵn sàng | ✅ Sẵn sàng | 🟢 Đã nối 100% | Thống kê số lượng (`stats`), biểu đồ truy cập (`activity-chart`), hàng chờ duyệt (`requests` - Duyệt/Từ chối), nhật ký hệ thống (`audit-logs`). |
+| **3** | **Quản lý Người dùng** (`/admin/users`) | ✅ Sẵn sàng | ✅ Sẵn sàng | 🟢 Đã nối 100% | Danh sách phân trang, tìm kiếm, tạo mới có sinh mã, sửa, khóa/mở khóa (`status`), xóa mềm (`status = 'DELETED'`), khôi phục, đổi mật khẩu, xuất/nhập Excel. |
+| **4** | **Quản lý Trường lớp** (`/admin/classes`) | ✅ Sẵn sàng | ⚠️ Mock UI | 🔴 **Chưa nối FE** | BE đã có đầy đủ API CRUD lớp, ghi danh học sinh, phân công giáo viên (`/api/v1/classes`). Tuy nhiên giao diện `AdminClassesPage.jsx` chưa gọi `classesApi` mà dùng mảng dữ liệu mẫu. |
+| **5** | **Phân quyền & Vai trò** (`/admin/roles`) | ❌ Chưa có API | ⚠️ Mock UI | 🔴 **Chưa nối BE & FE** | Bảng CSDL `roles`, `permissions`, `role_permissions` đã có, nhưng chưa viết router FastAPI `/api/v1/admin/roles` và `/api/v1/admin/permissions`. FE có UI ma trận quyền hoàn chỉnh nhưng đang chạy local state. |
+| **6** | **Báo cáo & Thống kê Quản trị** (`/admin/reports`) | ❌ Chưa có API | ⚠️ Mock UI | 🔴 **Chưa nối BE & FE** | Chưa có router BE tổng hợp phổ điểm toàn trường, phân bố thang đo Bloom và học sinh có nguy cơ sa sút. FE `AdminReportsPage.jsx` hiển thị dữ liệu giả định. |
+| **7** | **Cài đặt Hệ thống Quản trị** (`/admin/settings`) | ❌ Chưa có API | ⚠️ Mock UI | 🔴 **Chưa nối BE & FE** | Chưa có bảng CSDL cấu hình và router `/api/v1/admin/settings`. FE `AdminSettingsPage.jsx` chạy dữ liệu mẫu. |
+| **8** | **Ngân hàng Học liệu & Tài liệu** (`/teacher/documents`) | ✅ Sẵn sàng | ✅ Sẵn sàng | 🟢 Đã nối 100% | Upload file, download, xóa mềm, khôi phục, chỉ số dung lượng lưu trữ. |
+| **9** | **Ngân hàng Bài tập & Bóc tách AI OCR** (`/teacher/exercises`) | ✅ Sẵn sàng | ✅ Sẵn sàng | 🟢 Đã nối 100% | Soạn đề 3 phần (MCQ, Đúng/Sai, Điền số, LaTeX), import file docx/pdf, bóc tách đề thi bằng Gemini Vision OCR, xuất bản đề thi ra PDF. |
+| **10** | **Giao bài tập cho Lớp** (`/teacher/classes`) | ✅ Sẵn sàng | ✅ Sẵn sàng | 🟢 Đã nối 100% | Giao bài tập kèm hạn nộp (`due_at`), thời lượng làm bài, số lần nộp tối đa. |
+| **11** | **Khảo thí Trực tuyến của Học sinh** (`/student/exercises`) | ✅ Sẵn sàng | ✅ Sẵn sàng | 🟢 Đã nối 100% | Danh sách bài được giao, giao diện phòng thi độc lập toàn màn hình, đồng hồ đếm ngược, bàn phím số ảo, tự động chấm sơ bộ MCQ & Đúng/Sai khi nộp bài. |
+| **12** | **Quy trình Chấm bài 3 Trạng thái** (`/teacher/grading`) | ✅ Sẵn sàng | ✅ Sẵn sàng | 🟢 Đã nối 100% | Lấy danh sách bài nộp, lọc theo lớp/môn, chấm điểm tự luận/điền số, phản hồi nhận xét, chuyển trạng thái `pending_grading` $\rightarrow$ `pending_review` $\rightarrow$ `approved`. |
+| **13** | **Dashboard Giáo viên Bộ môn** (`SubjectTeacherDashboard`) | ⚠️ Một phần | ⚠️ Mock UI | 🔴 **Chưa nối FE** | BE có `/api/v1/attempts/dashboard` tính phổ điểm, nhưng giao diện dashboard giáo viên bộ môn chưa gắn API, đang hiển thị lịch dạy và bài chờ chấm giả định. |
+| **14** | **Dashboard Giáo viên Chủ nhiệm** (`HomeroomTeacherDashboard`) | ⚠️ Một phần | ⚠️ Mock UI | 🟡 Nối 1 phần | Giao diện đã nối API lấy danh sách học sinh của lớp (`classesApi.getStudentsInClass`), nhưng các chỉ số ĐTB các môn, điểm rèn luyện, chuyên cần và cảnh báo học sinh yếu đang là số liệu giả định. |
+| **15** | **Dashboard Học sinh & Radar Đa môn** (`StudentDashboard`) | ❌ Chưa có API | ⚠️ Mock UI | 🔴 **Chưa nối BE & FE** | Chưa có API tổng hợp năng lực đa môn và tự động sinh nhận xét định tính năng lực học tập. FE đang hiển thị biểu đồ radar và lịch học giả lập. |
+| **16** | **AI Practice Generator Modal** (Học sinh tự sinh đề luyện tập) | ❌ Chưa có API | ⚠️ Mock UI | 🔴 **Chưa nối BE & FE** | Giao diện modal đã được dựng sẵn, nhưng chưa có endpoint AI tạo đề theo yêu cầu từ ngân hàng câu hỏi. |
+| **17** | **Tracking Chi tiết Hành vi Làm bài** (Phân hệ 1) | ⚠️ Một phần | ⚠️ Mock UI | 🔴 **Chưa nối BE & FE** | BE chỉ mới lưu `start_time`, `end_time`, `total_time_seconds`. Chưa có bảng & endpoint ghi vết thời gian dừng ở từng câu hỏi, chưa có thuật toán tự động nhận diện và gắn cờ nộp bài sát giờ (`last-minute submission`). |
+
+### 7.2. Danh sách Chi tiết các API Backend chưa được nối vào Frontend
+
+1. **Academic Classes Management API**:
+   - `POST /api/v1/classes`: Tạo lớp học mới (chưa nối vào modal Thêm Lớp của `AdminClassesPage.jsx`).
+   - `PUT /api/v1/classes/{class_id}`: Cập nhật thông tin lớp học (chưa nối vào modal Sửa Lớp).
+   - `DELETE /api/v1/classes/{class_id}`: Xóa mềm lớp học (chưa nối vào nút Xóa Lớp).
+   - `POST /api/v1/classes/{class_id}/restore`: Khôi phục lớp đã xóa.
+   - `POST /api/v1/classes/{class_id}/teacher-subjects`: Phân công giáo viên bộ môn cho lớp.
+   - `DELETE /api/v1/classes/{class_id}/teacher-subjects/{id}`: Hủy phân công giáo viên bộ môn.
+2. **Grading Dashboard Metrics API**:
+   - `GET /api/v1/attempts/dashboard`: Backend đã cung cấp đầy đủ thông số bài chờ chấm, phổ điểm và danh sách theo lớp, nhưng `SubjectTeacherDashboard.jsx` chưa gọi endpoint này.
+
+### 7.3. Danh sách Chi tiết các Trang Frontend chưa có API Backend tương ứng
+
+1. **Phân quyền & Vai trò (`AdminRolesPage.jsx`)**:
+   - Thiếu `GET /api/v1/admin/roles` (Danh sách vai trò & số lượng thành viên).
+   - Thiếu `GET /api/v1/admin/permissions` (Danh mục quyền hệ thống).
+   - Thiếu `PUT /api/v1/admin/roles/{role_id}/permissions` (Cập nhật quyền cho vai trò).
+   - Thiếu `GET /api/v1/admin/users/{user_id}/permissions` và `PUT /api/v1/admin/users/{user_id}/permissions` (Ghi đè quyền cho từng cá nhân).
+2. **Báo cáo & Thống kê Toàn trường (`AdminReportsPage.jsx`)**:
+   - Thiếu `GET /api/v1/admin/reports/gpa-distribution` (Phổ điểm GPA theo khối 10, 11, 12).
+   - Thiếu `GET /api/v1/admin/reports/bloom-taxonomy` (Tỷ lệ phân bổ câu hỏi theo thang nhận thức Bloom).
+   - Thiếu `GET /api/v1/admin/reports/at-risk-students` (Danh sách học sinh có nguy cơ sa sút cần can thiệp sớm).
+3. **Cài đặt Hệ thống (`AdminSettingsPage.jsx`)**:
+   - Thiếu API lưu trữ cấu hình trường học, năm học và chính sách bảo mật.
+4. **Dashboard Cá nhân Học sinh (`StudentDashboard.jsx`)**:
+   - Thiếu API trả về biểu đồ mạng nhện đa môn tổng hợp từ kết quả các bài thi đã làm (`GET /api/v1/student/dashboard/radar`).
+   - Thiếu API tự động nhận xét năng lực học tập định tính (`GET /api/v1/student/dashboard/evaluation`).
+   - Thiếu API sinh đề tự luyện tập theo chủ đề AI (`POST /api/v1/student/practice/generate`).
+

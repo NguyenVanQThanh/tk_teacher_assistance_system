@@ -2,18 +2,23 @@
 # Description: Service layer for Exercise management (scoping, CRUD, soft-delete, restore).
 # Created At: 2026-07-31
 # Created By: Tam Khang
-# Updated At: 2026-07-31
-# Updated By: Tam Khang
+# Updated At: 2026-11-13
+# Updated By: AI Agent
 
 from typing import List, Optional, Dict, Any
 from uuid import UUID
+import uuid
+from datetime import datetime, timezone, timedelta
 from fastapi import HTTPException, status
 from sqlalchemy.orm import Session
 
-from models.models import User, Subject, TeacherSubject, Exercise
-from app.modules.exercise.schemas import ExerciseCreate, ExerciseUpdate
+from models.models import User, Subject, TeacherSubject, Exercise, Question, AnswerOption, ClassAssignment, StudentClass, Class
+from app.modules.exercise.schemas import ExerciseCreate, ExerciseUpdate, AiExerciseGenerateRequest, AiExerciseGenerateOut
 from app.modules.exercise.repository import ExerciseRepository
 from app.modules.academic.scoping import get_user_role_name
+from app.modules.auth import access_policy
+from app.modules.exercise.services.ai_exercise_service import AiExerciseService
+from app.modules.exercise.services.rag_context_service import RagContextService
 
 
 class ExerciseService:
@@ -43,7 +48,7 @@ class ExerciseService:
             )
 
         # 2. Scope check for Teacher
-        if role_name == "Teacher":
+        if access_policy.is_teacher(role_name):
             active_subject_ids = self._get_teacher_active_subject_ids(current_user.user_id)
             if payload.subject_id not in active_subject_ids:
                 raise HTTPException(
@@ -61,6 +66,7 @@ class ExerciseService:
             created_by=current_user.user_id,
             total_questions=0,
             ai_metadata=payload.ai_metadata,
+            exercise_kind=payload.exercise_kind,
             status='ACTIVE'
         )
         return self.repo.create(exercise)
@@ -74,115 +80,76 @@ class ExerciseService:
         direction: str = "next",
         page_size: int = 6
     ) -> Dict[str, Any]:
-        role_name = get_user_role_name(self.db, current_user)
-        
-        if role_name == "Admin":
-            if subject_id:
-                return self.repo.list_exercises(
-                    subject_ids=[subject_id],
-                    status='ACTIVE',
-                    search=search,
-                    cursor=cursor,
-                    direction=direction,
-                    page_size=page_size
-                )
-            return self.repo.list_exercises(
-                status='ACTIVE',
-                search=search,
-                cursor=cursor,
-                direction=direction,
-                page_size=page_size
-            )
-        else:
-            # For Teacher: restrict to created_by OR teacher_subjects
-            active_subject_ids = self._get_teacher_active_subject_ids(current_user.user_id)
-            if subject_id:
-                if subject_id not in active_subject_ids:
-                    # Can only see if created by self for that subject
-                    return self.repo.list_exercises(
-                        created_by=current_user.user_id,
-                        subject_ids=[subject_id],
-                        status='ACTIVE',
-                        search=search,
-                        cursor=cursor,
-                        direction=direction,
-                        page_size=page_size
-                    )
-                return self.repo.list_exercises(
-                    subject_ids=[subject_id],
-                    status='ACTIVE',
-                    search=search,
-                    cursor=cursor,
-                    direction=direction,
-                    page_size=page_size
-                )
+        """List exercises visible to the user (own, plus head-of-subject shared; Admin sees all)."""
+        return self.repo.list_exercises(
+            subject_ids=[subject_id] if subject_id else None,
+            status='ACTIVE',
+            search=search,
+            cursor=cursor,
+            direction=direction,
+            page_size=page_size,
+            visibility_clause=access_policy.exercise_visibility_clause(self.db, current_user),
+        )
 
-            return self.repo.list_exercises(
-                created_by=current_user.user_id,
-                subject_ids=active_subject_ids,
-                status='ACTIVE',
-                search=search,
-                cursor=cursor,
-                direction=direction,
-                page_size=page_size
-            )
+    def _not_found(self) -> HTTPException:
+        return HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail={"code": "ERR-EXE-EXERCISE_NOT_FOUND", "message": "Exercise not found."}
+        )
+
+    def _load_visible(self, current_user: User, exercise_id: UUID, include_deleted: bool = False) -> Exercise:
+        """Load an exercise or raise 404 when missing or invisible to the user."""
+        exercise = self.repo.get_by_id(exercise_id, include_deleted=include_deleted)
+        if not exercise:
+            raise self._not_found()
+        clause = access_policy.exercise_visibility_clause(self.db, current_user)
+        if clause is not None:
+            visible = self.db.query(Exercise.exercise_id).filter(
+                Exercise.exercise_id == exercise_id, clause
+            ).first()
+            if not visible:
+                raise self._not_found()
+        return exercise
 
     def get_exercise_detail(self, current_user: User, exercise_id: UUID) -> Exercise:
-        role_name = get_user_role_name(self.db, current_user)
-        exercise = self.repo.get_by_id(exercise_id, include_deleted=False)
-        
-        if not exercise:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail={
-                    "code": "ERR-EXE-EXERCISE_NOT_FOUND",
-                    "message": "Exercise not found."
-                }
-            )
+        """Read access: 404 unless visible to the user."""
+        return self._load_visible(current_user, exercise_id)
 
-        if role_name == "Teacher":
-            active_subject_ids = self._get_teacher_active_subject_ids(current_user.user_id)
-            if exercise.created_by != current_user.user_id and exercise.subject_id not in active_subject_ids:
-                raise HTTPException(
-                    status_code=status.HTTP_404_NOT_FOUND,
-                    detail={
-                        "code": "ERR-EXE-EXERCISE_NOT_FOUND",
-                        "message": "Exercise not found."
-                    }
-                )
-
+    def get_exercise_for_write(self, current_user: User, exercise_id: UUID, include_deleted: bool = False) -> Exercise:
+        """Write access: visibility (404) then owner-only (403)."""
+        exercise = self._load_visible(current_user, exercise_id, include_deleted=include_deleted)
+        access_policy.ensure_can_write(self.db, current_user, exercise.created_by)
         return exercise
 
     def update_exercise(self, current_user: User, exercise_id: UUID, payload: ExerciseUpdate) -> Exercise:
-        exercise = self.get_exercise_detail(current_user, exercise_id)
-        return self.repo.update(exercise, title=payload.title, ai_metadata=payload.ai_metadata)
+        exercise = self.get_exercise_for_write(current_user, exercise_id)
+        return self.repo.update(exercise, title=payload.title, ai_metadata=payload.ai_metadata,
+                                exercise_kind=payload.exercise_kind)
+
+    def set_answers_released(self, current_user: User, exercise_id: UUID, released: bool) -> Exercise:
+        """Release/hide answers for every active assignment of an EXAM exercise (all classes)."""
+        exercise = self.get_exercise_for_write(current_user, exercise_id)
+        if exercise.exercise_kind != 'EXAM':
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail={"code": "ERR-EXE-NOT_AN_EXAM", "message": "Only exam exercises have releasable answers."}
+            )
+        stamp = datetime.now(timezone.utc) if released else None
+        for a in exercise.assignments:
+            if a.status != 'DELETED':
+                a.answers_released_at = stamp
+        self.db.commit()
+        self.db.refresh(exercise)
+        return exercise
 
     def delete_exercise(self, current_user: User, exercise_id: UUID) -> None:
-        exercise = self.get_exercise_detail(current_user, exercise_id)
+        exercise = self.get_exercise_for_write(current_user, exercise_id)
         self.repo.soft_delete(exercise)
 
     def restore_exercise(self, current_user: User, exercise_id: UUID) -> Exercise:
-        role_name = get_user_role_name(self.db, current_user)
-        exercise = self.repo.get_by_id(exercise_id, include_deleted=True)
-        
-        if not exercise:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail={
-                    "code": "ERR-EXE-EXERCISE_NOT_FOUND",
-                    "message": "Exercise not found."
-                }
-            )
-
-        if role_name == "Teacher":
-            active_subject_ids = self._get_teacher_active_subject_ids(current_user.user_id)
-            if exercise.created_by != current_user.user_id and exercise.subject_id not in active_subject_ids:
-                raise HTTPException(
-                    status_code=status.HTTP_404_NOT_FOUND,
-                    detail={
-                        "code": "ERR-EXE-EXERCISE_NOT_FOUND",
-                        "message": "Exercise not found."
-                    }
-                )
-
+        exercise = self.get_exercise_for_write(current_user, exercise_id, include_deleted=True)
         return self.repo.restore(exercise)
+
+    def generate_ai_exercise(self, current_user: User, payload: AiExerciseGenerateRequest) -> AiExerciseGenerateOut:
+        """Teacher generation; delegates to AiExerciseService (no Subject/Class is auto-created)."""
+        return AiExerciseService(self.db).generate(current_user, payload)

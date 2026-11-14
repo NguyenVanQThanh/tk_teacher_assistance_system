@@ -2,7 +2,7 @@
 # Description: Security utilities including password hashing and JWT token management.
 # Created At: 2026-07-16
 # Created By: Tam Khang
-# Updated At: 2026-07-18
+# Updated At: 2026-10-04
 # Updated By: Tam Khang
 
 import os
@@ -43,6 +43,17 @@ def get_password_hash(password: str) -> str:
     Hash a password using bcrypt.
     """
     return pwd_context.hash(password)
+
+STREAM_TICKET_TTL_SECONDS = 30
+STREAM_TICKET_TYPE = "sse"
+
+
+def create_stream_ticket(user_id: Any) -> str:
+    """Short-lived, single-purpose JWT for opening the SSE stream (EventSource cannot send headers).
+    Never usable as an access token: resolve_user_from_token rejects typ=sse."""
+    expire = datetime.now(timezone.utc) + timedelta(seconds=STREAM_TICKET_TTL_SECONDS)
+    return jwt.encode({"sub": str(user_id), "typ": STREAM_TICKET_TYPE, "exp": expire}, SECRET_KEY, algorithm=ALGORITHM)
+
 
 def create_access_token(subject: Union[str, Any], role: str, expires_delta: Optional[timedelta] = None) -> str:
     """

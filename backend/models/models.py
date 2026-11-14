@@ -1,15 +1,16 @@
 """
 File Name: models.py
-Description: Database models definition for Sprint 0 & Sprint 2 tables (User, Role, Permission, Exercise, Question, AnswerOption, etc.).
+Description: Database models definition for tables (User, Role, Permission, Exercise, Question, ScheduleNote, etc.).
 Created At: 2026-07-04
 Created By: Tam Khang
-Updated At: 2026-08-09
-Updated By: Tam Khang
+Updated At: 2026-11-13
+Updated By: AI Agent
 """
 import uuid
 from datetime import datetime
-from sqlalchemy import Column, Integer, String, Text, Date, ForeignKey, DateTime, CheckConstraint, PrimaryKeyConstraint, Boolean, JSON, Numeric
-from sqlalchemy.dialects.postgresql import UUID
+from sqlalchemy import Column, Integer, String, Text, Date, ForeignKey, DateTime, CheckConstraint, PrimaryKeyConstraint, Boolean, JSON, Numeric, Float, Index
+from sqlalchemy.dialects.postgresql import UUID, JSONB, TSVECTOR
+from pgvector.sqlalchemy import Vector
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 from models.base import Base
@@ -86,6 +87,8 @@ class Subject(Base):
     subject_name = Column(String(100), unique=True, nullable=False)
     description = Column(Text, nullable=True)
     status = Column(String(20), default='ACTIVE', nullable=False)
+    # Head of the subject department; their published documents/exercises are shared with teachers of the subject.
+    head_teacher_id = Column(UUID(as_uuid=True), ForeignKey('users.user_id', ondelete='SET NULL'), nullable=True, index=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
 
@@ -148,10 +151,60 @@ class Document(Base):
     title = Column(String(255), nullable=False)
     file_url = Column(String(500), nullable=True)
     file_type = Column(String(20), nullable=True)
+    file_size = Column(Integer, default=0, nullable=True)
+    file_hash = Column(String(64), nullable=True, index=True)
+    download_count = Column(Integer, default=0, nullable=False, server_default='0')
+    grade = Column(String(20), nullable=True, default='12', server_default='12')
+    document_type = Column(String(50), nullable=True, default='reference', server_default='reference')
     raw_content = Column(Text, nullable=True)
     status = Column(String(20), default='Uploaded')
+    ingest_status = Column(Text, default='PENDING', server_default='PENDING')
+    ingest_error = Column(Text, nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+
+
+class SgkChunk(Base):
+    """Textbook (SGK) RAG chunk; data loaded by app/scripts/load_sgk_rag.py."""
+    __tablename__ = 'chunks'
+
+    id = Column(Text, primary_key=True)
+    doc_id = Column(Text, nullable=False, index=True)
+    page = Column(Integer, nullable=False)
+    chuong = Column(Text, nullable=True)
+    bai = Column(Text, nullable=True)
+    modality = Column(Text, nullable=False)
+    content = Column(Text, nullable=False)
+    embedding = Column(Text().with_variant(Vector(1024), 'postgresql'), nullable=False)
+    meta = Column(JSON().with_variant(JSONB(), 'postgresql'), nullable=True)
+    tsv = Column(Text().with_variant(TSVECTOR(), 'postgresql'), nullable=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+
+
+class SgkDoc(Base):
+    __tablename__ = 'sgk_docs'
+
+    doc_id = Column(Text, primary_key=True)
+    grade = Column(Integer, nullable=False)
+    subject_key = Column(Text, nullable=False)
+    title = Column(Text, nullable=False)
+    status = Column(Text, default='ACTIVE', server_default='ACTIVE')
+
+
+class DocumentChunk(Base):
+    """Chunk of a teacher-uploaded document (soft delete via status)."""
+    __tablename__ = 'document_chunks'
+
+    chunk_id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    document_id = Column(UUID(as_uuid=True), ForeignKey('documents.document_id'), nullable=False, index=True)
+    page = Column(Integer, nullable=True)
+    modality = Column(Text, nullable=False)
+    content = Column(Text, nullable=False)
+    embedding = Column(Text().with_variant(Vector(1024), 'postgresql'), nullable=False)
+    meta = Column(JSON().with_variant(JSONB(), 'postgresql'), nullable=True)
+    tsv = Column(Text().with_variant(TSVECTOR(), 'postgresql'), nullable=True)
+    status = Column(Text, nullable=False, default='ACTIVE', server_default='ACTIVE')
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
 
 
 class Exercise(Base):
@@ -163,11 +216,19 @@ class Exercise(Base):
     created_by = Column(UUID(as_uuid=True), ForeignKey('users.user_id', ondelete='CASCADE'), nullable=False)
     total_questions = Column(Integer, default=0)
     ai_metadata = Column(JSON, nullable=True)
+    # PRACTICE (default, answers always visible) or EXAM (answers hidden until the teacher releases them).
+    exercise_kind = Column(String(20), default='PRACTICE', server_default='PRACTICE', nullable=False)
     status = Column(String(20), default='ACTIVE', nullable=False)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
 
     questions = relationship("Question", back_populates="exercise", cascade="all, delete-orphan")
+
+    @property
+    def answers_released(self) -> bool:
+        """True when the exercise has active assignments and all of them have released answers."""
+        active = [a for a in (self.assignments or []) if a.status != 'DELETED']
+        return bool(active) and all(a.answers_released_at is not None for a in active)
 
 
 class Question(Base):
@@ -188,6 +249,7 @@ class Question(Base):
     explanation = Column(Text, nullable=True)
     display_order = Column(Integer, default=0)
     image_url = Column(String(500), nullable=True)
+    image_metadata = Column(JSON, nullable=True)
     is_ai_generated = Column(Boolean, default=False)
     status = Column(String(20), default='ACTIVE', nullable=False)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
@@ -219,10 +281,17 @@ class ClassAssignment(Base):
     assigned_at = Column(DateTime(timezone=True), server_default=func.now())
     due_at = Column(DateTime(timezone=True), nullable=False)
     status = Column(String(20), default='ACTIVE', nullable=False)
+    # Added 2026-11-12 so updates (incl. soft delete/restore) are visible to the data-version
+    # sync endpoint; previously only assigned_at existed and cancellations were invisible.
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+    # Set by the teacher to reveal per-question results/answers of an exam to students; NULL = hidden.
+    answers_released_at = Column(DateTime(timezone=True), nullable=True)
+    # Set for personal (student AI-generated) assignments; NULL means class-wide.
+    owner_student_id = Column(UUID(as_uuid=True), ForeignKey('users.user_id', ondelete='SET NULL'), nullable=True, index=True)
 
     class_obj = relationship("Class", backref="assignments")
     exercise = relationship("Exercise", backref="assignments")
-    assigner = relationship("User", backref="created_assignments")
+    assigner = relationship("User", foreign_keys=[assigned_by], backref="created_assignments")
 
 
 
@@ -256,4 +325,135 @@ class StudentExerciseAttempt(Base):
     assignment = relationship("ClassAssignment", backref="attempts")
 
 
+# =====================================================================
+# AGE VALIDATION TRIGGERS FOR USERS
+# =====================================================================
+from datetime import date
+from sqlalchemy import event, select
+from sqlalchemy.orm import Session
+
+@event.listens_for(User, 'before_insert')
+@event.listens_for(User, 'before_update')
+def check_user_age_by_role(mapper, connection, target):
+    """
+    Validation trigger:
+    - Student users must be at least 16 years old.
+    - Teacher users must be at least 22 years old.
+    """
+    if target.birthday and target.role_id:
+        role = None
+        session = Session.object_session(target)
+        if session:
+            role = session.query(Role).filter(Role.role_id == target.role_id).first()
+        if not role:
+            res = connection.execute(
+                select(Role.name).where(Role.role_id == target.role_id)
+            ).fetchone()
+            role_name = res[0] if res else None
+        else:
+            role_name = role.name
+
+        if role_name:
+            today = date.today()
+            b_date = target.birthday if isinstance(target.birthday, date) else date.fromisoformat(str(target.birthday))
+            age = today.year - b_date.year - ((today.month, today.day) < (b_date.month, b_date.day))
+            if role_name.lower() == "student" and age < 16:
+                raise ValueError(f"Student must be at least 16 years old. (Given birthday: {b_date}, age: {age})")
+            elif role_name.lower() == "teacher" and age < 22:
+                raise ValueError(f"Teacher must be at least 22 years old. (Given birthday: {b_date}, age: {age})")
+
+
+class ApprovalRequest(Base):
+    __tablename__ = 'approval_requests'
+
+    request_id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    requester_name = Column(String(100), nullable=False)
+    requester_sub = Column(String(150), nullable=True)
+    avatar_text = Column(String(10), nullable=True)
+    avatar_bg = Column(String(30), nullable=True)
+    is_system = Column(Boolean, default=False, nullable=False)
+    type = Column(String(255), nullable=False)
+    status = Column(String(20), default='pending', nullable=False)  # pending | approved | rejected | processed | DELETED
+    reviewed_by = Column(UUID(as_uuid=True), ForeignKey('users.user_id', ondelete='SET NULL'), nullable=True)
+    reviewed_at = Column(DateTime(timezone=True), nullable=True)
+    review_note = Column(Text, nullable=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+
+    reviewer = relationship("User", foreign_keys=[reviewed_by], backref="reviewed_requests")
+
+
+class SupportTicket(Base):
+    __tablename__ = 'support_tickets'
+
+    ticket_id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    full_name = Column(String(100), nullable=True)
+    phone = Column(String(20), nullable=False)
+    request_type = Column(String(30), nullable=False)  # forgot_password | new_account
+    message = Column(Text, nullable=True)
+    status = Column(String(20), default='PENDING', nullable=False)  # PENDING | PROCESSED | DELETED (Strict Soft Delete)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+
+    __table_args__ = (
+        CheckConstraint("request_type IN ('forgot_password', 'new_account')", name='chk_support_ticket_request_type'),
+        CheckConstraint("status IN ('PENDING', 'PROCESSED', 'DELETED')", name='chk_support_ticket_status'),
+    )
+
+
+class AuditLog(Base):
+    __tablename__ = 'audit_logs'
+
+    log_id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    title = Column(String(255), nullable=False)
+    description = Column(Text, nullable=True)
+    actor_name = Column(String(100), nullable=True)
+    ip_address = Column(String(45), nullable=True)
+    severity = Column(String(20), default='info', nullable=False)  # info | warning | danger
+    status = Column(String(20), default='ACTIVE', nullable=False)  # ACTIVE | DELETED
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+
+
+class ScheduleNote(Base):
+    __tablename__ = 'schedule_notes'
+
+    note_id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    user_id = Column(UUID(as_uuid=True), ForeignKey('users.user_id', ondelete='CASCADE'), nullable=False)
+    content = Column(Text, nullable=False)
+    note_date = Column(Date, nullable=True)
+    status = Column(String(20), default='ACTIVE', nullable=False)  # ACTIVE | DELETED (Strict Soft Delete)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+
+    user = relationship("User", backref="schedule_notes")
+
+
+class ApiRequestMetric(Base):
+    """One recorded API request (in-memory collector -> periodic bulk insert).
+
+    Deliberately uses portable column types (no JSONB/pgvector) so the table can also be
+    created on the SQLite test database. user_ref/ip_ref are anonymized hashes, never raw
+    user ids or IP addresses.
+    """
+    __tablename__ = 'api_request_metrics'
+
+    metric_id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    request_id = Column(String(64), nullable=False)
+    method = Column(String(10), nullable=False)
+    route = Column(String(255), nullable=False)
+    path = Column(String(512), nullable=False)
+    status_code = Column(Integer, nullable=False)
+    duration_ms = Column(Float, nullable=False, default=0.0)
+    request_bytes = Column(Integer, nullable=False, default=0)
+    response_bytes = Column(Integer, nullable=False, default=0)
+    user_ref = Column(String(64), nullable=False, default='anonymous')
+    ip_ref = Column(String(64), nullable=False, default='anonymous')
+    is_error = Column(Boolean, nullable=False, default=False)
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+
+    __table_args__ = (
+        Index('ix_api_request_metrics_created_at', 'created_at'),
+        Index('ix_api_request_metrics_route', 'route'),
+        Index('ix_api_request_metrics_status_code', 'status_code'),
+    )
 

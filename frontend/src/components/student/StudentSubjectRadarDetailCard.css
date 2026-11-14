@@ -3,7 +3,7 @@ File Name: StudentSubjectRadarDetailCard.css
 Description: Styling for Subject-specific cognitive triangular radar charts and assignments table matching Image 3.
 Created At: 2026-09-13
 Created By: Tam Khang
-Updated At: 2026-09-13
+Updated At: 2026-10-11
 Updated By: Tam Khang
 */
 
@@ -276,6 +276,11 @@ Updated By: Tam Khang
   color: #0F172A;
 }
 
+.metric-score.is-empty {
+  color: #94A3B8;
+  font-weight: 600;
+}
+
 /* Exercises Scores Table Card */
 .subject-exercises-score-table-card {
   background-color: #FFFFFF;
@@ -433,4 +438,177 @@ Updated By: Tam Khang
 
 .icon-check-double {
   color: #059669;
+}
+
+/* Clickable Radar Cards & Active Tab States */
+.subject-radar-stat-card.clickable-radar-card {
+  cursor: pointer;
+  transition: all 0.22s cubic-bezier(0.4, 0, 0.2, 1);
+  position: relative;
+  user-select: none;
+}
+
+.subject-radar-stat-card.clickable-radar-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.06);
+}
+
+.subject-radar-stat-card.clickable-radar-card.theme-purple.is-active-tab {
+  border: 2px solid #7C3AED;
+  background-color: #FDFAFF;
+  box-shadow: 0 4px 18px rgba(124, 58, 237, 0.14);
+}
+
+.subject-radar-stat-card.clickable-radar-card.theme-blue.is-active-tab {
+  border: 2px solid #2563EB;
+  background-color: #F8FAFF;
+  box-shadow: 0 4px 18px rgba(37, 99, 235, 0.14);
+}
+
+.radar-card-active-indicator {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11px;
+  font-weight: 700;
+  padding: 2px 8px;
+  border-radius: 9999px;
+  margin-top: 5px;
+}
+
+.radar-card-active-indicator.purple {
+  background-color: #EDE9FE;
+  color: #6D28D9;
+}
+
+.radar-card-active-indicator.blue {
+  background-color: #DBEAFE;
+  color: #1D4ED8;
+}
+
+.icon-blue-title {
+  color: #2563EB;
+}
+
+.table-count-pill.pill-blue {
+  background-color: #EFF6FF;
+  color: #2563EB;
+}
+
+.attempt-count-pill.pill-blue {
+  background-color: #EFF6FF;
+  color: #2563EB;
+}
+
+.highest-score-pill.pill-blue {
+  background-color: #EFF6FF;
+  color: #2563EB;
+  border-color: #BFDBFE;
+}
+
+/* Action column & redirect button */
+.th-action {
+  text-align: right;
+  padding-right: 20px !important;
+}
+
+.td-action {
+  text-align: right;
+  padding-right: 20px !important;
+}
+
+.btn-go-to-exercise {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: linear-gradient(135deg, #7C3AED, #6D28D9);
+  color: #FFFFFF;
+  border: none;
+  border-radius: 8px;
+  padding: 6px 14px;
+  font-size: 12.5px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.18s ease;
+  box-shadow: 0 2px 6px rgba(124, 58, 237, 0.2);
+  white-space: nowrap;
+  font-family: inherit;
+}
+
+.btn-go-to-exercise:hover {
+  background: linear-gradient(135deg, #6D28D9, #5B21B6);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 10px rgba(124, 58, 237, 0.3);
+}
+
+.btn-go-to-exercise.btn-ai-exercise {
+  background: linear-gradient(135deg, #2563EB, #1D4ED8);
+  box-shadow: 0 2px 6px rgba(37, 99, 235, 0.2);
+}
+
+.btn-go-to-exercise.btn-ai-exercise:hover {
+  background: linear-gradient(135deg, #1D4ED8, #1E40AF);
+  box-shadow: 0 4px 10px rgba(37, 99, 235, 0.3);
+}
+
+.status-uncompleted-pill {
+  background-color: #EFF6FF;
+  color: #2563EB;
+  font-size: 12px;
+  font-weight: 600;
+  padding: 4px 12px;
+  border-radius: 16px;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.status-overdue-pill {
+  background-color: #FEF2F2;
+  color: #DC2626;
+  font-size: 12px;
+  font-weight: 600;
+  padding: 4px 12px;
+  border-radius: 16px;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.table-empty-notice {
+  text-align: center;
+  padding: 36px 20px;
+  color: #64748B;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+}
+
+.table-empty-notice p {
+  font-size: 14px;
+  margin: 0;
+  color: #64748B;
+}
+
+.btn-empty-action {
+  background-color: #EDE9FE;
+  color: #7C3AED;
+  border: 1px solid #DDD6FE;
+  border-radius: 8px;
+  padding: 6px 14px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 4px;
+  transition: all 0.2s ease;
+}
+
+.btn-empty-action:hover {
+  background-color: #7C3AED;
+  color: #FFFFFF;
 }

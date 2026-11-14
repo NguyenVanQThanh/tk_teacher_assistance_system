@@ -2,8 +2,8 @@
 // Description: Interactive grading and feedback modal with question result overrides, warning confirmation popup on answer key changes, and automatic batch cascade regrading.
 // Created At: 2026-09-01
 // Created By: Tam Khang
-// Updated At: 2026-09-01
-// Updated By: Tam Khang
+// Updated At: 2026-11-12
+// Updated By: AI Agent
 
 import React, { useState, useEffect } from 'react';
 import { 
@@ -25,7 +25,21 @@ import {
   Loader2
 } from 'lucide-react';
 import { attemptsApi, exercisesApi } from '../../services/api';
+import MathRenderer from '../common/MathRenderer';
+import QuestionMedia from '../exercises/QuestionMedia';
 import './GradingFeedbackModal.css';
+
+// "Other" answers are a JSON array of strings (one per sub-question); render as numbered lines.
+const formatOtherAnswer = (text, subs) => {
+  if (!text) return '';
+  try {
+    const arr = JSON.parse(text);
+    if (Array.isArray(arr)) {
+      return arr.map((v, i) => `${i + 1}) ${(subs && subs[i] && subs[i].content) ? `(${subs[i].content}) ` : ''}${v || '--'}`).join('\n');
+    }
+  } catch (e) { /* fall through to raw text */ }
+  return text;
+};
 
 export default function GradingFeedbackModal({ 
   isOpen, 
@@ -41,148 +55,171 @@ export default function GradingFeedbackModal({
   const isPendingReview = submission.status === 'pending_review' || submission.statusLabel === 'Chờ duyệt';
   const isAiExercise = submission.exerciseTypeCode === 'ai' || submission.exerciseType === 'Tạo sinh';
 
-  // Base mock questions fallback
-  const initialQuestions = [
-    {
-      id: 1,
-      type: 'multiple_choice',
-      typeName: 'CÂU 1 (TRẮC NGHIỆM)',
-      maxPoints: 0.25,
-      studentOption: 'A',
-      correctOption: 'A',
-      currentPoints: 0.25,
-      isCorrect: true,
-      needsManualGrading: false,
-      stem: 'Tìm đạo hàm của hàm số y = x^3 - 3x^2 + 2 tại điểm x = 2.',
-      options: [
-        { key: 'A', text: "y'(2) = 0" },
-        { key: 'B', text: "y'(2) = 3" },
-        { key: 'C', text: "y'(2) = -3" },
-        { key: 'D', text: "y'(2) = 6" },
-      ]
-    },
-    {
-      id: 2,
-      type: 'true_false',
-      typeName: 'CÂU 2 (TRẮC NGHIỆM ĐÚNG/SAI)',
-      maxPoints: 0.25,
-      studentOption: 'true',
-      correctOption: 'true',
-      currentPoints: 0.25,
-      isCorrect: true,
-      needsManualGrading: false,
-      stem: 'Hàm số y = x^2 + 1 là hàm số chẵn. Đúng hay Sai?',
-      options: [
-        { key: 'true', text: 'Đúng' },
-        { key: 'false', text: 'Sai' }
-      ]
-    },
-    {
-      id: 3,
-      type: 'short_answer',
-      typeName: 'CÂU 3 (TRẢ LỜI NGẮN)',
-      maxPoints: 0.4,
-      studentAnswer: '5',
-      correctAnswer: '5',
-      isCorrect: isPendingGrading ? true : (submission.score !== null ? submission.score >= 8 : true),
-      currentPoints: 0.4,
-      needsManualGrading: isPendingGrading,
-      stem: 'Tìm giá trị cực đại của hàm số y = -x^2 + 4x + 1.'
-    }
-  ];
-
-  const [questions, setQuestions] = useState(initialQuestions);
-  const [score, setScore] = useState(submission.score !== null && submission.score !== undefined ? submission.score : 8.5);
+  const [questions, setQuestions] = useState([]);
+  const [score, setScore] = useState(submission.score !== null && submission.score !== undefined ? submission.score : 0);
   const [feedback, setFeedback] = useState(submission.feedback || '');
   const [isGeneratingAi, setIsGeneratingAi] = useState(false);
   const [hasModifiedAnswerKey, setHasModifiedAnswerKey] = useState(false);
   const [showWarningConfirmModal, setShowWarningConfirmModal] = useState(false);
-  const [loadingDetails, setLoadingDetails] = useState(false);
+  const [loadingDetails, setLoadingDetails] = useState(true);
+
+  // Close modal on Escape key
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      if (e.key === 'Escape') {
+        onClose();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [onClose]);
 
   useEffect(() => {
     if (!submission) return;
 
-    const initScore = submission.score !== null && submission.score !== undefined ? submission.score : 8.5;
+    setLoadingDetails(true);
+    const initScore = submission.score !== null && submission.score !== undefined ? submission.score : 0;
     setScore(initScore);
     setFeedback(submission.feedback || 'Em làm bài tốt, tư duy giải mạch lạc.');
     setHasModifiedAnswerKey(false);
     setShowWarningConfirmModal(false);
 
-    if (submission.attempt_id && submission.exercise_id) {
-      let isMounted = true;
-      async function loadRealDetails() {
-        try {
-          setLoadingDetails(true);
-          const [attRes, exRes] = await Promise.allSettled([
-            attemptsApi.getAttemptDetail(submission.attempt_id),
-            exercisesApi.getExerciseDetail(submission.exercise_id)
-          ]);
+    let isMounted = true;
+    async function loadRealDetails() {
+      try {
+        setLoadingDetails(true);
+        let attData = null;
+        if (submission.attempt_id) {
+          attData = await attemptsApi.getAttemptDetail(submission.attempt_id).catch(() => null);
+        }
 
-          if (!isMounted) return;
+        if (!isMounted) return;
 
-          if (exRes.status === 'fulfilled' && exRes.value && exRes.value.questions && exRes.value.questions.length > 0) {
-            const exQuestions = exRes.value.questions;
-            const attData = attRes.status === 'fulfilled' ? attRes.value : null;
-            const attResults = (attData?.detailed_results?.questions || []);
-            const resultsMap = {};
-            attResults.forEach((r) => {
-              resultsMap[r.question_id] = r;
-            });
+        const targetExerciseId = submission.exercise_id || attData?.exercise_id;
+        let exData = null;
+        if (targetExerciseId) {
+          exData = await exercisesApi.getExerciseDetail(targetExerciseId).catch(() => null);
+        }
 
-            const pointsPerQ = 10.0 / exQuestions.length;
+        if (!isMounted) return;
 
-            const mapped = exQuestions.map((q, idx) => {
-              const res = resultsMap[q.question_id] || {};
-              const isMC = q.question_type === 'MultipleChoice';
-              
-              let studentOptKey = null;
-              let correctOptKey = null;
-              const formattedOptions = (q.answer_options || []).map((opt, oIdx) => {
-                const letter = String.fromCharCode(65 + oIdx);
-                if (opt.is_correct) correctOptKey = letter;
-                if (opt.option_id === res.student_answer_option_id) studentOptKey = letter;
-                return { key: letter, text: opt.content, option_id: opt.option_id };
-              });
+        if (exData && exData.questions && exData.questions.length > 0) {
+          const exQuestions = exData.questions;
+          const attResults = (attData?.detailed_results?.questions || []);
+          const resultsMap = {};
+          attResults.forEach((r) => {
+            resultsMap[r.question_id] = r;
+          });
 
-              const isCorrect = res.is_correct !== undefined ? res.is_correct : (studentOptKey && studentOptKey === correctOptKey);
-              const currentPoints = isCorrect ? pointsPerQ : 0;
+          // Same part weights as the backend grader (MC 3 / TF 4 / short 3, normalised over parts present).
+          const WEIGHTS = { MultipleChoice: 3, TrueFalse: 4, ShortAnswer: 3 };
+          const partCounts = {};
+          exQuestions.forEach((q) => { partCounts[q.question_type] = (partCounts[q.question_type] || 0) + 1; });
+          const totalWeight = Object.keys(WEIGHTS).reduce((a, t) => a + (partCounts[t] ? WEIGHTS[t] : 0), 0);
+          const maxFor = (q) => (WEIGHTS[q.question_type] && totalWeight
+            ? (10 * WEIGHTS[q.question_type]) / totalWeight / partCounts[q.question_type] : 0);
+          const TF_PARTIAL = [0, 0.1, 0.25, 0.5, 1];
 
-              return {
-                id: q.question_id,
-                type: isMC ? 'multiple_choice' : 'short_answer',
-                typeName: `CÂU ${idx + 1} (${isMC ? 'TRẮC NGHIỆM' : 'TRẢ LỜI NGẮN'})`,
-                maxPoints: pointsPerQ,
-                studentOption: studentOptKey,
-                correctOption: correctOptKey,
-                studentAnswer: res.student_answer_text || studentOptKey,
-                correctAnswer: q.correct_answer || correctOptKey,
-                currentPoints: currentPoints,
-                isCorrect: isCorrect,
-                needsManualGrading: res.pending_manual_grade || false,
-                stem: q.content,
-                options: formattedOptions
+          const mapped = exQuestions.map((q, idx) => {
+            const res = resultsMap[q.question_id] || {};
+            const isMC = q.question_type === 'MultipleChoice';
+            const isTF = q.question_type === 'TrueFalse';
+            const isOther = q.question_type === 'Other';
+            const isShort = q.question_type === 'ShortAnswer' || isOther;
+            
+            let studentOptKey = null;
+            let correctOptKey = null;
+            const formattedOptions = (q.answer_options || []).map((opt, oIdx) => {
+              const letter = String.fromCharCode(65 + oIdx);
+              if (opt.is_correct) correctOptKey = letter;
+              if (opt.option_id === res.student_answer_option_id) studentOptKey = letter;
+              return { 
+                key: letter, 
+                text: opt.content, 
+                option_id: opt.option_id,
+                is_correct: opt.is_correct 
               };
             });
 
-            setQuestions(mapped);
-            if (attData && attData.score !== null && attData.score !== undefined) {
-              setScore(attData.score);
-            }
-          } else {
-            setQuestions(initialQuestions);
-          }
-        } catch (err) {
-          setQuestions(initialQuestions);
-        } finally {
-          if (isMounted) setLoadingDetails(false);
-        }
-      }
+            const pointsPerQ = maxFor(q);
+            let isCorrect = false;
+            let currentPoints = 0;
 
-      loadRealDetails();
-      return () => { isMounted = false; };
-    } else {
-      setQuestions(initialQuestions);
+            if (isMC) {
+              isCorrect = res.is_correct !== undefined ? res.is_correct : (studentOptKey && studentOptKey === correctOptKey);
+              currentPoints = isCorrect ? pointsPerQ : 0;
+            } else if (isTF) {
+              isCorrect = res.is_correct !== undefined ? res.is_correct : false;
+              const subVals = Object.values(res.sub_results || {});
+              const okCount = subVals.filter(Boolean).length;
+              currentPoints = typeof res.points === 'number'
+                ? res.points
+                : (subVals.length === 4 ? pointsPerQ * TF_PARTIAL[okCount] : (subVals.length ? pointsPerQ * okCount / subVals.length : 0));
+            } else if (isShort) {
+              // Short answer: check if already evaluated or matches exact string
+              if (res.is_correct !== null && res.is_correct !== undefined) {
+                isCorrect = res.is_correct;
+              } else if (q.correct_answer && res.student_answer_text) {
+                const normStudent = String(res.student_answer_text).trim().replace(',', '.').toLowerCase();
+                const normCorrect = String(q.correct_answer).trim().replace(',', '.').toLowerCase();
+                isCorrect = normStudent === normCorrect;
+              } else {
+                isCorrect = false;
+              }
+              currentPoints = isCorrect ? pointsPerQ : 0;
+            }
+
+            const type = isMC ? 'multiple_choice' : (isTF ? 'true_false' : 'short_answer');
+            const typeName = isMC 
+              ? `CÂU ${idx + 1} (TRẮC NGHIỆM)` 
+              : (isTF ? `CÂU ${idx + 1} (ĐÚNG / SAI)` : (isOther ? `CÂU ${idx + 1} (KHÁC)` : `CÂU ${idx + 1} (TRẢ LỜI NGẮN)`));
+
+            return {
+              id: q.question_id,
+              type: type,
+              typeName: typeName,
+              maxPoints: pointsPerQ,
+              studentOption: studentOptKey,
+              correctOption: correctOptKey,
+              studentAnswer: isOther ? formatOtherAnswer(res.student_answer_text, q.answer_options) : (res.student_answer_text || studentOptKey),
+              correctAnswer: isOther ? null : (q.correct_answer || correctOptKey),
+              currentPoints: currentPoints,
+              isCorrect: isCorrect,
+              needsManualGrading: isShort && (res.pending_manual_grade !== false),
+              needsReview: q.needs_review || (!correctOptKey && isMC),
+              stem: q.content,
+              options: formattedOptions,
+              subResults: res.sub_results || {},
+              studentTF: (() => {
+                const m = {};
+                String(res.student_answer_text || '').split(';').forEach((p) => {
+                  const [k, v] = p.split(':');
+                  if (k && v !== undefined) m[k.trim().toLowerCase()] = v.trim().toLowerCase() === 'true';
+                });
+                return m;
+              })(),
+              image_url: q.image_url,
+              segments: q.segments
+            };
+          });
+
+          setQuestions(mapped);
+          if (attData && attData.score !== null && attData.score !== undefined) {
+            setScore(attData.score);
+          }
+        } else {
+          setQuestions([]);
+        }
+      } catch (err) {
+        console.error('Failed to load attempt questions:', err);
+        setQuestions([]);
+      } finally {
+        if (isMounted) setLoadingDetails(false);
+      }
     }
+
+    loadRealDetails();
+    return () => { isMounted = false; };
   }, [submission]);
 
   // Recalculate total score dynamically (scale to 10-point rubric)
@@ -208,6 +245,7 @@ export default function GradingFeedbackModal({
         return {
           ...q,
           correctOption: optionKey,
+          keyChanged: true,
           isCorrect,
           currentPoints
         };
@@ -228,6 +266,7 @@ export default function GradingFeedbackModal({
           ...q,
           isCorrect,
           currentPoints,
+          manuallyMarked: true,
           needsManualGrading: false // Marked as graded once clicked
         };
       }
@@ -273,14 +312,16 @@ export default function GradingFeedbackModal({
       statusLabel: 'Đã duyệt',
       questionsData: questions,
       cascadeRegrade: cascade,
-      modifiedQuestions: questions
+      modifiedQuestions: questions,
+      // Persisted by the parent: new MC answer key + teacher verdicts on short answers
+      answerKey: questions.filter((q) => q.type === 'multiple_choice' && q.keyChanged)
+        .map((q) => ({ question_id: q.id, option_id: (q.options.find((o) => o.key === q.correctOption) || {}).option_id }))
+        .filter((k) => k.option_id),
+      manualMarks: questions.filter((q) => q.type === 'short_answer' && q.manuallyMarked)
+        .reduce((acc, q) => ({ ...acc, [q.id]: !!q.isCorrect }), {})
     });
     onClose();
   };
-
-  const q1 = questions[0];
-  const q2 = questions[1];
-  const q3 = questions[2];
 
   // Dynamic rubric scores
   const scoreNum = parseFloat(score) || 0;
@@ -290,8 +331,14 @@ export default function GradingFeedbackModal({
 
   return (
     <>
-      <div className="grading-modal-overlay">
-        <div className="grading-modal-window">
+      <div 
+        className="grading-modal-overlay"
+        onClick={onClose}
+      >
+        <div 
+          className="grading-modal-window"
+          onClick={(e) => e.stopPropagation()}
+        >
           {/* Modal Header */}
           <header className="grading-modal-header">
             <div className="modal-header-left">
@@ -343,184 +390,224 @@ export default function GradingFeedbackModal({
                   <h3 className="section-title">Nội dung bài nộp của học sinh</h3>
                 </div>
                 <span className="status-badge-chip success">
-                  <CheckCircle2 size={13} /> 10/10 câu đã làm
+                  <CheckCircle2 size={13} /> {questions.length}/{questions.length} câu đã làm
                 </span>
               </div>
 
               {/* Interactive Notice Banner for Teacher Overrides & Manual Grading */}
-              <div className={`ai-grading-edit-banner ${isPendingGrading ? 'amber-banner' : ''}`}>
-                <div className="banner-icon-title">
-                  {isPendingGrading ? (
-                    <AlertTriangle size={16} className="text-amber" />
-                  ) : (
-                    <Sparkles size={16} className="text-purple" />
-                  )}
-                  <span className="banner-title">
-                    {isPendingGrading 
-                      ? 'Chế độ chấm bài: Câu hỏi cần giáo viên chấm được làm nổi bật màu vàng'
-                      : 'Chế độ duyệt & chỉnh sửa kết quả trực tiếp'}
-                  </span>
-                </div>
-                <p className="banner-desc">
-                  Giáo viên có thể bấm trực tiếp vào đáp án để thay đổi kết quả (Đúng/Sai). Điểm số tổng kết và các tiêu chí sẽ tự động tính toán lại tương ứng.
-                </p>
-              </div>
+              {(() => {
+                const hasShortAnswer = questions.some(q => q.type === 'short_answer');
+                const hasUndefinedKey = questions.some(q => (q.type === 'multiple_choice' || q.type === 'true_false') && (!q.correctOption || q.needsReview));
+
+                return (
+                  <div className={`ai-grading-edit-banner ${hasShortAnswer || hasUndefinedKey ? 'amber-banner' : ''}`}>
+                    <div className="banner-icon-title">
+                      {hasShortAnswer || hasUndefinedKey ? (
+                        <AlertTriangle size={16} className="text-amber" />
+                      ) : (
+                        <Sparkles size={16} className="text-purple" />
+                      )}
+                      <span className="banner-title">
+                        {hasShortAnswer
+                          ? 'Chế độ chấm bài: Câu hỏi Trả lời ngắn cần giáo viên chấm được làm nổi bật màu vàng'
+                          : (hasUndefinedKey
+                            ? 'Chế độ chấm bài: Phát hiện câu hỏi chưa xác định đáp án chuẩn'
+                            : 'Chi tiết kết quả bài nộp của học sinh (Đã tự động chấm)')}
+                      </span>
+                    </div>
+                    <p className="banner-desc">
+                      {hasShortAnswer
+                        ? 'Hệ thống tự động chấm trắc nghiệm 4 lựa chọn và trắc nghiệm đúng/sai. Giáo viên chỉ thực hiện chấm lại Phần III (Trả lời ngắn).'
+                        : (hasUndefinedKey
+                          ? 'Câu hỏi trắc nghiệm chưa có đáp án trong đề bài cần giáo viên chỉ định đáp án đúng để hệ thống tính điểm.'
+                          : 'Toàn bộ câu hỏi trắc nghiệm đã được hệ thống tự động chấm điểm chính xác theo đáp án chuẩn.')}
+                    </p>
+                  </div>
+                );
+              })()}
 
               {/* Questions list */}
-              <div className="submission-questions-container">
-                {/* Question 1: Trắc nghiệm 4 lựa chọn (0.25đ) */}
-                <div className={`question-review-card ${!q1.isCorrect ? 'incorrect-marked' : ''}`}>
-                  <div className="question-card-head">
-                    <span className="question-num-tag">{q1.typeName}</span>
-                    <span className={`question-points-tag ${q1.currentPoints === 0 ? 'zero-points' : ''}`}>
-                      {q1.currentPoints} điểm
-                    </span>
-                  </div>
-
-                  <p className="question-stem-text">
-                    {q1.stem}
-                  </p>
-
-                  <div className="options-review-grid">
-                    {q1.options.map((opt) => {
-                      const isStudentChoice = opt.key === q1.studentOption;
-                      const isCorrectChoice = opt.key === q1.correctOption;
-
-                      let optionClass = 'option-choice clickable-option';
-                      let badge = null;
-
-                      if (isCorrectChoice && isStudentChoice) {
-                        optionClass += ' correct selected';
-                        badge = <span className="badge-correct">Đúng</span>;
-                      } else if (isCorrectChoice && !isStudentChoice) {
-                        optionClass += ' correct teacher-correct';
-                        badge = <span className="badge-correct">Đáp án đúng</span>;
-                      } else if (!isCorrectChoice && isStudentChoice) {
-                        optionClass += ' incorrect-option student-wrong';
-                        badge = <span className="badge-correct badge-wrong">Học sinh chọn (Sai)</span>;
-                      }
-
-                    return (
-                      <div
-                        key={opt.key}
-                        className={optionClass}
-                        onClick={() => handleSelectCorrectOption(1, opt.key)}
-                        title={`Bấm để chọn đáp án ${opt.key} làm đáp án đúng`}
-                      >
-                        <span className="option-letter">{opt.key}.</span>
-                        <span className="option-text">{opt.text}</span>
-                        {badge}
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-
-              {/* Question 2: Trắc nghiệm Đúng/Sai (0.25đ) */}
-              <div className={`question-review-card ${!q2.isCorrect ? 'incorrect-marked' : ''}`}>
-                <div className="question-card-head">
-                  <span className="question-num-tag">{q2.typeName}</span>
-                  <span className={`question-points-tag ${q2.currentPoints === 0 ? 'zero-points' : ''}`}>
-                    {q2.currentPoints} điểm
+              {loadingDetails ? (
+                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '48px 16px', gap: '12px' }}>
+                  <Loader2 size={28} className="animate-spin" style={{ color: '#7C3AED' }} />
+                  <span style={{ color: '#64748B', fontSize: '14px', fontWeight: 500 }}>
+                    Đang tải nội dung đề bài và bài nộp của học sinh...
                   </span>
                 </div>
+              ) : questions.length === 0 ? (
+                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '48px 16px', gap: '12px', textAlign: 'center', border: '1px dashed #CBD5E1', borderRadius: '12px' }}>
+                  <HelpCircle size={36} style={{ color: '#94A3B8' }} />
+                  <h4 style={{ margin: 0, fontSize: '15px', color: '#334155', fontWeight: 600 }}>Bài tập chưa có câu hỏi trong ngân hàng đề</h4>
+                  <p style={{ margin: 0, fontSize: '13px', color: '#64748B' }}>Vui lòng kiểm tra lại cấu hình ngân hàng đề cho bài tập này.</p>
+                </div>
+              ) : (
+                <div className="submission-questions-container">
+                {questions.map((q, idx) => {
+                  const isShortAnswer = q.type === 'short_answer';
+                  const isTrueFalse = q.type === 'true_false';
+                  const isMC = !isShortAnswer && !isTrueFalse;
+                  // Only allow teacher to manually select answer key if it was undefined / needs review
+                  const isAnswerUndefined = isMC && (!q.correctOption || q.needsReview);
 
-                <p className="question-stem-text">
-                  {q2.stem}
-                </p>
-
-                <div className="options-truefalse-grid">
-                  {q2.options.map((opt) => {
-                    const isStudentChoice = opt.key === q2.studentOption;
-                    const isCorrectChoice = opt.key === q2.correctOption;
-
-                    let optionClass = 'option-choice clickable-option';
-                    let badge = null;
-
-                    if (isCorrectChoice && isStudentChoice) {
-                      optionClass += ' correct selected';
-                      badge = <span className="badge-correct">Đã chọn</span>;
-                    } else if (isCorrectChoice && !isStudentChoice) {
-                      optionClass += ' correct teacher-correct';
-                      badge = <span className="badge-correct">Đáp án đúng</span>;
-                    } else if (!isCorrectChoice && isStudentChoice) {
-                      optionClass += ' incorrect-option student-wrong';
-                      badge = <span className="badge-correct badge-wrong">Học sinh chọn (Sai)</span>;
-                    }
-
-                    return (
-                      <div
-                        key={opt.key}
-                        className={optionClass}
-                        onClick={() => handleSelectCorrectOption(2, opt.key)}
-                        title={`Bấm để đặt đáp án ${opt.text} làm đáp án đúng`}
-                      >
-                        <span className="option-text">{opt.text}</span>
-                        {badge}
+                  return (
+                    <div 
+                      key={q.id || idx}
+                      className={`question-review-card ${
+                        (isPendingGrading || q.needsManualGrading) && isShortAnswer ? 'manual-grading-highlight' : ''
+                      } ${!q.isCorrect ? 'incorrect-marked' : ''}`}
+                    >
+                      <div className="question-card-head">
+                        <div className="head-badge-group">
+                          <span className="question-num-tag">{q.typeName || `CÂU ${idx + 1}`}</span>
+                          {isShortAnswer && (isPendingGrading || q.needsManualGrading) && (
+                            <span className="manual-grade-alert-pill">
+                              ⚡ CẦN GIÁO VIÊN CHẤM
+                            </span>
+                          )}
+                          {isAnswerUndefined && (
+                            <span className="manual-grade-alert-pill warning-key-pill">
+                              ⚠️ ĐÁP ÁN CHƯA XÁC ĐỊNH
+                            </span>
+                          )}
+                        </div>
+                        <span className={`question-points-tag ${q.currentPoints === 0 ? 'zero-points' : ''}`}>
+                          {typeof q.currentPoints === 'number' ? q.currentPoints.toFixed(2) : q.currentPoints} điểm
+                        </span>
                       </div>
-                    );
-                  })}
-                </div>
-              </div>
 
-              {/* Question 3: Trả lời ngắn / Tự luận (0.4đ) - COVERED IN DISTINCT COLOR IN "CHỜ CHẤM" */}
-              <div 
-                className={`question-review-card ${
-                  isPendingGrading || q3.needsManualGrading ? 'manual-grading-highlight' : ''
-                } ${!q3.isCorrect ? 'incorrect-marked' : ''}`}
-              >
-                <div className="question-card-head">
-                  <div className="head-badge-group">
-                    <span className="question-num-tag">{q3.typeName}</span>
-                    {(isPendingGrading || q3.needsManualGrading) && (
-                      <span className="manual-grade-alert-pill">
-                        ⚡ CẦN GIÁO VIÊN CHẤM
-                      </span>
-                    )}
-                  </div>
-                  <span className={`question-points-tag ${q3.currentPoints === 0 ? 'zero-points' : ''}`}>
-                    {q3.currentPoints} điểm
-                  </span>
-                </div>
+                      <p className="question-stem-text">
+                        <MathRenderer text={q.stem} />
+                      </p>
 
-                <p className="question-stem-text">
-                  {q3.stem}
-                </p>
+                      <QuestionMedia question={q} compact />
 
-                <div className={`student-written-answer-box ${
-                  isPendingGrading || q3.needsManualGrading ? 'manual-grading-answer-box' : ''
-                } ${!q3.isCorrect ? 'written-wrong' : ''}`}>
-                  <div className="written-box-header">
-                    <span className="written-label">BÀI GIẢI CỦA HỌC SINH:</span>
-                    <div className="written-toggle-actions">
-                      <button
-                        type="button"
-                        className={`btn-written-eval ${q3.isCorrect ? 'active-correct' : ''}`}
-                        onClick={() => handleToggleShortAnswer(3, true)}
-                        title="Đánh dấu câu trả lời Đúng (+0.4 điểm)"
-                      >
-                        <Check size={12} /> Đúng (+0.4đ)
-                      </button>
-                      <button
-                        type="button"
-                        className={`btn-written-eval ${!q3.isCorrect ? 'active-wrong' : ''}`}
-                        onClick={() => handleToggleShortAnswer(3, false)}
-                        title="Đánh dấu câu trả lời Sai (0 điểm)"
-                      >
-                        <X size={12} /> Sai (0đ)
-                      </button>
+                      {isAnswerUndefined && (
+                        <div className="undefined-key-notice-box">
+                          ⚠️ Câu hỏi này chưa có đáp án chuẩn trong đề. Giáo viên vui lòng bấm chọn một đáp án bên dưới để đặt làm đáp án đúng.
+                        </div>
+                      )}
+
+                      {/* Part I: Multiple Choice (Strictly Read-Only unless answer is undefined) */}
+                      {isMC && q.options && q.options.length > 0 && (
+                        <div className="options-review-grid">
+                          {q.options.map((opt) => {
+                            const isStudentChoice = opt.key === q.studentOption;
+                            const isCorrectChoice = opt.key === q.correctOption;
+
+                            let optionClass = 'option-choice';
+                            if (isAnswerUndefined) {
+                              optionClass += ' clickable-option';
+                            }
+
+                            let badge = null;
+                            if (isCorrectChoice && isStudentChoice) {
+                              optionClass += ' correct selected';
+                              badge = <span className="badge-correct">Đúng</span>;
+                            } else if (isCorrectChoice && !isStudentChoice) {
+                              optionClass += ' correct teacher-correct';
+                              badge = <span className="badge-correct">Đáp án đúng</span>;
+                            } else if (!isCorrectChoice && isStudentChoice) {
+                              optionClass += ' incorrect-option student-wrong';
+                              badge = <span className="badge-correct badge-wrong">Học sinh chọn (Sai)</span>;
+                            }
+
+                            return (
+                              <div
+                                key={opt.key}
+                                className={optionClass}
+                                onClick={isAnswerUndefined ? () => handleSelectCorrectOption(q.id, opt.key) : undefined}
+                                title={isAnswerUndefined ? `Bấm để chọn đáp án ${opt.key} làm đáp án đúng` : undefined}
+                              >
+                                <span className="option-letter">{opt.key}.</span>
+                                <span className="option-text">
+                                  <MathRenderer text={opt.text} />
+                                </span>
+                                {badge}
+                              </div>
+                            );
+                          })}
+                        </div>
+                      )}
+
+                      {/* Part II: True / False (Strictly Read-Only) */}
+                      {isTrueFalse && q.options && q.options.length > 0 && (
+                        <div className="options-truefalse-grid">
+                          {q.options.map((opt, oIdx) => {
+                            const isCorrectStatement = opt.is_correct === true || opt.is_correct === 'true';
+                            const hasSubResult = q.subResults && Object.keys(q.subResults).length > 0;
+                            const optLabel = String.fromCharCode(97 + oIdx); // a, b, c, d
+                            const isSubCorrect = hasSubResult ? q.subResults[optLabel] : true;
+
+                            let optionClass = 'option-choice';
+                            if (isSubCorrect === false) {
+                              optionClass += ' incorrect-option';
+                            } else {
+                              optionClass += ' correct selected';
+                            }
+
+                            return (
+                              <div
+                                key={opt.key || oIdx}
+                                className={optionClass}
+                              >
+                                <span className="option-text">
+                                  <MathRenderer text={opt.text} />
+                                </span>
+                                <span className={`badge-correct ${!isSubCorrect ? 'badge-wrong' : ''}`}>
+                                  {`Đáp án: ${isCorrectStatement ? 'Đúng' : 'Sai'} | HS chọn: ${q.studentTF && q.studentTF[optLabel] !== undefined ? (q.studentTF[optLabel] ? 'Đúng' : 'Sai') : '--'}`}
+                                </span>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      )}
+
+                      {isShortAnswer && (
+                        <div className={`student-written-answer-box ${
+                          isPendingGrading || q.needsManualGrading ? 'manual-grading-answer-box' : ''
+                        } ${!q.isCorrect ? 'written-wrong' : ''}`}>
+                          <div className="written-box-header">
+                            <span className="written-label">BÀI GIẢI CỦA HỌC SINH:</span>
+                            <div className="written-toggle-actions">
+                              <button
+                                type="button"
+                                className={`btn-written-eval ${q.isCorrect ? 'active-correct' : ''}`}
+                                onClick={() => handleToggleShortAnswer(q.id, true)}
+                                title={`Đánh dấu câu trả lời Đúng (+${typeof q.maxPoints === 'number' ? q.maxPoints.toFixed(2) : q.maxPoints}đ)`}
+                              >
+                                <Check size={12} /> Đúng (+{typeof q.maxPoints === 'number' ? q.maxPoints.toFixed(2) : q.maxPoints}đ)
+                              </button>
+                              <button
+                                type="button"
+                                className={`btn-written-eval ${!q.isCorrect ? 'active-wrong' : ''}`}
+                                onClick={() => handleToggleShortAnswer(q.id, false)}
+                                title="Đánh dấu câu trả lời Sai (0 điểm)"
+                              >
+                                <X size={12} /> Sai (0đ)
+                              </button>
+                            </div>
+                          </div>
+                          <div className="written-content-row">
+                            <span className="short-answer-val" style={{ whiteSpace: 'pre-wrap' }}>
+                              {String(q.studentAnswer || '--').replace('.', ',')}
+                            </span>
+                            {q.correctAnswer && (
+                              <span className="short-answer-expected-key">
+                                Đáp án chuẩn: <strong><MathRenderer text={q.correctAnswer} /></strong>
+                              </span>
+                            )}
+                            <span className={`badge-correct ${!q.isCorrect ? 'badge-wrong' : ''}`}>
+                              {q.isCorrect ? 'Đúng' : 'Sai'}
+                            </span>
+                          </div>
+                        </div>
+                      )}
                     </div>
-                  </div>
-                  <div className="written-content-row">
-                    <span className="short-answer-val">{q3.studentAnswer}</span>
-                    <span className={`badge-correct ${!q3.isCorrect ? 'badge-wrong' : ''}`}>
-                      {q3.isCorrect ? 'Đúng' : 'Sai'}
-                    </span>
-                  </div>
-                </div>
+                  );
+                })}
               </div>
+              )}
             </div>
-          </div>
 
           {/* Right Column: Grading Controls & Feedback */}
           <div className="grading-action-panel">
@@ -543,10 +630,10 @@ export default function GradingFeedbackModal({
               {/* Automatic question correctness breakdown bar */}
               <div className="score-stats-breakdown-row">
                 <span className="stats-breakdown-text">
-                  Đúng <strong>{questions.filter(q => q.isCorrect).length}/{questions.length} câu</strong> ({((questions.filter(q => q.isCorrect).length / questions.length) * 100).toFixed(0)}%)
+                  Đúng <strong>{questions.filter(q => q.isCorrect).length}/{questions.length} câu</strong> ({questions.length > 0 ? ((questions.filter(q => q.isCorrect).length / questions.length) * 100).toFixed(0) : 0}%)
                 </span>
                 <span className="stats-breakdown-points">
-                  Tổng điểm thành phần: <strong>{questions.reduce((acc, q) => acc + q.currentPoints, 0).toFixed(2)}/0.90đ</strong>
+                  Tổng điểm thành phần: <strong>{questions.reduce((acc, q) => acc + (q.currentPoints || 0), 0).toFixed(2)}/10.00đ</strong>
                 </span>
               </div>
             </div>
@@ -624,6 +711,7 @@ export default function GradingFeedbackModal({
                 type="button" 
                 className="btn-submit-grade" 
                 onClick={handleInitiateSave}
+                disabled={loadingDetails || (questions.length === 0 && (submission.score === null || submission.score === undefined))}
               >
                 <CheckCircle2 size={16} />
                 <span>Hoàn tất</span>

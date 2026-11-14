@@ -2,10 +2,11 @@
 // Description: Interactive student examination interface supporting 3 question types: Multiple Choice (4 options), True/False (4 sub-items), and Short Answer (with on-screen numpad helper).
 // Created At: 2026-09-07
 // Created By: Tam Khang
-// Updated At: 2026-09-20
-// Updated By: Tam Khang
+// Updated At: 2026-11-12
+// Updated By: AI Agent
 
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
+import { getQuestionItems } from '../../utils/questionItems';
 import { 
   Clock, 
   HelpCircle, 
@@ -23,15 +24,36 @@ import {
   Info,
   AlertCircle,
   X,
+  Check,
+  Lightbulb,
   ShieldAlert,
   Eye,
   Lock,
-  Loader2
+  Loader2,
+  Maximize2,
+  Minimize2,
+  MonitorX,
+  RefreshCw
 } from 'lucide-react';
 import { useNavigate, Link, useParams, useLocation } from 'react-router-dom';
-import { exercisesApi, attemptsApi } from '../../services/api';
+import { attemptsApi, assignmentsApi } from '../../services/api';
+import { studentTakingApi, sanitizeQuestionsForStudent } from '../../services/studentTakingApi';
 import MathRenderer from '../../components/common/MathRenderer';
+import QuestionContentView from '../../components/common/QuestionContentView';
+import MathTextEditor from '../../components/common/MathTextEditor';
+import MathSymbolToolbar from '../../components/common/MathSymbolToolbar';
+import useExamLockdown from '../../hooks/useExamLockdown';
+import usePageMeta from '../../hooks/usePageMeta';
+import '../../components/documents/EditExerciseModal.css';
+import QuestionMedia from '../../components/exercises/QuestionMedia';
+import AiSourcesList from '../../components/exercises/AiSourcesList';
 import './StudentExerciseTakingPage.css';
+import toast from '../../components/common/toast';
+
+// Aborted requests (component unmount / React StrictMode double-mount) are expected
+// control flow — they must never be surfaced to the student as an error.
+const isAbortError = (err) =>
+  err?.code === 'ERR_CANCELED' || err?.name === 'CanceledError' || err?.name === 'AbortError';
 
 export default function StudentExerciseTakingPage() {
   const navigate = useNavigate();
@@ -45,10 +67,26 @@ export default function StudentExerciseTakingPage() {
   // Real Backend Data States
   const [backendExercise, setBackendExercise] = useState(null);
   const [backendQuestions, setBackendQuestions] = useState([]);
+  const [backendAssignment, setBackendAssignment] = useState(null);
   const [attemptId, setAttemptId] = useState(null);
   const [isLoadingBackend, setIsLoadingBackend] = useState(false);
   const [backendError, setBackendError] = useState(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // Mirror of the `answers` state for async init logic: the post-start refetch must
+  // never replace the paper once the student has already answered something.
+  const answersRef = useRef({});
+
+  // UUID check: distinguishes real backend targets from local AI/mock exercises
+  const isUuid = (id) => typeof id === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id);
+
+  // Sort backend questions by display_order and their options by display_order
+  const sortBackendQuestions = (qs) => [...(qs || [])]
+    .map(q => ({
+      ...q,
+      answer_options: [...(q.answer_options || [])].sort((a, b) => (a.display_order || 0) - (b.display_order || 0))
+    }))
+    .sort((a, b) => (a.display_order || 0) - (b.display_order || 0));
 
   // Exercise / Exam Metadata from localStorage (for AI generated practice fallback)
   const savedAiExercise = useMemo(() => {
@@ -72,36 +110,129 @@ export default function StudentExerciseTakingPage() {
   // Helper to normalize any backend question_type (MultipleChoice, TrueFalse, ShortAnswer, etc.)
   const normalizeQType = (typeStr) => {
     const clean = String(typeStr || '').replace(/[^a-zA-Z]/g, '').toUpperCase();
+    if (clean === 'OTHER') return 'OTHER';
     if (clean.includes('TRUEFALSE') || clean.includes('DUNGSAI')) return 'TRUE_FALSE';
     if (clean.includes('SHORTANSWER') || clean.includes('TRALOI') || clean.includes('NGAN') || clean.includes('FILL') || clean.includes('NUMERIC')) return 'SHORT_ANSWER';
     return 'MULTIPLE_CHOICE';
   };
 
+  // "Other" answers are stored as a JSON array of strings (one per sub-question) in answer_text.
+  const parseOtherAnswer = (text) => {
+    try {
+      const arr = JSON.parse(text || '[]');
+      const obj = {};
+      if (Array.isArray(arr)) arr.forEach((v, i) => { if (String(v || '').trim()) obj[i] = String(v); });
+      return obj;
+    } catch (e) {
+      return text ? { 0: String(text) } : {};
+    }
+  };
+
   // Initialize Backend Exam and Attempt
   useEffect(() => {
     let isMounted = true;
+    const abortController = new AbortController();
     async function initExam() {
-      const isUuid = (id) => typeof id === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id);
-
       const targetExerciseId = stateExerciseId || exerciseId;
-      const targetAssignmentId = stateAssignmentId;
+      let targetAssignmentId = stateAssignmentId;
+
+      // 0. Auto-resolve assignment ID if missing from navigation state
+      if (isUuid(targetExerciseId) && !isUuid(targetAssignmentId)) {
+        try {
+          const assignments = await assignmentsApi.getAssignments();
+          const matched = (assignments || []).find(a =>
+            String(a.exercise_id).toLowerCase() === String(targetExerciseId).toLowerCase() ||
+            String(a.assignment_id).toLowerCase() === String(targetExerciseId).toLowerCase()
+          );
+          if (matched && matched.assignment_id) {
+            targetAssignmentId = matched.assignment_id;
+            if (isMounted) setBackendAssignment(matched);
+          }
+        } catch (resolveErr) {
+          console.warn('Assignment lookup fallback error:', resolveErr);
+        }
+      }
 
       if (isUuid(targetExerciseId) || isUuid(targetAssignmentId)) {
         try {
           setIsLoadingBackend(true);
 
           let sortedQ = [];
-          // 1. Fetch exercise detail from backend
-          if (isUuid(targetExerciseId)) {
-            const exerciseData = await exercisesApi.getExerciseDetail(targetExerciseId);
-            if (isMounted && exerciseData) {
-              setBackendExercise(exerciseData);
-              if (exerciseData.questions && exerciseData.questions.length > 0) {
-                sortedQ = [...exerciseData.questions].sort((a, b) => (a.display_order || 0) - (b.display_order || 0));
+          let exerciseData = null;
+          let takingOpenAttemptId = null;
+
+          // 1. Preferred: sanitized taking payload from the BE
+          //    GET /api/v1/assignments/{assignmentId}/taking -> { assignment, exercise, questions (sanitized), open_attempt }
+          if (isUuid(targetAssignmentId)) {
+            try {
+              const taking = await studentTakingApi.getAssignmentTaking(targetAssignmentId, {
+                signal: abortController.signal,
+              });
+              if (isMounted && taking) {
+                const assignment = taking.assignment || null;
+                exerciseData = taking.exercise || null;
+                const rawQuestions = Array.isArray(taking.questions)
+                  ? taking.questions
+                  : (Array.isArray(exerciseData?.questions) ? exerciseData.questions : []);
+                // Defensive double-sanitize: the BE should already strip answer fields
+                sortedQ = sortBackendQuestions(sanitizeQuestionsForStudent(rawQuestions));
+                if (exerciseData) setBackendExercise({ ...exerciseData, questions: sortedQ });
                 setBackendQuestions(sortedQ);
+                if (assignment) setBackendAssignment(assignment);
+                if (taking.open_attempt && taking.open_attempt.attempt_id) {
+                  takingOpenAttemptId = taking.open_attempt.attempt_id;
+                }
+              }
+            } catch (takingErr) {
+              // Unmount/StrictMode abort: stop initializing, nothing to report.
+              if (isAbortError(takingErr)) return;
+              const status = takingErr?.response?.status;
+              if (status === 404 || status === 405) {
+                console.warn('Taking endpoint not deployed yet (404/405), falling back to exercise detail:', takingErr?.message);
+              } else {
+                console.warn('getAssignmentTaking failed, trying exercise detail fallback:', takingErr);
               }
             }
           }
+
+          // Students never read the raw exercise detail (it carries the answer key); only the taking payload is used.
+
+          // 2b. Re-fetch the taking payload once an attempt exists so the paper follows
+          //     that attempt's shuffle seed. The BE shuffles questions/options from
+          //     attempt.detailed_results["shuffle_seed"]; before the attempt is started it
+          //     serves a stable preview seed, so the order may change right after start.
+          //     Runs only during init, while the student has not answered anything yet.
+          const refetchTakingForAttempt = async () => {
+            if (!isMounted || !isUuid(targetAssignmentId)) return;
+            if (Object.keys(answersRef.current || {}).length > 0) return;
+            try {
+              const taking = await studentTakingApi.getAssignmentTaking(targetAssignmentId, {
+                signal: abortController.signal,
+                // Bypass in-flight de-dupe: a cached preview response would defeat the refetch.
+                force: true,
+              });
+              if (!isMounted || !taking) return;
+              const assignment = taking.assignment || null;
+              const exercise = taking.exercise || null;
+              const rawQuestions = Array.isArray(taking.questions)
+                ? taking.questions
+                : (Array.isArray(exercise?.questions) ? exercise.questions : []);
+              if (rawQuestions.length === 0) return;
+              // Same sanitize + sort pipeline as the initial load: display_order is the
+              // already-shuffled alias, so sorting by it preserves the seeded order.
+              const seededQuestions = sortBackendQuestions(sanitizeQuestionsForStudent(rawQuestions));
+              if (exercise) setBackendExercise({ ...exercise, questions: seededQuestions });
+              setBackendQuestions(seededQuestions);
+              if (assignment) setBackendAssignment(assignment);
+            } catch (refetchErr) {
+              if (isAbortError(refetchErr)) return;
+              // Keep the current paper instead of blocking the exam on a refresh hiccup.
+              console.warn('Could not refresh taking payload for the started attempt:', refetchErr);
+            }
+          };
+
+          // Unmounted while loading: never create an attempt from a dead effect.
+          if (!isMounted) return;
 
           // 2. Fetch existing attempt from DB (matching assignmentId or exerciseId) or start attempt
           try {
@@ -112,21 +243,51 @@ export default function StudentExerciseTakingPage() {
               (targetExerciseId && String(a.exercise_id).toLowerCase() === String(targetExerciseId).toLowerCase())
             );
 
-            // Prioritize finished attempt (completed exam cannot be retaken)
-            const finishedAttempt = matchingAttempts.find(a => a.is_finished);
-            const matchedAttempt = finishedAttempt || matchingAttempts[0];
-
-            if (matchedAttempt && matchedAttempt.is_finished) {
-              let fullAttempt = matchedAttempt;
+            // Prioritize specified attempt from modal or open in-progress attempt, or finished attempt
+            const stateAttemptId = location.state?.attemptId;
+            const isRetake = Boolean(location.state?.isRetake);
+            let specifiedAttempt = null;
+            if (stateAttemptId && isUuid(stateAttemptId)) {
               try {
-                const detailAtt = await attemptsApi.getAttemptDetail(matchedAttempt.attempt_id);
-                if (detailAtt) fullAttempt = detailAtt;
+                specifiedAttempt = await attemptsApi.getAttemptDetail(stateAttemptId);
               } catch (e) {
-                console.warn('Could not fetch full attempt detail:', e);
+                console.warn('Could not fetch specified attempt detail directly:', e);
+              }
+            }
+            if (!specifiedAttempt && stateAttemptId) {
+              specifiedAttempt = matchingAttempts.find(a => String(a.attempt_id).toLowerCase() === String(stateAttemptId).toLowerCase()) || null;
+            }
+
+            const openAttempt = matchingAttempts.find(a => !a.is_finished)
+              || (takingOpenAttemptId ? { attempt_id: takingOpenAttemptId, is_finished: false } : null);
+            const finishedAttempt = matchingAttempts.find(a => a.is_finished);
+            
+            const isExamExercise = Boolean(
+              backendExercise?.category === 'exam' ||
+              (backendExercise?.title || '').toLowerCase().includes('đề thi') ||
+              (location.state?.title || '').toLowerCase().includes('đề thi')
+            );
+            const isExamLocked = isExamExercise && finishedAttempt && !openAttempt;
+
+            // Only enter review mode if specifically requested or if finished and NOT a retake/open attempt (exams can never be retaken once finished)
+            const reviewTarget = specifiedAttempt?.is_finished 
+              ? specifiedAttempt 
+              : (isExamLocked ? finishedAttempt : (!isRetake && !openAttempt && finishedAttempt ? finishedAttempt : null));
+
+            if (reviewTarget && reviewTarget.is_finished) {
+              let fullAttempt = reviewTarget;
+              if (!fullAttempt.detailed_results) {
+                try {
+                  const detailAtt = await attemptsApi.getAttemptDetail(reviewTarget.attempt_id);
+                  if (detailAtt) fullAttempt = detailAtt;
+                } catch (e) {
+                  console.warn('Could not fetch full attempt detail:', e);
+                }
               }
 
               if (isMounted) {
                 setAttemptId(fullAttempt.attempt_id);
+                setAttemptDetailedResults(fullAttempt.detailed_results || null);
                 setIsExamSubmitted(true);
                 setIsReadOnlyReview(true);
 
@@ -155,12 +316,14 @@ export default function StudentExerciseTakingPage() {
                         restored[qIdx] = (qRes.student_answer_text !== null && qRes.student_answer_text !== undefined) 
                           ? String(qRes.student_answer_text).replace(/\./g, ',') 
                           : '';
+                      } else if (normType === 'OTHER') {
+                        restored[qIdx] = parseOtherAnswer(qRes.student_answer_text);
                       } else if (normType === 'TRUE_FALSE') {
                         if (qRes.student_answer_text) {
                           const tfObj = {};
                           qRes.student_answer_text.split(';').forEach(pair => {
                             const [k, v] = pair.split(':');
-                            if (k) tfObj[k.trim()] = v === 'true';
+                            if (k) tfObj[k.trim()] = (String(v).trim().toLowerCase() === 'true');
                           });
                           restored[qIdx] = tfObj;
                         }
@@ -196,18 +359,54 @@ export default function StudentExerciseTakingPage() {
 
                 try {
                   localStorage.setItem(`tk_exam_submitted_${currentExamId}`, JSON.stringify(subData));
+                  if (targetAssignmentId) {
+                    localStorage.setItem(`tk_exam_submitted_${targetAssignmentId}`, JSON.stringify(subData));
+                  }
                 } catch (e) {
                   console.warn('Could not cache submission:', e);
                 }
               }
-            } else if (matchedAttempt && !matchedAttempt.is_finished) {
+            } else {
+              // Active taking mode: ensure review states are false and clean up stale local submission flags
               if (isMounted) {
-                setAttemptId(matchedAttempt.attempt_id);
+                setIsExamSubmitted(false);
+                setIsReadOnlyReview(false);
+                setSubmissionResult(null);
               }
-            } else if (isUuid(targetAssignmentId)) {
-              const startRes = await attemptsApi.startAttempt(targetAssignmentId);
-              if (isMounted && startRes?.attempt_id) {
-                setAttemptId(startRes.attempt_id);
+              try {
+                localStorage.removeItem(`tk_exam_submitted_${currentExamId}`);
+                if (targetAssignmentId) localStorage.removeItem(`tk_exam_submitted_${targetAssignmentId}`);
+              } catch (e) {}
+
+              // The effect may have been torn down while attempts were loading: never
+              // start/resume an attempt from a dead effect (StrictMode / fast navigation).
+              if (!isMounted) return;
+
+              if (openAttempt) {
+                // Seamlessly resume open attempt
+                if (isMounted) {
+                  setAttemptId(openAttempt.attempt_id);
+                }
+              } else if (isUuid(targetAssignmentId)) {
+                try {
+                  const startRes = await attemptsApi.startAttempt(targetAssignmentId);
+                  if (isMounted && startRes?.attempt_id) {
+                    setAttemptId(startRes.attempt_id);
+                    // A fresh attempt gets a fresh shuffle seed → reload the seeded paper.
+                    await refetchTakingForAttempt();
+                  }
+                } catch (startErr) {
+                  console.warn('Could not start new attempt, looking for open attempt:', startErr);
+                  const refreshed = await attemptsApi.getAttempts();
+                  const foundOpen = (refreshed || []).find(a => 
+                    String(a.assignment_id).toLowerCase() === String(targetAssignmentId).toLowerCase() && !a.is_finished
+                  );
+                  if (isMounted && foundOpen) {
+                    setAttemptId(foundOpen.attempt_id);
+                    // Resuming an existing attempt: make sure the paper matches its seed.
+                    await refetchTakingForAttempt();
+                  }
+                }
               }
             }
           } catch (attErr) {
@@ -229,26 +428,62 @@ export default function StudentExerciseTakingPage() {
     initExam();
     return () => {
       isMounted = false;
+      abortController.abort();
     };
   }, [exerciseId, stateAssignmentId, stateExerciseId]);
 
+  // True when the route targets a real backend record (UUID) — mock data must NEVER be used then
+  const isBackendTarget = Boolean(
+    isUuid(exerciseId) || isUuid(stateAssignmentId) || isUuid(stateExerciseId)
+  );
+
   const exerciseInfo = useMemo(() => {
+    // Backend (UUID) targets ALWAYS use real BE data — never the local mock datasets (id 1/4, chemPart*, shortAnswerSamples)
+    if (isBackendTarget) {
+      const qList = backendQuestions;
+      const p1 = qList.filter(q => normalizeQType(q.question_type) === 'MULTIPLE_CHOICE').length;
+      const p2 = qList.filter(q => normalizeQType(q.question_type) === 'TRUE_FALSE').length;
+      const p3 = qList.filter(q => normalizeQType(q.question_type) === 'SHORT_ANSWER').length;
+      const p4 = qList.filter(q => normalizeQType(q.question_type) === 'OTHER').length;
+      const isMath = (backendExercise?.title || location.state?.title || '').toLowerCase().includes('toán');
+      const assignmentDuration = Number(backendAssignment?.duration_minutes || backendExercise?.duration_minutes || 0);
+      return {
+        id: backendExercise?.exercise_id || currentExamId,
+        title: backendExercise?.title || location.state?.title || 'Đề thi trực tuyến',
+        subject: location.state?.subject || backendAssignment?.subject_name || (isMath ? 'Toán học' : 'Hóa học'),
+        category: 'exam',
+        categoryLabel: 'Bài thi chính thức',
+        teacher: location.state?.teacher || backendAssignment?.teacher_name || backendExercise?.teacher_name || 'Sample Teacher (Thầy Nguyễn Văn A)',
+        totalQuestions: qList.length,
+        part1Count: p1,
+        part2Count: p2,
+        part3Count: p3,
+        part4Count: p4,
+        durationMinutes: assignmentDuration > 0 ? assignmentDuration : 45,
+        isExam: true,
+        isBackend: true
+      };
+    }
+
     if (backendExercise) {
       const qList = backendQuestions;
       const p1 = qList.filter(q => normalizeQType(q.question_type) === 'MULTIPLE_CHOICE').length;
       const p2 = qList.filter(q => normalizeQType(q.question_type) === 'TRUE_FALSE').length;
       const p3 = qList.filter(q => normalizeQType(q.question_type) === 'SHORT_ANSWER').length;
+      const p4 = qList.filter(q => normalizeQType(q.question_type) === 'OTHER').length;
+      const isMath = (backendExercise.title || '').toLowerCase().includes('toán');
       return {
         id: backendExercise.exercise_id,
         title: backendExercise.title || location.state?.title || 'Đề thi trực tuyến',
-        subject: 'Môn học',
+        subject: location.state?.subject || (isMath ? 'Toán học' : 'Hóa học'),
         category: 'exam',
         categoryLabel: 'Bài thi chính thức',
-        teacher: 'Giáo viên bộ môn',
-        totalQuestions: qList.length || 40,
+        teacher: location.state?.teacher || 'Sample Teacher (Thầy Nguyễn Văn A)',
+        totalQuestions: qList.length || 20,
         part1Count: p1,
         part2Count: p2,
         part3Count: p3,
+        part4Count: p4,
         durationMinutes: 45,
         isExam: true,
         isBackend: true
@@ -307,7 +542,14 @@ export default function StudentExerciseTakingPage() {
       durationMinutes: 45,
       isExam: true
     };
-  }, [backendExercise, backendQuestions, savedAiExercise, isChemistry, location.state]);
+  }, [isBackendTarget, backendExercise, backendQuestions, backendAssignment, savedAiExercise, isChemistry, location.state, currentExamId]);
+
+  // Private exam screen: never index it. Title is still set so the browser tab is clear.
+  usePageMeta({
+    title: exerciseInfo?.title ? `${exerciseInfo.title} — Làm bài — SmartLMS` : 'Làm bài — SmartLMS',
+    robots: 'noindex,nofollow',
+    ogType: 'website',
+  });
 
   const totalQuestions = exerciseInfo.totalQuestions;
 
@@ -317,37 +559,68 @@ export default function StudentExerciseTakingPage() {
   // Dynamic answers dictionary
   const [answers, setAnswers] = useState({});
 
+  // Keep the async-init guard in sync with the latest answers.
+  useEffect(() => {
+    answersRef.current = answers;
+  }, [answers]);
+
   const [flaggedQuestions, setFlaggedQuestions] = useState({});
   const [timeLeft, setTimeLeft] = useState(exerciseInfo.durationMinutes * 60);
   const [filterMode, setFilterMode] = useState('all'); // 'all', 'flagged'
 
-  // Check if exam/exercise is already submitted in localStorage
+  // Check if exam/exercise is already submitted in localStorage (strictly for local offline practice)
   const savedSubmission = useMemo(() => {
+    if (isBackendTarget) return null;
     try {
       const data = localStorage.getItem(`tk_exam_submitted_${currentExamId}`);
       return data ? JSON.parse(data) : null;
     } catch {
       return null;
     }
-  }, [currentExamId]);
+  }, [currentExamId, isBackendTarget]);
 
   // Submission & Exam Lock States
   const [isSubmitModalOpen, setIsSubmitModalOpen] = useState(false);
-  const [isReadOnlyReview, setIsReadOnlyReview] = useState(Boolean(savedSubmission));
-  const [isExamSubmitted, setIsExamSubmitted] = useState(Boolean(savedSubmission));
-  const [submissionResult, setSubmissionResult] = useState(savedSubmission);
+  const [isReadOnlyReview, setIsReadOnlyReview] = useState(Boolean(!isBackendTarget && savedSubmission));
+  const [isExamSubmitted, setIsExamSubmitted] = useState(Boolean(!isBackendTarget && savedSubmission));
+  const [submissionResult, setSubmissionResult] = useState(!isBackendTarget ? savedSubmission : null);
+  const [attemptDetailedResults, setAttemptDetailedResults] = useState(null);
 
   // Restore student answers when in review mode
   useEffect(() => {
-    if (savedSubmission?.savedAnswers && Object.keys(savedSubmission.savedAnswers).length > 0) {
+    if (!isBackendTarget && savedSubmission?.savedAnswers && Object.keys(savedSubmission.savedAnswers).length > 0) {
       setAnswers(savedSubmission.savedAnswers);
       setIsReadOnlyReview(true);
     }
     // Restore actual exam duration for review mode timer
-    if (savedSubmission?.totalTimeSeconds != null) {
+    if (!isBackendTarget && savedSubmission?.totalTimeSeconds != null) {
       setTimeLeft(savedSubmission.totalTimeSeconds);
     }
-  }, [savedSubmission]);
+  }, [savedSubmission, isBackendTarget]);
+
+  // Autosave answers to sessionStorage so an expired session never loses student's work
+  useEffect(() => {
+    if (!isReadOnlyReview && !isExamSubmitted && answers && Object.keys(answers).length > 0) {
+      try {
+        sessionStorage.setItem(`tk_exam_draft_${currentExamId}`, JSON.stringify(answers));
+      } catch (e) {}
+    }
+  }, [answers, currentExamId, isReadOnlyReview, isExamSubmitted]);
+
+  // Restore draft answers on mount if available
+  useEffect(() => {
+    if (!isReadOnlyReview && Object.keys(answers).length === 0) {
+      try {
+        const savedDraft = sessionStorage.getItem(`tk_exam_draft_${currentExamId}`);
+        if (savedDraft) {
+          const parsed = JSON.parse(savedDraft);
+          if (parsed && typeof parsed === 'object' && Object.keys(parsed).length > 0) {
+            setAnswers(parsed);
+          }
+        }
+      } catch (e) {}
+    }
+  }, [currentExamId, isReadOnlyReview]);
 
   // Timer countdown (only active when exam is not submitted)
   useEffect(() => {
@@ -396,6 +669,104 @@ export default function StudentExerciseTakingPage() {
       };
     });
   };
+
+  // Handler to clear/reset answer for a question
+  const handleClearAnswer = (qIdx) => {
+    if (isReadOnlyReview || isExamSubmitted) return;
+    setAnswers(prev => {
+      const copy = { ...prev };
+      delete copy[qIdx];
+      return copy;
+    });
+  };
+
+  // Anti-cheating & Fullscreen detection
+  const [isFullscreen, setIsFullscreen] = useState(Boolean(document.fullscreenElement));
+  const [showAntiCheatWarning, setShowAntiCheatWarning] = useState(false);
+
+  const toggleFullscreen = () => {
+    if (!document.fullscreenElement) {
+      document.documentElement.requestFullscreen().catch(() => {});
+      setIsFullscreen(true);
+    } else {
+      if (document.exitFullscreen) {
+        document.exitFullscreen().catch(() => {});
+        setIsFullscreen(false);
+      }
+    }
+  };
+
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (document.hidden && !isExamSubmitted && !isReadOnlyReview) {
+        setShowAntiCheatWarning(true);
+      }
+    };
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
+  }, [isExamSubmitted, isReadOnlyReview]);
+
+  // Exam lock: warn on blur/fullscreen exit, block copy/paste/context menu/devtools keys,
+  // and prevent leaving the page (reload/close/back) while the exam is in progress.
+  useEffect(() => {
+    if (isExamSubmitted || isReadOnlyReview) return undefined;
+    const warn = () => setShowAntiCheatWarning(true);
+    const block = (e) => e.preventDefault();
+    const onFullscreenChange = () => {
+      const fs = Boolean(document.fullscreenElement);
+      setIsFullscreen(fs);
+      if (!fs) warn();
+    };
+    const onKeyDown = (e) => {
+      const k = (e.key || '').toLowerCase();
+      const ctrl = e.ctrlKey || e.metaKey;
+      if (
+        k === 'f12' || k === 'printscreen' ||
+        (ctrl && ['c', 'x', 'v', 'a', 'p', 's', 'u'].includes(k) && !(e.target && /^(input|textarea)$/i.test(e.target.tagName) && ['c', 'x', 'v', 'a'].includes(k))) ||
+        (ctrl && e.shiftKey && ['i', 'j', 'c'].includes(k))
+      ) {
+        e.preventDefault();
+      }
+    };
+    const onBeforeUnload = (e) => { e.preventDefault(); e.returnValue = ''; };
+    // Trap the browser back button
+    window.history.pushState(null, '', window.location.href);
+    const onPopState = () => {
+      window.history.pushState(null, '', window.location.href);
+      warn();
+    };
+    window.addEventListener('blur', warn);
+    document.addEventListener('fullscreenchange', onFullscreenChange);
+    document.addEventListener('copy', block);
+    document.addEventListener('cut', block);
+    document.addEventListener('paste', block);
+    document.addEventListener('contextmenu', block);
+    document.addEventListener('keydown', onKeyDown);
+    window.addEventListener('beforeunload', onBeforeUnload);
+    window.addEventListener('popstate', onPopState);
+    return () => {
+      window.removeEventListener('blur', warn);
+      document.removeEventListener('fullscreenchange', onFullscreenChange);
+      document.removeEventListener('copy', block);
+      document.removeEventListener('cut', block);
+      document.removeEventListener('paste', block);
+      document.removeEventListener('contextmenu', block);
+      document.removeEventListener('keydown', onKeyDown);
+      window.removeEventListener('beforeunload', onBeforeUnload);
+      window.removeEventListener('popstate', onPopState);
+    };
+  }, [isExamSubmitted, isReadOnlyReview]);
+
+  // Full exam lockdown — ONLY for real backend targets while taking
+  // (not after submit, not in read-only review). Auto-enters fullscreen, re-locks
+  // fullscreen when exited, and blocks multi-monitor/extended setups via overlay.
+  // Everything is released (exitFullscreen + listeners) when `enabled` flips false,
+  // i.e. on successful submit or when switching to review mode.
+  const lockdownEnabled = isBackendTarget && !isExamSubmitted && !isReadOnlyReview && !backendError;
+  const lockdown = useExamLockdown({
+    enabled: lockdownEnabled,
+    onFullscreenLost: () => setShowAntiCheatWarning(true),
+  });
 
   // Clean and validate Short Answer (Max 4 chars, decimal comma only)
   const cleanShortAnswer = (val) => {
@@ -488,7 +859,8 @@ export default function StudentExerciseTakingPage() {
   const answeredCount = Object.keys(answers).filter(k => isQuestionAnswered(Number(k)) && Number(k) < totalQuestions).length;
   const unansweredCount = totalQuestions - answeredCount;
   const flaggedCount = Object.keys(flaggedQuestions).filter(k => flaggedQuestions[k] && Number(k) < totalQuestions).length;
-  const progressPercent = Math.round((answeredCount / totalQuestions) * 100);
+  const progressPercent = totalQuestions > 0 ? Math.round((answeredCount / totalQuestions) * 100) : 0;
+  const partPct = (answered, total) => (total > 0 ? Math.min(100, Math.round((answered / total) * 100)) : 0);
 
   // Breakdown by Part
   const part1Answered = Array.from({ length: exerciseInfo.part1Count }, (_, i) => i).filter(i => isQuestionAnswered(i)).length;
@@ -513,11 +885,19 @@ export default function StudentExerciseTakingPage() {
           if (userAns !== undefined && userAns !== null) {
             const qType = normalizeQType(q.question_type);
             if (qType === 'SHORT_ANSWER') {
-              if (typeof userAns === 'string' && userAns.trim()) {
+              if (userAns !== undefined && userAns !== null && String(userAns).trim() !== '') {
                 submitAnswers.push({
                   question_id: q.question_id,
-                  answer_text: userAns.trim().replace(/,/g, '.')
+                  answer_text: String(userAns).trim().replace(/,/g, '.')
                 });
+              }
+            } else if (qType === 'OTHER') {
+              if (typeof userAns === 'object') {
+                const subCount = Math.max((q.answer_options || []).length, ...Object.keys(userAns).map(k => Number(k) + 1), 0);
+                const arr = Array.from({ length: subCount }, (_, i) => userAns[i] || '');
+                if (arr.some(v => String(v).trim())) {
+                  submitAnswers.push({ question_id: q.question_id, answer_text: JSON.stringify(arr) });
+                }
               }
             } else if (qType === 'TRUE_FALSE') {
               if (typeof userAns === 'object') {
@@ -530,7 +910,8 @@ export default function StudentExerciseTakingPage() {
             } else {
               const selectedLetter = userAns;
               const optIdx = ['A', 'B', 'C', 'D'].indexOf(selectedLetter);
-              const matchedOpt = optIdx !== -1 && q.answer_options ? q.answer_options[optIdx] : null;
+              const sortedOptions = [...(q.answer_options || [])].sort((a, b) => (a.display_order || 0) - (b.display_order || 0));
+              const matchedOpt = optIdx !== -1 && sortedOptions[optIdx] ? sortedOptions[optIdx] : null;
               if (matchedOpt) {
                 submitAnswers.push({
                   question_id: q.question_id,
@@ -546,10 +927,60 @@ export default function StudentExerciseTakingPage() {
           }
         });
 
-        const submitRes = await attemptsApi.submitAttempt(attemptId, { answers: submitAnswers });
+        const currentToken = localStorage.getItem('access_token');
+        if (!currentToken) {
+          try {
+            sessionStorage.setItem(`tk_exam_draft_${currentExamId}`, JSON.stringify(answers));
+          } catch (e) {}
+          toast.error('Phiên đăng nhập của bạn đã hết hạn. Các câu trả lời đã được lưu tạm, vui lòng đăng nhập lại để nộp bài.');
+          setTimeout(() => { window.location.href = '/login'; }, 2500);
+          return;
+        }
+
+        let targetAttemptId = attemptId;
+        if (!targetAttemptId && isUuid(stateAssignmentId)) {
+          try {
+            const myAttempts = await attemptsApi.getAttempts();
+            const open = (myAttempts || []).find(a =>
+              String(a.assignment_id).toLowerCase() === String(stateAssignmentId).toLowerCase() && !a.is_finished
+            );
+            if (open) {
+              targetAttemptId = open.attempt_id;
+              setAttemptId(targetAttemptId);
+            } else {
+              const startRes = await attemptsApi.startAttempt(stateAssignmentId);
+              targetAttemptId = startRes.attempt_id;
+              setAttemptId(targetAttemptId);
+            }
+          } catch (lookupErr) {
+            console.warn('Could not resolve open attempt before submit:', lookupErr);
+          }
+        }
+
+        if (!targetAttemptId) {
+          toast.error('Không tìm thấy phiên làm bài hợp lệ. Vui lòng tải lại trang.');
+          return;
+        }
+
+        const submitRes = await attemptsApi.submitAttempt(targetAttemptId, { answers: submitAnswers });
         const score = submitRes?.score !== undefined && submitRes?.score !== null 
           ? Number(submitRes.score).toFixed(2) 
           : ((answeredCount / totalQuestions) * 10).toFixed(2);
+
+        // Clear draft and exercises session cache on successful submit
+        try {
+          sessionStorage.removeItem(`tk_exam_draft_${currentExamId}`);
+          let currentUserId = 'default';
+          try {
+            const rawUser = localStorage.getItem('user_info');
+            if (rawUser) {
+              const u = JSON.parse(rawUser);
+              currentUserId = u.user_id || u.id || 'default';
+            }
+          } catch (e) {}
+          sessionStorage.removeItem(`tk_student_assignments_session_${currentUserId}`);
+          sessionStorage.removeItem(`tk_student_attempts_session_${currentUserId}`);
+        } catch (e) {}
 
         const resultData = {
           submittedAt: new Date().toISOString(),
@@ -561,23 +992,29 @@ export default function StudentExerciseTakingPage() {
           score,
           isExam: exerciseInfo.isExam,
           title: exerciseInfo.title,
-          attemptId: submitRes?.attempt_id || attemptId,
-          savedAnswers: { ...answers }
+          attemptId: submitRes?.attempt_id || targetAttemptId,
+          savedAnswers: { ...answers },
+          detailedResults: submitRes?.detailed_results || null
         };
 
-        try {
-          localStorage.setItem(`tk_exam_submitted_${currentExamId}`, JSON.stringify(resultData));
-        } catch (e) {
-          console.error('Failed to save state', e);
-        }
-
+        setAttemptDetailedResults(submitRes?.detailed_results || null);
         setSubmissionResult(resultData);
         setIsExamSubmitted(true);
-        setIsReadOnlyReview(true);
+        setIsReadOnlyReview(false);
         setIsSubmitModalOpen(false);
       } catch (err) {
         console.error('Submit attempt failed:', err);
-        alert(err.response?.data?.detail?.message || 'Có lỗi xảy ra khi nộp bài. Vui lòng thử lại.');
+        const errDetail = err.response?.data?.detail;
+        const msg = typeof errDetail === 'object' ? errDetail?.message : errDetail;
+        if (err.response?.status === 401 || !localStorage.getItem('access_token')) {
+          try {
+            sessionStorage.setItem(`tk_exam_draft_${currentExamId}`, JSON.stringify(answers));
+          } catch (e) {}
+          toast.error('Phiên làm việc đã hết hạn. Các câu trả lời của bạn đã được lưu tạm, vui lòng đăng nhập lại để nộp bài.');
+          setTimeout(() => { window.location.href = '/login'; }, 2500);
+        } else {
+          toast.error(msg || 'Có lỗi xảy ra khi nộp bài. Vui lòng thử lại.');
+        }
       } finally {
         setIsSubmitting(false);
       }
@@ -601,13 +1038,16 @@ export default function StudentExerciseTakingPage() {
 
     try {
       localStorage.setItem(`tk_exam_submitted_${currentExamId}`, JSON.stringify(resultData));
+      if (stateAssignmentId) {
+        localStorage.setItem(`tk_exam_submitted_${stateAssignmentId}`, JSON.stringify(resultData));
+      }
     } catch (e) {
       console.error('Failed to save state', e);
     }
 
     setSubmissionResult(resultData);
     setIsExamSubmitted(true);
-    setIsReadOnlyReview(true);
+    setIsReadOnlyReview(false);
     setIsSubmitModalOpen(false);
   };
 
@@ -644,58 +1084,133 @@ export default function StudentExerciseTakingPage() {
       } else if (normalizedType === 'SHORT_ANSWER') {
         qType = 'short_answer';
         partLabel = 'Phần III: Trả lời ngắn';
+      } else if (normalizedType === 'OTHER') {
+        qType = 'other';
+        partLabel = 'Phần IV: Câu hỏi khác';
       }
+
+      const qRes = attemptDetailedResults?.questions?.find(
+        r => String(r.question_id).toLowerCase() === String(bQ.question_id).toLowerCase()
+      );
 
       if (qType === 'single_choice') {
         const letters = ['A', 'B', 'C', 'D', 'E', 'F'];
-        const options = (bQ.answer_options && bQ.answer_options.length > 0)
-          ? bQ.answer_options.map((opt, oIdx) => ({
-              key: letters[oIdx] || String(oIdx + 1),
-              text: opt.content,
-              optionId: opt.option_id
-            }))
+        const options = (getQuestionItems(bQ).length > 0)
+          ? getQuestionItems(bQ).map((opt, oIdx) => {
+              let text = opt.content || '';
+              text = text.replace(/^[A-Da-d][\.\)]\s*/, '').trim();
+              text = text.replace(/[\r\n\s\.]*[√✓\u221a]\s*$/, '').trim();
+              text = text.replace(/[\r\n\s\.]*\(\s*\)\s*$/, '').trim();
+              return {
+                key: letters[oIdx] || String(oIdx + 1),
+                text,
+                optionId: opt.option_id,
+                isCorrect: Boolean(opt.is_correct)
+                  || Boolean(qRes && qRes.correct_option_id && String(qRes.correct_option_id) === String(opt.option_id))
+              };
+            })
           : [
-              { key: 'A', text: 'Phương án A' },
-              { key: 'B', text: 'Phương án B' },
-              { key: 'C', text: 'Phương án C' },
-              { key: 'D', text: 'Phương án D' }
+              { key: 'A', text: 'Phương án A', isCorrect: false },
+              { key: 'B', text: 'Phương án B', isCorrect: false },
+              { key: 'C', text: 'Phương án C', isCorrect: false },
+              { key: 'D', text: 'Phương án D', isCorrect: false }
             ];
         return {
+          id: bQ.question_id,
           part: partLabel,
           number: qNum,
           type: 'single_choice',
           statement: bQ.content || 'Nội dung câu hỏi',
-          options
+          options,
+          explanation: bQ.explanation ?? qRes?.explanation ?? null,
+          correctAnswer: bQ.correct_answer ?? qRes?.correct_answer ?? null,
+          isCorrect: qRes ? qRes.is_correct : (options.find(o => o.key === answers[currentQuestionIdx])?.isCorrect ?? null),
+          image_url: bQ.image_url,
+          image_metadata: bQ.image_metadata,
+          segments: bQ.segments,
+          qRes
         };
       } else if (qType === 'true_false') {
         const letters = ['a', 'b', 'c', 'd'];
-        const items = (bQ.answer_options && bQ.answer_options.length > 0)
-          ? bQ.answer_options.map((opt, oIdx) => ({
-              key: letters[oIdx] || String(oIdx + 1),
-              text: opt.content,
-              optionId: opt.option_id
-            }))
+        const items = (getQuestionItems(bQ).length > 0)
+          ? getQuestionItems(bQ).map((opt, oIdx) => {
+              const letter = letters[oIdx] || String(oIdx + 1);
+              let text = opt.content || '';
+              text = text.replace(/^[a-dA-D][\.\)]\s*/, '').trim();
+              text = text.replace(/[\r\n\s\.]*[√✓\u221a]\s*$/, '').trim();
+              text = text.replace(/[\r\n\s\.]*\(\s*\)\s*$/, '').trim();
+              return {
+                key: letter,
+                text,
+                optionId: opt.option_id,
+                isCorrect: Boolean(opt.is_correct)
+              };
+            })
           : [
-              { key: 'a', text: 'Mệnh đề a' },
-              { key: 'b', text: 'Mệnh đề b' },
-              { key: 'c', text: 'Mệnh đề c' },
-              { key: 'd', text: 'Mệnh đề d' }
+              { key: 'a', text: 'Mệnh đề a', isCorrect: true },
+              { key: 'b', text: 'Mệnh đề b', isCorrect: false },
+              { key: 'c', text: 'Mệnh đề c', isCorrect: true },
+              { key: 'd', text: 'Mệnh đề d', isCorrect: false }
             ];
         return {
+          id: bQ.question_id,
           part: partLabel,
           number: qNum,
           type: 'true_false',
           statement: bQ.content || 'Nội dung câu hỏi Đúng/Sai',
-          items
+          items,
+          explanation: bQ.explanation ?? qRes?.explanation ?? null,
+          correctAnswer: bQ.correct_answer ?? qRes?.correct_answer ?? null,
+          isCorrect: qRes ? qRes.is_correct : null,
+          image_url: bQ.image_url,
+          image_metadata: bQ.image_metadata,
+          segments: bQ.segments,
+          qRes
+        };
+      } else if (qType === 'other') {
+        return {
+          id: bQ.question_id,
+          part: partLabel,
+          number: qNum,
+          type: 'other',
+          statement: bQ.content || 'Nội dung câu hỏi',
+          subQuestions: getQuestionItems(bQ).map((opt) => opt.content || ''),
+          explanation: bQ.explanation ?? qRes?.explanation ?? null,
+          correctAnswer: null,
+          isCorrect: null,
+          image_url: bQ.image_url,
+          image_metadata: bQ.image_metadata,
+          segments: bQ.segments,
+          qRes
         };
       } else {
         return {
+          id: bQ.question_id,
           part: partLabel,
           number: qNum,
           type: 'short_answer',
-          statement: bQ.content || 'Nội dung câu hỏi trả lời ngắn'
+          statement: bQ.content || 'Nội dung câu hỏi trả lời ngắn',
+          explanation: bQ.explanation ?? qRes?.explanation ?? null,
+          correctAnswer: bQ.correct_answer ?? qRes?.correct_answer ?? null,
+          isCorrect: qRes ? qRes.is_correct : null,
+          image_url: bQ.image_url,
+          image_metadata: bQ.image_metadata,
+          segments: bQ.segments,
+          qRes
         };
       }
+    }
+
+    // Backend (UUID) target but no question loaded (loading / BE error): NEVER fall back to the mock datasets
+    if (isBackendTarget) {
+      return {
+        id: null,
+        part: '',
+        number: qNum,
+        type: 'single_choice',
+        statement: '',
+        options: []
+      };
     }
 
     // CHEMISTRY 12 DATASET (Este & Lipit)
@@ -1113,13 +1628,99 @@ export default function StudentExerciseTakingPage() {
       statement: sItem.text,
       diagram: sItem.diagram
     };
-  }, [currentQuestionIdx, isChemistry, exerciseInfo, backendQuestions]);
+  }, [currentQuestionIdx, isChemistry, isBackendTarget, exerciseInfo, backendQuestions, attemptDetailedResults, answers]);
+
+  const otherEditorRefs = useRef({});
+  const otherActiveRef = useRef(null);
+  const handleOtherChange = (qIdx, subIdx, val) => {
+    setAnswers(prev => {
+      const cur = prev[qIdx] && typeof prev[qIdx] === 'object' ? { ...prev[qIdx] } : {};
+      if (String(val || '').trim()) cur[subIdx] = val; else delete cur[subIdx];
+      return { ...prev, [qIdx]: cur };
+    });
+  };
+
+  const getQuestionReviewStatus = (qIdx) => {
+    if (!isReadOnlyReview) return null;
+    if (backendQuestions.length > 0 && backendQuestions[qIdx]) {
+      const bQ = backendQuestions[qIdx];
+      const qRes = attemptDetailedResults?.questions?.find(
+        r => String(r.question_id).toLowerCase() === String(bQ.question_id).toLowerCase()
+      );
+      if (qRes && qRes.is_correct !== null && qRes.is_correct !== undefined) {
+        return qRes.is_correct ? 'correct' : 'wrong';
+      }
+      const normType = normalizeQType(bQ.question_type);
+      if (normType === 'OTHER') return null; // manual grading: no auto verdict
+      if (normType === 'MULTIPLE_CHOICE') {
+        const userKey = answers[qIdx];
+        if (!userKey) return 'wrong';
+        const letters = ['A', 'B', 'C', 'D', 'E', 'F'];
+        const optIdx = letters.indexOf(userKey);
+        if (optIdx !== -1 && bQ.answer_options?.[optIdx]?.is_correct) {
+          return 'correct';
+        }
+        return 'wrong';
+      } else if (normType === 'TRUE_FALSE') {
+        const userTF = answers[qIdx];
+        if (!userTF || typeof userTF !== 'object' || Object.keys(userTF).length === 0) return 'wrong';
+        const answerOpts = bQ.answer_options || [];
+        if (answerOpts.length > 0) {
+          const isAllCorrect = answerOpts.every((opt, oIdx) => {
+            const key = ['a', 'b', 'c', 'd'][oIdx] || String(oIdx + 1);
+            return userTF[key] === Boolean(opt.is_correct);
+          });
+          return isAllCorrect ? 'correct' : 'wrong';
+        }
+        return 'wrong';
+      } else if (normType === 'SHORT_ANSWER') {
+        const userVal = answers[qIdx];
+        if (!userVal) return 'wrong';
+        const correctAns = bQ.correct_answer;
+        if (correctAns) {
+          const normUser = String(userVal).trim().replace(',', '.');
+          const normCorr = String(correctAns).trim().replace(',', '.');
+          return normUser === normCorr ? 'correct' : 'wrong';
+        }
+        return 'wrong';
+      }
+    }
+    const val = answers[qIdx];
+    if (val !== undefined && val !== null && val !== '') {
+      if (typeof val === 'string' && val.toUpperCase() === 'A') {
+        return 'correct';
+      }
+      return 'wrong';
+    }
+    return null;
+  };
 
   if (isLoadingBackend) {
     return (
       <div className="exercise-taking-container" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100vh', background: '#F8FAFC' }}>
         <Loader2 size={40} className="animate-spin" style={{ animation: 'spin 1s linear infinite', color: '#2563EB', marginBottom: '16px' }} />
         <p style={{ color: '#475569', fontSize: '15px', fontWeight: 500 }}>Đang tải đề thi và phiên làm bài...</p>
+      </div>
+    );
+  }
+
+  // Backend target but the BE failed: show a clear error state — NEVER fall back to mock data
+  if (isBackendTarget && backendError && !backendExercise) {
+    return (
+      <div className="exercise-taking-container exam-backend-error-screen">
+        <div className="exam-backend-error-card">
+          <AlertCircle size={44} className="backend-error-icon" />
+          <h3 className="backend-error-title">Không thể tải đề thi từ hệ thống</h3>
+          <p className="backend-error-message">{backendError}</p>
+          <button
+            type="button"
+            className="btn-backend-error-back"
+            onClick={() => navigate('/student/exercises')}
+          >
+            <ArrowLeft size={16} />
+            <span>Về Kho bài tập</span>
+          </button>
+        </div>
       </div>
     );
   }
@@ -1141,6 +1742,15 @@ export default function StudentExerciseTakingPage() {
             <Clock size={16} className="timer-icon" />
             <span>{isExamSubmitted ? `Đã làm: ${formatTimer(timeLeft)}` : formatTimer(timeLeft)}</span>
           </div>
+          <button 
+            type="button" 
+            className="exam-icon-btn btn-fullscreen-toggle" 
+            aria-label="Toàn màn hình" 
+            title={isFullscreen ? "Thoát toàn màn hình" : "Chế độ toàn màn hình"}
+            onClick={toggleFullscreen}
+          >
+            {isFullscreen ? <Minimize2 size={18} /> : <Maximize2 size={18} />}
+          </button>
           <button type="button" className="exam-icon-btn" aria-label="Help" title="Hướng dẫn làm bài">
             <HelpCircle size={20} />
           </button>
@@ -1156,6 +1766,13 @@ export default function StudentExerciseTakingPage() {
         <aside className="exam-palette-sidebar">
           <div>
             <h3 className="palette-header-title">MỤC LỤC CÂU HỎI</h3>
+
+            {isReadOnlyReview && (
+              <div className="palette-review-legend">
+                <div className="legend-item"><span className="legend-dot dot-correct" /><span>Đúng</span></div>
+                <div className="legend-item"><span className="legend-dot dot-wrong" /><span>Sai / Chưa làm</span></div>
+              </div>
+            )}
 
             {/* Filter Toggle Actions */}
             <div className="palette-filter-actions">
@@ -1221,16 +1838,21 @@ export default function StudentExerciseTakingPage() {
                         const isFlagged = Boolean(flaggedQuestions[i]);
                         const isActive = currentQuestionIdx === i;
                         const isDimmed = filterMode === 'flagged' && !isFlagged;
+                        const reviewStatus = getQuestionReviewStatus(i);
                         return (
                           <button
                             key={qNum}
                             type="button"
-                            className={`palette-num-btn ${isActive ? 'active' : ''} ${isAns ? 'answered' : ''} ${isFlagged ? 'flagged' : ''} ${isDimmed ? 'dimmed' : ''}`}
+                            className={`palette-num-btn ${isActive ? 'active' : ''} ${isAns ? 'answered' : ''} ${isFlagged ? 'flagged' : ''} ${isDimmed ? 'dimmed' : ''} ${reviewStatus ? `review-${reviewStatus}` : ''}`}
                             onClick={() => setCurrentQuestionIdx(i)}
-                            title={`Câu ${qNum}${isFlagged ? ' (Đã gắn cờ)' : ''}${isAns ? ' (Đã trả lời)' : ''}`}
+                            title={`Câu ${qNum}${reviewStatus === 'correct' ? ' (Đúng)' : reviewStatus === 'wrong' ? ' (Sai)' : ''}${isFlagged ? ' (Đã gắn cờ)' : ''}`}
                           >
                             {qNum}
-                            {isAns && !isActive && <span className="answered-dot" />}
+                            {isReadOnlyReview && reviewStatus ? (
+                              <span className={`review-dot ${reviewStatus}`} />
+                            ) : (
+                              isAns && !isActive && <span className="answered-dot" />
+                            )}
                           </button>
                         );
                       })}
@@ -1250,16 +1872,21 @@ export default function StudentExerciseTakingPage() {
                         const isFlagged = Boolean(flaggedQuestions[qIdx]);
                         const isActive = currentQuestionIdx === qIdx;
                         const isDimmed = filterMode === 'flagged' && !isFlagged;
+                        const reviewStatus = getQuestionReviewStatus(qIdx);
                         return (
                           <button
                             key={qNum}
                             type="button"
-                            className={`palette-num-btn ${isActive ? 'active' : ''} ${isAns ? 'answered' : ''} ${isFlagged ? 'flagged' : ''} ${isDimmed ? 'dimmed' : ''}`}
+                            className={`palette-num-btn ${isActive ? 'active' : ''} ${isAns ? 'answered' : ''} ${isFlagged ? 'flagged' : ''} ${isDimmed ? 'dimmed' : ''} ${reviewStatus ? `review-${reviewStatus}` : ''}`}
                             onClick={() => setCurrentQuestionIdx(qIdx)}
-                            title={`Câu ${qNum}${isFlagged ? ' (Đã gắn cờ)' : ''}${isAns ? ' (Đã trả lời)' : ''}`}
+                            title={`Câu ${qNum}${reviewStatus === 'correct' ? ' (Đúng)' : reviewStatus === 'wrong' ? ' (Sai)' : ''}${isFlagged ? ' (Đã gắn cờ)' : ''}`}
                           >
                             {qNum}
-                            {isAns && !isActive && <span className="answered-dot" />}
+                            {isReadOnlyReview && reviewStatus ? (
+                              <span className={`review-dot ${reviewStatus}`} />
+                            ) : (
+                              isAns && !isActive && <span className="answered-dot" />
+                            )}
                           </button>
                         );
                       })}
@@ -1279,15 +1906,45 @@ export default function StudentExerciseTakingPage() {
                         const isFlagged = Boolean(flaggedQuestions[qIdx]);
                         const isActive = currentQuestionIdx === qIdx;
                         const isDimmed = filterMode === 'flagged' && !isFlagged;
+                        const reviewStatus = getQuestionReviewStatus(qIdx);
                         return (
                           <button
                             key={qNum}
                             type="button"
-                            className={`palette-num-btn ${isActive ? 'active' : ''} ${isAns ? 'answered' : ''} ${isFlagged ? 'flagged' : ''} ${isDimmed ? 'dimmed' : ''}`}
+                            className={`palette-num-btn ${isActive ? 'active' : ''} ${isAns ? 'answered' : ''} ${isFlagged ? 'flagged' : ''} ${isDimmed ? 'dimmed' : ''} ${reviewStatus ? `review-${reviewStatus}` : ''}`}
                             onClick={() => setCurrentQuestionIdx(qIdx)}
-                            title={`Câu ${qNum}${isFlagged ? ' (Đã gắn cờ)' : ''}${isAns ? ' (Đã trả lời)' : ''}`}
+                            title={`Câu ${qNum}${reviewStatus === 'correct' ? ' (Đúng)' : reviewStatus === 'wrong' ? ' (Sai)' : ''}${isFlagged ? ' (Đã gắn cờ)' : ''}`}
                           >
                             {qNum}
+                            {isReadOnlyReview && reviewStatus ? (
+                              <span className={`review-dot ${reviewStatus}`} />
+                            ) : (
+                              isAns && !isActive && <span className="answered-dot" />
+                            )}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+                {/* Group 4: Khác */}
+                {exerciseInfo.part4Count > 0 && (
+                  <div className="palette-section-group">
+                    <span className="palette-section-label">Khác ({exerciseInfo.part4Count})</span>
+                    <div className="palette-buttons-grid">
+                      {Array.from({ length: exerciseInfo.part4Count }, (_, i) => {
+                        const qIdx = i + exerciseInfo.part1Count + exerciseInfo.part2Count + exerciseInfo.part3Count;
+                        const isAns = isQuestionAnswered(qIdx);
+                        const isActive = currentQuestionIdx === qIdx;
+                        return (
+                          <button
+                            key={qIdx}
+                            type="button"
+                            className={`palette-num-btn ${isActive ? 'active' : ''} ${isAns ? 'answered' : ''}`}
+                            onClick={() => setCurrentQuestionIdx(qIdx)}
+                            title={`Câu ${qIdx + 1}`}
+                          >
+                            {qIdx + 1}
                             {isAns && !isActive && <span className="answered-dot" />}
                           </button>
                         );
@@ -1295,6 +1952,7 @@ export default function StudentExerciseTakingPage() {
                     </div>
                   </div>
                 )}
+
               </div>
             )}
           </div>
@@ -1330,6 +1988,10 @@ export default function StudentExerciseTakingPage() {
 
         {/* Center Question Viewport */}
         <main className="exam-question-viewport">
+          {/* AI reference sources: shown only after submission to avoid leaking answers */}
+          {isExamSubmitted && backendExercise?.ai_metadata?.is_ai_generated && (
+            <AiSourcesList sources={backendExercise.ai_metadata.sources} />
+          )}
           {/* Readonly Review Banner */}
           {isExamSubmitted && isReadOnlyReview && (
             <div className={`exam-readonly-banner ${!exerciseInfo.isExam ? 'banner-practice' : ''}`}>
@@ -1339,7 +2001,16 @@ export default function StudentExerciseTakingPage() {
                   <strong>{exerciseInfo.isExam ? 'Chế độ xem lại bài thi:' : 'Chế độ xem lại bài tập:'}</strong> {exerciseInfo.isExam ? `Đã nộp thành công lúc ${submissionResult?.formattedTime || 'trước đó'}. Bài thi này không cho phép làm lại.` : `Đã nộp lúc ${submissionResult?.formattedTime || 'trước đó'}. Bạn có thể bấm "Làm lại bài tập" bất cứ lúc nào.`}
                 </span>
               </div>
-              <div style={{ display: 'flex', gap: '8px' }}>
+              <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                <button
+                  type="button"
+                  className="btn-banner-view-score"
+                  onClick={() => setIsReadOnlyReview(false)}
+                  title="Xem lại bảng điểm và kết quả tổng quan"
+                >
+                  <Eye size={14} />
+                  <span>Xem bảng điểm & tổng quan</span>
+                </button>
                 {!exerciseInfo.isExam && (
                   <button 
                     type="button" 
@@ -1373,22 +2044,49 @@ export default function StudentExerciseTakingPage() {
                   Câu {questionData.number}
                 </span>
               </div>
-              <button 
-                type="button" 
-                disabled={isReadOnlyReview}
-                className={`btn-flag-review ${flaggedQuestions[currentQuestionIdx] ? 'flagged' : ''} ${isReadOnlyReview ? 'readonly' : ''}`}
-                onClick={() => toggleFlag(currentQuestionIdx)}
-              >
-                <Flag size={15} fill={flaggedQuestions[currentQuestionIdx] ? '#DC2626' : 'none'} />
-                <span>
-                  {flaggedQuestions[currentQuestionIdx] ? 'Đã gắn cờ xem lại' : 'Đánh dấu để xem lại'}
-                </span>
-              </button>
+              <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                {!isReadOnlyReview && !isExamSubmitted && answers[currentQuestionIdx] !== undefined && (
+                  <button 
+                    type="button" 
+                    className="btn-clear-answer"
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '6px',
+                      padding: '6px 12px',
+                      borderRadius: '8px',
+                      border: '1px solid #E2E8F0',
+                      background: '#FFFFFF',
+                      color: '#64748B',
+                      fontSize: '13px',
+                      fontWeight: 500,
+                      cursor: 'pointer'
+                    }}
+                    onClick={() => handleClearAnswer(currentQuestionIdx)}
+                    title="Xóa lựa chọn đáp án câu này"
+                  >
+                    <RotateCcw size={14} />
+                    <span>Xóa đáp án</span>
+                  </button>
+                )}
+                <button 
+                  type="button" 
+                  disabled={isReadOnlyReview}
+                  className={`btn-flag-review ${flaggedQuestions[currentQuestionIdx] ? 'flagged' : ''} ${isReadOnlyReview ? 'readonly' : ''}`}
+                  onClick={() => toggleFlag(currentQuestionIdx)}
+                >
+                  <Flag size={15} fill={flaggedQuestions[currentQuestionIdx] ? '#DC2626' : 'none'} />
+                  <span>
+                    {flaggedQuestions[currentQuestionIdx] ? 'Đã gắn cờ xem lại' : 'Đánh dấu để xem lại'}
+                  </span>
+                </button>
+              </div>
             </div>
 
             {/* Question Statement */}
             <div className="question-statement-text">
-              <MathRenderer text={questionData.statement} />
+              <QuestionContentView text={questionData.statement} />
+              <QuestionMedia question={questionData} compact />
             </div>
 
             {/* Dynamic Diagram */}
@@ -1405,16 +2103,40 @@ export default function StudentExerciseTakingPage() {
                 <div className="question-options-grid">
                   {questionData.options.map((opt) => {
                     const isSelected = answers[currentQuestionIdx] === opt.key;
+                    const isCorrectOpt = opt.isCorrect === true || (questionData.correctAnswer && String(questionData.correctAnswer).toUpperCase() === opt.key);
+                    let reviewClass = '';
+                    if (isReadOnlyReview) {
+                      if (isCorrectOpt) {
+                        reviewClass = 'review-correct-option';
+                      } else if (isSelected && !isCorrectOpt) {
+                        reviewClass = 'review-wrong-option';
+                      }
+                    }
+
                     return (
                       <div
                         key={opt.key}
-                        className={`option-select-box ${isSelected ? 'selected' : ''} ${isReadOnlyReview ? 'readonly-option' : ''}`}
+                        className={`option-select-box ${isSelected ? 'selected' : ''} ${isReadOnlyReview ? 'readonly-option' : ''} ${reviewClass}`}
                         onClick={() => !isReadOnlyReview && handleSelectOption(currentQuestionIdx, opt.key)}
                       >
-                        <div className="option-letter-badge">{opt.key}</div>
+                        <div className="option-letter-badge">
+                          {isReadOnlyReview && isCorrectOpt ? (
+                            <Check size={16} className="opt-status-icon correct-icon" />
+                          ) : isReadOnlyReview && isSelected && !isCorrectOpt ? (
+                            <X size={16} className="opt-status-icon wrong-icon" />
+                          ) : (
+                            opt.key
+                          )}
+                        </div>
                         <span className="option-content-text">
-                          <MathRenderer text={opt.text} />
+                          <QuestionContentView text={(opt.text || '').replace(/^[A-Da-d][\.\)]\s*/, '').trim()} />
                         </span>
+                        {isReadOnlyReview && isCorrectOpt && (
+                          <span className="review-badge-tag correct-tag">Đáp án đúng</span>
+                        )}
+                        {isReadOnlyReview && isSelected && !isCorrectOpt && (
+                          <span className="review-badge-tag wrong-tag">Lựa chọn của bạn</span>
+                        )}
                       </div>
                     );
                   })}
@@ -1429,42 +2151,87 @@ export default function StudentExerciseTakingPage() {
               <div className="question-tf-wrapper">
                 <div className="tf-header-bar">
                   <h4 className="question-prompt-label">Xét tính Đúng / Sai của từng mệnh đề dưới đây:</h4>
-                  <span className="tf-guide-note">Chọn một phương án [Đúng] hoặc [Sai] cho mỗi ý</span>
+                  <span className="tf-guide-note">
+                    {isReadOnlyReview ? 'Xem lại kết quả Đúng/Sai đối chiếu với đáp án chuẩn' : 'Chọn một phương án [Đúng] hoặc [Sai] cho mỗi ý'}
+                  </span>
                 </div>
 
                 <div className="tf-items-list">
                   {questionData.items.map((item) => {
-                    const currentTFState = answers[currentQuestionIdx] && typeof answers[currentQuestionIdx] === 'object'
+                    const userChoice = answers[currentQuestionIdx] && typeof answers[currentQuestionIdx] === 'object'
                       ? answers[currentQuestionIdx][item.key]
                       : undefined;
+                    const correctVal = item.isCorrect;
+                    const isAnswered = userChoice !== undefined && userChoice !== null;
+                    const isUserCorrect = isReadOnlyReview && isAnswered && correctVal !== undefined
+                      ? (userChoice === correctVal)
+                      : false;
+
+                    let rowReviewClass = '';
+                    if (isReadOnlyReview) {
+                      rowReviewClass = isUserCorrect ? 'tf-review-correct' : 'tf-review-wrong';
+                    }
 
                     return (
-                      <div key={item.key} className={`tf-item-row ${currentTFState !== undefined ? 'has-answer' : ''}`}>
+                      <div key={item.key} className={`tf-item-row ${isAnswered ? 'has-answer' : ''} ${rowReviewClass}`}>
                         <div className="tf-item-content">
                           <span className="tf-sub-key-badge">{item.key})</span>
                           <span className="tf-sub-text">
-                            <MathRenderer text={item.text} />
+                            <QuestionContentView text={(item.text || '').replace(/^[a-dA-D][\.\)]\s*/, '').replace(/[\r\n\s\.]*[√✓\u221a]\s*$/, '').replace(/[\r\n\s\.]*\(\s*\)\s*$/, '').trim()} />
                           </span>
+                          {isReadOnlyReview && correctVal !== undefined && (
+                            <span className={`tf-key-verdict-pill ${correctVal ? 'pill-true' : 'pill-false'}`}>
+                              Đáp án chuẩn: {correctVal ? 'Đúng' : 'Sai'}
+                            </span>
+                          )}
                         </div>
 
                         <div className="tf-toggle-actions">
                           <button
                             type="button"
                             disabled={isReadOnlyReview}
-                            className={`tf-btn btn-true ${currentTFState === true ? 'active' : ''}`}
+                            className={`tf-btn btn-true ${
+                              isReadOnlyReview
+                                ? userChoice === true
+                                  ? isUserCorrect
+                                    ? 'active user-correct'
+                                    : 'active user-wrong'
+                                  : 'faded'
+                                : userChoice === true
+                                ? 'active'
+                                : ''
+                            }`}
                             onClick={() => !isReadOnlyReview && handleSelectTrueFalse(currentQuestionIdx, item.key, true)}
                           >
-                            <CheckCircle2 size={16} />
+                            {isReadOnlyReview && userChoice === true ? (
+                              isUserCorrect ? <CheckCircle2 size={16} /> : <XCircle size={16} />
+                            ) : (
+                              <CheckCircle2 size={16} />
+                            )}
                             <span>Đúng</span>
                           </button>
 
                           <button
                             type="button"
                             disabled={isReadOnlyReview}
-                            className={`tf-btn btn-false ${currentTFState === false ? 'active' : ''}`}
+                            className={`tf-btn btn-false ${
+                              isReadOnlyReview
+                                ? userChoice === false
+                                  ? isUserCorrect
+                                    ? 'active user-correct'
+                                    : 'active user-wrong'
+                                  : 'faded'
+                                : userChoice === false
+                                ? 'active'
+                                : ''
+                            }`}
                             onClick={() => !isReadOnlyReview && handleSelectTrueFalse(currentQuestionIdx, item.key, false)}
                           >
-                            <XCircle size={16} />
+                            {isReadOnlyReview && userChoice === false ? (
+                              isUserCorrect ? <CheckCircle2 size={16} /> : <XCircle size={16} />
+                            ) : (
+                              <XCircle size={16} />
+                            )}
                             <span>Sai</span>
                           </button>
                         </div>
@@ -1472,6 +2239,41 @@ export default function StudentExerciseTakingPage() {
                     );
                   })}
                 </div>
+              </div>
+            )}
+
+            {/* TYPE 4: OTHER (stem + one rich math input per sub-question) */}
+            {questionData.type === 'other' && (
+              <div className="question-other-wrapper">
+                {!isReadOnlyReview && (
+                  <MathSymbolToolbar onInsert={(tpl) => (otherActiveRef.current || otherEditorRefs.current[0])?.insertMath(tpl)} />
+                )}
+                {questionData.subQuestions.map((sub, sIdx) => {
+                  const val = (answers[currentQuestionIdx] && answers[currentQuestionIdx][sIdx]) || '';
+                  return (
+                    <div key={`${currentQuestionIdx}-${sIdx}`} className="other-sub-question" style={{ margin: '14px 0' }}>
+                      <div style={{ fontWeight: 600, marginBottom: '6px' }}>
+                        <span>{sIdx + 1}) </span><QuestionContentView text={sub} />
+                      </div>
+                      {isReadOnlyReview ? (
+                        <div className="comparison-box student-ans-box">
+                          <span className="comparison-label">Câu trả lời của bạn:</span>
+                          <span className="comparison-value">{val ? <MathRenderer text={val} /> : '(Chưa trả lời)'}</span>
+                        </div>
+                      ) : (
+                        <MathTextEditor
+                          ref={(r) => { otherEditorRefs.current[sIdx] = r; }}
+                          className="question-latex-textarea"
+                          value={val}
+                          onChange={(v) => handleOtherChange(currentQuestionIdx, sIdx, v)}
+                          onFocus={() => { otherActiveRef.current = otherEditorRefs.current[sIdx]; }}
+                          placeholder={`Nhập câu trả lời cho ý ${sIdx + 1}...`}
+                          ariaLabel={`Answer for sub-question ${sIdx + 1}`}
+                        />
+                      )}
+                    </div>
+                  );
+                })}
               </div>
             )}
 
@@ -1595,6 +2397,40 @@ export default function StudentExerciseTakingPage() {
                     </div>
                   </div>
                 </div>
+
+                {isReadOnlyReview && (
+                  <div className="short-answer-review-comparison">
+                    <div className={`comparison-box student-ans-box ${
+                      questionData.correctAnswer && answers[currentQuestionIdx]
+                        ? String(answers[currentQuestionIdx]).trim().replace(',', '.') === String(questionData.correctAnswer).trim().replace(',', '.')
+                          ? 'sa-correct'
+                          : 'sa-wrong'
+                        : 'sa-wrong'
+                    }`}>
+                      <span className="comparison-label">Câu trả lời của bạn:</span>
+                      <span className="comparison-value">{answers[currentQuestionIdx] || '(Chưa trả lời)'}</span>
+                    </div>
+                    {questionData.correctAnswer && (
+                      <div className="comparison-box correct-ans-box">
+                        <span className="comparison-label">Đáp án chuẩn của đề:</span>
+                        <span className="comparison-value">{questionData.correctAnswer}</span>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Explanation & Solution Guide in Review Mode */}
+            {isReadOnlyReview && (questionData.explanation || questionData.solutionGuide) && (
+              <div className="review-solution-guide-card">
+                <div className="solution-guide-header">
+                  <Lightbulb size={18} className="guide-bulb-icon" />
+                  <span className="guide-title">Lời giải chi tiết & Phương pháp giải</span>
+                </div>
+                <div className="solution-guide-body">
+                  <QuestionContentView text={questionData.explanation || questionData.solutionGuide} />
+                </div>
               </div>
             )}
           </div>
@@ -1638,7 +2474,49 @@ export default function StudentExerciseTakingPage() {
       </footer>
 
       {/* ============================================================ */}
-      {/* 4. CONFIRMATION SUBMIT MODAL DIALOG */}
+      {/* 4. ANTI-CHEATING WARNING MODAL */}
+      {/* ============================================================ */}
+      {showAntiCheatWarning && (
+        <div className="exam-modal-backdrop" onClick={() => setShowAntiCheatWarning(false)}>
+          <div className="exam-submit-modal-card" style={{ maxWidth: '480px' }} onClick={(e) => e.stopPropagation()}>
+            <div className="submit-modal-header" style={{ borderBottom: 'none', paddingBottom: 0 }}>
+              <div className="modal-header-info">
+                <div className="modal-icon-badge" style={{ background: '#FEE2E2', color: '#DC2626' }}>
+                  <ShieldAlert size={24} />
+                </div>
+                <div>
+                  <h3 className="modal-heading-title" style={{ color: '#991B1B' }}>
+                    Cảnh báo chống gian lận thi cử!
+                  </h3>
+                  <p className="modal-heading-sub">Phát hiện rời khỏi màn hình làm bài</p>
+                </div>
+              </div>
+            </div>
+            <div style={{ padding: '16px 24px', color: '#475569', fontSize: '14px', lineHeight: 1.6 }}>
+              <p>
+                Hệ thống giám sát ghi nhận bạn vừa chuyển sang cửa sổ hoặc ứng dụng khác. 
+                Vui lòng duy trì chế độ tập trung toàn màn hình để đảm bảo tính công bằng và tính hợp lệ của bài thi.
+              </p>
+            </div>
+            <div className="submit-modal-actions" style={{ padding: '16px 24px', background: '#F8FAFC', borderTop: '1px solid #E2E8F0', display: 'flex', justifyContent: 'flex-end', gap: '12px' }}>
+              <button
+                type="button"
+                className="btn-confirm-submit-modal"
+                style={{ background: '#DC2626', color: '#FFFFFF' }}
+                onClick={() => {
+                  setShowAntiCheatWarning(false);
+                  toggleFullscreen();
+                }}
+              >
+                Tôi đã hiểu & Tiếp tục làm bài
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ============================================================ */}
+      {/* 5. CONFIRMATION SUBMIT MODAL DIALOG */}
       {/* ============================================================ */}
       {isSubmitModalOpen && (
         <div className="exam-modal-backdrop" onClick={() => setIsSubmitModalOpen(false)}>
@@ -1719,7 +2597,7 @@ export default function StudentExerciseTakingPage() {
                     <strong>{part1Answered}/{exerciseInfo.part1Count} câu</strong>
                   </div>
                   <div className="part-bar-track">
-                    <div className="part-bar-fill fill-purple" style={{ width: `${(part1Answered / exerciseInfo.part1Count) * 100}%` }} />
+                    <div className="part-bar-fill fill-purple" style={{ width: `${partPct(part1Answered, exerciseInfo.part1Count)}%` }} />
                   </div>
                 </div>
 
@@ -1729,7 +2607,7 @@ export default function StudentExerciseTakingPage() {
                     <strong>{part2Answered}/{exerciseInfo.part2Count} câu</strong>
                   </div>
                   <div className="part-bar-track">
-                    <div className="part-bar-fill fill-indigo" style={{ width: `${(part2Answered / exerciseInfo.part2Count) * 100}%` }} />
+                    <div className="part-bar-fill fill-indigo" style={{ width: `${partPct(part2Answered, exerciseInfo.part2Count)}%` }} />
                   </div>
                 </div>
 
@@ -1739,7 +2617,7 @@ export default function StudentExerciseTakingPage() {
                     <strong>{part3Answered}/{exerciseInfo.part3Count} câu</strong>
                   </div>
                   <div className="part-bar-track">
-                    <div className="part-bar-fill fill-violet" style={{ width: `${(part3Answered / exerciseInfo.part3Count) * 100}%` }} />
+                    <div className="part-bar-fill fill-violet" style={{ width: `${partPct(part3Answered, exerciseInfo.part3Count)}%` }} />
                   </div>
                 </div>
               </div>
@@ -1884,6 +2762,47 @@ export default function StudentExerciseTakingPage() {
                 <ArrowRight size={16} />
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* ============================================================ */}
+      {/* 6. LOCKDOWN OVERLAY: chặn toàn màn hình khi phát hiện nhiều màn hình (extend) */}
+      {/* Chỉ gỡ khi phát hiện lại CHỈ 1 màn hình (isExtended === false) */}
+      {/* ============================================================ */}
+      {lockdown.showMonitorOverlay && (
+        <div className="exam-lockdown-overlay">
+          <div className="exam-lockdown-overlay-card">
+            <div className="lockdown-icon-badge">
+              <MonitorX size={30} />
+            </div>
+            <h3 className="lockdown-title">Phát hiện nhiều màn hình (chế độ Extend)</h3>
+            <p className="lockdown-desc">
+              Hệ thống phát hiện bạn đang dùng <strong>nhiều màn hình (chế độ extend)</strong>.
+              Vui lòng chuyển về <strong>CHỈ 1 màn hình</strong> rồi bấm
+              {' "Kiểm tra lại & Tiếp tục" '}để làm bài.
+            </p>
+            <div className="lockdown-screen-meta">
+              <span>screen.isExtended: <strong>{String(lockdown.extendedDetected)}</strong></span>
+              <span>
+                Màn hình: {window.screen.width}×{window.screen.height}
+                {' '}· availLeft: {window.screen.availLeft}
+                {' '}· availWidth: {window.screen.availWidth}
+              </span>
+            </div>
+            <button
+              type="button"
+              className="btn-lockdown-continue"
+              onClick={() => {
+                const stillExtended = lockdown.recheckMonitors();
+                if (!stillExtended) {
+                  lockdown.requestFullscreen().catch(() => {});
+                }
+              }}
+            >
+              <RefreshCw size={16} />
+              <span>Kiểm tra lại &amp; Tiếp tục</span>
+            </button>
           </div>
         </div>
       )}

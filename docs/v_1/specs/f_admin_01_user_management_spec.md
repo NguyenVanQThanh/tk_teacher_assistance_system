@@ -29,7 +29,7 @@
 ## A.1 Feature Summary
 
 Cung cấp cho **Quản trị viên (Admin)** công cụ quản lý toàn diện danh sách người dùng trong hệ thống trường học:
-* Tạo mới, tra cứu (tìm kiếm theo tên, email, username, mã định danh), lọc nâng cao (theo vai trò `Admin`/`Teacher`/`Student`, khối lớp, tổ chuyên môn, trạng thái tài khoản).
+* Tạo mới, tra cứu (tìm kiếm theo tên, username, mã định danh), lọc nâng cao (theo vai trò `Admin`/`Teacher`/`Student`, khối lớp, tổ chuyên môn, trạng thái tài khoản).
 * Cập nhật thông tin hồ sơ, phân loại và phân quyền ban đầu.
 * Khóa / mở khóa tài khoản tức thời (`ACTIVE`, `INACTIVE`, `SUSPENDED`).
 * Đặt lại mật khẩu mặc định (Reset Password).
@@ -41,7 +41,7 @@ Cung cấp cho **Quản trị viên (Admin)** công cụ quản lý toàn diện
 | Story ID | As (Role) | I Want (Capability) | So That (Value) |
 |---|---|---|---|
 | **US-01** | Admin | Xem danh sách người dùng có phân trang, tìm kiếm và lọc linh hoạt | Quản lý và tra cứu thông tin nhanh chóng |
-| **US-02** | Admin | Thêm mới từng tài khoản học sinh, giáo viên hoặc quản trị viên | Cấp quyền truy cập hệ thống cho nhân sự mới |
+| **US-02** | Admin | Thêm mới từng tài khoản học sinh, giáo viên | Cấp quyền truy cập hệ thống cho nhân sự mới |
 | **US-03** | Admin | Chỉnh sửa thông tin hồ sơ, phòng ban, khối lớp của người dùng | Duy trì dữ liệu chính xác khi có thay đổi |
 | **US-04** | Admin | Khóa hoặc tạm dừng tài khoản (`SUSPENDED` / `INACTIVE`) | Đảm bảo an ninh khi tài khoản có dấu hiệu bất thường |
 | **US-05** | Admin | Đặt lại mật khẩu cho tài khoản người dùng | Hỗ trợ học sinh/giáo viên khi quên mật khẩu |
@@ -76,7 +76,7 @@ graph TD
 * **Permission**: `ADMIN_USER_VIEW`
 * **Query Params**:
   * `page` (int, default=1), `page_size` (int, default=10, max=100)
-  * `search` (string, optional - tìm kiếm theo `username`, `full_name`, `email`, `phone_number`)
+  * `search` (string, optional - tìm kiếm theo `username`, `full_name`, `phone_number`)
   * `role` (string, optional - `all` | `student` | `teacher` | `admin`)
   * `status` (string, optional - `all` | `ACTIVE` | `INACTIVE` | `SUSPENDED` | `DELETED`)
   * `grade` (string, optional - khối lớp)
@@ -88,7 +88,6 @@ graph TD
     {
       "id": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
       "username": "nguyenvana",
-      "email": "vana@school.edu.vn",
       "full_name": "Nguyễn Văn A",
       "phone_number": "0912345678",
       "role": "Teacher",
@@ -111,7 +110,6 @@ graph TD
 ```json
 {
   "username": "tranthib",
-  "email": "thib@school.edu.vn",
   "password": "InitialPassword@123",
   "full_name": "Trần Thị B",
   "phone_number": "0987654321",
@@ -125,7 +123,7 @@ graph TD
 
 ### 3. `PUT /api/v1/admin/users/{user_id}`
 * **Permission**: `ADMIN_USER_MANAGE`
-* **Request Body**: Cập nhật `full_name`, `email`, `phone_number`, `role`, `department`, `grade`.
+* **Request Body**: Cập nhật `full_name`, `phone_number`, `role`, `department`, `grade`.
 * **Response `200 OK`**: User Object đã cập nhật.
 
 ### 4. `PATCH /api/v1/admin/users/{user_id}/status`

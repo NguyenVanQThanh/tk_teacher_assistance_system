@@ -1,99 +1,260 @@
 /*
 File Name: PendingStudentAssignmentsCard.css
-Description: Styling for student pending assignments card with status badges and checkbox items.
+Description: Styling for student pending assignments card with status badges, AI/classroom categorization, and interactive hover/active states.
 Created At: 2026-09-07
 Created By: Tam Khang
-Updated At: 2026-09-07
+Updated At: 2026-09-27
 Updated By: Tam Khang
 */
 
 .pending-assignments-card {
   background-color: #FFFFFF;
   border-radius: 16px;
-  border: 1px solid #EBE8F0;
-  padding: 20px 24px;
+  border: 1.5px solid #EBE8F0;
+  padding: 20px 22px;
   box-sizing: border-box;
   display: flex;
   flex-direction: column;
   box-shadow: 0 2px 10px rgba(0, 0, 0, 0.02);
-  transition: box-shadow 0.2s ease;
-  height: 100%;
+  transition: all 0.22s cubic-bezier(0.16, 1, 0.3, 1);
+  height: 335px;
+  min-height: 335px;
+  max-height: 335px;
+  cursor: pointer;
+  position: relative;
 }
 
 .pending-assignments-card:hover {
-  box-shadow: 0 6px 18px rgba(77, 48, 141, 0.05);
+  border-color: #C4B5FD;
+  box-shadow: 0 8px 24px rgba(109, 40, 217, 0.09);
+  transform: translateY(-2px);
+}
+
+.pending-assignments-card.is-active-card {
+  border-color: #7C3AED;
+  box-shadow: 0 0 0 3px rgba(124, 58, 237, 0.12), 0 8px 24px rgba(109, 40, 217, 0.08);
+}
+
+.pending-card-header-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 14px;
 }
 
 .pending-card-title {
   font-size: 17px;
   font-weight: 800;
   color: #1E1B4B;
-  margin: 0 0 16px 0;
+  margin: 0;
   letter-spacing: -0.2px;
 }
 
+.pending-count-chip {
+  background-color: #FEE2E2;
+  color: #DC2626;
+  font-size: 11.5px;
+  font-weight: 700;
+  padding: 3px 9px;
+  border-radius: 9999px;
+}
+
+/* Categorization Stats Grid: Trên lớp vs Tạo sinh AI */
+.pending-category-stats-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  margin-bottom: 14px;
+}
+
+.category-stat-card {
+  border-radius: 12px;
+  padding: 10px 12px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  transition: all 0.2s ease;
+}
+
+.category-stat-card.classroom-theme {
+  background-color: #EFF6FF;
+  border: 1px solid #DBEAFE;
+}
+
+.category-stat-card.ai-theme {
+  background-color: #FAF5FF;
+  border: 1px solid #F3E8FF;
+}
+
+.stat-card-icon-wrap {
+  width: 34px;
+  height: 34px;
+  border-radius: 9px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.stat-card-icon-wrap.classroom-icon {
+  background-color: #DBEAFE;
+  color: #2563EB;
+}
+
+.stat-card-icon-wrap.ai-icon {
+  background-color: #F3E8FF;
+  color: #7C3AED;
+}
+
+.stat-card-info {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.stat-type-label {
+  font-size: 11.5px;
+  color: #64748B;
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.stat-count-row {
+  display: flex;
+  align-items: baseline;
+  gap: 4px;
+}
+
+.stat-number {
+  font-size: 16px;
+  font-weight: 800;
+  color: #0F172A;
+  line-height: 1.2;
+}
+
+.stat-subtext {
+  font-size: 11px;
+  color: #64748B;
+  font-weight: 500;
+}
+
+/* Assignments List */
 .assignments-list {
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 9px;
+  margin-bottom: 12px;
 }
 
 .assignment-item-row {
   border: 1px solid #E2E8F0;
-  border-radius: 12px;
-  padding: 14px 16px;
+  border-radius: 10px;
+  padding: 10px 12px;
   display: flex;
   align-items: flex-start;
-  gap: 14px;
-  background-color: #FFFFFF;
-  transition: all 0.2s ease;
-  cursor: pointer;
+  gap: 10px;
+  background-color: #FAFAFC;
+  transition: all 0.15s ease;
 }
 
 .assignment-item-row:hover {
   border-color: #CBD5E1;
-  background-color: #FAF8FE;
-  transform: translateY(-1px);
+  background-color: #FFFFFF;
 }
 
 .assignment-checkbox-custom {
-  width: 18px;
-  height: 18px;
+  width: 16px;
+  height: 16px;
   border: 2px solid #CBD5E1;
   border-radius: 4px;
   margin-top: 2px;
   flex-shrink: 0;
   background-color: #FFFFFF;
-  transition: all 0.15s ease;
-}
-
-.assignment-item-row:hover .assignment-checkbox-custom {
-  border-color: #7C3AED;
 }
 
 .assignment-info {
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 3px;
+  min-width: 0;
+  flex: 1;
+}
+
+.assignment-name-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+  width: 100%;
   min-width: 0;
 }
 
 .assignment-name {
-  font-size: 14px;
+  font-size: 13px;
   font-weight: 700;
   color: #1E293B;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  flex: 1;
+  min-width: 0;
+}
+
+.assignment-tag-type {
+  font-size: 10px;
+  font-weight: 700;
+  padding: 1.5px 6px;
+  border-radius: 4px;
+  flex-shrink: 0;
+}
+
+.assignment-tag-type.classroom {
+  background-color: #DBEAFE;
+  color: #1D4ED8;
+}
+
+.assignment-tag-type.ai_generated {
+  background-color: #EDE9FE;
+  color: #6D28D9;
 }
 
 .assignment-due-tag {
-  font-size: 12px;
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  font-size: 11px;
   font-weight: 500;
 }
 
 .assignment-due-tag.overdue {
   color: #DC2626;
-  font-weight: 600;
+  font-weight: 700;
 }
 
 .assignment-due-tag.normal {
-  color: #64748B;
+  color: #D97706;
+  font-weight: 600;
+}
+
+/* Footer Prompt */
+.pending-card-footer-prompt {
+  margin-top: auto;
+  padding-top: 10px;
+  border-top: 1px dashed #E2E8F0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  color: #7C3AED;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.pending-card-footer-prompt .prompt-arrow-icon {
+  transition: transform 0.2s ease;
+}
+
+.pending-assignments-card:hover .prompt-arrow-icon {
+  transform: translate(2px, -2px);
 }

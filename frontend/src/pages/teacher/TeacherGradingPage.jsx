@@ -2,10 +2,10 @@
 // Description: Teacher Grading & Feedback management page with submission metrics, multi-criteria filtering, submission roster table, and interactive grading modal.
 // Created At: 2026-09-01
 // Created By: Tam Khang
-// Updated At: 2026-09-12
+// Updated At: 2026-11-11
 // Updated By: Tam Khang
 
-import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { 
   ChevronRight, 
   Search, 
@@ -23,16 +23,29 @@ import {
   Check,
   Loader2
 } from 'lucide-react';
+import AnswerReleaseButton from '../../components/teacher/AnswerReleaseButton';
+import { useSearchParams } from 'react-router-dom';
 import GradingFeedbackModal from '../../components/teacher/GradingFeedbackModal';
 import { attemptsApi, classesApi, subjectsApi } from '../../services/api';
 import './TeacherGradingPage.css';
 
+const formatSubmissionTime = (timeVal) => {
+  if (!timeVal) return 'Vừa xong';
+  const d = new Date(timeVal);
+  if (isNaN(d.getTime())) return String(timeVal);
+  const day = String(d.getDate()).padStart(2, '0');
+  const month = String(d.getMonth() + 1).padStart(2, '0');
+  const hours = String(d.getHours()).padStart(2, '0');
+  const minutes = String(d.getMinutes()).padStart(2, '0');
+  return `${day}/${month}, ${hours}:${minutes}`;
+};
+
 export default function TeacherGradingPage() {
+  const [searchParams, setSearchParams] = useSearchParams();
   const [showSidebar, setShowSidebar] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [gradeFilter, setGradeFilter] = useState('all');
-  const [subjectFilter, setSubjectFilter] = useState('all');
-  const [statusFilter, setStatusFilter] = useState('all');
+  const [statusFilter, setStatusFilter] = useState(searchParams.get('status') || 'all');
   const [typeFilter, setTypeFilter] = useState('all');
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 8;
@@ -43,379 +56,42 @@ export default function TeacherGradingPage() {
   const [loading, setLoading] = useState(true);
   const [classesList, setClassesList] = useState([]);
   const [subjectsList, setSubjectsList] = useState([]);
+  const [dashboardStats, setDashboardStats] = useState(null);
 
-  // Submissions dataset with 3 official statuses: pending_grading (Chờ chấm), pending_review (Chờ duyệt), approved (Đã duyệt)
-  const [submissions, setSubmissions] = useState([
-    {
-      id: 1,
-      studentName: 'Trần Thị Lan',
-      avatarInitial: 'TL',
-      avatarColor: '#8B5CF6',
-      className: '10A1',
-      grade: '10',
-      subject: 'math',
-      exerciseTitle: 'Kiểm tra 15p - Đạo hàm',
-      exerciseType: 'Bài tập trên lớp',
-      exerciseTypeCode: 'classroom',
-      submittedTime: 'Hôm nay, 08:30',
-      timeType: 'normal',
-      status: 'pending_grading',
-      statusLabel: 'Chờ chấm',
-      score: null,
-      feedback: ''
-    },
-    {
-      id: 2,
-      studentName: 'Phạm Thu Thảo',
-      avatarInitial: 'TT',
-      avatarColor: '#6366F1',
-      className: '12A1',
-      grade: '12',
-      subject: 'math',
-      exerciseTitle: 'Khảo sát hàm số nâng cao',
-      exerciseType: 'Bài tập trên lớp',
-      exerciseTypeCode: 'classroom',
-      submittedTime: 'Hôm nay, 09:15',
-      timeType: 'normal',
-      status: 'pending_grading',
-      statusLabel: 'Chờ chấm',
-      score: null,
-      feedback: ''
-    },
-    {
-      id: 3,
-      studentName: 'Hoàng Yến Nhi',
-      avatarInitial: 'YN',
-      avatarColor: '#EC4899',
-      className: '11A3',
-      grade: '11',
-      subject: 'physics',
-      exerciseTitle: 'Kiểm tra 45p - Sóng ánh sáng',
-      exerciseType: 'Bài tập trên lớp',
-      exerciseTypeCode: 'classroom',
-      submittedTime: 'Hôm qua, 22:30',
-      timeType: 'late',
-      status: 'pending_grading',
-      statusLabel: 'Chờ chấm',
-      score: null,
-      feedback: ''
-    },
-    {
-      id: 4,
-      studentName: 'Bùi Quốc Anh',
-      avatarInitial: 'QA',
-      avatarColor: '#3B82F6',
-      className: '10A2',
-      grade: '10',
-      subject: 'physics',
-      exerciseTitle: 'Bài tập Thuyết electron & Điện tích',
-      exerciseType: 'Bài tập trên lớp',
-      exerciseTypeCode: 'classroom',
-      submittedTime: 'Hôm nay, 10:05',
-      timeType: 'normal',
-      status: 'pending_grading',
-      statusLabel: 'Chờ chấm',
-      score: null,
-      feedback: ''
-    },
-    {
-      id: 5,
-      studentName: 'Lê Gia Hưng',
-      avatarInitial: 'GH',
-      avatarColor: '#10B981',
-      className: '11B1',
-      grade: '11',
-      subject: 'chemistry',
-      exerciseTitle: 'Bài tập Ancol - Phenol',
-      exerciseType: 'Bài tập trên lớp',
-      exerciseTypeCode: 'classroom',
-      submittedTime: 'Hôm nay, 10:45',
-      timeType: 'normal',
-      status: 'pending_grading',
-      statusLabel: 'Chờ chấm',
-      score: null,
-      feedback: ''
-    },
-    {
-      id: 6,
-      studentName: 'Đỗ Minh Trí',
-      avatarInitial: 'MT',
-      avatarColor: '#F59E0B',
-      className: '12A2',
-      grade: '12',
-      subject: 'chemistry',
-      exerciseTitle: 'Đề kiểm tra Este Lipit nâng cao',
-      exerciseType: 'Bài tập trên lớp',
-      exerciseTypeCode: 'classroom',
-      submittedTime: 'Hôm qua, 21:10',
-      timeType: 'normal',
-      status: 'pending_grading',
-      statusLabel: 'Chờ chấm',
-      score: null,
-      feedback: ''
-    },
-    {
-      id: 7,
-      studentName: 'Võ Thùy Trang',
-      avatarInitial: 'TT',
-      avatarColor: '#8B5CF6',
-      className: '10A3',
-      grade: '10',
-      subject: 'literature',
-      exerciseTitle: 'Phân tích văn bản Tấm Cám',
-      exerciseType: 'Bài tập trên lớp',
-      exerciseTypeCode: 'classroom',
-      submittedTime: 'Hôm qua, 18:20',
-      timeType: 'normal',
-      status: 'pending_grading',
-      statusLabel: 'Chờ chấm',
-      score: null,
-      feedback: ''
-    },
-    {
-      id: 8,
-      studentName: 'Trịnh Hoàng Long',
-      avatarInitial: 'HL',
-      avatarColor: '#06B6D4',
-      className: '11A1',
-      grade: '11',
-      subject: 'literature',
-      exerciseTitle: 'Nghị luận xã hội: Tư duy tự học',
-      exerciseType: 'Bài tập trên lớp',
-      exerciseTypeCode: 'classroom',
-      submittedTime: 'Hôm nay, 07:50',
-      timeType: 'normal',
-      status: 'pending_grading',
-      statusLabel: 'Chờ chấm',
-      score: null,
-      feedback: ''
-    },
-    {
-      id: 9,
-      studentName: 'Dương Thanh Hà',
-      avatarInitial: 'TH',
-      avatarColor: '#EC4899',
-      className: '12A3',
-      grade: '12',
-      subject: 'english',
-      exerciseTitle: 'Ôn tập Unit 4: Urbanisation',
-      exerciseType: 'Bài tập trên lớp',
-      exerciseTypeCode: 'classroom',
-      submittedTime: 'Hôm qua, 23:45',
-      timeType: 'late',
-      status: 'pending_grading',
-      statusLabel: 'Chờ chấm',
-      score: null,
-      feedback: ''
-    },
-    {
-      id: 10,
-      studentName: 'Nguyễn Hải Yến',
-      avatarInitial: 'HY',
-      avatarColor: '#14B8A6',
-      className: '10A1',
-      grade: '10',
-      subject: 'english',
-      exerciseTitle: 'Progress Test: Tenses & Modals',
-      exerciseType: 'Bài tập trên lớp',
-      exerciseTypeCode: 'classroom',
-      submittedTime: 'Hôm nay, 11:00',
-      timeType: 'normal',
-      status: 'pending_grading',
-      statusLabel: 'Chờ chấm',
-      score: null,
-      feedback: ''
-    },
-    {
-      id: 11,
-      studentName: 'Phan Minh Khang',
-      avatarInitial: 'MK',
-      avatarColor: '#6366F1',
-      className: '11B2',
-      grade: '11',
-      subject: 'physics',
-      exerciseTitle: 'Bài tập Định luật Vạn vật Hấp dẫn',
-      exerciseType: 'Bài tập trên lớp',
-      exerciseTypeCode: 'classroom',
-      submittedTime: 'Hôm nay, 11:30',
-      timeType: 'normal',
-      status: 'pending_grading',
-      statusLabel: 'Chờ chấm',
-      score: null,
-      feedback: ''
-    },
-    {
-      id: 12,
-      studentName: 'Trương Bảo Ngọc',
-      avatarInitial: 'BN',
-      avatarColor: '#A855F7',
-      className: '12A1',
-      grade: '12',
-      subject: 'math',
-      exerciseTitle: 'Phương trình Logarit chứa tham số m',
-      exerciseType: 'Bài tập trên lớp',
-      exerciseTypeCode: 'classroom',
-      submittedTime: 'Hôm nay, 11:45',
-      timeType: 'normal',
-      status: 'pending_grading',
-      statusLabel: 'Chờ chấm',
-      score: null,
-      feedback: ''
-    },
-    {
-      id: 13,
-      studentName: 'Nguyễn Minh Hải',
-      avatarInitial: 'MH',
-      avatarColor: '#A855F7',
-      className: '11B2',
-      grade: '11',
-      subject: 'math',
-      exerciseTitle: 'Luyện tập AI - Tích phân',
-      exerciseType: 'Tạo sinh',
-      exerciseTypeCode: 'ai',
-      submittedTime: 'Hôm qua, 23:15',
-      timeType: 'normal',
-      status: 'pending_review',
-      statusLabel: 'Chờ duyệt',
-      score: 8.5,
-      feedback: ''
-    },
-    {
-      id: 14,
-      studentName: 'Đặng Quốc Huy',
-      avatarInitial: 'QH',
-      avatarColor: '#10B981',
-      className: '12A1',
-      grade: '12',
-      subject: 'chemistry',
-      exerciseTitle: 'Luyện tập AI - Este Lipit',
-      exerciseType: 'Tạo sinh',
-      exerciseTypeCode: 'ai',
-      submittedTime: 'Hôm nay, 11:20',
-      timeType: 'normal',
-      status: 'pending_review',
-      statusLabel: 'Chờ duyệt',
-      score: 8.0,
-      feedback: ''
-    },
-    {
-      id: 15,
-      studentName: 'Cao Tuấn Kiệt',
-      avatarInitial: 'TK',
-      avatarColor: '#3B82F6',
-      className: '10A2',
-      grade: '10',
-      subject: 'physics',
-      exerciseTitle: 'Luyện tập AI - Khúc xạ ánh sáng',
-      exerciseType: 'Tạo sinh',
-      exerciseTypeCode: 'ai',
-      submittedTime: 'Hôm nay, 08:15',
-      timeType: 'normal',
-      status: 'pending_review',
-      statusLabel: 'Chờ duyệt',
-      score: 9.0,
-      feedback: ''
-    },
-    {
-      id: 16,
-      studentName: 'Lâm Khánh Linh',
-      avatarInitial: 'KL',
-      avatarColor: '#EC4899',
-      className: '11A1',
-      grade: '11',
-      subject: 'english',
-      exerciseTitle: 'Luyện tập AI - Conditional Sentences',
-      exerciseType: 'Tạo sinh',
-      exerciseTypeCode: 'ai',
-      submittedTime: 'Hôm nay, 09:40',
-      timeType: 'normal',
-      status: 'pending_review',
-      statusLabel: 'Chờ duyệt',
-      score: 8.5,
-      feedback: ''
-    },
-    {
-      id: 17,
-      studentName: 'Hồ Văn Tuấn',
-      avatarInitial: 'VT',
-      avatarColor: '#F59E0B',
-      className: '12A2',
-      grade: '12',
-      subject: 'math',
-      exerciseTitle: 'Luyện tập AI - Tọa độ không gian Oxyz',
-      exerciseType: 'Tạo sinh',
-      exerciseTypeCode: 'ai',
-      submittedTime: 'Hôm nay, 10:10',
-      timeType: 'normal',
-      status: 'pending_review',
-      statusLabel: 'Chờ duyệt',
-      score: 7.5,
-      feedback: ''
-    },
-    {
-      id: 18,
-      studentName: 'Lê Phương Duy',
-      avatarInitial: 'PD',
-      avatarColor: '#94A3B8',
-      className: '10A1',
-      grade: '10',
-      subject: 'math',
-      exerciseTitle: 'Bài tập Hình học Không gian',
-      exerciseType: 'Bài tập trên lớp',
-      exerciseTypeCode: 'classroom',
-      submittedTime: '12/05/2023, 14:20',
-      timeType: 'graded',
-      status: 'approved',
-      statusLabel: 'Đã duyệt',
-      score: 8.5,
-      feedback: 'Làm bài tốt, hình vẽ rõ ràng và lập luận chuẩn xác.'
-    },
-    {
-      id: 19,
-      studentName: 'Vũ Đức Nam',
-      avatarInitial: 'DN',
-      avatarColor: '#3B82F6',
-      className: '10A2',
-      grade: '10',
-      subject: 'math',
-      exerciseTitle: 'Luyện tập AI - Tổ hợp xác suất',
-      exerciseType: 'Tạo sinh',
-      exerciseTypeCode: 'ai',
-      submittedTime: 'Hôm qua, 20:45',
-      timeType: 'graded',
-      status: 'approved',
-      statusLabel: 'Đã duyệt',
-      score: 9.0,
-      feedback: 'Lời giải ngắn gọn, kết quả chính xác 100%.'
-    },
-    {
-      id: 20,
-      studentName: 'Nguyễn Bích Ngọc',
-      avatarInitial: 'BN',
-      avatarColor: '#F59E0B',
-      className: '10A1',
-      grade: '10',
-      subject: 'literature',
-      exerciseTitle: 'Đọc hiểu Văn bản Thơ',
-      exerciseType: 'Bài tập trên lớp',
-      exerciseTypeCode: 'classroom',
-      submittedTime: 'Hôm qua, 16:30',
-      timeType: 'graded',
-      status: 'approved',
-      statusLabel: 'Đã duyệt',
-      score: 8.0,
-      feedback: 'Cảm thụ tốt, lời văn trau chuốt.'
+  // Submissions dataset populated from real backend API
+  const [submissions, setSubmissions] = useState([]);
+  const autoOpenedAttemptIdRef = useRef(null);
+
+  const handleCloseModal = useCallback(() => {
+    setGradingSubmission(null);
+    setSearchParams((prev) => {
+      const next = new URLSearchParams(prev);
+      next.delete('attempt_id');
+      next.delete('submission_id');
+      return next;
+    }, { replace: true });
+  }, [setSearchParams]);
+
+  useEffect(() => {
+    const s = searchParams.get('status');
+    if (s) {
+      setStatusFilter(s);
     }
-  ]);
+  }, [searchParams]);
 
   const loadData = useCallback(async () => {
     try {
       setLoading(true);
-      const [attemptsRes, classesRes, subjectsRes] = await Promise.allSettled([
+      const [attemptsRes, classesRes, subjectsRes, dashboardRes] = await Promise.allSettled([
         attemptsApi.getAttempts(),
         classesApi.getClasses(),
         subjectsApi.getSubjects(),
+        attemptsApi.getGradingDashboard(),
       ]);
+
+      if (dashboardRes.status === 'fulfilled' && dashboardRes.value) {
+        setDashboardStats(dashboardRes.value);
+      }
 
       if (classesRes.status === 'fulfilled') {
         setClassesList(Array.isArray(classesRes.value) ? classesRes.value : classesRes.value.items || []);
@@ -425,11 +101,12 @@ export default function TeacherGradingPage() {
         setSubjectsList(Array.isArray(subjectsRes.value) ? subjectsRes.value : subjectsRes.value.items || []);
       }
 
-      if (attemptsRes.status === 'fulfilled' && Array.isArray(attemptsRes.value) && attemptsRes.value.length > 0) {
-        const mapped = attemptsRes.value.map((att, idx) => {
+      if (attemptsRes.status === 'fulfilled') {
+        const rawItems = Array.isArray(attemptsRes.value) ? attemptsRes.value : (attemptsRes.value?.items || []);
+        const mapped = rawItems.map((att, idx) => {
           const rawScore = att.score;
           const hasScore = rawScore !== null && rawScore !== undefined;
-          const gradeMatch = att.class_name ? att.class_name.match(/\b(10|11|12)\b/) : null;
+          const gradeMatch = att.class_name ? att.class_name.match(/(10|11|12)/) : null;
           const grade = gradeMatch ? gradeMatch[1] : '12';
 
           let subjKey = 'math';
@@ -445,14 +122,21 @@ export default function TeacherGradingPage() {
           const nameParts = (att.student_name || 'Học sinh').trim().split(' ');
           const avatarInitial = nameParts.length >= 2 ? (nameParts[0][0] + nameParts[nameParts.length - 1][0]).toUpperCase() : nameParts[0].slice(0, 2).toUpperCase();
 
-          const submittedFormatted = att.end_time
-            ? new Date(att.end_time).toLocaleDateString('vi-VN', { hour: '2-digit', minute: '2-digit', day: '2-digit', month: '2-digit' })
-            : (att.start_time ? new Date(att.start_time).toLocaleDateString('vi-VN', { hour: '2-digit', minute: '2-digit', day: '2-digit', month: '2-digit' }) : 'Vừa xong');
+          const submittedFormatted = formatSubmissionTime(att.end_time || att.start_time);
+
+          const itemStatus = (att.status === 'pending_grading' || att.status === 'pending_review' || att.status === 'approved')
+            ? att.status
+            : (hasScore ? 'approved' : 'pending_grading');
+          const itemStatusLabel = itemStatus === 'pending_grading'
+            ? 'Chờ chấm'
+            : (itemStatus === 'pending_review' ? 'Chờ duyệt' : 'Đã duyệt');
 
           return {
             id: att.attempt_id,
             attempt_id: att.attempt_id,
             assignment_id: att.assignment_id,
+            is_exam: Boolean(att.is_exam),
+            answers_released: Boolean(att.answers_released),
             exercise_id: att.exercise_id,
             student_id: att.student_id,
             studentName: att.student_name || 'Học sinh',
@@ -463,13 +147,13 @@ export default function TeacherGradingPage() {
             grade,
             subject: subjKey,
             subjectName: att.subject_name || 'Toán học',
-            exerciseTitle: att.exercise_title || 'Bài tập trực tuyến',
+            exerciseTitle: att.exercise_title || att.assignment_title || 'Bài tập trực tuyến',
             exerciseType: 'Bài tập trực tuyến',
             exerciseTypeCode: 'classroom',
             submittedTime: submittedFormatted,
             timeType: 'normal',
-            status: hasScore ? 'approved' : 'pending_grading',
-            statusLabel: hasScore ? 'Đã duyệt' : 'Chờ chấm',
+            status: itemStatus,
+            statusLabel: itemStatusLabel,
             score: hasScore ? Number(rawScore) : null,
             feedback: '',
             raw: att
@@ -488,14 +172,103 @@ export default function TeacherGradingPage() {
     loadData();
   }, [loadData]);
 
+  // Auto-open grading detail modal if attempt_id is present in query parameters (e.g. redirected from dashboard)
+  useEffect(() => {
+    const targetAttemptId = searchParams.get('attempt_id') || searchParams.get('submission_id');
+    if (!targetAttemptId) {
+      autoOpenedAttemptIdRef.current = null;
+      return;
+    }
+
+    if (autoOpenedAttemptIdRef.current === String(targetAttemptId)) return;
+
+    if (submissions.length > 0) {
+      const found = submissions.find(
+        (s) => String(s.id) === String(targetAttemptId) || String(s.attempt_id) === String(targetAttemptId)
+      );
+      if (found) {
+        autoOpenedAttemptIdRef.current = String(targetAttemptId);
+        if (statusFilter !== 'all' && found.status !== statusFilter) {
+          setStatusFilter('all');
+        }
+        setGradingSubmission(found);
+      } else {
+        // Fetch specific attempt directly if not present in default list
+        attemptsApi.getAttemptDetail(targetAttemptId).then((att) => {
+          if (att) {
+            autoOpenedAttemptIdRef.current = String(targetAttemptId);
+            const rawScore = att.score;
+            const hasScore = rawScore !== null && rawScore !== undefined;
+            const nameParts = (att.student_name || 'Học sinh').trim().split(' ');
+            const avatarInitial = nameParts.length >= 2
+              ? (nameParts[0][0] + nameParts[nameParts.length - 1][0]).toUpperCase()
+              : nameParts[0].slice(0, 2).toUpperCase();
+
+            const submittedFormatted = formatSubmissionTime(att.end_time || att.start_time);
+
+            const itemStatus = (att.status === 'pending_grading' || att.status === 'pending_review' || att.status === 'approved')
+              ? att.status
+              : (hasScore ? 'approved' : 'pending_grading');
+            const itemStatusLabel = itemStatus === 'pending_grading'
+              ? 'Chờ chấm'
+              : (itemStatus === 'pending_review' ? 'Chờ duyệt' : 'Đã duyệt');
+
+            const item = {
+              id: att.attempt_id,
+              attempt_id: att.attempt_id,
+              assignment_id: att.assignment_id,
+              is_exam: Boolean(att.is_exam),
+              answers_released: Boolean(att.answers_released),
+              exercise_id: att.exercise_id,
+              student_id: att.student_id,
+              studentName: att.student_name || 'Học sinh',
+              avatarInitial,
+              avatarColor: '#8B5CF6',
+              className: att.class_name || '12A1',
+              class_id: att.class_id,
+              grade: '12',
+              subject: 'math',
+              subjectName: att.subject_name || 'Toán học',
+              exerciseTitle: att.exercise_title || att.assignment_title || 'Bài tập trực tuyến',
+              exerciseType: 'Bài tập trực tuyến',
+              exerciseTypeCode: 'classroom',
+              submittedTime: submittedFormatted,
+              timeType: 'normal',
+              status: itemStatus,
+              statusLabel: itemStatusLabel,
+              score: hasScore ? Number(rawScore) : null,
+              feedback: att.feedback || '',
+              raw: att
+            };
+            setGradingSubmission(item);
+          }
+        }).catch((err) => {
+          console.error('Failed to load target attempt for grading modal:', err);
+        });
+      }
+    }
+  }, [searchParams, submissions, statusFilter]);
+
+  // Save the answer key (recomputes ALL submissions server-side), then this attempt's verdicts/feedback.
+  const persistGrade = async (u) => {
+    if (u.cascadeRegrade && u.answerKey && u.answerKey.length > 0 && u.exercise_id) {
+      const keys = {};
+      u.answerKey.forEach((k) => { keys[k.question_id] = k.option_id; });
+      await attemptsApi.updateAnswerKey(u.exercise_id, { keys });
+    }
+    await attemptsApi.updateGrade(u.attempt_id, {
+      score: u.score !== null ? u.score : 0,
+      feedback: u.feedback || '',
+      manual_marks: u.manualMarks && Object.keys(u.manualMarks).length ? u.manualMarks : undefined,
+    });
+    if (u.cascadeRegrade) await loadData();
+  };
+
   // Handle grade/approval saved from modal (transitions to 'approved' and supports cascade batch regrade)
   const handleSaveGrade = async (updatedSubmission) => {
     try {
       if (updatedSubmission.attempt_id) {
-        await attemptsApi.updateGrade(updatedSubmission.attempt_id, {
-          score: updatedSubmission.score !== null ? updatedSubmission.score : 0,
-          feedback: updatedSubmission.feedback || '',
-        });
+        await persistGrade(updatedSubmission);
       }
 
       setSubmissions((prev) =>
@@ -535,10 +308,7 @@ export default function TeacherGradingPage() {
   const handleSaveAndNext = async (updatedSubmission) => {
     try {
       if (updatedSubmission.attempt_id) {
-        await attemptsApi.updateGrade(updatedSubmission.attempt_id, {
-          score: updatedSubmission.score !== null ? updatedSubmission.score : 0,
-          feedback: updatedSubmission.feedback || '',
-        });
+        await persistGrade(updatedSubmission);
       }
     } catch (err) {
       console.error(err);
@@ -594,12 +364,18 @@ export default function TeacherGradingPage() {
 
   // Dynamic counts: exact real-time counts from submissions
   const pendingGradingCount = useMemo(() => {
-    return submissions.filter((s) => s.status === 'pending_grading').length;
-  }, [submissions]);
+    if (submissions && submissions.length > 0) {
+      return submissions.filter((s) => s.status === 'pending_grading').length;
+    }
+    return dashboardStats?.pending_grading_count ?? 0;
+  }, [dashboardStats, submissions]);
 
   const pendingReviewCount = useMemo(() => {
-    return submissions.filter((s) => s.status === 'pending_review').length;
-  }, [submissions]);
+    if (submissions && submissions.length > 0) {
+      return submissions.filter((s) => s.status === 'pending_review').length;
+    }
+    return dashboardStats?.pending_review_count ?? 0;
+  }, [dashboardStats, submissions]);
 
   // Filter logic
   const filteredSubmissions = useMemo(() => {
@@ -618,10 +394,6 @@ export default function TeacherGradingPage() {
         return false;
       }
 
-      // Subject filter
-      if (subjectFilter !== 'all' && item.subject !== subjectFilter) {
-        return false;
-      }
 
       // Status filter
       if (statusFilter !== 'all') {
@@ -638,7 +410,7 @@ export default function TeacherGradingPage() {
 
       return true;
     });
-  }, [submissions, searchQuery, gradeFilter, subjectFilter, statusFilter, typeFilter]);
+  }, [submissions, searchQuery, gradeFilter, statusFilter, typeFilter]);
 
   // Paginated records
   const totalPages = Math.max(1, Math.ceil(filteredSubmissions.length / itemsPerPage));
@@ -647,12 +419,57 @@ export default function TeacherGradingPage() {
     return filteredSubmissions.slice(startIndex, startIndex + itemsPerPage);
   }, [filteredSubmissions, currentPage, itemsPerPage]);
 
+  // Server-side report (CSV / PDF) with the same role scoping as the list
+  const handleExportServer = async (format) => {
+    try {
+      const blob = await attemptsApi.exportReport({ format });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `grading_report_${new Date().toISOString().slice(0, 10)}.${format}`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+      setToastMessage(`Đã xuất báo cáo ${format.toUpperCase()} thành công!`);
+    } catch (err) {
+      setToastMessage('Lỗi khi xuất báo cáo.');
+    }
+    setTimeout(() => setToastMessage(null), 3500);
+  };
+
   const handleExportReport = () => {
-    setToastMessage('Đang xuất file báo cáo chấm điểm (Excel/PDF)...');
-    setTimeout(() => {
-      setToastMessage('Xuất báo cáo thành công!');
-      setTimeout(() => setToastMessage(null), 3000);
-    }, 1000);
+    try {
+      const headers = ['Mã bài làm', 'Họ và tên học sinh', 'Lớp', 'Môn học', 'Đề bài', 'Điểm số', 'Trạng thái', 'Nhận xét', 'Thời gian nộp'];
+      const rows = filteredSubmissions.map((s) => [
+        `"${s.id || s.attempt_id || ''}"`,
+        `"${(s.studentName || '').replace(/"/g, '""')}"`,
+        `"${(s.className || '').replace(/"/g, '""')}"`,
+        `"${(s.subjectName || s.subject || '').replace(/"/g, '""')}"`,
+        `"${(s.exerciseTitle || '').replace(/"/g, '""')}"`,
+        `"${s.score !== null && s.score !== undefined ? s.score : ''}"`,
+        `"${(s.statusLabel || s.status || '').replace(/"/g, '""')}"`,
+        `"${(s.feedback || '').replace(/"/g, '""')}"`,
+        `"${(s.submittedTime || '').replace(/"/g, '""')}"`
+      ]);
+
+      const csvContent = '\uFEFF' + [headers.join(','), ...rows.map(r => r.join(','))].join('\r\n');
+      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.setAttribute('href', url);
+      link.setAttribute('download', `Bang_Diem_Hoc_Sinh_${new Date().toISOString().slice(0, 10)}.csv`);
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+
+      setToastMessage('Đã xuất file bảng điểm (Excel/CSV) thành công!');
+    } catch (err) {
+      console.error('Export error:', err);
+      setToastMessage('Lỗi khi xuất bảng điểm.');
+    }
+    setTimeout(() => setToastMessage(null), 3500);
   };
 
   return (
@@ -675,14 +492,24 @@ export default function TeacherGradingPage() {
           {/* Page Title & Actions */}
           <div className="grading-header-row">
             <h1 className="grading-page-title">Quản lý Chấm điểm</h1>
+            <div style={{ display: 'flex', gap: 8 }}>
             <button 
               type="button" 
               className="btn-export-report"
               onClick={handleExportReport}
             >
               <Download size={16} />
-              <span>Xuất báo cáo</span>
+              <span>Xuất CSV</span>
             </button>
+            <button 
+              type="button" 
+              className="btn-export-report"
+              onClick={() => handleExportServer('pdf')}
+            >
+              <FileText size={16} />
+              <span>Xuất PDF</span>
+            </button>
+            </div>
           </div>
 
           {/* 3 Redefined Metric Summary Cards as requested */}
@@ -795,26 +622,6 @@ export default function TeacherGradingPage() {
               <ChevronDown size={14} className="select-arrow" />
             </div>
 
-            {/* Subject Filter */}
-            <div className="select-container">
-              <select 
-                className="filter-select"
-                value={subjectFilter}
-                onChange={(e) => {
-                  setSubjectFilter(e.target.value);
-                  setCurrentPage(1);
-                }}
-              >
-                <option value="all">Môn học</option>
-                <option value="math">Toán học</option>
-                <option value="physics">Vật lý</option>
-                <option value="chemistry">Hóa học</option>
-                <option value="literature">Ngữ văn</option>
-                <option value="english">Tiếng Anh</option>
-              </select>
-              <ChevronDown size={14} className="select-arrow" />
-            </div>
-
             {/* Status Filter */}
             <div className="select-container">
               <select 
@@ -834,20 +641,23 @@ export default function TeacherGradingPage() {
             </div>
 
             {/* Assignment Type Filter */}
-            <div className="select-container">
-              <select 
-                className="filter-select"
-                value={typeFilter}
-                onChange={(e) => {
-                  setTypeFilter(e.target.value);
-                  setCurrentPage(1);
-                }}
-              >
-                <option value="all">Tất cả bài tập</option>
-                <option value="classroom">Bài tập trên lớp</option>
-                <option value="ai">Tạo sinh</option>
-              </select>
-              <ChevronDown size={14} className="select-arrow" />
+            <div className="filter-field-group">
+              <label className="filter-field-label">Loại bài tập</label>
+              <div className="select-container">
+                <select 
+                  className="filter-select"
+                  value={typeFilter}
+                  onChange={(e) => {
+                    setTypeFilter(e.target.value);
+                    setCurrentPage(1);
+                  }}
+                >
+                  <option value="all">Tất cả bài tập</option>
+                  <option value="classroom">Bài tập trên lớp</option>
+                  <option value="ai">Bài tập tạo sinh</option>
+                </select>
+                <ChevronDown size={14} className="select-arrow" />
+              </div>
             </div>
 
             {/* Search Input */}
@@ -882,7 +692,18 @@ export default function TeacherGradingPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {currentRecords.length === 0 ? (
+                  {loading ? (
+                    <tr>
+                      <td colSpan={7} className="no-data-cell">
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '10px', padding: '36px 0' }}>
+                          <Loader2 size={22} className="animate-spin" style={{ color: '#6366F1' }} />
+                          <span style={{ color: '#64748B', fontSize: '14px', fontWeight: 500 }}>
+                            Đang tải danh sách bài nộp từ hệ thống...
+                          </span>
+                        </div>
+                      </td>
+                    </tr>
+                  ) : currentRecords.length === 0 ? (
                     <tr>
                       <td colSpan={7} className="no-data-cell">
                         Không tìm thấy bài nộp nào phù hợp với bộ lọc.
@@ -967,6 +788,17 @@ export default function TeacherGradingPage() {
 
                         {/* Actions */}
                         <td className="text-center">
+                          {item.is_exam && (
+                            <div style={{ marginBottom: 4 }}>
+                              <AnswerReleaseButton
+                                assignmentId={item.assignment_id}
+                                released={item.answers_released}
+                                onChanged={(aid, v) => setSubmissions((prev) => prev.map((s) => (
+                                  s.assignment_id === aid ? { ...s, answers_released: v } : s
+                                )))}
+                              />
+                            </div>
+                          )}
                           {item.status === 'approved' ? (
                             <div className="graded-action-box">
                               <span className="score-badge-pill">{item.score}</span>
@@ -1051,7 +883,7 @@ export default function TeacherGradingPage() {
       {/* Interactive Grading and Feedback Modal */}
       <GradingFeedbackModal
         isOpen={Boolean(gradingSubmission)}
-        onClose={() => setGradingSubmission(null)}
+        onClose={handleCloseModal}
         submission={gradingSubmission}
         onSaveGrade={handleSaveGrade}
         hasNextPending={submissions.some(

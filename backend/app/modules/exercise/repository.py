@@ -2,15 +2,15 @@
 # Description: Data Access Layer (Repository) for Exercise, Question, and AnswerOption models.
 # Created At: 2026-07-31
 # Created By: Tam Khang
-# Updated At: 2026-07-31
-# Updated By: Tam Khang
+# Updated At: 2026-11-13
+# Updated By: AI Agent
 
 from typing import List, Optional, Any, Tuple, Dict
 from uuid import UUID
 from datetime import datetime
 import base64
 from fastapi import HTTPException, status
-from sqlalchemy import and_, or_
+from sqlalchemy import and_, or_, func
 from sqlalchemy.orm import Session, joinedload
 from models.models import User, Exercise, Question, AnswerOption, ClassAssignment, StudentExerciseAttempt
 
@@ -67,6 +67,7 @@ class ExerciseRepository:
         cursor: Optional[str] = None,
         direction: str = "next",
         page_size: int = 6,
+        visibility_clause: Optional[Any] = None,
     ) -> Dict[str, Any]:
         """
         List exercises using Keyset / Cursor-based Pagination (zero OFFSET) for O(1) query performance.
@@ -76,6 +77,10 @@ class ExerciseRepository:
         if status is not None:
             base_query = base_query.filter(Exercise.status == status)
         
+        if visibility_clause is not None:
+            # RBAC clause from access_policy.exercise_visibility_clause (None = unrestricted).
+            base_query = base_query.filter(visibility_clause)
+
         if created_by and subject_ids is not None:
             base_query = base_query.filter(
                 (Exercise.created_by == created_by) | (Exercise.subject_id.in_(subject_ids))
@@ -88,7 +93,14 @@ class ExerciseRepository:
         if search:
             search_clean = search.strip()
             if search_clean:
-                base_query = base_query.filter(Exercise.title.ilike(f"%{search_clean}%"))
+                # unaccent both sides so Vietnamese searches work with or without diacritics
+                # (e.g. "de thi" matches "Đề thi"). Requires the unaccent extension.
+                try:
+                    base_query = base_query.filter(
+                        func.unaccent(Exercise.title).ilike(func.unaccent(f"%{search_clean}%"))
+                    )
+                except Exception:
+                    base_query = base_query.filter(Exercise.title.ilike(f"%{search_clean}%"))
 
         total = base_query.count()
 
@@ -151,10 +163,13 @@ class ExerciseRepository:
             "total": total
         }
 
-    def update(self, exercise: Exercise, title: Optional[str] = None, ai_metadata: Optional[dict] = None) -> Exercise:
-        """Update title or AI metadata of an Exercise."""
+    def update(self, exercise: Exercise, title: Optional[str] = None, ai_metadata: Optional[dict] = None,
+               exercise_kind: Optional[str] = None) -> Exercise:
+        """Update title, AI metadata or kind of an Exercise."""
         if title is not None:
             exercise.title = title
+        if exercise_kind is not None:
+            exercise.exercise_kind = exercise_kind
         if ai_metadata is not None:
             exercise.ai_metadata = ai_metadata
         self.db.commit()
@@ -230,6 +245,7 @@ class QuestionRepository:
         explanation: Optional[str] = None,
         display_order: Optional[int] = None,
         image_url: Optional[str] = None,
+        image_metadata: Optional[Any] = None,
         answer_options: Optional[List[AnswerOption]] = None
     ) -> Question:
         """Update Question fields and replace associated AnswerOptions if provided."""
@@ -257,6 +273,8 @@ class QuestionRepository:
             question.display_order = display_order
         if image_url is not None:
             question.image_url = image_url
+        if image_metadata is not None:
+            question.image_metadata = image_metadata
         
         if answer_options is not None:
             self.db.query(AnswerOption).filter(AnswerOption.question_id == question.question_id).delete()
@@ -368,6 +386,29 @@ class AttemptRepository:
             StudentExerciseAttempt.status != 'DELETED'
         ).first()
 
+    def find_latest_attempt(self, student_id: UUID, assignment_id: UUID) -> Optional[StudentExerciseAttempt]:
+        """Find the student's most recent attempt (open OR finished) for an assignment.
+
+        Used to resolve the display-shuffle seed of the student paper: resume and review must
+        reproduce the exact question/option order of the attempt they belong to. An open attempt
+        always wins (only one may exist at a time and it is the paper being worked on), otherwise
+        the most recently ended/created attempt is returned.
+        """
+        return self.db.query(StudentExerciseAttempt).filter(
+            StudentExerciseAttempt.student_id == student_id,
+            StudentExerciseAttempt.assignment_id == assignment_id,
+            StudentExerciseAttempt.status != 'DELETED'
+        ).order_by(
+            StudentExerciseAttempt.is_finished.asc(),
+            func.coalesce(
+                StudentExerciseAttempt.end_time,
+                StudentExerciseAttempt.start_time,
+                StudentExerciseAttempt.created_at
+            ).desc(),
+            StudentExerciseAttempt.created_at.desc(),
+            StudentExerciseAttempt.attempt_id.desc()
+        ).first()
+
     def update(self, attempt: StudentExerciseAttempt) -> StudentExerciseAttempt:
         """Commit changes to an existing StudentExerciseAttempt."""
         self.db.commit()
@@ -422,18 +463,29 @@ class AttemptRepository:
                     User.phone.ilike(term)
                 )
             )
-
-        return query.order_by(StudentExerciseAttempt.created_at.desc()).all()
+        return query.order_by(
+            func.coalesce(
+                StudentExerciseAttempt.end_time,
+                StudentExerciseAttempt.start_time,
+                StudentExerciseAttempt.created_at
+            ).desc()
+        ).all()
 
     def update_grade(
         self,
         attempt: StudentExerciseAttempt,
         score: float,
         feedback: Optional[str] = None,
-        detailed_results: Optional[Any] = None
+        detailed_results: Optional[Any] = None,
+        status: Optional[str] = None
     ) -> StudentExerciseAttempt:
-        """Update score, feedback and detailed_results on an attempt."""
+        """Update score, feedback, status and detailed_results on an attempt."""
         attempt.score = score
+        if status:
+            attempt.status = status
+        else:
+            attempt.status = 'approved'
+
         if detailed_results is not None:
             attempt.detailed_results = detailed_results
         elif feedback is not None:

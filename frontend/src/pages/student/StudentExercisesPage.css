@@ -1,14 +1,15 @@
 /*
 File Name: StudentExercisesPage.css
-Description: Styling for Student exercise repository page with filter card, exercise cards, and AI-powered exercise generation modal.
+Description: Styling for Student exercise repository page with filter card, tabs, exercise cards, and AI-powered exercise generation modal.
 Created At: 2026-09-07
 Created By: Tam Khang
-Updated At: 2026-09-12
+Updated At: 2026-10-11
 Updated By: Tam Khang
 */
 
 .student-exercises-container {
   padding: 24px 32px 40px;
+  width: 100%;
   box-sizing: border-box;
   font-family: 'Be Vietnam Pro', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
   color: #1D1928;
@@ -97,6 +98,74 @@ Updated By: Tam Khang
   text-transform: uppercase;
 }
 
+/* Exercise Tabs Bar */
+.exercises-tabs-bar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 20px;
+  overflow-x: auto;
+  padding-bottom: 4px;
+}
+
+.exercises-tab-pill {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 18px;
+  background-color: #FFFFFF;
+  border: 1px solid #E2E8F0;
+  border-radius: 9999px;
+  font-size: 13.5px;
+  font-weight: 600;
+  color: #64748B;
+  cursor: pointer;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  white-space: nowrap;
+}
+
+.exercises-tab-pill:hover {
+  background-color: #F8FAFC;
+  border-color: #CBD5E1;
+  color: #1E293B;
+}
+
+.exercises-tab-pill.active {
+  background-color: #7C3AED;
+  border-color: #7C3AED;
+  color: #FFFFFF;
+  box-shadow: 0 4px 12px rgba(124, 58, 237, 0.25);
+}
+
+.tab-pill-count {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1px 8px;
+  font-size: 11.5px;
+  font-weight: 700;
+  border-radius: 9999px;
+  background-color: #F1F5F9;
+  color: #475569;
+}
+
+.exercises-tab-pill.active .tab-pill-count {
+  background-color: rgba(255, 255, 255, 0.25);
+  color: #FFFFFF;
+}
+
+.count-active {
+  color: #2563EB;
+}
+
+.count-overdue {
+  color: #DC2626;
+}
+
+.count-completed {
+  color: #16A34A;
+}
+
 /* Filter Card Banner */
 .exercises-filter-card {
   background-color: #FFFFFF;
@@ -108,6 +177,84 @@ Updated By: Tam Khang
   align-items: flex-end;
   gap: 20px;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.02);
+  flex-wrap: wrap;
+}
+
+.filter-search-input-wrap {
+  position: relative;
+  display: flex;
+  align-items: center;
+  width: 100%;
+}
+
+.filter-search-icon {
+  position: absolute;
+  left: 12px;
+  color: #94A3B8;
+  pointer-events: none;
+}
+
+.filter-search-input {
+  width: 100%;
+  height: 42px;
+  padding: 0 36px 0 38px;
+  background-color: #FFFFFF;
+  border: 1px solid #E2E8F0;
+  border-radius: 10px;
+  font-size: 13.5px;
+  color: #1E293B;
+  font-family: inherit;
+  outline: none;
+  box-sizing: border-box;
+  transition: all 0.2s ease;
+}
+
+.filter-search-input:focus {
+  border-color: #7C3AED;
+  box-shadow: 0 0 0 3px rgba(124, 58, 237, 0.1);
+}
+
+.filter-search-clear {
+  position: absolute;
+  right: 10px;
+  background: none;
+  border: none;
+  color: #94A3B8;
+  cursor: pointer;
+  padding: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+}
+
+.filter-search-clear:hover {
+  color: #475569;
+  background-color: #F1F5F9;
+}
+
+.meta-chip-item.class-badge {
+  background-color: #EEF2FF;
+  color: #4F46E5;
+  font-weight: 700;
+}
+
+.card-status-pill.active {
+  background-color: #EFF6FF;
+  color: #2563EB;
+  border: 1px solid #BFDBFE;
+}
+
+.card-status-pill.overdue {
+  background-color: #FEF2F2;
+  color: #DC2626;
+  border: 1px solid #FECACA;
+}
+
+.card-status-pill.completed {
+  background-color: #F0FDF4;
+  color: #16A34A;
+  border: 1px solid #BBF7D0;
 }
 
 .filter-field-group {
@@ -169,12 +316,60 @@ Updated By: Tam Khang
   box-shadow: 0 4px 12px rgba(107, 70, 193, 0.25);
 }
 
+.filter-refresh-group {
+  display: flex;
+  align-items: flex-end;
+  height: 42px;
+}
+
+.btn-filter-refresh {
+  height: 42px;
+  padding: 0 16px;
+  background-color: #F8FAFC;
+  color: #475569;
+  border: 1px solid #E2E8F0;
+  border-radius: 10px;
+  font-size: 13.5px;
+  font-weight: 600;
+  font-family: inherit;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  white-space: nowrap;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  box-sizing: border-box;
+}
+
+.btn-filter-refresh:hover:not(:disabled) {
+  background-color: #F1F5F9;
+  border-color: #CBD5E1;
+  color: #1E293B;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.04);
+}
+
+.btn-filter-refresh:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.icon-spin {
+  animation: filterSpin 1s linear infinite;
+}
+
+@keyframes filterSpin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
 /* Exercises Cards Grid */
 .exercises-cards-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(280px, 320px));
+  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
   gap: 24px;
   margin-bottom: 32px;
+  width: 100%;
+  box-sizing: border-box;
 }
 
 .student-assignment-card {
@@ -1715,5 +1910,29 @@ Updated By: Tam Khang
 .btn-modal-retake-purple:hover {
   background: linear-gradient(135deg, #523591, #3B2274);
   transform: translateY(-1px);
+}
+
+.modal-exam-locked-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  font-weight: 700;
+  color: #DC2626;
+  background-color: #FEF2F2;
+  border: 1px solid #FECACA;
+  padding: 0 16px;
+  height: 42px;
+  border-radius: 10px;
+  user-select: none;
+}
+
+.attempts-exam-limit-pill {
+  color: #DC2626 !important;
+  background-color: #FEF2F2 !important;
+  border: 1px solid #FECACA !important;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
 }
 

@@ -2,7 +2,7 @@
 // Description: Main application router with AuthProvider, ProtectedRoute, TeacherLayout, StudentLayout, and standalone exam taking mode.
 // Created At: 2026-08-30
 // Created By: Tam Khang
-// Updated At: 2026-09-20
+// Updated At: 2026-09-27
 // Updated By: Tam Khang
 
 import React from 'react';
@@ -13,31 +13,37 @@ import TeacherLayout from './components/layout/TeacherLayout';
 import StudentLayout from './components/layout/StudentLayout';
 import LoginPage from './pages/LoginPage';
 
+// Layouts stay eager (small, needed for every route in the section). Pages are
+// code-split with React.lazy so the public login screen does not download the
+// teacher/student/admin bundles (KaTeX, MathLive, Tiptap, dashboards, ...).
+import AdminLayout from './components/layout/AdminLayout';
+
 // Teacher Pages
-import TeacherDashboard from './pages/teacher/TeacherDashboard';
-import DocumentRepositoryPage from './pages/teacher/DocumentRepositoryPage';
-import ExerciseRepositoryPage from './pages/teacher/ExerciseRepositoryPage';
-import CreateExerciseManualPage from './pages/teacher/CreateExerciseManualPage';
-import TeacherClassesPage from './pages/teacher/TeacherClassesPage';
-import TeacherClassDetailPage from './pages/teacher/TeacherClassDetailPage';
-import TeacherHomeroomPage from './pages/teacher/TeacherHomeroomPage';
-import TeacherGradingPage from './pages/teacher/TeacherGradingPage';
-import TeacherSchedulePage from './pages/teacher/TeacherSchedulePage';
-import TeacherProfilePage from './pages/teacher/TeacherProfilePage';
+const TeacherDashboard = React.lazy(() => import('./pages/teacher/TeacherDashboard'));
+const DocumentRepositoryPage = React.lazy(() => import('./pages/teacher/DocumentRepositoryPage'));
+const ExerciseRepositoryPage = React.lazy(() => import('./pages/teacher/ExerciseRepositoryPage'));
+const CreateExerciseManualPage = React.lazy(() => import('./pages/teacher/CreateExerciseManualPage'));
+const TeacherClassesPage = React.lazy(() => import('./pages/teacher/TeacherClassesPage'));
+const TeacherClassDetailPage = React.lazy(() => import('./pages/teacher/TeacherClassDetailPage'));
+const TeacherHomeroomPage = React.lazy(() => import('./pages/teacher/TeacherHomeroomPage'));
+const TeacherGradingPage = React.lazy(() => import('./pages/teacher/TeacherGradingPage'));
+const TeacherSchedulePage = React.lazy(() => import('./pages/teacher/TeacherSchedulePage'));
+const TeacherProfilePage = React.lazy(() => import('./pages/teacher/TeacherProfilePage'));
 
 // Student Pages
-import StudentDashboard from './pages/student/StudentDashboard';
-import StudentExercisesPage from './pages/student/StudentExercisesPage';
-import StudentExerciseTakingPage from './pages/student/StudentExerciseTakingPage';
+const StudentDashboard = React.lazy(() => import('./pages/student/StudentDashboard'));
+const StudentExercisesPage = React.lazy(() => import('./pages/student/StudentExercisesPage'));
+const StudentExerciseTakingPage = React.lazy(() => import('./pages/student/StudentExerciseTakingPage'));
 
-// Admin Pages & Layout
-import AdminLayout from './components/layout/AdminLayout';
-import AdminDashboard from './pages/admin/AdminDashboard';
-import AdminUsersPage from './pages/admin/AdminUsersPage';
-import AdminClassesPage from './pages/admin/AdminClassesPage';
-import AdminRolesPage from './pages/admin/AdminRolesPage';
-import AdminReportsPage from './pages/admin/AdminReportsPage';
-import AdminSettingsPage from './pages/admin/AdminSettingsPage';
+// Admin Pages
+const AdminDashboard = React.lazy(() => import('./pages/admin/AdminDashboard'));
+const AdminUsersPage = React.lazy(() => import('./pages/admin/AdminUsersPage'));
+const AdminClassesPage = React.lazy(() => import('./pages/admin/AdminClassesPage'));
+const AdminRolesPage = React.lazy(() => import('./pages/admin/AdminRolesPage'));
+const AdminSubjectsPage = React.lazy(() => import('./pages/admin/AdminSubjectsPage'));
+const AdminReportsPage = React.lazy(() => import('./pages/admin/AdminReportsPage'));
+const AdminSettingsPage = React.lazy(() => import('./pages/admin/AdminSettingsPage'));
+const AdminMonitoringPage = React.lazy(() => import('./pages/admin/AdminMonitoringPage'));
 
 function RootRedirector() {
   const { user } = useAuth();
@@ -148,6 +154,23 @@ export default function App() {
     <ErrorBoundary>
       <AuthProvider>
         <BrowserRouter>
+        <React.Suspense
+          fallback={
+            <div style={{
+              minHeight: '100vh',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              backgroundColor: '#F8F7FA',
+              color: '#4D308D',
+              fontFamily: 'Be Vietnam Pro, sans-serif',
+              fontSize: '14px',
+              fontWeight: 600,
+            }}>
+              Đang tải trang…
+            </div>
+          }
+        >
         <Routes>
           {/* Public Login Route */}
           <Route path="/login" element={<LoginPage />} />
@@ -166,7 +189,7 @@ export default function App() {
           <Route
             path="/student/exercises/:exerciseId/taking"
             element={
-              <ProtectedRoute>
+              <ProtectedRoute allowedRoles={['Student']}>
                 <StudentExerciseTakingPage />
               </ProtectedRoute>
             }
@@ -175,7 +198,7 @@ export default function App() {
           {/* Protected Teacher Module Routes with Shared Persistent TeacherLayout */}
           <Route
             element={
-              <ProtectedRoute>
+              <ProtectedRoute allowedRoles={['Teacher']}>
                 <TeacherLayout />
               </ProtectedRoute>
             }
@@ -195,7 +218,7 @@ export default function App() {
           {/* Protected Student Module Routes with Shared Persistent StudentLayout */}
           <Route
             element={
-              <ProtectedRoute>
+              <ProtectedRoute allowedRoles={['Student']}>
                 <StudentLayout />
               </ProtectedRoute>
             }
@@ -208,7 +231,7 @@ export default function App() {
           {/* Protected Admin Module Routes with Shared Persistent AdminLayout */}
           <Route
             element={
-              <ProtectedRoute>
+              <ProtectedRoute allowedRoles={['Admin']}>
                 <AdminLayout />
               </ProtectedRoute>
             }
@@ -217,15 +240,19 @@ export default function App() {
             <Route path="/admin/users" element={<AdminUsersPage />} />
             <Route path="/admin/classes" element={<AdminClassesPage />} />
             <Route path="/admin/roles" element={<AdminRolesPage />} />
+            <Route path="/admin/subjects" element={<AdminSubjectsPage />} />
             <Route path="/admin/reports" element={<AdminReportsPage />} />
+            <Route path="/admin/monitoring" element={<AdminMonitoringPage />} />
             <Route path="/admin/settings" element={<AdminSettingsPage />} />
           </Route>
 
           {/* Catch-all Fallback */}
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
+        </React.Suspense>
       </BrowserRouter>
     </AuthProvider>
     </ErrorBoundary>
   );
 }
+

@@ -2,7 +2,7 @@
 # Description: Integration & Unit tests for F-EXE-01 Exercise Bank module (CRUD, scoping, soft-delete, restore, validation).
 # Created At: 2026-07-31
 # Created By: Tam Khang
-# Updated At: 2026-07-31
+# Updated At: 2026-10-03
 # Updated By: Tam Khang
 
 import uuid
@@ -23,6 +23,14 @@ def get_teacher_token(client: TestClient) -> str:
     resp = client.post(
         "/api/v1/auth/login",
         json={"phone": "0912345678", "password": "password123"}
+    )
+    return resp.json()["access_token"]
+
+
+def get_student_token(client: TestClient) -> str:
+    resp = client.post(
+        "/api/v1/auth/login",
+        json={"phone": "0934567890", "password": "password123"}
     )
     return resp.json()["access_token"]
 
@@ -157,3 +165,26 @@ class TestExerciseBankModule:
         )
         assert fail_ex.status_code == status.HTTP_403_FORBIDDEN
         assert fail_ex.json()["detail"]["code"] == "ERR-EXE-INVALID_SUBJECT_SCOPE"
+
+    def test_student_cannot_use_teacher_ai_generate(self, client: TestClient):
+        """Student AI generation moved to /api/v1/ai-exercises/student; the teacher route rejects students."""
+        student_headers = {"Authorization": f"Bearer {get_student_token(client)}"}
+        resp = client.post(
+            "/api/v1/exercises/ai-generate",
+            json={"subject_name": "History", "topic_prompt": "August Revolution",
+                  "part1_count": 1, "part2_count": 0, "part3_count": 0, "duration_minutes": 45},
+            headers=student_headers,
+        )
+        assert resp.status_code == status.HTTP_403_FORBIDDEN
+
+    def test_student_sees_no_foreign_exercise(self, client: TestClient):
+        """Students may only read exercises they created; an admin exercise is hidden (404)."""
+        admin_headers = {"Authorization": f"Bearer {get_admin_token(client)}"}
+        student_headers = {"Authorization": f"Bearer {get_student_token(client)}"}
+        subject_id = client.post(
+            "/api/v1/subjects", json={"subject_name": f"Sci {uuid.uuid4().hex[:6]}"}, headers=admin_headers
+        ).json()["subject_id"]
+        ex_id = client.post(
+            "/api/v1/exercises", json={"title": "Admin only", "subject_id": subject_id}, headers=admin_headers
+        ).json()["exercise_id"]
+        assert client.get(f"/api/v1/exercises/{ex_id}", headers=student_headers).status_code == status.HTTP_404_NOT_FOUND

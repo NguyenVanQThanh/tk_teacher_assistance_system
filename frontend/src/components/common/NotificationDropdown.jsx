@@ -5,9 +5,11 @@
 // Updated At: 2026-09-13
 // Updated By: Tam Khang
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { MessageSquare, Settings, FileText } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
+import { teacherApi } from '../../services/api';
 import './NotificationDropdown.css';
 
 export default function NotificationDropdown({ onClose, onOpenQA, onOpenAllNotifs, initialNotifications }) {
@@ -51,7 +53,30 @@ export default function NotificationDropdown({ onClose, onOpenQA, onOpenAllNotif
     },
   ];
 
-  const [notifications, setNotifications] = useState(initialNotifications || defaultItems);
+  const navigate = useNavigate();
+  const [notifications, setNotifications] = useState(initialNotifications || (isTeacher ? [] : defaultItems));
+  const [loaded, setLoaded] = useState(!isTeacher);
+
+  // Teachers get real notifications derived from grading and timetable data.
+  useEffect(() => {
+    if (!isTeacher || initialNotifications) return;
+    let active = true;
+    teacherApi.getNotifications().then((rows) => {
+      if (!active) return;
+      setNotifications(rows.map((r) => ({
+        id: r.id,
+        type: r.type,
+        title: r.title,
+        content: r.content,
+        time: r.time ? new Date(r.time).toLocaleString('vi-VN') : '',
+        link: r.link,
+        unread: true,
+        icon: r.type === 'system' ? Settings : FileText,
+        iconTheme: 'purple',
+      })));
+    }).catch(() => {}).finally(() => { if (active) setLoaded(true); });
+    return () => { active = false; };
+  }, [isTeacher, initialNotifications]);
 
   const handleMarkAllRead = (e) => {
     e.stopPropagation();
@@ -62,6 +87,11 @@ export default function NotificationDropdown({ onClose, onOpenQA, onOpenAllNotif
     setNotifications(prev =>
       prev.map(n => (n.id === item.id ? { ...n, unread: false } : n))
     );
+    if (item.link) {
+      if (onClose) onClose();
+      navigate(item.link);
+      return;
+    }
     if (item.type === 'qa' && onOpenQA) {
       if (onClose) onClose();
       onOpenQA();
@@ -84,6 +114,11 @@ export default function NotificationDropdown({ onClose, onOpenQA, onOpenAllNotif
 
       {/* List of notification items */}
       <div className="notif-list">
+        {loaded && notifications.length === 0 && (
+          <div style={{ padding: '24px 12px', textAlign: 'center', color: '#64748B', fontSize: 13 }}>
+            No new notifications.
+          </div>
+        )}
         {notifications.map((item) => {
           const IconComponent = item.icon;
           return (

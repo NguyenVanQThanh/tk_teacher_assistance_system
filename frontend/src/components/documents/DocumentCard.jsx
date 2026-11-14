@@ -2,7 +2,7 @@
 // Description: Reusable card component for displaying educational documents and learning materials.
 // Created At: 2026-08-30
 // Created By: Tam Khang
-// Updated At: 2026-09-12
+// Updated At: 2026-11-03
 // Updated By: Tam Khang
 
 import React from 'react';
@@ -14,39 +14,49 @@ import {
   Eye, 
   Download, 
   Edit3, 
-  HardDrive 
+  HardDrive,
+  GraduationCap
 } from 'lucide-react';
 import './DocumentCard.css';
 
-export default function DocumentCard({ doc, onPreview, onDownload, onEdit, onMore, onDelete, onRemove }) {
-  // Determine icon and color scheme based on file type
+export default function DocumentCard({ doc, onPreview, onDownload, onEdit, onMore, onDelete, onRemove, onView, canModify = true }) {
+  // Determine icon and color scheme based on file/document type
   const renderTypeIcon = () => {
-    switch (doc.fileType?.toLowerCase()) {
+    const type = doc.fileType?.toLowerCase();
+    switch (type) {
+      case 'exam':
+        return (
+          <div className="doc-icon-badge pdf-badge" title="Đề kiểm tra">
+            <span className="pdf-tag">EXAM</span>
+          </div>
+        );
+      case 'lecture':
+        return (
+          <div className="doc-icon-badge word-badge" title="Bài giảng">
+            <FileText size={20} strokeWidth={2.2} />
+          </div>
+        );
+      case 'reference':
+        return (
+          <div className="doc-icon-badge code-badge" title="Tài liệu tham khảo">
+            <FileText size={20} strokeWidth={2.2} />
+          </div>
+        );
       case 'pdf':
         return (
           <div className="doc-icon-badge pdf-badge">
             <span className="pdf-tag">PDF</span>
           </div>
         );
-      case 'video':
-        return (
-          <div className="doc-icon-badge video-badge">
-            <Video size={20} strokeWidth={2.2} />
-          </div>
-        );
-      case 'code':
-        return (
-          <div className="doc-icon-badge code-badge">
-            <FileCode size={20} strokeWidth={2.2} />
-          </div>
-        );
-      case 'exercise':
+      case 'xlsx':
+      case 'excel':
         return (
           <div className="doc-icon-badge exercise-badge">
-            <FileText size={20} strokeWidth={2.2} />
+            <span className="pdf-tag" style={{ background: '#10B981', color: '#fff' }}>XLSX</span>
           </div>
         );
       case 'word':
+      case 'docx':
       default:
         return (
           <div className="doc-icon-badge word-badge">
@@ -64,6 +74,7 @@ export default function DocumentCard({ doc, onPreview, onDownload, onEdit, onMor
       {/* Top Header: Icon & Close / Delete Button */}
       <div className="doc-card-top">
         {renderTypeIcon()}
+        {canModify && (
         <button 
           type="button" 
           className="doc-more-btn doc-close-btn" 
@@ -82,6 +93,7 @@ export default function DocumentCard({ doc, onPreview, onDownload, onEdit, onMor
         >
           <X size={17} strokeWidth={2.2} />
         </button>
+        )}
       </div>
 
       {/* Document Title */}
@@ -95,6 +107,15 @@ export default function DocumentCard({ doc, onPreview, onDownload, onEdit, onMor
         <span>{doc.fileSize}</span>
         <span className="meta-dot">•</span>
         <span>{doc.uploadDate}</span>
+        {doc.grade && (
+          <>
+            <span className="meta-dot">•</span>
+            <span className="doc-grade-chip" title={`Khối ${doc.grade}`}>
+              <GraduationCap size={12} className="meta-icon" />
+              Khối {doc.grade}
+            </span>
+          </>
+        )}
       </div>
 
       {/* Teacher Uploader */}
@@ -103,6 +124,11 @@ export default function DocumentCard({ doc, onPreview, onDownload, onEdit, onMor
           {doc.authorInitial || 'GV'}
         </div>
         <span className="author-name">{doc.authorName}</span>
+        {!canModify && (
+          <span className="doc-grade-chip" data-testid="head-dept-badge" title="Tài liệu của tổ trưởng bộ môn (chỉ xem)">
+            Tổ trưởng bộ môn
+          </span>
+        )}
       </div>
 
       {/* Bottom Actions Bar */}
@@ -112,7 +138,7 @@ export default function DocumentCard({ doc, onPreview, onDownload, onEdit, onMor
           className="btn-action-preview"
           onClick={(e) => {
             e.stopPropagation();
-            onPreview && onPreview(doc);
+            if (onView) { onView(doc); } else if (onPreview) { onPreview(doc); }
           }}
         >
           <Eye size={15} />
@@ -120,17 +146,7 @@ export default function DocumentCard({ doc, onPreview, onDownload, onEdit, onMor
         </button>
 
         <div className="doc-action-icons">
-          <button 
-            type="button" 
-            className="icon-action-btn"
-            onClick={(e) => {
-              e.stopPropagation();
-              onDownload && onDownload(doc);
-            }}
-            title="Tải xuống tài liệu"
-          >
-            <Download size={16} />
-          </button>
+          {canModify && (
           <button 
             type="button" 
             className="icon-action-btn"
@@ -142,6 +158,7 @@ export default function DocumentCard({ doc, onPreview, onDownload, onEdit, onMor
           >
             <Edit3 size={16} />
           </button>
+          )}
         </div>
       </div>
     </div>

@@ -23,3 +23,24 @@ Dưới đây là danh sách các tài khoản mẫu (seed accounts) đã đư�
 
 > [!NOTE]
 > Tất cả các mật khẩu đều được băm bằng thuật toán `bcrypt` an toàn và lưu trữ trong bảng `users` của cơ sở dữ liệu.
+
+## Production: account Admin chính
+
+Bảng trên là dữ liệu **dev**, tạo bởi `backend/app/scripts/seed_users.py` (chạy tay). Database
+production dựng thuần từ `alembic upgrade head` **không có** các account này — thậm chí bảng
+`roles` cũng rỗng.
+
+Thay vào đó, container backend tự chạy `backend/app/scripts/bootstrap_admin.py` sau bước
+migrate. Account được tạo từ biến môi trường, không hard-code:
+
+| Biến | Ý nghĩa |
+| :--- | :--- |
+| `ADMIN_PHONE` | số điện thoại đăng nhập (bắt buộc) |
+| `ADMIN_PASSWORD` | mật khẩu thô, ≥ 8 ký tự (bắt buộc) |
+| `ADMIN_EMAIL` | tuỳ chọn |
+| `ADMIN_FULL_NAME` | tuỳ chọn, mặc định `System Administrator` |
+| `ADMIN_RESET_PASSWORD` | `1` = ép lại mật khẩu (khi quên) |
+
+Script idempotent nên restart container không tạo trùng và không đổi mật khẩu. Chi tiết cách
+cấu hình: xem [`deploy/README.md`](../deploy/README.md) mục *Account Admin chính trên production*.
+

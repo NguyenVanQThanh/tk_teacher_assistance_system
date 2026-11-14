@@ -72,6 +72,19 @@ export default function AddStudentModal({ isOpen, onClose, onAddStudent, nextStu
       }
     }
 
+    if (formData.dateOfBirth) {
+      const birth = new Date(formData.dateOfBirth);
+      const today = new Date();
+      let age = today.getFullYear() - birth.getFullYear();
+      const m = today.getMonth() - birth.getMonth();
+      if (m < 0 || (m === 0 && today.getDate() < birth.getDate())) {
+        age--;
+      }
+      if (age < 16) {
+        newErrors.dateOfBirth = 'Học sinh phải từ 16 tuổi trở lên (ngày sinh không hợp lệ).';
+      }
+    }
+
     if (Object.keys(newErrors).length > 0) {
       setErrors(newErrors);
       return;
@@ -163,13 +176,14 @@ export default function AddStudentModal({ isOpen, onClose, onAddStudent, nextStu
               </div>
 
               <div className="add-student-form-group">
-                <label className="add-student-label">Ngày sinh</label>
+                <label className="add-student-label">Ngày sinh (Định dạng: Ngày/Tháng/Năm)</label>
                 <input 
                   type="date" 
-                  className="add-student-input"
+                  className={`add-student-input ${errors.dateOfBirth ? 'input-error' : ''}`}
                   value={formData.dateOfBirth}
                   onChange={(e) => handleChange('dateOfBirth', e.target.value)}
                 />
+                {errors.dateOfBirth && <span className="add-student-error-text">{errors.dateOfBirth}</span>}
               </div>
             </div>
 

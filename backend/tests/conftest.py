@@ -2,7 +2,7 @@
 # Description: Testing configuration, database setup using SQLite in-memory, and fixtures.
 # Created At: 2026-07-17
 # Created By: Tam Khang
-# Updated At: 2026-07-22
+# Updated At: 2026-09-30
 # Updated By: Tam Khang
 
 
@@ -20,6 +20,9 @@ os.environ["ACCESS_TOKEN_EXPIRE_MINUTES"] = "10"
 os.environ["DB_USERNAME"] = "dummy"
 os.environ["DB_PASSWORD"] = "dummy"
 os.environ["DB_NAME"] = "dummy"
+# Monitoring persistence would open real DB sessions from the background flush loop; the tests
+# use an in-memory SQLite override, so keep the collector purely in-memory.
+os.environ["MONITORING_PERSIST_ENABLED"] = "0"
 
 # Monkeypatch bcrypt.hashpw to avoid passlib bug check ValueError on Python 3.13 / bcrypt >= 4.0
 import bcrypt
@@ -31,7 +34,7 @@ def _patched_hashpw(password, salt):
 bcrypt.hashpw = _patched_hashpw
 
 from models.base import Base
-from models.models import User, Role, Permission, RolePermission, UserPermission
+from models.models import User, Role, Permission, RolePermission, UserPermission, ApprovalRequest, AuditLog
 from app.core.database import get_db
 from app.core.security import get_password_hash
 from app.modules.auth.services.permission_service import PermissionService
@@ -39,8 +42,9 @@ from app.main import app
 
 
 # Create SQLite in-memory engine for testing
+from sqlalchemy.pool import StaticPool
 SQLALCHEMY_DATABASE_URL = "sqlite:///:memory:"
-engine = create_engine(SQLALCHEMY_DATABASE_URL, connect_args={"check_same_thread": False})
+engine = create_engine(SQLALCHEMY_DATABASE_URL, connect_args={"check_same_thread": False}, poolclass=StaticPool)
 TestingSessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
 @pytest.fixture(scope="session", autouse=True)
@@ -84,6 +88,12 @@ def setup_db() -> Generator[None, None, None]:
             permission_code="ACAD_SUBJECT_MANAGE",
             name="Manage subjects",
             description="Allows admin to create, update, delete subjects"
+        )
+        acad_subject_head_assign_perm = Permission(
+            permission_id=uuid.uuid4(),
+            permission_code="ACAD_SUBJECT_HEAD_ASSIGN",
+            name="Assign subject head",
+            description="Allows admin to assign the head of a subject department"
         )
         acad_subject_view_perm = Permission(
             permission_id=uuid.uuid4(),
@@ -175,6 +185,7 @@ def setup_db() -> Generator[None, None, None]:
             pwd_change_perm,
             perm_manage_perm,
             acad_subject_manage_perm,
+            acad_subject_head_assign_perm,
             acad_subject_view_perm,
             acad_class_manage_perm,
             acad_class_view_perm,
@@ -199,6 +210,7 @@ def setup_db() -> Generator[None, None, None]:
             RolePermission(role_id=admin_role.role_id, permission_id=pwd_change_perm.permission_id),
             RolePermission(role_id=admin_role.role_id, permission_id=perm_manage_perm.permission_id),
             RolePermission(role_id=admin_role.role_id, permission_id=acad_subject_manage_perm.permission_id),
+            RolePermission(role_id=admin_role.role_id, permission_id=acad_subject_head_assign_perm.permission_id),
             RolePermission(role_id=admin_role.role_id, permission_id=acad_subject_view_perm.permission_id),
             RolePermission(role_id=admin_role.role_id, permission_id=acad_class_manage_perm.permission_id),
             RolePermission(role_id=admin_role.role_id, permission_id=acad_class_view_perm.permission_id),
@@ -226,6 +238,7 @@ def setup_db() -> Generator[None, None, None]:
             RolePermission(role_id=student_role.role_id, permission_id=me_view_perm.permission_id),
             RolePermission(role_id=student_role.role_id, permission_id=pwd_change_perm.permission_id),
             RolePermission(role_id=student_role.role_id, permission_id=exe_assignment_view_perm.permission_id),
+            RolePermission(role_id=student_role.role_id, permission_id=exe_exercise_view_perm.permission_id),
             RolePermission(role_id=student_role.role_id, permission_id=exe_attempt_submit_perm.permission_id),
             RolePermission(role_id=student_role.role_id, permission_id=exe_attempt_view_perm.permission_id),
         ])
@@ -354,10 +367,15 @@ def db_session() -> Generator[Session, None, None]:
     connection.close()
 
 @pytest.fixture
-def client(db_session: Session) -> Generator[TestClient, None, None]:
+def client(db_session: Session, monkeypatch) -> Generator[TestClient, None, None]:
     """
     FastAPI TestClient with overridden get_db dependency.
+    Document ingestion (background task, needs Postgres + pgvector + VLM) is stubbed out.
     """
+    monkeypatch.setattr(
+        "app.modules.document.services.document_ingest_service.DocumentIngestService.ingest",
+        staticmethod(lambda *a, **kw: None),
+    )
     def override_get_db():
         try:
             yield db_session
@@ -368,3 +386,9 @@ def client(db_session: Session) -> Generator[TestClient, None, None]:
     with TestClient(app) as test_client:
         yield test_client
     app.dependency_overrides.clear()
+
+
+@pytest.fixture(autouse=True)
+def _isolate_llm_keys(monkeypatch):
+    """Keep tests off real LLM APIs: generation tests mock the Gemini path, so Mistral must be disabled."""
+    monkeypatch.delenv("MISTRAL_API_KEY", raising=False)

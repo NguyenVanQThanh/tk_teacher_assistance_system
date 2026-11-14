@@ -23,6 +23,7 @@ import {
 import { useAuth } from '../../context/AuthContext';
 import AdminSidebar from '../admin/AdminSidebar';
 import './AdminLayout.css';
+import toast from '../../components/common/toast';
 
 export default function AdminLayout() {
   const { user, logout } = useAuth();
@@ -74,8 +75,10 @@ export default function AdminLayout() {
     const path = location.pathname;
     if (path.startsWith('/admin/users')) return 'Quản lý người dùng';
     if (path.startsWith('/admin/classes')) return 'Quản lý trường lớp';
+    if (path.startsWith('/admin/subjects')) return 'Môn học & Tổ trưởng bộ môn';
     if (path.startsWith('/admin/roles')) return 'Phân quyền & Vai trò';
     if (path.startsWith('/admin/reports')) return 'Báo cáo & Thống kê';
+    if (path.startsWith('/admin/monitoring')) return 'Giám sát hệ thống';
     if (path.startsWith('/admin/settings')) return 'Cài đặt hệ thống';
     return null;
   };
@@ -148,7 +151,7 @@ export default function AdminLayout() {
               type="button" 
               className="admin-icon-btn" 
               title="Trung tâm hỗ trợ"
-              onClick={() => alert('Trung tâm hướng dẫn quản trị viên SmartLMS')}
+              onClick={() => toast.info('Trung tâm hướng dẫn quản trị viên SmartLMS')}
             >
               <HelpCircle size={20} strokeWidth={1.8} />
             </button>

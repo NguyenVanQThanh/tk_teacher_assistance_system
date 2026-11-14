@@ -1,8 +1,8 @@
 // File Name: AuthContext.jsx
-// Description: Authentication Context Provider managing JWT token, user state, and login/logout flows.
+// Description: Authentication Context Provider managing JWT token, user profile, effective permissions, and login/logout flows.
 // Created At: 2026-08-30
 // Created By: Tam Khang
-// Updated At: 2026-08-30
+// Updated At: 2026-10-28
 // Updated By: Tam Khang
 
 import React, { createContext, useContext, useState, useEffect } from 'react';
@@ -67,6 +67,12 @@ export function AuthProvider({ children }) {
     }
   };
 
+  const hasPermission = (permissionCode) => {
+    if (!user) return false;
+    if (user.role === 'Admin') return true;
+    return Array.isArray(user.permissions) && user.permissions.includes(permissionCode);
+  };
+
   const value = {
     user,
     token,
@@ -74,6 +80,7 @@ export function AuthProvider({ children }) {
     isLoading,
     login,
     logout,
+    hasPermission,
   };
 
   return (

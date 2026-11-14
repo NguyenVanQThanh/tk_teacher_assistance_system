@@ -31,19 +31,9 @@ config = context.config
 if config.config_file_name is not None:
     fileConfig(config.config_file_name)
 
-# Dynamic DB URL configuration from environment
-db_url = os.environ.get("DATABASE_URL")
-if not db_url:
-    db_user = os.environ.get("DB_USERNAME")
-    db_pass = os.environ.get("DB_PASSWORD")
-    db_host = os.environ.get("DB_HOST", "localhost")
-    db_port = os.environ.get("DB_PORT", "5432")
-    db_name = os.environ.get("DB_NAME")
-    if db_user and db_pass and db_name:
-        db_url = f"postgresql://{db_user}:{db_pass}@{db_host}:{db_port}/{db_name}"
-
-if db_url:
-    config.set_main_option("sqlalchemy.url", db_url)
+from app.core.database import DATABASE_URL
+if DATABASE_URL:
+    config.set_main_option("sqlalchemy.url", DATABASE_URL)
 
 # add your model's MetaData object here
 # for 'autogenerate' support

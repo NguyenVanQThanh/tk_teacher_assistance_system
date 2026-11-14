@@ -2,7 +2,7 @@
 /* Description: Styles for the Document Detail View matching Image 1 design. */
 /* Created At: 2026-09-01 */
 /* Created By: Tam Khang */
-/* Updated At: 2026-09-01 */
+/* Updated At: 2026-11-03 */
 /* Updated By: Tam Khang */
 
 .doc-detail-view-container {
@@ -222,7 +222,26 @@
   color: #4F46E5;
   border: 1px solid #4F46E5;
   border-radius: 8px;
-  padding: 10px 22px;
+  padding: 10px 20px;
+  font-size: 13.5px;
+  font-weight: 600;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.btn-action-edit:hover {
+  background-color: #F5F3FF;
+}
+
+.btn-action-delete {
+  background-color: #FEF2F2;
+  color: #DC2626;
+  border: 1px solid #FECACA;
+  border-radius: 8px;
+  padding: 10px 20px;
   font-size: 13.5px;
   font-weight: 600;
   display: inline-flex;
@@ -233,14 +252,16 @@
   transition: all 0.15s ease;
 }
 
-.btn-action-edit:hover {
-  background-color: #F5F3FF;
+.btn-action-delete:hover {
+  background-color: #FEE2E2;
+  border-color: #F87171;
+  color: #B91C1C;
 }
 
 /* Metric / Analytics Cards Grid */
 .doc-analytics-cards-grid {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: 1fr;
   gap: 16px;
 }
 

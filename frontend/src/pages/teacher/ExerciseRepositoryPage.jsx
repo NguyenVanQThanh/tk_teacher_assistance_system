@@ -2,7 +2,7 @@
 // Description: Teacher Exercise Repository Page connected to backend RESTful APIs with Cursor-based Keyset Pagination, centered delete confirmation modal, and toast notifications.
 // Created At: 2026-08-30
 // Created By: Tam Khang
-// Updated At: 2026-09-12
+// Updated At: 2026-11-11
 // Updated By: Tam Khang
 
 import React, { useState, useEffect, useCallback, useRef } from 'react';
@@ -20,10 +20,11 @@ import {
 } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
 import ExerciseFilterBar from '../../components/exercises/ExerciseFilterBar';
+import { useAuth } from '../../context/AuthContext';
 import ExerciseCard from '../../components/exercises/ExerciseCard';
 import CreateExerciseModal from '../../components/exercises/CreateExerciseModal';
 import ExercisePreviewModal from '../../components/exercises/ExercisePreviewModal';
-import EditDocumentModal from '../../components/documents/EditDocumentModal';
+const EditExerciseModal = React.lazy(() => import('../../components/documents/EditExerciseModal'));
 import AssignExerciseModal from '../../components/exercises/AssignExerciseModal';
 import { exercisesApi, subjectsApi } from '../../services/api';
 import './ExerciseRepositoryPage.css';
@@ -31,9 +32,11 @@ import './ExerciseRepositoryPage.css';
 const PAGE_SIZE = 6;
 
 export default function ExerciseRepositoryPage() {
+  const { user } = useAuth();
+  const currentUserId = user?.user_id || user?.id;
+  const isAdmin = user?.role === 'Admin';
   const [showSidebar, setShowSidebar] = useState(true);
   const [selectedGrade, setSelectedGrade] = useState('all');
-  const [selectedSubject, setSelectedSubject] = useState('all');
   const [selectedType, setSelectedType] = useState('all');
   const [searchQuery, setSearchQuery] = useState('');
 
@@ -64,9 +67,10 @@ export default function ExerciseRepositoryPage() {
     }, 2800);
   };
 
-  const handleSaveEditedExercise = (updated) => {
-    setExercises((prev) => prev.map((ex) => (ex.id === updated.id ? { ...ex, ...updated } : ex)));
-    showToast(`Đã lưu và cập nhật nội dung "${updated.title}" thành công!`, 'success', 'Cập nhật thành công');
+  const handleSaveEditedExercise = async (updated) => {
+    const currentCursor = cursorHistory[currentPage - 1] || null;
+    await loadExercises(currentCursor, 'next', currentPage);
+    showToast(`Đã lưu và cập nhật nội dung "${updated.title}" vào cơ sở dữ liệu thành công!`, 'success', 'Cập nhật thành công');
   };
 
   const [exercises, setExercises] = useState([]);
@@ -114,20 +118,6 @@ export default function ExerciseRepositoryPage() {
         params.search = searchQuery.trim();
       }
 
-      if (selectedSubject !== 'all' && subjectsList.length > 0) {
-        const found = subjectsList.find(
-          (s) =>
-            s.subject_id === selectedSubject ||
-            (selectedSubject === 'math' && s.subject_name.toLowerCase().includes('toán')) ||
-            (selectedSubject === 'physics' && s.subject_name.toLowerCase().includes('vật')) ||
-            (selectedSubject === 'chemistry' && s.subject_name.toLowerCase().includes('hóa')) ||
-            (selectedSubject === 'english' && s.subject_name.toLowerCase().includes('anh'))
-        );
-        if (found) {
-          params.subject_id = found.subject_id;
-        }
-      }
-
       const res = await exercisesApi.getExercises(params);
 
       let rawItems = [];
@@ -165,7 +155,7 @@ export default function ExerciseRepositoryPage() {
       // Enrich exercises data for card display
       const enriched = rawItems.map((ex) => {
         const meta = ex.ai_metadata || {};
-        const subjectName = subjectsMap[ex.subject_id] || 'Toán học';
+        const subjectName = subjectsMap[ex.subject_id] || 'Chung';
 
         let grade = meta.grade || '12';
         if (!meta.grade) {
@@ -187,7 +177,7 @@ export default function ExerciseRepositoryPage() {
           duration: meta.duration || (exType === 'test' ? '60 phút' : exType === 'quiz' ? '15 phút' : null),
           date: createdDate,
           grade: grade,
-          subject: subjectName.toLowerCase().includes('toán') ? 'math' : subjectName.toLowerCase().includes('vật lý') ? 'physics' : subjectName.toLowerCase().includes('hóa') ? 'chemistry' : 'math',
+          subject: subjectName.toLowerCase().includes('toán') ? 'math' : subjectName.toLowerCase().includes('vật lý') ? 'physics' : subjectName.toLowerCase().includes('hóa') ? 'chemistry' : 'other',
           subjectName: subjectName,
           authorName: 'Thầy Nguyễn Văn A',
           authorInitial: 'NA',
@@ -202,13 +192,13 @@ export default function ExerciseRepositoryPage() {
     } finally {
       setLoading(false);
     }
-  }, [searchQuery, selectedSubject, subjectsList]);
+  }, [searchQuery, subjectsList]);
 
   // Initial and reactive load on filter change
   useEffect(() => {
     setCursorHistory([null]);
     loadExercises(null, 'next', 1);
-  }, [selectedGrade, selectedSubject, selectedType, searchQuery, loadExercises]);
+  }, [selectedGrade, selectedType, searchQuery, loadExercises]);
 
   const handleNextPage = () => {
     if (!nextCursor || !hasMore) return;
@@ -325,8 +315,6 @@ export default function ExerciseRepositoryPage() {
           <ExerciseFilterBar
             selectedGrade={selectedGrade}
             onChangeGrade={setSelectedGrade}
-            selectedSubject={selectedSubject}
-            onChangeSubject={setSelectedSubject}
             selectedType={selectedType}
             onChangeType={setSelectedType}
             searchQuery={searchQuery}
@@ -355,9 +343,9 @@ export default function ExerciseRepositoryPage() {
                   <ExerciseCard
                     key={exercise.id}
                     exercise={exercise}
+                    canModify={isAdmin || (currentUserId && String(exercise.raw?.created_by) === String(currentUserId))}
                     onPreview={(item) => setPreviewExercise(item)}
                     onEdit={(item) => setEditingExercise(item)}
-                    onShare={(item) => setAssignModalExercise(item)}
                     onDownload={(item) => handleDownloadPdf(item)}
                     onDelete={(item) => requestDeleteExercise(item)}
                     onMore={(item) => requestDeleteExercise(item)}
@@ -428,12 +416,14 @@ export default function ExerciseRepositoryPage() {
       />
 
       {/* Edit Exercise / Document Modal Matching Image 1 */}
-      <EditDocumentModal
+      <React.Suspense fallback={null}>
+        <EditExerciseModal
         isOpen={!!editingExercise}
         doc={editingExercise}
         onClose={() => setEditingExercise(null)}
         onSave={handleSaveEditedExercise}
       />
+      </React.Suspense>
 
       {/* Assign Exercise to Class Modal */}
       <AssignExerciseModal

@@ -1,21 +1,25 @@
 # File Name: schemas.py
-# Description: Pydantic schemas for Exercise, Question, and AnswerOption CRUD & validation.
+# Description: Pydantic schemas for Exercise, Question, AnswerOption, and Assignment CRUD & validation.
 # Created At: 2026-07-31
 # Created By: Tam Khang
-# Updated At: 2026-08-09
-# Updated By: Tam Khang
+# Updated At: 2026-11-12
+# Updated By: AI Agent
+# Note: Student-safe schemas (StudentQuestionOut and friends) intentionally omit correct_answer /
+# explanation / is_correct so students can never read the answer key from API responses.
 
 from enum import Enum
 from uuid import UUID
 from datetime import datetime
-from typing import Optional, List, Any
-from pydantic import BaseModel, Field, field_validator, model_validator
+from typing import Optional, List, Any, Dict, Literal
+from pydantic import BaseModel, Field, ValidationInfo, field_validator, model_validator
 
 
 class QuestionTypeEnum(str, Enum):
     MultipleChoice = "MultipleChoice"
     TrueFalse = "TrueFalse"
     ShortAnswer = "ShortAnswer"
+    # Free-form question: stem + ordered sub-questions stored as answer_options rows (is_correct=False).
+    Other = "Other"
 
 
 class DifficultyEnum(str, Enum):
@@ -54,6 +58,8 @@ class AnswerOptionOut(BaseModel):
 
 
 class SegmentSchema(BaseModel):
+    # Keep extra keys (e.g. statement/is_correct, table content) when segments round-trip through an edit.
+    model_config = {"extra": "allow"}
     type: str = Field("text", description="Segment type: text, math, or image")
     content: Optional[str] = Field(None, description="Text content if type=text")
     latex: Optional[str] = Field(None, description="LaTeX string if type=math")
@@ -76,7 +82,25 @@ class QuestionCreate(BaseModel):
     display_order: int = Field(0, description="Display order within exercise")
     document_id: Optional[UUID] = Field(None, description="Associated source document ID")
     image_url: Optional[str] = Field(None, description="URL of question image")
+    image_metadata: Optional[dict] = Field(None, description="Metadata of the question image (filename, size, dimensions, content_type, ...)")
     answer_options: Optional[List[AnswerOptionCreate]] = Field(default=None, description="List of answer choices")
+
+    @field_validator("difficulty", mode="before")
+    @classmethod
+    def normalize_difficulty(cls, v: Any) -> Any:
+        if v is None or v == "":
+            return None
+        if isinstance(v, DifficultyEnum):
+            return v
+        if isinstance(v, str):
+            s = v.strip().lower()
+            if s in ("nhanbiet", "nhận biết", "nb", "knowledge", "basic"):
+                return DifficultyEnum.NhanBiet
+            if s in ("thonghieu", "thông hiểu", "th", "comprehension", "medium"):
+                return DifficultyEnum.ThongHieu
+            if s in ("vandung", "vận dụng", "vd", "vdc", "vận dụng cao", "application", "advanced"):
+                return DifficultyEnum.VanDung
+        return v
 
     @field_validator("content")
     @classmethod
@@ -87,18 +111,36 @@ class QuestionCreate(BaseModel):
         return v
 
     @model_validator(mode="after")
-    def validate_answer_options_for_type(self):
+    def validate_answer_options_for_type(self, info: ValidationInfo):
         if self.question_type == QuestionTypeEnum.MultipleChoice:
             options = self.answer_options or []
             if len(options) < 2:
                 raise ValueError("MultipleChoice questions must have at least 2 answer options.")
             correct_count = sum(1 for opt in options if opt.is_correct)
-            if correct_count != 1:
+            # Imports without an answer key may legitimately have 0 correct options; the
+            # importer opts in via validation context (not settable through the API body).
+            allow_unkeyed = bool(info.context and info.context.get("allow_no_correct"))
+            if correct_count != 1 and not (allow_unkeyed and correct_count == 0):
                 raise ValueError(f"MultipleChoice questions must have exactly 1 correct answer (found {correct_count}).")
         elif self.question_type == QuestionTypeEnum.TrueFalse:
             options = self.answer_options or []
             if len(options) < 1:
-                raise ValueError("TrueFalse questions must have at least 1 option item.")
+                if self.correct_answer:
+                    is_corr = str(self.correct_answer).strip().lower() in ("đúng", "true", "1", "dung")
+                    self.answer_options = [
+                        AnswerOptionCreate(
+                            content=f"a) {self.content}",
+                            is_correct=is_corr,
+                            display_order=1
+                        )
+                    ]
+                else:
+                    raise ValueError("TrueFalse questions must have at least 1 option item.")
+        elif self.question_type == QuestionTypeEnum.Other:
+            if not (self.answer_options or []):
+                raise ValueError("Other questions must have at least 1 sub-question.")
+            for opt in self.answer_options:
+                opt.is_correct = False
         return self
 
 
@@ -115,7 +157,25 @@ class QuestionUpdate(BaseModel):
     explanation: Optional[str] = None
     display_order: Optional[int] = None
     image_url: Optional[str] = None
+    image_metadata: Optional[dict] = None
     answer_options: Optional[List[AnswerOptionCreate]] = None
+
+    @field_validator("difficulty", mode="before")
+    @classmethod
+    def normalize_difficulty_update(cls, v: Any) -> Any:
+        if v is None or v == "":
+            return None
+        if isinstance(v, DifficultyEnum):
+            return v
+        if isinstance(v, str):
+            s = v.strip().lower()
+            if s in ("nhanbiet", "nhận biết", "nb", "knowledge", "basic"):
+                return DifficultyEnum.NhanBiet
+            if s in ("thonghieu", "thông hiểu", "th", "comprehension", "medium"):
+                return DifficultyEnum.ThongHieu
+            if s in ("vandung", "vận dụng", "vd", "vdc", "vận dụng cao", "application", "advanced"):
+                return DifficultyEnum.VanDung
+        return v
 
     @field_validator("content")
     @classmethod
@@ -129,13 +189,26 @@ class QuestionUpdate(BaseModel):
 
     @model_validator(mode="after")
     def validate_answer_options_if_provided(self):
-        if self.question_type == QuestionTypeEnum.MultipleChoice and self.answer_options is not None:
-            options = self.answer_options
+        if self.answer_options is None:
+            return self
+        options = self.answer_options
+        if self.question_type == QuestionTypeEnum.MultipleChoice:
             if len(options) < 2:
                 raise ValueError("MultipleChoice questions must have at least 2 answer options.")
             correct_count = sum(1 for opt in options if opt.is_correct)
             if correct_count != 1:
                 raise ValueError(f"MultipleChoice questions must have exactly 1 correct answer (found {correct_count}).")
+        elif self.question_type == QuestionTypeEnum.TrueFalse:
+            if len(options) != 4:
+                raise ValueError("TrueFalse questions must have exactly 4 statements.")
+        elif self.question_type == QuestionTypeEnum.ShortAnswer:
+            if options:
+                raise ValueError("ShortAnswer questions must not have answer options.")
+        elif self.question_type == QuestionTypeEnum.Other:
+            if not options:
+                raise ValueError("Other questions must have at least 1 sub-question.")
+            for opt in options:
+                opt.is_correct = False
         return self
 
 
@@ -155,6 +228,7 @@ class QuestionOut(BaseModel):
     explanation: Optional[str] = None
     display_order: int
     image_url: Optional[str] = None
+    image_metadata: Optional[Any] = None
     is_ai_generated: bool
     status: str
     created_at: datetime
@@ -168,6 +242,7 @@ class ExerciseCreate(BaseModel):
     title: str = Field(..., min_length=1, max_length=255, description="Exercise title")
     subject_id: UUID = Field(..., description="Subject UUID")
     ai_metadata: Optional[Any] = Field(None, description="Metadata for AI generation")
+    exercise_kind: Literal["PRACTICE", "EXAM"] = Field("PRACTICE", description="PRACTICE or EXAM")
 
     @field_validator("title")
     @classmethod
@@ -181,6 +256,7 @@ class ExerciseCreate(BaseModel):
 class ExerciseUpdate(BaseModel):
     title: Optional[str] = Field(None, min_length=1, max_length=255, description="New exercise title")
     ai_metadata: Optional[Any] = Field(None, description="New AI metadata")
+    exercise_kind: Optional[Literal["PRACTICE", "EXAM"]] = Field(None, description="New exercise kind")
 
     @field_validator("title")
     @classmethod
@@ -200,6 +276,8 @@ class ExerciseOut(BaseModel):
     created_by: UUID
     total_questions: int
     ai_metadata: Optional[Any] = None
+    exercise_kind: str = "PRACTICE"
+    answers_released: bool = False
     status: str
     created_at: datetime
     updated_at: datetime
@@ -232,6 +310,8 @@ class CursorPaginatedExerciseOut(BaseModel):
 class AssignmentCreate(BaseModel):
     exercise_id: UUID = Field(..., description="Exercise UUID")
     due_at: datetime = Field(..., description="Assignment due date")
+    duration_minutes: Optional[int] = Field(45, description="Duration in minutes (10 - 180)")
+    max_attempts: Optional[int] = Field(1, description="Max allowed attempts (1 - 10)")
 
     @field_validator("due_at")
     @classmethod
@@ -240,6 +320,10 @@ class AssignmentCreate(BaseModel):
         if v <= now:
             raise ValueError("Assignment due date (due_at) must be in the future.")
         return v
+
+
+class AnswerReleaseRequest(BaseModel):
+    released: bool
 
 
 class AssignmentOut(BaseModel):
@@ -251,12 +335,39 @@ class AssignmentOut(BaseModel):
     due_at: datetime
     status: str
     exercise_title: Optional[str] = None
+    answers_released: Optional[bool] = False
     total_questions: Optional[int] = None
+    class_name: Optional[str] = None
+    subject_id: Optional[UUID] = None
+    subject_name: Optional[str] = None
+    teacher_name: Optional[str] = None
+    duration_minutes: Optional[int] = 45
+    max_attempts: Optional[int] = 1
+    completed_attempts_count: Optional[int] = 0
+    submission_count: Optional[int] = 0
+    total_students: Optional[int] = 0
+    completion_rate: Optional[float] = 0.0
+    is_finished: Optional[bool] = False
+    latest_score: Optional[float] = None
+    feed_status: Optional[str] = None
+    category: Optional[str] = "class_exercise"
+    categoryLabel: Optional[str] = "Bài tập trên lớp"
+    is_ai_generated: Optional[bool] = False
+    exercise_type: Optional[str] = None
 
     @model_validator(mode="before")
     @classmethod
     def populate_exercise_fields(cls, data: Any) -> Any:
+        if isinstance(data, dict):
+            return data
         if hasattr(data, "exercise") and data.exercise:
+            class_name = getattr(data.class_obj, "class_name", None) if hasattr(data, "class_obj") and data.class_obj else None
+            teacher_name = getattr(data.assigner, "full_name", None) if hasattr(data, "assigner") and data.assigner else None
+            subject_id = getattr(data.exercise, "subject_id", None)
+            is_exam = getattr(data.exercise, "exercise_kind", "PRACTICE") == "EXAM"
+            ai_meta = getattr(data.exercise, "ai_metadata", {}) or {}
+            custom_duration = ai_meta.get("duration_minutes", 45)
+            custom_attempts = ai_meta.get("max_attempts", 1 if is_exam else 3)
             return {
                 "assignment_id": data.assignment_id,
                 "class_id": data.class_id,
@@ -266,7 +377,23 @@ class AssignmentOut(BaseModel):
                 "due_at": data.due_at,
                 "status": data.status,
                 "exercise_title": data.exercise.title if hasattr(data.exercise, "title") else None,
+                "answers_released": getattr(data, "answers_released_at", None) is not None,
                 "total_questions": data.exercise.total_questions if hasattr(data.exercise, "total_questions") else None,
+                "class_name": class_name,
+                "subject_id": subject_id,
+                "teacher_name": teacher_name,
+                "duration_minutes": custom_duration,
+                "max_attempts": custom_attempts,
+                "completed_attempts_count": 0,
+                "submission_count": len(getattr(data, "attempts", [])) if hasattr(data, "attempts") else 0,
+                "total_students": 25,
+                "completion_rate": 0.0,
+                "is_finished": False,
+                "latest_score": None,
+                "feed_status": "active",
+                "category": "exam" if is_exam else "class_exercise",
+                "categoryLabel": "Bài thi" if is_exam else "Bài tập trên lớp",
+                "is_ai_generated": False
             }
         return data
 
@@ -371,6 +498,7 @@ class AttemptListItemOut(BaseModel):
     class_name: str
     exercise_id: UUID
     exercise_title: str
+    assignment_title: Optional[str] = None
     subject_id: Optional[UUID] = None
     subject_name: Optional[str] = None
     score: Optional[float] = None
@@ -379,6 +507,9 @@ class AttemptListItemOut(BaseModel):
     end_time: Optional[datetime] = None
     total_time_seconds: Optional[int] = None
     status: str
+    # Exam answer release flag of the attempt's assignment (teacher-controlled; exams only).
+    is_exam: bool = False
+    answers_released: bool = False
 
     model_config = {"from_attributes": True}
 
@@ -387,6 +518,310 @@ class AttemptGradeUpdateRequest(BaseModel):
     score: float = Field(..., ge=0.0, le=10.0, description="Updated score from 0.0 to 10.0")
     feedback: Optional[str] = Field(None, max_length=2000, description="Teacher feedback / notes")
     detailed_results: Optional[Any] = Field(None, description="Optional updated detailed question results")
+    status: Optional[str] = Field("approved", description="Grading workflow status: pending_grading, pending_review, approved")
+    is_published: Optional[bool] = Field(True, description="Publish finalized score to student")
+    manual_marks: Optional[Dict[str, bool]] = Field(None, description="Teacher verdicts for short-answer questions keyed by question_id")
 
 
+class AnswerKeyUpdateRequest(BaseModel):
+    """New correct options for MultipleChoice questions; all submissions are regraded afterwards."""
+    keys: Dict[UUID, UUID] = Field(default_factory=dict, description="question_id -> correct option_id")
 
+
+class RegradeOut(BaseModel):
+    updated_questions: int
+    regraded_attempts: int
+
+
+class GradingScoreDistribution(BaseModel):
+    under_5: int = 0
+    from_5_to_6_5: int = 0
+    from_6_5_to_8: int = 0
+    from_8_to_10: int = 0
+
+
+class GradingClassSummary(BaseModel):
+    class_id: UUID
+    class_name: str
+    total_submissions: int = 0
+    graded_count: int = 0
+    pending_count: int = 0
+    avg_score: float = 0.0
+
+
+class GradingDashboardOut(BaseModel):
+    total_submissions: int = 0
+    pending_grading_count: int = 0
+    pending_review_count: int = 0
+    graded_count: int = 0
+    need_feedback_count: int = 0
+    avg_score: float = 0.0
+    score_distribution: GradingScoreDistribution = GradingScoreDistribution()
+    by_class: List[GradingClassSummary] = []
+    recent_submissions: List[AttemptListItemOut] = []
+
+
+class CognitiveLevelStats(BaseModel):
+    correct: int = 0
+    total: int = 0
+    pct: str = "0%"
+
+
+class CognitiveAnalysis(BaseModel):
+    recognition: CognitiveLevelStats = Field(default_factory=CognitiveLevelStats)
+    understanding: CognitiveLevelStats = Field(default_factory=CognitiveLevelStats)
+    application: CognitiveLevelStats = Field(default_factory=CognitiveLevelStats)
+
+
+class AssignmentAttemptDetail(BaseModel):
+    id: UUID
+    attempt_id: UUID
+    attempt_num: int
+    badge_label: str
+    is_latest: bool = False
+    is_best: bool = False
+    date_text: str
+    status_tag: str
+    status_tag_class: str
+    score: Optional[float] = None
+    score_label: str
+    grade: str
+    correct_count: int
+    total_count: int
+    correct_pct: str
+    time_spent: str
+    cognitive: CognitiveAnalysis
+
+    model_config = {"from_attributes": True}
+
+
+class AssignmentResultSummaryOut(BaseModel):
+    assignment_id: Optional[UUID] = None
+    exercise_id: Optional[UUID] = None
+    class_id: Optional[UUID] = None
+    title: str
+    subject_name: Optional[str] = "Toán học"
+    grade_name: Optional[str] = "Lớp 12"
+    teacher_name: Optional[str] = "Giáo viên bộ môn"
+    duration_minutes: int = 45
+    total_questions: int = 0
+    due_at: Optional[datetime] = None
+    deadline_text: Optional[str] = None
+    status: str = "active"
+    max_attempts: int = 1
+    attempts: List[AssignmentAttemptDetail] = []
+    best_attempt: Optional[AssignmentAttemptDetail] = None
+    latest_attempt: Optional[AssignmentAttemptDetail] = None
+
+    model_config = {"from_attributes": True}
+
+
+class AiPartMatrix(BaseModel):
+    """Question counts per difficulty for one part (0-15 each)."""
+    NhanBiet: int = Field(0, ge=0, le=15)
+    ThongHieu: int = Field(0, ge=0, le=15)
+    VanDung: int = Field(0, ge=0, le=15)
+
+    def total(self) -> int:
+        return self.NhanBiet + self.ThongHieu + self.VanDung
+
+
+class AiMatrix(BaseModel):
+    """Exam matrix: mcq (Part1), tf (Part2) and short (Part3) counts per difficulty."""
+    mcq: AiPartMatrix = Field(default_factory=AiPartMatrix)
+    tf: AiPartMatrix = Field(default_factory=AiPartMatrix)
+    short: AiPartMatrix = Field(default_factory=AiPartMatrix)
+
+    def total(self) -> int:
+        return self.mcq.total() + self.tf.total() + self.short.total()
+
+    def as_dict(self) -> dict:
+        return {k: getattr(self, k).model_dump() for k in ("mcq", "tf", "short")}
+
+
+class StudentAiGenerateRequest(BaseModel):
+    """Payload (JSON string in the multipart `payload` field) for POST /api/v1/ai-exercises/student."""
+    subject_id: UUID
+    chapters: List[str] = Field(..., max_length=10)
+    topic_prompt: str = Field("", max_length=300)
+    duration_minutes: int = Field(45, ge=5, le=180)
+    matrix: AiMatrix
+
+    @field_validator("chapters")
+    @classmethod
+    def _clean_chapters(cls, v: List[str]) -> List[str]:
+        cleaned = [c.strip() for c in v if isinstance(c, str) and c.strip()]
+        return list(dict.fromkeys(cleaned))
+
+    @field_validator("topic_prompt")
+    @classmethod
+    def _strip_topic(cls, v: str) -> str:
+        return (v or "").strip()
+
+
+class AiChapterOut(BaseModel):
+    chapter: str
+    doc_id: str
+    page_start: Optional[int] = None
+
+
+class AiExerciseGenerateRequest(BaseModel):
+    subject_name: str = ""
+    subject_id: Optional[UUID] = None
+    grade_name: Optional[str] = "Lớp 12"
+    topic_prompt: str
+    part1_count: int = 4
+    part2_count: int = 1
+    part3_count: int = 1
+    duration_minutes: int = 45
+    class_id: Optional[UUID] = None
+    document_ids: List[UUID] = []
+    matrix: Optional[AiMatrix] = None
+
+
+class AiExerciseGenerateOut(BaseModel):
+    exercise_id: UUID
+    assignment_id: UUID
+    title: str
+    subject_name: str
+    total_questions: int
+    duration_minutes: int
+    class_id: UUID
+    class_name: str
+    due_at: Optional[datetime] = None
+    created_at: datetime
+    sources: List[dict] = []
+
+    model_config = {"from_attributes": True}
+
+
+class QuestionImageUploadOut(BaseModel):
+    url: str = Field(..., description="Public URL of the stored image")
+    filename: str = Field(..., description="Stored filename on BE storage")
+    original_name: Optional[str] = Field(None, description="Original uploaded filename")
+    size_bytes: int = Field(..., description="File size in bytes")
+    content_type: Optional[str] = Field(None, description="MIME type of the image")
+    width: Optional[int] = Field(None, description="Image width in pixels (when detectable)")
+    height: Optional[int] = Field(None, description="Image height in pixels (when detectable)")
+
+
+# =====================================================================
+# STUDENT-SAFE (SANITIZED) SCHEMAS — no answer key may leak to students
+# =====================================================================
+
+# Keys that must never reach a student inside segment payloads (SegmentSchema is extra-allow,
+# so sensitive keys can sneak in via OCR/import; they are stripped recursively).
+SENSITIVE_SEGMENT_KEYS = {
+    "is_correct", "correct", "answer", "answers",
+    "correct_answer", "explanation", "solution", "key",
+}
+
+
+def strip_sensitive_segment_keys(obj: Any) -> Any:
+    """Recursively remove answer-key-like keys from segment dicts/lists (including nested segments)."""
+    if isinstance(obj, dict):
+        return {
+            k: strip_sensitive_segment_keys(v)
+            for k, v in obj.items()
+            if str(k).lower() not in SENSITIVE_SEGMENT_KEYS
+        }
+    if isinstance(obj, list):
+        return [strip_sensitive_segment_keys(item) for item in obj]
+    return obj
+
+
+class StudentAnswerOptionOut(BaseModel):
+    """Answer option as seen by a student: NO is_correct flag."""
+    option_id: UUID
+    question_id: UUID
+    content: str
+    display_order: int
+
+    model_config = {"from_attributes": True}
+
+
+class StudentSegmentOut(SegmentSchema):
+    """Segment as seen by a student: keeps type/content/latex/display/bbox/confidence and any
+    non-sensitive extra keys, but strips is_correct/correct/answer/... recursively."""
+    @model_validator(mode="before")
+    @classmethod
+    def strip_sensitive_keys(cls, data: Any) -> Any:
+        return strip_sensitive_segment_keys(data)
+
+
+class StudentQuestionOut(BaseModel):
+    """Question as seen by a student: same shape as QuestionOut WITHOUT correct_answer and
+    explanation; answer_options are StudentAnswerOptionOut; segments are sanitized."""
+    question_id: UUID
+    exercise_id: UUID
+    document_id: Optional[UUID] = None
+    content: str
+    content_markdown: Optional[str] = None
+    content_latex: Optional[str] = None
+    segments: Optional[List[StudentSegmentOut]] = None
+    confidence_score: Optional[float] = None
+    needs_review: bool = False
+    question_type: str
+    difficulty: Optional[str] = None
+    display_order: int
+    image_url: Optional[str] = None
+    image_metadata: Optional[Any] = None
+    is_ai_generated: bool
+    status: str
+    created_at: datetime
+    updated_at: datetime
+    answer_options: List[StudentAnswerOptionOut] = []
+
+    model_config = {"from_attributes": True}
+
+
+class StudentOpenAttemptOut(BaseModel):
+    """The student's own in-progress attempt (if any) attached to the taking payload."""
+    attempt_id: UUID
+    created_at: Optional[datetime] = None
+    start_time: Optional[datetime] = None
+    answers: Optional[Any] = None
+
+    model_config = {"from_attributes": True}
+
+
+class AssignmentTakingInfoOut(BaseModel):
+    assignment_id: UUID
+    exercise_id: UUID
+    class_id: UUID
+    due_at: Optional[datetime] = None
+    duration_minutes: int = 45
+    max_attempts: int = 1
+    status: str
+    # Denormalized display fields for the student taking screen (never sensitive).
+    teacher_name: Optional[str] = None
+    class_name: Optional[str] = None
+    subject_name: Optional[str] = None
+
+
+class AssignmentTakingExerciseOut(BaseModel):
+    exercise_id: UUID
+    title: str
+    subject_id: Optional[UUID] = None
+    subject_name: Optional[str] = None
+    # Non-sensitive metadata (type, duration, AI sources, ...) for display parity with the feed.
+    ai_metadata: Optional[Any] = None
+
+
+class AssignmentTakingOut(BaseModel):
+    """Student-safe 'paper' of an assignment: assignment info + exercise info + sanitized questions
+    + the student's own open attempt (if any)."""
+    assignment: AssignmentTakingInfoOut
+    exercise: AssignmentTakingExerciseOut
+    questions: List[StudentQuestionOut] = []
+    open_attempt: Optional[StudentOpenAttemptOut] = None
+
+    model_config = {"from_attributes": True}
+
+
+class SyncVersionOut(BaseModel):
+    """Data version snapshot: global version + per-table latest change timestamps (ISO8601 UTC)."""
+    version: str
+    tables: Dict[str, Optional[str]] = {}
+
+    model_config = {"from_attributes": True}

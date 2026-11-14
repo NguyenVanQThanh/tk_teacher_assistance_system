@@ -1,33 +1,31 @@
 // File Name: DocumentDetailView.jsx
-// Description: Document detail view displaying metadata, description, action buttons (view, download, edit), and analytics metrics.
+// Description: Document detail view displaying metadata, description, action buttons (view, edit, delete), and analytics metrics.
 // Created At: 2026-09-01
 // Created By: Tam Khang
-// Updated At: 2026-09-01
+// Updated At: 2026-11-03
 // Updated By: Tam Khang
 
 import React from 'react';
 import { 
   ArrowLeft, 
-  MoreVertical, 
   Eye, 
-  Download, 
   Edit3, 
+  Trash2,
   User, 
   Calendar, 
   FileText, 
   Folder, 
-  Check, 
-  Star 
+  Check
 } from 'lucide-react';
 import './DocumentDetailView.css';
+import toast from '../../components/common/toast';
 
 export default function DocumentDetailView({ 
   doc, 
   onBack, 
   onViewDocument, 
-  onDownloadDocument, 
   onEditDocument, 
-  onMoreOptions 
+  onDeleteDocument 
 }) {
   if (!doc) return null;
 
@@ -35,10 +33,7 @@ export default function DocumentDetailView({
     'Tài liệu tổng hợp các kiến thức trọng tâm học kì 1 môn Toán lớp 12, bao gồm các chuyên đề: Ứng dụng đạo hàm để khảo sát và vẽ đồ thị hàm số, Hàm số lũy thừa, hàm số mũ và hàm số logarit. Kèm theo hệ thống bài tập tự luyện từ cơ bản đến nâng cao có đáp án chi tiết, phù hợp cho học sinh ôn thi THPT Quốc gia.';
 
   const folderName = doc.folder || `Toán ${doc.grade || '12'}`;
-  const viewsCount = doc.viewsCount || '1,245';
-  const downloadsCount = doc.downloadsCount || '342';
-  const ratingScore = doc.ratingScore || '4.8/5';
-  const ratingsCount = doc.ratingsCount || '56';
+  const downloadsCount = doc.downloadsCount !== undefined && doc.downloadsCount !== null ? String(doc.downloadsCount) : '0';
 
   return (
     <div className="doc-detail-view-container">
@@ -99,16 +94,6 @@ export default function DocumentDetailView({
               </div>
             </div>
           </div>
-
-          {/* More Options Button */}
-          <button 
-            type="button" 
-            className="btn-doc-more-options"
-            onClick={() => onMoreOptions && onMoreOptions(doc)}
-            aria-label="Tùy chọn khác"
-          >
-            <MoreVertical size={20} />
-          </button>
         </div>
 
         {/* Description Box */}
@@ -122,7 +107,7 @@ export default function DocumentDetailView({
           <button 
             type="button" 
             className="btn-action-primary"
-            onClick={() => onViewDocument ? onViewDocument(doc) : alert(`Đang mở xem tài liệu: ${doc.title}`)}
+            onClick={() => onViewDocument ? onViewDocument(doc) : toast.info(`Đang mở xem tài liệu: ${doc.title}`)}
           >
             <Eye size={16} />
             <span>Xem tài liệu</span>
@@ -130,51 +115,33 @@ export default function DocumentDetailView({
 
           <button 
             type="button" 
-            className="btn-action-download"
-            onClick={() => onDownloadDocument ? onDownloadDocument(doc) : alert(`Bắt đầu tải xuống: ${doc.title}`)}
+            className="btn-action-edit"
+            onClick={() => onEditDocument ? onEditDocument(doc) : null}
           >
-            <Download size={16} />
-            <span>Tải xuống</span>
+            <Edit3 size={16} />
+            <span>Chỉnh sửa</span>
           </button>
 
           <button 
             type="button" 
-            className="btn-action-edit"
-            onClick={() => onEditDocument ? onEditDocument(doc) : alert(`Chỉnh sửa tài liệu: ${doc.title}`)}
+            className="btn-action-delete"
+            onClick={() => onDeleteDocument ? onDeleteDocument(doc) : null}
           >
-            <Edit3 size={16} />
-            <span>Chỉnh sửa</span>
+            <Trash2 size={16} />
+            <span>Xóa tài liệu</span>
           </button>
         </div>
       </div>
 
       {/* Metric / Statistics Cards Row */}
       <div className="doc-analytics-cards-grid">
-        {/* Metric 1: Views */}
-        <div className="doc-stat-card">
-          <div className="stat-icon-wrap blue">
-            <Eye size={22} />
-          </div>
-          <div className="stat-number">{viewsCount}</div>
-          <div className="stat-label">Lượt xem</div>
-        </div>
-
-        {/* Metric 2: Downloads */}
+        {/* Downloads (the only metric tracked by the backend) */}
         <div className="doc-stat-card">
           <div className="stat-icon-wrap green">
             <Check size={22} strokeWidth={2.5} />
           </div>
           <div className="stat-number">{downloadsCount}</div>
           <div className="stat-label">Lượt tải về</div>
-        </div>
-
-        {/* Metric 3: Ratings */}
-        <div className="doc-stat-card">
-          <div className="stat-icon-wrap purple">
-            <Star size={22} />
-          </div>
-          <div className="stat-number">{ratingScore}</div>
-          <div className="stat-label">Đánh giá ({ratingsCount})</div>
         </div>
       </div>
     </div>

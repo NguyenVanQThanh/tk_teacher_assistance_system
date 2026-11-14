@@ -48,6 +48,22 @@
     "password_plain": "Teacher@1234"
   },
   {
+    "user_id": "8a547513-29c3-4aef-bd0b-815fc143be9e",
+    "phone": "0999000008",
+    "email": "teacher_ha@school.com",
+    "full_name": "Cô Đặng Thu Hà (Tổ Sinh học)",
+    "role_name": "Teacher",
+    "password_plain": "Teacher@1234"
+  },
+  {
+    "user_id": "3baddc4a-9584-41ce-9709-8d472b52bee4",
+    "phone": "0999000009",
+    "email": "teacher_hung@school.com",
+    "full_name": "Thầy Nguyễn Quốc Hùng (Tổ Lịch sử)",
+    "role_name": "Teacher",
+    "password_plain": "Teacher@1234"
+  },
+  {
     "user_id": "8da6124a-417b-4ddd-96d7-a53599e557a3",
     "phone": "0999100001",
     "email": "student01@school.com",

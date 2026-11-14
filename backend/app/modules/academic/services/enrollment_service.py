@@ -25,17 +25,17 @@ class EnrollmentService:
     def enroll_student(
         db: Session,
         class_id: UUID,
-        student_id: UUID,
+        student_id: Optional[UUID] = None,
         student_code: Optional[str] = None,
-        status_val: str = "ACTIVE"
+        status_val: str = "ACTIVE",
+        student_name: Optional[str] = None,
+        birthday: Optional[object] = None,
+        phone: Optional[str] = None,
+        gender: Optional[str] = None
     ) -> StudentClass:
         """
-        Enroll a student into a class.
-        Raises 404 ERR-ACAD-CLASS_NOT_FOUND if class does not exist.
-        Raises 404 ERR-ACAD-STUDENT_NOT_FOUND if student user does not exist.
-        Raises 400 ERR-ACAD-INVALID_STUDENT_ROLE if user is not role Student or status is not Active.
-        Raises 409 ERR-ACAD-ALREADY_ENROLLED if student is already enrolled in this class.
-        Raises 409 ERR-ACAD-DUPLICATE_STUDENT_CODE if student_code is already used.
+        Enroll a student into a class, creating the student user first if not yet existing.
+        Enforces age constraint: Student must be at least 16 years old.
         """
         # 1. Validate class_id exists
         cls = ClassRepository.get_by_id(db, class_id)
@@ -49,7 +49,58 @@ class EnrollmentService:
                 }
             )
 
-        # 2. Validate student_id exists
+        # 2. If student_id is not provided, auto-create student user
+        from datetime import date
+        if not student_id:
+            if not student_name or not student_name.strip():
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail={
+                        "code": "ERR-ACAD-MISSING_STUDENT_INFO",
+                        "message": "Either student_id or student_name must be provided."
+                    }
+                )
+
+            # Age validation (Student >= 16)
+            if birthday:
+                today = date.today()
+                b_date = birthday if isinstance(birthday, date) else date.fromisoformat(str(birthday))
+                age = today.year - b_date.year - ((today.month, today.day) < (b_date.month, b_date.day))
+                if age < 16:
+                    raise HTTPException(
+                        status_code=status.HTTP_400_BAD_REQUEST,
+                        detail={
+                            "code": "ERR-USER-INVALID_AGE_STUDENT",
+                            "message": f"Student must be at least 16 years old. (Calculated age: {age})"
+                        }
+                    )
+
+            import uuid as py_uuid
+            from app.core.security import get_password_hash
+            student_role = db.query(Role).filter(Role.name == "Student").first()
+            if not student_role:
+                raise HTTPException(
+                    status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                    detail={"code": "ERR-ACAD-ROLE_NOT_FOUND", "message": "Student role not found in system."}
+                )
+
+            new_user_id = py_uuid.uuid4()
+            b_date_val = birthday if isinstance(birthday, date) else (date.fromisoformat(str(birthday)) if birthday else None)
+            new_user = User(
+                user_id=new_user_id,
+                full_name=student_name.strip(),
+                phone=phone or None,
+                birthday=b_date_val,
+                role_id=student_role.role_id,
+                password_hash=get_password_hash("Student@1234"),
+                status="ACTIVE"
+            )
+            db.add(new_user)
+            db.commit()
+            db.refresh(new_user)
+            student_id = new_user_id
+
+        # 3. Validate student_id exists
         user = db.query(User).filter(User.user_id == student_id).first()
         if not user:
             logger.warning("Enrollment failed — student_id not found: %s", student_id)
@@ -61,7 +112,7 @@ class EnrollmentService:
                 }
             )
 
-        # 3. Validate user role Student + status Active
+        # 4. Validate user role Student + status Active
         valid_student = (
             db.query(User)
             .join(Role, User.role_id == Role.role_id)
@@ -83,6 +134,7 @@ class EnrollmentService:
                     "message": "Invalid student (must have Student role and Active status)."
                 }
             )
+
 
         # 4. Validate not already enrolled in this class
         existing = EnrollmentRepository.get_enrollment(db, class_id=class_id, student_id=student_id)

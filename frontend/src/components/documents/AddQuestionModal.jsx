@@ -2,7 +2,7 @@
 // Description: Interactive Add Question modal with filter metadata row, comprehensive math symbol palette (Image 3), LaTeX editor, answer options, and live KaTeX preview matching Image 2.
 // Created At: 2026-09-13
 // Created By: Tam Khang
-// Updated At: 2026-09-13
+// Updated At: 2026-11-11
 // Updated By: Tam Khang
 
 import React, { useState, useEffect, useRef } from 'react';
@@ -221,15 +221,6 @@ export default function AddQuestionModal({
     setOptions(reindexed);
   };
 
-  const handleAddOption = () => {
-    if (options.length >= 6) return;
-    const nextKey = String.fromCharCode(65 + options.length);
-    setOptions([
-      ...options,
-      { key: nextKey, text: `Phương án ${nextKey}`, isCorrect: false }
-    ]);
-  };
-
   const handleShuffleOptions = () => {
     const texts = options.map((o) => o.text);
     // Fisher-Yates shuffle texts
@@ -269,7 +260,7 @@ export default function AddQuestionModal({
       shortAnswerExpected,
       solutionGuide,
       previewSnippet: content.slice(0, 120) + (content.length > 120 ? '...' : ''),
-      formulaMeta: `${latexBlocksCount} công thức LaTeX`,
+      formulaMeta: `${latexBlocksCount} công thức`,
       answersMeta: `${options.length} đáp án (${correctOpt}*)`
     };
   };
@@ -742,7 +733,7 @@ export default function AddQuestionModal({
                 onClick={() => insertLatexSnippet('\n$$\n\\begin{aligned}\n  \n\\end{aligned}\n$$\n')}
               >
                 <Code size={14} className="btn-struct-icon" />
-                <span>Chèn khối LaTeX</span>
+                <span>Chèn công thức</span>
               </button>
 
               <button
@@ -774,15 +765,15 @@ export default function AddQuestionModal({
               <h3 className="section-main-title">Nội dung đề bài & Lựa chọn</h3>
             </div>
             <span className="badge-katex-support">
-              <span className="katex-icon-square">KaTeX</span>
-              <span>Hỗ trợ Markdown & LaTeX chuẩn KaTeX</span>
+              <span className="katex-icon-square">fx</span>
+              <span>Hỗ trợ nhập công thức toán học</span>
             </span>
           </div>
 
           {/* Question Textarea Box */}
           <div className="question-input-card">
             <div className="textarea-top-hint-row">
-              <span className="textarea-lead-label">Đề bài câu hỏi (Kèm công thức LaTeX):</span>
+              <span className="textarea-lead-label">Đề bài câu hỏi (Kèm công thức):</span>
               <span className="textarea-syntax-guide">Đặt công thức trong cặp dấu $...$</span>
             </div>
 
@@ -801,12 +792,12 @@ export default function AddQuestionModal({
               <div className="meta-counts-cluster">
                 <span>{wordCount} từ</span>
                 <span className="meta-bullet">•</span>
-                <span>{latexBlocksCount} khối công thức LaTeX</span>
+                <span>{latexBlocksCount} công thức</span>
               </div>
 
               <div className="ai-tools-cluster">
                 {showAiNotice && (
-                  <span className="ai-notice-toast">Đã tối ưu hóa cú pháp LaTeX!</span>
+                  <span className="ai-notice-toast">Đã tối ưu hóa nội dung!</span>
                 )}
                 <button
                   type="button"
@@ -930,17 +921,6 @@ export default function AddQuestionModal({
                 })}
               </div>
 
-              {/* Add Option Button */}
-              {options.length < 6 && (
-                <button
-                  type="button"
-                  className="btn-add-new-option"
-                  onClick={handleAddOption}
-                >
-                  <Plus size={15} />
-                  <span>Thêm phương án lựa chọn</span>
-                </button>
-              )}
             </div>
           )}
 

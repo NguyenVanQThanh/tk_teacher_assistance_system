@@ -2,7 +2,7 @@
 // Description: Interactive SVG Radar Chart visualizing multi-subject performance.
 // Created At: 2026-08-30
 // Created By: Tam Khang
-// Updated At: 2026-08-30
+// Updated At: 2026-10-29
 // Updated By: Tam Khang
 
 import React from 'react';
@@ -100,30 +100,51 @@ export default function RadarChart({
         {/* Data Polygon 2: Trung bình khối (Blue) */}
         <polygon
           points={getPolygonPoints(averageData)}
-          fill="rgba(59, 130, 246, 0.12)"
-          stroke="#3b82f6"
-          strokeWidth="1.8"
-          strokeDasharray="4,3"
+          fill="rgba(37, 99, 235, 0.18)"
+          stroke="#2563eb"
+          strokeWidth="2.2"
           style={{
             animation: 'polygonReveal 0.8s cubic-bezier(0.16, 1, 0.3, 1) forwards',
             transformOrigin: `${center}px ${center}px`,
           }}
         />
 
-        {/* Data Polygon 1: Lớp 12A1 (Purple) */}
+        {/* Data Polygon 1: Lớp chủ nhiệm (Purple) */}
         <polygon
           points={getPolygonPoints(classData)}
           fill="rgba(124, 58, 237, 0.22)"
           stroke="#7c3aed"
-          strokeWidth="2"
+          strokeWidth="2.2"
           style={{
             animation: 'polygonReveal 1s cubic-bezier(0.16, 1, 0.3, 1) forwards',
             transformOrigin: `${center}px ${center}px`,
           }}
         />
 
-        {/* Data points (dots) for Class */}
-        {classData.map((val, idx) => {
+        {/* Data points (dots) for Grade Average (Trung bình khối - Blue) */}
+        {averageData && averageData.map((val, idx) => {
+          const { x, y } = getCoordinates(val, idx);
+          return (
+            <circle
+              key={`dot-avg-${idx}`}
+              cx={x}
+              cy={y}
+              r="4.5"
+              fill="#2563eb"
+              stroke="#ffffff"
+              strokeWidth="1.5"
+              style={{
+                animation: `fadeInDot 0.6s ease forwards ${0.25 + idx * 0.08}s`,
+                cursor: 'pointer',
+              }}
+            >
+              <title>{subjects[idx]}: Trung bình khối {val} điểm</title>
+            </circle>
+          );
+        })}
+
+        {/* Data points (dots) for Class (Lớp chủ nhiệm - Purple) */}
+        {classData && classData.map((val, idx) => {
           const { x, y } = getCoordinates(val, idx);
           return (
             <circle
@@ -136,9 +157,11 @@ export default function RadarChart({
               strokeWidth="1.5"
               style={{
                 animation: `fadeInDot 0.6s ease forwards ${0.3 + idx * 0.08}s`,
-                opacity: 0,
+                cursor: 'pointer',
               }}
-            />
+            >
+              <title>{subjects[idx]}: {classNameLabel} {val} điểm</title>
+            </circle>
           );
         })}
       </svg>
@@ -172,7 +195,7 @@ export default function RadarChart({
           <span style={{ fontWeight: 600, color: '#475569' }}>{classNameLabel}</span>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-          <span style={{ width: '10px', height: '10px', borderRadius: '50%', backgroundColor: '#3b82f6' }}></span>
+          <span style={{ width: '10px', height: '10px', borderRadius: '50%', backgroundColor: '#2563eb' }}></span>
           <span style={{ fontWeight: 600, color: '#475569' }}>Trung bình khối</span>
         </div>
       </div>
