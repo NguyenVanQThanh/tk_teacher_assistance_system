@@ -2,8 +2,8 @@
 # Description: Main entry point of the FastAPI application.
 # Created At: 2026-07-17
 # Created By: Tam Khang
-# Updated At: 2026-11-13
-# Updated By: AI Agent
+# Updated At: 2026-11-14
+# Updated By: Tam Khang
 
 import sys
 from pathlib import Path
@@ -95,6 +95,7 @@ from app.modules.exercise.routers.ai_generation import router as ai_generation_r
 from app.modules.document.routers.documents import router as documents_router
 from app.modules.admin.routers.users import router as admin_users_router
 from app.modules.admin.routers.dashboard import router as admin_dashboard_router
+from app.modules.admin.routers.roles import router as admin_roles_router
 from app.modules.exercise.routers.student_dashboard import router as student_dashboard_router
 from app.modules.exercise.routers.teacher_schedule import router as teacher_schedule_router
 from app.modules.exercise.routers.teacher_dashboard import router as teacher_dashboard_router
@@ -321,6 +322,7 @@ app.include_router(sync_router)
 app.include_router(documents_router)
 app.include_router(admin_users_router)
 app.include_router(admin_dashboard_router)
+app.include_router(admin_roles_router)
 app.include_router(student_dashboard_router)
 app.include_router(teacher_schedule_router)
 app.include_router(teacher_dashboard_router)
