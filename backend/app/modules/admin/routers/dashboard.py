@@ -2,7 +2,7 @@
 # Description: API routers for Admin Dashboard, statistics, approval requests, and audit logs.
 # Created At: 2026-09-30
 # Created By: Tam Khang
-# Updated At: 2026-09-30
+# Updated At: 2026-11-14
 # Updated By: Tam Khang
 
 from datetime import datetime, timezone
@@ -115,39 +115,106 @@ def get_dashboard_stats(db: Session = Depends(get_db)):
 
 @router.get("/activity-chart", response_model=DashboardActivityResponse, dependencies=[Depends(require_admin_privilege)])
 def get_activity_chart(
-    timeframe: str = Query("week", description="Chart timeframe: 'week' or 'month'")
+    timeframe: str = Query("week", description="Chart timeframe: 'week' or 'month'"),
+    db: Session = Depends(get_db),
 ):
     """
-    Retrieve activity metrics for the area curve chart.
+    Retrieve activity metrics for the area curve chart from live database records.
     """
-    if timeframe == "month":
+    from datetime import datetime, timedelta, timezone
+    from sqlalchemy import func, or_
+    from models.models import AuditLog, Document, StudentExerciseAttempt, User
+
+    now = datetime.now(timezone.utc)
+    is_month = timeframe == "month"
+    window_days = 28 if is_month else 7
+    since = now - timedelta(days=window_days)
+
+    def _to_utc(dt):
+        if dt is None:
+            return None
+        return dt.replace(tzinfo=timezone.utc) if dt.tzinfo is None else dt.astimezone(timezone.utc)
+
+    # Only load rows inside the chart window; totals are computed with COUNT/SUM in the DB.
+    def _window(col, *extra):
+        return [ts for (ts,) in db.query(col).filter(col >= since, *extra).all() if ts is not None]
+
+    attempt_ok = StudentExerciseAttempt.status != "DELETED"
+    doc_ok = Document.status != "DELETED"
+    recent_events = [
+        _to_utc(ts)
+        for ts in (
+            _window(StudentExerciseAttempt.created_at, attempt_ok)
+            + _window(Document.created_at, doc_ok)
+            + _window(User.created_at, User.status != "DELETED")
+            + _window(
+                AuditLog.created_at,
+                AuditLog.status != "DELETED",
+                or_(AuditLog.ip_address.is_(None), AuditLog.ip_address != "INTERNAL_STATE"),
+                or_(AuditLog.title.is_(None), func.substr(AuditLog.title, 1, 2) != "__"),
+            )
+        )
+    ]
+
+    total_doc_downloads = int(db.query(func.coalesce(func.sum(Document.download_count), 0)).filter(doc_ok).scalar() or 0)
+    total_docs = db.query(Document).filter(doc_ok).count()
+    total_attempts = db.query(StudentExerciseAttempt).filter(attempt_ok).count()
+    lecture_views = total_doc_downloads if total_doc_downloads > 0 else total_docs
+    assignments_submitted = total_attempts
+
+    if not recent_events:
+        # No real activity: return zeroed points instead of fabricated sample data.
+        if is_month:
+            labels = ["Tuần 1", "Tuần 2", "Tuần 3", "Tuần 4"]
+            x_coords = [70, 210, 380, 550]
+        else:
+            labels = ["T2", "T3", "T4", "T5", "T6", "T7", "CN"]
+            x_coords = [50, 140, 230, 320, 410, 500, 590]
         points = [
-            ActivityChartPoint(day="Tuần 1", visits=12400, x=70, y=170),
-            ActivityChartPoint(day="Tuần 2", visits=15800, x=210, y=125),
-            ActivityChartPoint(day="Tuần 3 (Đỉnh)", visits=19400, x=380, y=65, is_peak=True),
-            ActivityChartPoint(day="Tuần 4", visits=14600, x=550, y=140),
+            ActivityChartPoint(day=lbl, visits=0, x=x_coords[i], y=190)
+            for i, lbl in enumerate(labels)
         ]
-        lecture_views = 62200
-        assignments_submitted = 14350
     else:
-        points = [
-            ActivityChartPoint(day="T2", visits=850, x=50, y=190),
-            ActivityChartPoint(day="T3", visits=1450, x=140, y=155),
-            ActivityChartPoint(day="T4", visits=2250, x=230, y=105),
-            ActivityChartPoint(day="T5", visits=2350, x=320, y=100),
-            ActivityChartPoint(day="T6 (Đỉnh)", visits=2840, x=410, y=70, is_peak=True),
-            ActivityChartPoint(day="T7", visits=2200, x=500, y=110),
-            ActivityChartPoint(day="CN", visits=1250, x=590, y=165),
-        ]
-        lecture_views = 14200
-        assignments_submitted = 3489
+        if is_month:
+            labels = ["Tuần 1", "Tuần 2", "Tuần 3", "Tuần 4"]
+            x_coords = [70, 210, 380, 550]
+            counts = [0, 0, 0, 0]
+            for ts in recent_events:
+                days_ago = max(0, (now - ts).days)
+                bucket_idx = min(3, 3 - min(3, days_ago // 7))
+                counts[bucket_idx] += 1
+        else:
+            labels = ["T2", "T3", "T4", "T5", "T6", "T7", "CN"]
+            x_coords = [50, 140, 230, 320, 410, 500, 590]
+            counts = [0] * 7
+            for ts in recent_events:
+                counts[ts.weekday()] += 1
+
+        max_count = max(counts) if max(counts) > 0 else 1
+        peak_idx = counts.index(max(counts))
+        points = []
+        for idx, label in enumerate(labels):
+            val = counts[idx]
+            is_peak = idx == peak_idx
+            # Scale y smoothly into SVG chart canvas range [65..190] (lower y = higher bar/curve)
+            y_val = int(round(190 - (val / max_count) * 125)) if max_count > 0 else 190
+            display_label = f"{label} (Đỉnh)" if is_peak else label
+            points.append(
+                ActivityChartPoint(
+                    day=display_label,
+                    visits=val,
+                    x=x_coords[idx],
+                    y=y_val,
+                    is_peak=is_peak,
+                )
+            )
 
     return DashboardActivityResponse(
         timeframe=timeframe,
         points=points,
         lecture_views=lecture_views,
         assignments_submitted=assignments_submitted,
-        last_updated_relative="10 minutes ago",
+        last_updated_relative="Just now",
     )
 
 

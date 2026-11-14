@@ -2,10 +2,11 @@
 # Description: Service layer for Enrollment business logic — validation of class, student role/status, duplicate checks, RBAC Data Scoping, CRUD, and restore operations.
 # Created At: 2026-07-23
 # Created By: Tam Khang
-# Updated At: 2026-07-26
+# Updated At: 2026-11-14
 # Updated By: Tam Khang
 
 import logging
+import secrets
 from typing import List, Optional
 from uuid import UUID
 
@@ -92,7 +93,8 @@ class EnrollmentService:
                 phone=phone or None,
                 birthday=b_date_val,
                 role_id=student_role.role_id,
-                password_hash=get_password_hash("Student@1234"),
+                # Random unknown password; admin must issue a reset to enable login.
+                password_hash=get_password_hash(secrets.token_urlsafe(16)),
                 status="ACTIVE"
             )
             db.add(new_user)
@@ -177,6 +179,8 @@ class EnrollmentService:
             student_code=student_code,
             **kwargs
         )
+        if gender and str(gender).strip():
+            EnrollmentService.save_student_metadata(db, student_id=student_id, gender=str(gender).strip())
         logger.info(
             "Domain Event: EVT-ACAD-STUDENT_ENROLLED - class_id: %s, student_id: %s",
             class_id, student_id
@@ -270,3 +274,474 @@ class EnrollmentService:
         EnrollmentRepository.restore(db, enrollment)
         logger.info("Domain Event: EVT-ACAD-STUDENT_ENROLLMENT_RESTORED - class_id: %s, student_id: %s", class_id, student_id)
         return enrollment
+
+    @staticmethod
+    def _student_meta_key(student_id: UUID) -> str:
+        return f"__STUDENT_META__:{student_id}"
+
+    @staticmethod
+    def save_student_metadata(
+        db: Session, student_id: UUID, gender: Optional[str] = None, commit: bool = True
+    ) -> None:
+        """
+        Persist extended student metadata (gender) in the shared state store.
+        """
+        if gender is None:
+            return
+        from app.modules.admin.state_store import get_latest_state, upsert_state
+
+        key = EnrollmentService._student_meta_key(student_id)
+        current = get_latest_state(db, key) or {}
+        current["gender"] = gender.strip() if gender else None
+        upsert_state(db, key, current, actor_name="System", commit=commit)
+
+    @staticmethod
+    def _load_student_meta_map(db: Session, student_ids) -> dict:
+        """Load gender metadata only for the given students (exact keys, no prefix scan)."""
+        from app.modules.admin.state_store import list_state_items_by_keys
+
+        meta_map = {}
+        keys = [EnrollmentService._student_meta_key(sid) for sid in student_ids]
+        for row, payload in list_state_items_by_keys(db, keys):
+            sid_str = row.title.split("__STUDENT_META__:", 1)[-1]
+            meta_map[sid_str] = payload
+        return meta_map
+
+    @staticmethod
+    def enrich_enrollments_out(db: Session, enrollments: List[StudentClass]):
+        """
+        Convert StudentClass ORM records into enriched EnrollmentOut schemas
+        with email, phone, gender, dob, and birthday.
+        """
+        from app.modules.academic.schemas import EnrollmentOut
+
+        if not enrollments:
+            return []
+
+        student_ids = list({e.student_id for e in enrollments})
+        users = db.query(User).filter(User.user_id.in_(student_ids)).all()
+        user_map = {u.user_id: u for u in users}
+        meta_map = EnrollmentService._load_student_meta_map(db, student_ids)
+
+        results: List[EnrollmentOut] = []
+        for enrollment in enrollments:
+            user = user_map.get(enrollment.student_id)
+            meta = meta_map.get(str(enrollment.student_id), {})
+            bday = user.birthday if user else None
+            dob_str = bday.isoformat() if bday else None
+            results.append(
+                EnrollmentOut(
+                    student_id=enrollment.student_id,
+                    class_id=enrollment.class_id,
+                    student_code=enrollment.student_code,
+                    student_name=user.full_name if user else enrollment.student_name,
+                    email=user.email if user else None,
+                    phone=user.phone if user else None,
+                    gender=meta.get("gender"),
+                    dob=dob_str,
+                    birthday=bday,
+                    status=enrollment.status,
+                )
+            )
+        return results
+
+    @staticmethod
+    def enrich_enrollment_out(db: Session, enrollment: StudentClass):
+        """
+        Enrich a single StudentClass enrollment into EnrollmentOut.
+        """
+        return EnrollmentService.enrich_enrollments_out(db, [enrollment])[0]
+
+    @staticmethod
+    def get_available_students(
+        db: Session,
+        class_id: Optional[UUID] = None,
+        search: Optional[str] = None,
+        limit: int = 100,
+    ):
+        """
+        List non-deleted Student users not currently enrolled in the given class_id.
+        """
+        from sqlalchemy import func, or_
+        from app.modules.academic.schemas import AvailableStudentItem
+
+        query = (
+            db.query(User)
+            .join(Role, User.role_id == Role.role_id)
+            .filter(
+                func.lower(Role.name) == "student",
+                func.upper(User.status) != "DELETED",
+            )
+        )
+
+        if class_id is not None:
+            enrolled_ids = (
+                db.query(StudentClass.student_id)
+                .filter(
+                    StudentClass.class_id == class_id,
+                    func.upper(StudentClass.status) != "DELETED",
+                )
+                .distinct()
+            )
+            query = query.filter(~User.user_id.in_(enrolled_ids))
+
+        if search and search.strip():
+            term = f"%{search.strip()}%"
+            query = query.filter(
+                or_(
+                    User.full_name.ilike(term),
+                    User.email.ilike(term),
+                    User.phone.ilike(term),
+                )
+            )
+
+        users = query.order_by(User.full_name.asc()).limit(limit).all()
+        if not users:
+            return []
+
+        user_ids = [u.user_id for u in users]
+        existing_codes = (
+            db.query(StudentClass.student_id, StudentClass.student_code)
+            .filter(
+                StudentClass.student_id.in_(user_ids),
+                StudentClass.student_code.isnot(None),
+                func.upper(StudentClass.status) != "DELETED",
+            )
+            .all()
+        )
+        code_map = {sid: code for sid, code in existing_codes if code}
+        meta_map = EnrollmentService._load_student_meta_map(db, user_ids)
+
+        items: List[AvailableStudentItem] = []
+        for user in users:
+            meta = meta_map.get(str(user.user_id), {})
+            bday = user.birthday
+            items.append(
+                AvailableStudentItem(
+                    user_id=user.user_id,
+                    student_id=user.user_id,
+                    full_name=user.full_name,
+                    student_name=user.full_name,
+                    student_code=code_map.get(user.user_id),
+                    email=user.email,
+                    phone=user.phone,
+                    gender=meta.get("gender"),
+                    dob=bday.isoformat() if bday else None,
+                    birthday=bday,
+                    status=user.status,
+                )
+            )
+        return items
+
+    @staticmethod
+    def import_students_from_rows(
+        db: Session,
+        class_id: UUID,
+        rows: list,
+    ):
+        """
+        Import and enroll students from parsed CSV/XLSX rows into a target class.
+        Finds existing students by email, phone, or student_code; creates new Student accounts if absent.
+        """
+        import re
+        import uuid as py_uuid
+        from datetime import date
+        from sqlalchemy import func
+        from app.core.security import get_password_hash
+        from app.modules.academic.schemas import StudentImportErrorItem, StudentImportExcelResponse
+        from app.modules.admin.services.user_import_service import (
+            _cell_text,
+            _normalize_phone,
+            _parse_birthday,
+        )
+
+        cls = ClassRepository.get_by_id(db, class_id)
+        if not cls:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail={"code": "ERR-ACAD-CLASS_NOT_FOUND", "message": "Class not found."},
+            )
+
+        student_role = db.query(Role).filter(func.lower(Role.name) == "student").first()
+        if not student_role:
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail={"code": "ERR-ACAD-ROLE_NOT_FOUND", "message": "Student role not found in system."},
+            )
+
+        def _pick(record: dict, *aliases: str) -> str:
+            for alias in aliases:
+                if alias in record and record[alias] is not None:
+                    text = _cell_text(record[alias])
+                    if text:
+                        return text
+            return ""
+
+        enrolled_orm: List[StudentClass] = []
+        errors: List[StudentImportErrorItem] = []
+
+        def _import_row(row, row_num):
+            """Process one import row; runs inside a savepoint so it is atomic."""
+            full_name = _pick(
+                row,
+                "full_name",
+                "fullname",
+                "student_name",
+                "name",
+                "họ và tên",
+                "ho va ten",
+                "họ tên",
+                "ho ten",
+                "tên học sinh",
+                "ten hoc sinh",
+            )
+            student_code = _pick(
+                row,
+                "student_code",
+                "code",
+                "mã học sinh",
+                "ma hoc sinh",
+                "mã hs",
+                "ma hs",
+            ) or None
+            email = _pick(row, "email", "e-mail", "mail").lower() or None
+            raw_phone = _pick(row, "phone", "số điện thoại", "so dien thoai", "sđt", "sdt", "điện thoại", "dien thoai")
+            phone = _normalize_phone(raw_phone) if raw_phone else None
+            gender = _pick(row, "gender", "giới tính", "gioi tinh", "sex") or None
+
+            raw_bday = None
+            for b_alias in ("birthday", "dob", "ngày sinh", "ngay sinh", "birth_date"):
+                if b_alias in row and row[b_alias] not in (None, ""):
+                    raw_bday = row[b_alias]
+                    break
+            parsed_bday = _parse_birthday(raw_bday) if raw_bday is not None else None
+            if raw_bday is not None and parsed_bday is None:
+                errors.append(
+                    StudentImportErrorItem(row=row_num, message="Invalid date of birth format.")
+                )
+                return
+
+            if phone and not re.match(r"^0\d{9,10}$", phone):
+                errors.append(
+                    StudentImportErrorItem(row=row_num, message=f"Invalid phone number '{raw_phone}'.")
+                )
+                return
+
+            # Locate existing non-deleted user by email, phone, or student_code
+            matched_user = None
+            if email:
+                matched_user = (
+                    db.query(User)
+                    .filter(func.lower(User.email) == email, func.upper(User.status) != "DELETED")
+                    .first()
+                )
+            if not matched_user and phone:
+                matched_user = (
+                    db.query(User)
+                    .filter(User.phone == phone, func.upper(User.status) != "DELETED")
+                    .first()
+                )
+            if not matched_user and student_code:
+                existing_code_row = (
+                    db.query(StudentClass)
+                    .filter(
+                        StudentClass.student_code == student_code,
+                        func.upper(StudentClass.status) != "DELETED",
+                    )
+                    .first()
+                )
+                if existing_code_row:
+                    matched_user = (
+                        db.query(User)
+                        .filter(
+                            User.user_id == existing_code_row.student_id,
+                            func.upper(User.status) != "DELETED",
+                        )
+                        .first()
+                    )
+
+            if matched_user:
+                role_obj = db.query(Role).filter(Role.role_id == matched_user.role_id).first()
+                if not role_obj or role_obj.name.lower() != "student":
+                    errors.append(
+                        StudentImportErrorItem(row=row_num, message="Matched user does not have Student role.")
+                    )
+                    return
+                if matched_user.status.upper() != "ACTIVE":
+                    errors.append(
+                        StudentImportErrorItem(row=row_num, message="Matched student account is not ACTIVE.")
+                    )
+                    return
+
+                existing_enrollment = (
+                    db.query(StudentClass)
+                    .filter(
+                        StudentClass.class_id == class_id,
+                        StudentClass.student_id == matched_user.user_id,
+                    )
+                    .first()
+                )
+                if existing_enrollment:
+                    if existing_enrollment.status.upper() != "DELETED":
+                        errors.append(
+                            StudentImportErrorItem(
+                                row=row_num,
+                                message="Student is already enrolled in this class.",
+                            )
+                        )
+                        return
+                    existing_enrollment.status = "ACTIVE"
+                    if student_code and not existing_enrollment.student_code:
+                        code_conflict = EnrollmentRepository.get_by_student_code(db, student_code)
+                        if code_conflict and code_conflict.student_id != matched_user.user_id:
+                            errors.append(
+                                StudentImportErrorItem(
+                                    row=row_num,
+                                    message=f"Student code '{student_code}' is already in use.",
+                                )
+                            )
+                            return
+                        existing_enrollment.student_code = student_code
+                    db.flush()
+                    if gender:
+                        EnrollmentService.save_student_metadata(
+                            db, matched_user.user_id, gender=gender, commit=False
+                        )
+                    return existing_enrollment
+
+                if student_code:
+                    code_conflict = EnrollmentRepository.get_by_student_code(db, student_code)
+                    if code_conflict and code_conflict.student_id != matched_user.user_id:
+                        errors.append(
+                            StudentImportErrorItem(
+                                row=row_num,
+                                message=f"Student code '{student_code}' is already in use.",
+                            )
+                        )
+                        return
+
+                enrollment = EnrollmentRepository.create(
+                    db=db,
+                    class_id=class_id,
+                    student_id=matched_user.user_id,
+                    student_code=student_code,
+                    commit=False,
+                )
+                if gender:
+                    EnrollmentService.save_student_metadata(
+                        db, matched_user.user_id, gender=gender, commit=False
+                    )
+                return enrollment
+            else:
+                if not full_name:
+                    errors.append(
+                        StudentImportErrorItem(
+                            row=row_num,
+                            message="Missing student full name for new student record.",
+                        )
+                    )
+                    return
+
+                if parsed_bday:
+                    today = date.today()
+                    age = (
+                        today.year
+                        - parsed_bday.year
+                        - ((today.month, today.day) < (parsed_bday.month, parsed_bday.day))
+                    )
+                    if age < 16:
+                        errors.append(
+                            StudentImportErrorItem(
+                                row=row_num,
+                                message=f"Student must be at least 16 years old (calculated: {age}).",
+                            )
+                        )
+                        return
+
+                if student_code:
+                    code_conflict = EnrollmentRepository.get_by_student_code(db, student_code)
+                    if code_conflict:
+                        errors.append(
+                            StudentImportErrorItem(
+                                row=row_num,
+                                message=f"Student code '{student_code}' is already in use.",
+                            )
+                        )
+                        return
+
+                # Soft-deleted accounts still hold their unique email/phone; report that clearly.
+                if email and db.query(User).filter(func.lower(User.email) == email).first():
+                    errors.append(
+                        StudentImportErrorItem(
+                            row=row_num,
+                            message=f"Email '{email}' belongs to a deleted account. Restore it instead.",
+                        )
+                    )
+                    return
+                if phone and db.query(User).filter(User.phone == phone).first():
+                    errors.append(
+                        StudentImportErrorItem(
+                            row=row_num,
+                            message=f"Phone '{phone}' belongs to a deleted account. Restore it instead.",
+                        )
+                    )
+                    return
+
+                new_user = User(
+                    user_id=py_uuid.uuid4(),
+                    full_name=full_name,
+                    email=email,
+                    phone=phone,
+                    birthday=parsed_bday,
+                    role_id=student_role.role_id,
+                    # Random unknown password; admin must issue a reset to enable login.
+                    password_hash=get_password_hash(secrets.token_urlsafe(16)),
+                    status="ACTIVE",
+                )
+                # Flush only: the caller's savepoint + commit makes user, enrollment and metadata atomic.
+                db.add(new_user)
+                db.flush()
+
+                enrollment = EnrollmentRepository.create(
+                    db=db,
+                    class_id=class_id,
+                    student_id=new_user.user_id,
+                    student_code=student_code,
+                    commit=False,
+                )
+                if gender:
+                    EnrollmentService.save_student_metadata(
+                        db, new_user.user_id, gender=gender, commit=False
+                    )
+                return enrollment
+
+        for idx, row in enumerate(rows, start=2):
+            row_num = int(row.get("__row_num__", idx))
+            try:
+                # Savepoint: user, enrollment and metadata for this row succeed or fail together.
+                with db.begin_nested():
+                    row_enrollment = _import_row(row, row_num)
+                db.commit()
+                if row_enrollment is not None:
+                    db.refresh(row_enrollment)
+                    enrolled_orm.append(row_enrollment)
+            except Exception as exc:
+                # begin_nested already rolled back this row's savepoint; drop any leftover state.
+                db.rollback()
+                logger.warning("Row %d import failed for class %s: %s", row_num, class_id, exc)
+                errors.append(
+                    StudentImportErrorItem(row=row_num, message=str(exc))
+                )
+
+        enriched = EnrollmentService.enrich_enrollments_out(db, enrolled_orm)
+        logger.info(
+            "Domain Event: EVT-ACAD-STUDENTS_IMPORTED - class_id: %s, imported: %d, errors: %d",
+            class_id,
+            len(enriched),
+            len(errors),
+        )
+        return StudentImportExcelResponse(
+            imported_count=len(enriched),
+            enrolled_students=enriched,
+            errors=errors,
+        )
