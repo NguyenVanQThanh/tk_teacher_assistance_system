@@ -164,7 +164,7 @@ def _compute_analytics(
     if dept_key not in ("", "all") and subject_ids:
         exercise_query = exercise_query.filter(Exercise.subject_id.in_(subject_ids))
     elif dept_key not in ("", "all") and not subject_ids:
-        exercise_query = exercise_query.filter(False)
+        exercise_query = exercise_query.filter(false())
     exercises = exercise_query.all()
 
     ai_exercises_real = sum(
@@ -181,7 +181,7 @@ def _compute_analytics(
             Question.exercise_id.in_([e.exercise_id for e in exercises])
         )
     elif dept_key not in ("", "all"):
-        question_query = question_query.filter(False)
+        question_query = question_query.filter(false())
     questions = question_query.all()
     ai_questions_real = sum(1 for q in questions if bool(q.is_ai_generated))
 

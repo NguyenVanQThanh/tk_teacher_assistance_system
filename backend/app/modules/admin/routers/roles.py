@@ -332,12 +332,8 @@ def _role_display_meta(db: Session, role: Role, member_count: int) -> Dict[str, 
 
 
 def _get_role_member_users(db: Session, role: Role) -> list:
-    """
-    Return deduplicated non-deleted users belonging to a role.
-    For head_teacher, unions explicit User.role_id members with active
-    teachers assigned as Subject.head_teacher_id on active subjects.
-    """
-    direct_users = (
+    """Return non-deleted users whose role_id is this role (the only users the role permissions apply to)."""
+    return (
         db.query(User)
         .filter(
             User.role_id == role.role_id,
@@ -346,25 +342,6 @@ def _get_role_member_users(db: Session, role: Role) -> list:
         .order_by(User.full_name.asc())
         .all()
     )
-    if (role.name or "").strip().lower() != "head_teacher":
-        return direct_users
-
-    subject_heads = (
-        db.query(User)
-        .join(Subject, Subject.head_teacher_id == User.user_id)
-        .filter(
-            func.upper(Subject.status) != "DELETED",
-            Subject.head_teacher_id.isnot(None),
-            func.upper(User.status) != "DELETED",
-        )
-        .all()
-    )
-    by_id = {u.user_id: u for u in direct_users}
-    for teacher in subject_heads:
-        by_id.setdefault(teacher.user_id, teacher)
-
-    return sorted(by_id.values(), key=lambda u: (u.full_name or "").lower())
-
 
 def _build_roles_and_matrix(db: Session) -> Dict[str, Any]:
     perm_map = _ensure_seeded(db)
