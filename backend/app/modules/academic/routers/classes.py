@@ -33,21 +33,30 @@ def create_class(
     """
     Create a new class. Requires ACAD_CLASS_MANAGE permission.
     """
-    cls = ClassService.create_class(
-        db=db,
-        class_name=payload.class_name,
-        school_year=payload.school_year,
-        homeroom_teacher_id=payload.homeroom_teacher_id,
-        status_val=payload.status.value
-    )
-    ClassService.save_class_metadata(
-        db=db,
-        class_id=cls.class_id,
-        room_name=payload.room_name,
-        specialization=payload.specialization,
-        update_room="room_name" in payload.model_fields_set,
-        update_specialization="specialization" in payload.model_fields_set,
-    )
+    # Class row and its metadata commit together so a failure cannot leave them out of sync.
+    try:
+        cls = ClassService.create_class(
+            db=db,
+            class_name=payload.class_name,
+            school_year=payload.school_year,
+            homeroom_teacher_id=payload.homeroom_teacher_id,
+            status_val=payload.status.value,
+            commit=False
+        )
+        ClassService.save_class_metadata(
+            db=db,
+            class_id=cls.class_id,
+            room_name=payload.room_name,
+            specialization=payload.specialization,
+            update_room="room_name" in payload.model_fields_set,
+            update_specialization="specialization" in payload.model_fields_set,
+            commit=False,
+        )
+        db.commit()
+    except Exception:
+        db.rollback()
+        raise
+    db.refresh(cls)
     return ClassService.enrich_class_out(db, cls)
 
 
@@ -183,23 +192,31 @@ def update_class(
     """
     update_homeroom = "homeroom_teacher_id" in payload.model_fields_set
     status_val = payload.status.value if payload.status else None
-    cls = ClassService.update_class(
-        db=db,
-        class_id=class_id,
-        class_name=payload.class_name,
-        school_year=payload.school_year,
-        homeroom_teacher_id=payload.homeroom_teacher_id,
-        update_homeroom_teacher=update_homeroom,
-        status_val=status_val
-    )
-    ClassService.save_class_metadata(
-        db=db,
-        class_id=cls.class_id,
-        room_name=payload.room_name,
-        specialization=payload.specialization,
-        update_room="room_name" in payload.model_fields_set,
-        update_specialization="specialization" in payload.model_fields_set,
-    )
+    try:
+        cls = ClassService.update_class(
+            db=db,
+            class_id=class_id,
+            class_name=payload.class_name,
+            school_year=payload.school_year,
+            homeroom_teacher_id=payload.homeroom_teacher_id,
+            update_homeroom_teacher=update_homeroom,
+            status_val=status_val,
+            commit=False
+        )
+        ClassService.save_class_metadata(
+            db=db,
+            class_id=cls.class_id,
+            room_name=payload.room_name,
+            specialization=payload.specialization,
+            update_room="room_name" in payload.model_fields_set,
+            update_specialization="specialization" in payload.model_fields_set,
+            commit=False,
+        )
+        db.commit()
+    except Exception:
+        db.rollback()
+        raise
+    db.refresh(cls)
     return ClassService.enrich_class_out(db, cls)
 
 

@@ -17,7 +17,7 @@ from uuid import UUID
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
-from sqlalchemy import func, or_
+from sqlalchemy import false, func, or_
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
@@ -141,13 +141,13 @@ def _compute_analytics(
     if norm_grade:
         class_query = class_query.filter(Class.class_name.ilike(f"{norm_grade}%"))
     all_matching_classes = class_query.all()
-    if academic_year and academic_year.strip().lower() != "all":
-        year_filtered = [
-            c for c in all_matching_classes if (c.academic_year or "") == academic_year
-        ]
-        classes = year_filtered if year_filtered else all_matching_classes
+    year_filter_active = bool(academic_year and academic_year.strip().lower() != "all")
+    if year_filter_active:
+        # Strict match: never fall back to other years, that would misreport the filter.
+        classes = [c for c in all_matching_classes if (c.academic_year or "") == academic_year]
     else:
         classes = all_matching_classes
+    class_ids = [c.class_id for c in classes]
 
     # 3. Active students
     student_role = db.query(Role).filter(func.lower(Role.name) == "student").first()
@@ -186,22 +186,26 @@ def _compute_analytics(
     ai_questions_real = sum(1 for q in questions if bool(q.is_ai_generated))
 
     # 5. Student Exercise Attempts & Score metrics
-    attempt_query = db.query(StudentExerciseAttempt).filter(
-        func.upper(StudentExerciseAttempt.status) != "DELETED"
-    )
-    filtered_scope = norm_grade or dept_key not in ("", "all") or (
-        academic_year and academic_year.strip().lower() != "all"
-    )
-    if filtered_scope:
-        # Restrict attempts to assignments of the filtered classes and exercises.
-        attempt_query = attempt_query.join(
+    attempt_query = (
+        db.query(StudentExerciseAttempt, ClassAssignment.class_id)
+        .join(
             ClassAssignment,
             ClassAssignment.assignment_id == StudentExerciseAttempt.assignment_id,
-        ).filter(
-            ClassAssignment.class_id.in_([c.class_id for c in classes] or [None]),
-            ClassAssignment.exercise_id.in_([e.exercise_id for e in exercises] or [None]),
         )
-    attempts = attempt_query.all()
+        .filter(func.upper(StudentExerciseAttempt.status) != "DELETED")
+    )
+    # Each active filter is applied independently; an empty match set yields no attempts.
+    if norm_grade or year_filter_active:
+        attempt_query = attempt_query.filter(
+            ClassAssignment.class_id.in_(class_ids) if class_ids else false()
+        )
+    if dept_key not in ("", "all"):
+        dept_exercise_ids = [e.exercise_id for e in exercises]
+        attempt_query = attempt_query.filter(
+            ClassAssignment.exercise_id.in_(dept_exercise_ids) if dept_exercise_ids else false()
+        )
+    attempt_rows = attempt_query.all()
+    attempts = [row[0] for row in attempt_rows]
     scores = [float(a.score) for a in attempts if a.score is not None]
     avg_score_real = round(sum(scores) / len(scores), 2) if scores else 0.0
     finished_real = sum(1 for a in attempts if bool(a.is_finished))
@@ -231,6 +235,7 @@ def _compute_analytics(
                 class_grade_map[prefix].append(cls)
                 break
 
+    exercise_id_set = {e.exercise_id for e in exercises}
     for g_code, g_num, g_label, _unused_students, _unused_exercises in _GRADE_SPECS:
         if norm_grade and norm_grade != g_num:
             continue
@@ -246,15 +251,34 @@ def _compute_analytics(
                 .count()
             )
         students_count = enrolled_count
-        ex_count = total_exercises // 3
 
-        # Use real score distribution buckets when attempt scores exist
-        if scores:
-            excellent = sum(1 for s in scores if s >= 8.0)
-            good = sum(1 for s in scores if 6.5 <= s < 8.0)
-            average = sum(1 for s in scores if 5.0 <= s < 6.5)
-            support = sum(1 for s in scores if s < 5.0)
-            tot = max(1, len(scores))
+        # Per-grade figures come from assignments/attempts of this grade's classes only.
+        grade_class_ids = {c.class_id for c in matched_classes}
+        if grade_class_ids and exercise_id_set:
+            ex_count = (
+                db.query(func.count(func.distinct(ClassAssignment.exercise_id)))
+                .filter(
+                    ClassAssignment.class_id.in_(grade_class_ids),
+                    ClassAssignment.exercise_id.in_(exercise_id_set),
+                    func.upper(ClassAssignment.status) != "DELETED",
+                )
+                .scalar()
+                or 0
+            )
+        else:
+            ex_count = 0
+        grade_scores = [
+            float(a.score) for a, cid in attempt_rows
+            if cid in grade_class_ids and a.score is not None
+        ]
+
+        # Use real score distribution buckets when attempt scores exist for this grade
+        if grade_scores:
+            excellent = sum(1 for s in grade_scores if s >= 8.0)
+            good = sum(1 for s in grade_scores if 6.5 <= s < 8.0)
+            average = sum(1 for s in grade_scores if 5.0 <= s < 6.5)
+            support = sum(1 for s in grade_scores if s < 5.0)
+            tot = max(1, len(grade_scores))
             segments = [
                 {"label": "Excellent", "count": excellent, "percent": round(excellent * 100 / tot, 1), "color": "#10b981"},
                 {"label": "Good", "count": good, "percent": round(good * 100 / tot, 1), "color": "#3b82f6"},

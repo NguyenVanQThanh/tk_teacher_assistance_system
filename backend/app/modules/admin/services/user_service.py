@@ -249,9 +249,18 @@ class AdminUserService:
                     status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
                     detail={"code": "ERR-ADMIN-INVALID_ROLE", "message": f"Role '{payload.role}' does not exist."}
                 )
-            # Promotion to Admin is blocked; an existing Admin may keep the role.
             if target_role.role_id != user.role_id:
+                # Promotion to Admin is blocked, and an Admin can never be demoted
+                # (this also makes demoting the last Admin impossible).
                 cls.reject_admin_role(target_role.name)
+                if cls._is_admin_user(db, user):
+                    raise HTTPException(
+                        status_code=status.HTTP_403_FORBIDDEN,
+                        detail={
+                            "code": "ERR-ADMIN-ADMIN_ROLE_LOCKED",
+                            "message": "The role of an Admin account cannot be changed.",
+                        },
+                    )
 
         role_name_to_check = target_role.name if target_role else None
         if not role_name_to_check:

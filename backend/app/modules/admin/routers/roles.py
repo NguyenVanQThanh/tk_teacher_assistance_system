@@ -450,6 +450,12 @@ def create_role(
 
     template_code = payload.template_role_code or payload.cloneFrom
     source_role = _resolve_role(db, template_code) if template_code else None
+    # Cloning the Admin role would mint a custom role with full admin permissions.
+    if source_role and _canonical_role_code(source_role) == "admin":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail={"code": "ERR-ADMIN-ADMIN_ROLE_LOCKED", "message": "The Admin role cannot be used as a template."},
+        )
 
     new_role = Role(
         role_id=uuid.uuid4(),
@@ -692,27 +698,13 @@ def assign_user_to_role(
             detail={"code": "ERR-ADMIN-SELF_ROLE_CHANGE", "message": "You cannot change your own role."},
         )
 
-    # Last-admin protection: never demote the only remaining active Admin.
+    # An Admin account can never be moved to another role (also prevents demoting the last Admin).
     admin_role = db.query(Role).filter(func.lower(Role.name) == "admin").first()
-    if (
-        admin_role
-        and target_user.role_id == admin_role.role_id
-        and role.role_id != admin_role.role_id
-    ):
-        other_admins = (
-            db.query(User)
-            .filter(
-                User.role_id == admin_role.role_id,
-                User.user_id != target_user.user_id,
-                func.upper(User.status) == "ACTIVE",
-            )
-            .count()
+    if admin_role and target_user.role_id == admin_role.role_id and role.role_id != admin_role.role_id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail={"code": "ERR-ADMIN-ADMIN_ROLE_LOCKED", "message": "The role of an Admin account cannot be changed."},
         )
-        if other_admins == 0:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail={"code": "ERR-ADMIN-LAST_ADMIN", "message": "Cannot demote the last active Admin."},
-            )
 
     target_user.role_id = role.role_id
     db.commit()

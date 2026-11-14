@@ -22,10 +22,19 @@ Fixed six review findings on the admin portal (roles, settings, reports, student
 - Dashboard stats and activity chart return zeros when empty (no fabricated numbers); activity chart loads only window rows and uses COUNT/SUM for totals.
 - `list_state_items` prefix match escapes LIKE wildcards (`_`, `%`).
 
+- Third review round:
+  - An Admin account's role can never change via user edit or `/roles/admin/members` (covers last-admin demotion). The Admin role cannot be cloned as a template (403).
+  - Student import is atomic per row (`db.begin_nested()` savepoint plus a commit per row). `commit=False` flags added to `ClassRepository`/`EnrollmentRepository` create/update, `upsert_state` and the metadata savers. Class create/update and its metadata now commit together in the router.
+  - Import rejects emails/phones owned by soft-deleted users with a clear row error instead of a unique-constraint crash.
+  - Reports: academic_year filter is strict (no fallback to other years); each filter is applied independently; per-grade exercise count and score buckets are computed from that grade's classes only.
+  - Class/student metadata loads by exact key via `list_state_items_by_keys` (no prefix scan of all rows).
+  - Dashboard stats: growth fields are real 30-day vs previous-30-day percent change, `None` when there is no baseline. `attendance_rate` is the attempt completion rate (no attendance data exists), `None` when no attempts. Frontend dashboard defaults are zeros.
+  - Not a bug, left as is: the `url_pattern="/api/v1/admin/roles"` on UI permissions is never matched, because `require_perm` checks `permission_code` only.
+
 ### Bug & Feature Context
 - Review report flagged: unrestricted admin role assignment; internal state rows leaking into audit counts; API key masked before save (real key lost) and ping always "connected"; shared default password `Student@1234` plus per-row commit leaving orphan users; `startswith` grade filter; fabricated report numbers.
 - Second review round: reports.py `.join()` lost its `ClassAssignment` target during a scripted edit (would 500 every default analytics request); fixed. Dashboard/repository fabricated fallbacks removed.
-- Known open item: `list_state_items(prefix_match=True)` still loads all class/student meta rows per list call (needs separate table or JSON column plus Alembic migration).
+- Meta state still lives in AuditLog rows (keyed lookup now, but a dedicated table would be cleaner; needs Alembic migration).
 - Seed scripts still use `Student@1234` (not changed). Admin accounts exist only via seeding.
 
 ### Solution & Technical Details
@@ -40,4 +49,4 @@ Fixed six review findings on the admin portal (roles, settings, reports, student
 - `backend/app/modules/academic/services/class_service.py`, `routers/classes.py`: `matches_grade` helper.
 - `frontend/src/pages/admin/AdminUsersPage.jsx`, `AdminSettingsPage.jsx`: hidden actions, `isSelf` via `useAuth().user.user_id`, ping toast.
 - `.claude/rules/coding_rules.md`: section 9 Admin Account Restrictions.
-- Not run: tests. Verify `/auth/me` exposes `user_id` for `isSelf`.
+- Tests: full backend suite 539 passed. New: `tests/admin/test_admin_account_locks.py`, `tests/academic/test_student_import_atomic.py`. Frontend not run; verify `/auth/me` exposes `user_id` for `isSelf`.

@@ -56,9 +56,11 @@ def upsert_state(
     key_title: str,
     payload: Dict[str, Any],
     actor_name: str = "System",
+    commit: bool = True,
 ) -> AuditLog:
     """
     Create or update an active internal JSON state record identified by key_title.
+    With commit=False the change is only flushed so the caller can commit it atomically.
     """
     existing = (
         db.query(AuditLog)
@@ -74,8 +76,11 @@ def upsert_state(
     if existing:
         existing.description = serialized
         existing.actor_name = actor_name
-        db.commit()
-        db.refresh(existing)
+        if commit:
+            db.commit()
+            db.refresh(existing)
+        else:
+            db.flush()
         return existing
 
     record = AuditLog(
@@ -88,8 +93,11 @@ def upsert_state(
         status="ACTIVE",
     )
     db.add(record)
-    db.commit()
-    db.refresh(record)
+    if commit:
+        db.commit()
+        db.refresh(record)
+    else:
+        db.flush()
     return record
 
 
@@ -147,6 +155,36 @@ def list_state_items(
         data = _parse_json(row.description)
         data.setdefault("id", str(row.log_id))
         results.append((row, data))
+    return results
+
+
+def list_state_items_by_keys(
+    db: Session,
+    key_titles: List[str],
+    chunk_size: int = 500,
+) -> List[Tuple[AuditLog, Dict[str, Any]]]:
+    """
+    List active internal JSON state items whose title is exactly one of key_titles.
+    Loads only the requested entities instead of scanning every row by prefix.
+    """
+    results: List[Tuple[AuditLog, Dict[str, Any]]] = []
+    unique_keys = list(dict.fromkeys(key_titles))
+    for start in range(0, len(unique_keys), chunk_size):
+        chunk = unique_keys[start:start + chunk_size]
+        rows = (
+            db.query(AuditLog)
+            .filter(
+                AuditLog.title.in_(chunk),
+                AuditLog.ip_address == INTERNAL_STATE_MARKER,
+                func.upper(AuditLog.status) != "DELETED",
+            )
+            .order_by(AuditLog.created_at.asc())
+            .all()
+        )
+        for row in rows:
+            data = _parse_json(row.description)
+            data.setdefault("id", str(row.log_id))
+            results.append((row, data))
     return results
 
 

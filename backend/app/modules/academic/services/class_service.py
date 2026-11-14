@@ -69,10 +69,11 @@ class ClassService:
         class_name: str,
         school_year: Optional[str] = None,
         homeroom_teacher_id: Optional[UUID] = None,
-        status_val: str = "ACTIVE"
+        status_val: str = "ACTIVE",
+        commit: bool = True
     ) -> Class:
         """
-        Create a new class.
+        Create a new class (commit=False leaves the transaction open for the caller).
         Raises 400 if homeroom_teacher_id is provided but invalid.
         Raises 409 if class_name already exists.
         """
@@ -95,6 +96,8 @@ class ClassService:
         kwargs = {}
         if status_val and status_val != "ACTIVE":
             kwargs["status"] = status_val
+        if not commit:
+            kwargs["commit"] = False
 
         cls = ClassRepository.create(
             db=db,
@@ -171,10 +174,11 @@ class ClassService:
         school_year: Optional[str] = None,
         homeroom_teacher_id: Optional[UUID] = None,
         update_homeroom_teacher: bool = False,
-        status_val: Optional[str] = None
+        status_val: Optional[str] = None,
+        commit: bool = True
     ) -> Class:
         """
-        Update a class.
+        Update a class (commit=False leaves the transaction open for the caller).
         Raises 404 if not found.
         Raises 400 if homeroom_teacher_id is updated to an invalid teacher.
         Raises 409 if new class_name conflicts with another class.
@@ -205,7 +209,8 @@ class ClassService:
             academic_year=school_year,
             homeroom_teacher_id=homeroom_teacher_id,
             update_homeroom_teacher=update_homeroom_teacher,
-            status=status_val
+            status=status_val,
+            **({} if commit else {"commit": False})
         )
         logger.info(
             "Domain Event: EVT-ACAD-CLASS_UPDATED - class_id: %s", cls.class_id
@@ -256,6 +261,7 @@ class ClassService:
         specialization: Optional[str] = None,
         update_room: bool = False,
         update_specialization: bool = False,
+        commit: bool = True,
     ) -> None:
         """
         Persist extended class metadata (room_name, specialization) in the shared state store.
@@ -270,7 +276,7 @@ class ClassService:
             current["room_name"] = room_name.strip() if room_name else None
         if update_specialization:
             current["specialization"] = specialization.strip() if specialization else None
-        upsert_state(db, key, current, actor_name="System")
+        upsert_state(db, key, current, actor_name="System", commit=commit)
 
     @staticmethod
     def enrich_classes_out(db: Session, classes: List[Class]):
@@ -281,7 +287,7 @@ class ClassService:
         from sqlalchemy import func
         from models.models import StudentClass, User
         from app.modules.academic.schemas import ClassOut
-        from app.modules.admin.state_store import list_state_items
+        from app.modules.admin.state_store import list_state_items_by_keys
 
         if not classes:
             return []
@@ -308,7 +314,9 @@ class ClassService:
             teachers_map = {t.user_id: t for t in teacher_rows}
 
         # 3. Batch load optional class metadata (room_name, specialization)
-        meta_rows = list_state_items(db, "__CLASS_META__:", prefix_match=True)
+        meta_rows = list_state_items_by_keys(
+            db, [ClassService._class_meta_key(cid) for cid in class_ids]
+        )
         meta_map = {}
         for row, payload in meta_rows:
             cid_str = row.title.split("__CLASS_META__:", 1)[-1]
