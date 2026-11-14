@@ -42,10 +42,14 @@
 #   DEPLOY_PROFILE  profile compose: tunnel (mặc định) | proxy | quick
 name: deploy
 
+# Manual only: run from Actions tab > deploy > Run workflow on branch `prod`.
 on:
-  push:
-    branches: [prod]
   workflow_dispatch:
+    inputs:
+      force_sgk:
+        description: "Re-download and re-upload SGK data even if version is unchanged"
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -62,7 +66,12 @@ env:
   CLOUDFLARED_VERSION: "2026.5.1"
 
 jobs:
+  # Gate: backend tests + frontend build (same as ci.yml). Deploy stops if red.
+  test:
+    uses: ./.github/workflows/ci.yml
+
   build-and-push:
+    needs: test
     runs-on: ubuntu-latest
     timeout-minutes: 40
     steps:
@@ -112,7 +121,7 @@ jobs:
   deploy:
     needs: build-and-push
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
 
@@ -199,18 +208,71 @@ jobs:
           done
           echo "thu duoc $(wc -l < /tmp/deploy.env) bien"
 
+      # Tách riêng để lỗi SSH và lỗi đường dẫn báo khác nhau, thay vì cùng
+      # một "Permission denied" khó đoán ở bước scp.
+      - name: Verify SSH access and target directory
+        env:
+          DEPLOY_PATH: ${{ secrets.DEPLOY_PATH }}
+        run: |
+          set -euo pipefail
+          echo "target path: $DEPLOY_PATH"
+          if ! ssh smartlms "echo SSH_OK"; then
+            echo "ERROR: khong SSH duoc vao server."
+            echo "  - DEPLOY_HOST phai la hostname Access (vd ssh-staging.vnexus.io.vn), KHONG phai IP"
+            echo "  - CF_ACCESS_CLIENT_ID / CF_ACCESS_CLIENT_SECRET phai dung"
+            echo "  - service token phai nam trong policy 'Service Auth' cua application SSH"
+            exit 1
+          fi
+          if ! ssh smartlms "mkdir -p '$DEPLOY_PATH/deploy/nginx' '$DEPLOY_PATH/deploy/scripts' '$DEPLOY_PATH/postgres-init'"; then
+            echo "ERROR: khong tao duoc thu muc trong DEPLOY_PATH=$DEPLOY_PATH"
+            echo "  - thu muc cha phai ghi duoc boi user SSH"
+            echo "  - dung /home/<user>/smartlms, KHONG dung /opt/smartlms (root-owned)"
+            exit 1
+          fi
+
       # Chỉ đồng bộ file cấu hình — không đẩy source code lên server.
       - name: Sync config + deploy script to server
         env:
           DEPLOY_PATH: ${{ secrets.DEPLOY_PATH }}
         run: |
           set -euo pipefail
-          ssh smartlms "mkdir -p '$DEPLOY_PATH/deploy/nginx' '$DEPLOY_PATH/deploy/scripts' '$DEPLOY_PATH/postgres-init'"
           scp deploy/docker-compose.images.yml smartlms:"$DEPLOY_PATH/deploy/docker-compose.images.yml"
           scp deploy/nginx/nginx.conf           smartlms:"$DEPLOY_PATH/deploy/nginx/nginx.conf"
           scp postgres-init/01_extensions.sql   smartlms:"$DEPLOY_PATH/postgres-init/01_extensions.sql"
           scp deploy/scripts/remote-deploy.sh   smartlms:"$DEPLOY_PATH/deploy/scripts/remote-deploy.sh"
           scp /tmp/deploy.env                   smartlms:"$DEPLOY_PATH/.deploy.env"
+
+      # SGK RAG data: Drive folder must be shared "Anyone with the link".
+      # Variables: SGK_DRIVE_FOLDER_ID (folder id from the Drive URL),
+      #            SGK_VERSION (any string; bump it when RAG_SGK data changes).
+      # Skipped when the server's sgk_data/.version already equals SGK_VERSION.
+      - name: Sync SGK data (only when version changed)
+        env:
+          DEPLOY_PATH: ${{ secrets.DEPLOY_PATH }}
+          FOLDER_ID: ${{ vars.SGK_DRIVE_FOLDER_ID }}
+          SGK_VERSION: ${{ vars.SGK_VERSION }}
+          FORCE: ${{ inputs.force_sgk }}
+        run: |
+          set -euo pipefail
+          if [ -z "$FOLDER_ID" ] || [ -z "$SGK_VERSION" ]; then
+            echo "SGK_DRIVE_FOLDER_ID / SGK_VERSION not set - skip SGK sync"; exit 0
+          fi
+          remote=$(ssh smartlms "cat '$DEPLOY_PATH/sgk_data/.version' 2>/dev/null || true")
+          if [ "$remote" = "$SGK_VERSION" ] && [ "$FORCE" != "true" ]; then
+            echo "SGK data up to date ($SGK_VERSION) - skip"; exit 0
+          fi
+          pip install --quiet gdown
+          mkdir -p /tmp/sgk
+          gdown --folder "https://drive.google.com/drive/folders/$FOLDER_ID" -O /tmp/sgk
+          # gdown puts files in /tmp/sgk (or one subfolder); locate vectors.dump
+          dump=$(find /tmp/sgk -name vectors.dump | head -n1)
+          [ -n "$dump" ] || { echo "ERROR: vectors.dump not found in Drive folder"; exit 1; }
+          dir=$(dirname "$dump")
+          ssh smartlms "mkdir -p '$DEPLOY_PATH/sgk_data'"
+          scp "$dir"/vectors.dump smartlms:"$DEPLOY_PATH/sgk_data/vectors.dump"
+          [ -f "$dir/images.tar" ] && scp "$dir/images.tar" smartlms:"$DEPLOY_PATH/sgk_data/images.tar"
+          # .reload tells remote-deploy.sh to wipe chunks + SGK images so load_sgk reloads.
+          ssh smartlms "touch '$DEPLOY_PATH/sgk_data/.reload' && echo '$SGK_VERSION' > '$DEPLOY_PATH/sgk_data/.version'"
 
       - name: Pull new images and restart
         env:

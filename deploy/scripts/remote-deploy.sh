@@ -131,8 +131,23 @@ COMPOSE="docker compose --project-directory . --env-file $ENV_FILE -f $COMPOSE_F
 echo "==> pull (tag=$IMAGE_TAG)"
 $COMPOSE pull
 
+# SGK reload: load_sgk.sh only loads into EMPTY targets, so wipe them first.
+# chunks is a rebuildable index (not user data); hard delete explicitly approved for it.
+RELOAD_FLAG="sgk_data/.reload"
+UP_FLAGS=""
+if [ -f "$RELOAD_FLAG" ]; then
+  echo "==> SGK data changed: wipe chunks + sgk_images, backend will reload"
+  if docker ps --format '{{.Names}}' | grep -qx smartlms_postgres; then
+    docker exec smartlms_postgres sh -c 'psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -c "TRUNCATE chunks"'       || echo "WARN: TRUNCATE chunks failed (table may not exist yet)"
+  fi
+  if docker ps --format '{{.Names}}' | grep -qx "$BACKEND_CONTAINER"; then
+    docker exec "$BACKEND_CONTAINER" sh -c 'rm -rf /app/uploads/sgk_images/* /app/uploads/sgk_images/.[!.]*' || true
+  fi
+  UP_FLAGS="--force-recreate"
+fi
+
 echo "==> up -d"
-$COMPOSE up -d --remove-orphans
+$COMPOSE up -d --remove-orphans $UP_FLAGS
 docker image prune -f >/dev/null 2>&1 || true
 
 # ---------------------------------------------------------------------------
@@ -160,5 +175,5 @@ echo "==> ket qua bootstrap admin"
 docker logs "$BACKEND_CONTAINER" 2>&1 | grep "bootstrap_admin:" || echo "(chua co log bootstrap_admin)"
 
 $COMPOSE ps
-rm -f "$OVERRIDES"
+rm -f "$OVERRIDES" "$RELOAD_FLAG"
 echo "==> deploy xong"
