@@ -48,4 +48,8 @@ Updated By: <author_name_or_email>
 - **Strict Soft Delete Only**: System ONLY accepts **Soft Delete** for all data resources/entities (e.g. updating `status` column to `DELETED` or setting soft delete flag). **Hard Delete is strictly prohibited**.
 - Any feature specs or initial requirements specifying Hard Delete MUST be converted to Soft Delete.
 
-
+## 9. Admin Account Restrictions
+- **No New Admins**: The system MUST NOT create Admin accounts or promote/assign any user to the Admin role through any API, bulk import, or UI. Admin accounts exist only through seeding/provisioning outside the application.
+- **No Admin Deletion**: Admin accounts MUST NOT be deletable (including soft delete) from user CRUD. The UI MUST NOT show a delete option for Admin users, and the backend MUST reject such requests.
+- Any feature spec requiring otherwise MUST be rejected or converted to comply with these restrictions.
+- **No Self-Blocking**: A signed-in admin MUST NOT be able to deactivate, suspend, or delete their own account. The UI MUST hide those actions for the own account, and the backend MUST reject them (403).

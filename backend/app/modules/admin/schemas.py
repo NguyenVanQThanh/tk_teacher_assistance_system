@@ -223,13 +223,16 @@ class DashboardStatsResponse(BaseModel):
     total_students: int
     total_teachers: int
     total_classes: int
-    attendance_rate: float
+    # Completion rate of started exercise attempts (percent); None when there are no attempts.
+    attendance_rate: Optional[float] = None
     lecture_views: int
     assignments_submitted: int
-    student_growth: float = 12.5
-    teacher_growth: float = 4.2
-    attendance_growth: float = 0.8
-    classes_growth: float = 6.0
+    # Growth = percent change in records created in the last 30 days vs the previous 30 days.
+    # None means there is no previous-period baseline to compare against.
+    student_growth: Optional[float] = None
+    teacher_growth: Optional[float] = None
+    attendance_growth: Optional[float] = None
+    classes_growth: Optional[float] = None
 
 
 class ActivityChartPoint(BaseModel):

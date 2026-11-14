@@ -2,10 +2,11 @@
 # Description: Database access layer for Admin User Management module.
 # Created At: 2026-09-29
 # Created By: Tam Khang
-# Updated At: 2026-09-30
+# Updated At: 2026-11-14
 # Updated By: Tam Khang
 
 import uuid
+from datetime import datetime, timedelta, timezone
 from typing import List, Optional, Tuple, Dict, Any
 from uuid import UUID
 from sqlalchemy.orm import Session
@@ -88,6 +89,89 @@ class AdminUserRepository:
                     User.full_name.ilike(term),
                     User.phone.ilike(term),
                     User.email.ilike(term)
+                )
+            )
+
+        # Grade filter (matches active StudentClass enrollment in matching Class)
+        if grade and grade.strip() and grade.strip().lower() != "all":
+            grade_clean = grade.strip().lower()
+            for prefix in ("khối", "khoi", "grade", "k"):
+                if grade_clean.startswith(prefix):
+                    grade_clean = grade_clean[len(prefix):].strip()
+                    break
+            if grade_clean:
+                grade_student_ids = (
+                    db.query(StudentClass.student_id)
+                    .join(Class, StudentClass.class_id == Class.class_id)
+                    .filter(
+                        func.upper(StudentClass.status) != "DELETED",
+                        func.upper(Class.status) != "DELETED",
+                        or_(
+                            Class.class_name.ilike(f"{grade_clean}%"),
+                            Class.class_name.ilike(f"% {grade_clean}%"),
+                        ),
+                    )
+                    .distinct()
+                )
+                query = query.filter(User.user_id.in_(grade_student_ids))
+
+        # Department filter (matches TeacherSubject assignment or Subject head_teacher_id)
+        if department and department.strip() and department.strip().lower() != "all":
+            dept_clean = department.strip().lower()
+            for prefix in ("tổ ", "bộ môn ", "department "):
+                if dept_clean.startswith(prefix):
+                    dept_clean = dept_clean[len(prefix):].strip()
+                    break
+            dept_aliases = {
+                "math": ["math", "toán"],
+                "toán": ["math", "toán"],
+                "physics": ["physics", "vật lý"],
+                "vật lý": ["physics", "vật lý"],
+                "chemistry": ["chemistry", "hóa học"],
+                "hóa học": ["chemistry", "hóa học"],
+                "biology": ["biology", "sinh học"],
+                "sinh học": ["biology", "sinh học"],
+                "literature": ["literature", "ngữ văn"],
+                "ngữ văn": ["literature", "ngữ văn"],
+                "history": ["history", "lịch sử"],
+                "lịch sử": ["history", "lịch sử"],
+                "geography": ["geography", "địa lý"],
+                "địa lý": ["geography", "địa lý"],
+                "english": ["english", "ngoại ngữ", "tiếng anh"],
+                "ngoại ngữ": ["english", "ngoại ngữ", "tiếng anh"],
+                "tiếng anh": ["english", "ngoại ngữ", "tiếng anh"],
+                "informatics": ["informatics", "tin học"],
+                "tin học": ["informatics", "tin học"],
+            }
+            keywords = dept_aliases.get(dept_clean, [dept_clean])
+            subj_filters = []
+            for kw in keywords:
+                subj_filters.append(Subject.subject_name.ilike(f"%{kw}%"))
+                subj_filters.append(Subject.description.ilike(f"%{kw}%"))
+
+            dept_teacher_ids = (
+                db.query(TeacherSubject.teacher_id)
+                .join(Subject, TeacherSubject.subject_id == Subject.subject_id)
+                .filter(
+                    func.upper(TeacherSubject.status) != "DELETED",
+                    func.upper(Subject.status) != "DELETED",
+                    or_(*subj_filters),
+                )
+                .distinct()
+            )
+            dept_head_ids = (
+                db.query(Subject.head_teacher_id)
+                .filter(
+                    Subject.head_teacher_id.isnot(None),
+                    func.upper(Subject.status) != "DELETED",
+                    or_(*subj_filters),
+                )
+                .distinct()
+            )
+            query = query.filter(
+                or_(
+                    User.user_id.in_(dept_teacher_ids),
+                    User.user_id.in_(dept_head_ids),
                 )
             )
 
@@ -236,6 +320,8 @@ class AdminUserRepository:
 class AdminDashboardRepository:
     @staticmethod
     def get_stats(db: Session) -> Dict[str, Any]:
+        from models.models import Document, StudentExerciseAttempt
+
         student_role = db.query(Role).filter(func.lower(Role.name) == "student").first()
         teacher_role = db.query(Role).filter(func.lower(Role.name) == "teacher").first()
 
@@ -255,24 +341,54 @@ class AdminDashboardRepository:
 
         total_classes = db.query(Class).filter(Class.status != "DELETED").count()
 
-        if total_students == 0:
-            total_students = 2450
-        if total_teachers == 0:
-            total_teachers = 128
-        if total_classes == 0:
-            total_classes = 64
+        doc_views = db.query(func.coalesce(func.sum(Document.download_count), 0)).filter(
+            Document.status != "DELETED"
+        ).scalar() or 0
+        doc_count = db.query(Document).filter(Document.status != "DELETED").count()
+        lecture_views = int(doc_views) if int(doc_views) > 0 else doc_count
+
+        attempt_count = db.query(StudentExerciseAttempt).filter(
+            StudentExerciseAttempt.status != "DELETED"
+        ).count()
+        finished_attempts = db.query(StudentExerciseAttempt).filter(
+            StudentExerciseAttempt.status != "DELETED",
+            StudentExerciseAttempt.is_finished.is_(True)
+        ).count()
+        assignments_submitted = attempt_count
+        # No attendance data exists; report the real completion rate of attempts instead.
+        attendance_rate = (
+            round((finished_attempts / attempt_count) * 100, 1) if attempt_count > 0 else None
+        )
+
+        def _growth(model, extra_filters=()):
+            """Percent change in rows created in the last 30 days vs the 30 days before."""
+            now = datetime.now(timezone.utc)
+            cur_start = now - timedelta(days=30)
+            prev_start = now - timedelta(days=60)
+            base = [model.status != "DELETED", *extra_filters]
+            current = db.query(model).filter(*base, model.created_at >= cur_start).count()
+            previous = db.query(model).filter(
+                *base, model.created_at >= prev_start, model.created_at < cur_start
+            ).count()
+            if previous == 0:
+                return None
+            return round((current - previous) * 100.0 / previous, 1)
+
+        student_growth = _growth(User, [User.role_id == student_role.role_id]) if student_role else None
+        teacher_growth = _growth(User, [User.role_id == teacher_role.role_id]) if teacher_role else None
+        classes_growth = _growth(Class)
 
         return {
             "total_students": total_students,
             "total_teachers": total_teachers,
             "total_classes": total_classes,
-            "attendance_rate": 96.8,
-            "lecture_views": 14200,
-            "assignments_submitted": 3489,
-            "student_growth": 12.5,
-            "teacher_growth": 4.2,
-            "attendance_growth": 0.8,
-            "classes_growth": 6.0
+            "attendance_rate": attendance_rate,
+            "lecture_views": lecture_views,
+            "assignments_submitted": assignments_submitted,
+            "student_growth": student_growth,
+            "teacher_growth": teacher_growth,
+            "attendance_growth": None,
+            "classes_growth": classes_growth,
         }
 
     @staticmethod
@@ -309,5 +425,7 @@ class AdminDashboardRepository:
     @staticmethod
     def get_audit_logs(db: Session, limit: int = 10) -> List[AuditLog]:
         return db.query(AuditLog).filter(
-            AuditLog.status != "DELETED"
+            AuditLog.status != "DELETED",
+            or_(AuditLog.ip_address.is_(None), AuditLog.ip_address != "INTERNAL_STATE"),
+            or_(AuditLog.title.is_(None), func.substr(AuditLog.title, 1, 2) != "__"),
         ).order_by(AuditLog.created_at.desc()).limit(limit).all()
