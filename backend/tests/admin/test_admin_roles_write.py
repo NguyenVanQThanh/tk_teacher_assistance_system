@@ -131,3 +131,30 @@ class TestAdminRolesRouter:
         assert "lab_assistant" in exp_csv.content.decode("utf-8-sig")
 
 
+
+class TestAdminRolesWriteAuthorization:
+    def test_non_admin_denied_on_write_endpoints(self, client: TestClient, db_session):
+        student_headers = _login_headers(client, phone="0934567890")
+        post = client.post("/api/v1/admin/roles", headers=student_headers, json={"name": "Hack"})
+        put = client.put(
+            "/api/v1/admin/roles/student_parent/permissions",
+            headers=student_headers,
+            json={"permissions": {"create_class": True}},
+        )
+        assign = client.post(
+            "/api/v1/admin/roles/subject_teacher/members",
+            headers=student_headers,
+            json={"user_id": str(uuid.uuid4())},
+        )
+        assert post.status_code == status.HTTP_403_FORBIDDEN
+        assert put.status_code == status.HTTP_403_FORBIDDEN
+        assert assign.status_code == status.HTTP_403_FORBIDDEN
+
+    def test_unknown_permission_code_rejected(self, client: TestClient, db_session):
+        headers = _login_headers(client)
+        res = client.put(
+            "/api/v1/admin/roles/subject_teacher/permissions",
+            headers=headers,
+            json={"permissions": {"not_a_real_permission": True}},
+        )
+        assert res.status_code == status.HTTP_400_BAD_REQUEST

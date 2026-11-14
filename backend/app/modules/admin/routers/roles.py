@@ -25,7 +25,7 @@ from app.modules.admin.routers.users import require_admin_privilege
 from app.modules.admin.state_store import get_latest_state, record_audit_event, upsert_state
 from app.modules.auth.dependencies import get_current_user
 from app.modules.auth.services.permission_service import PermissionService
-from models.models import Permission, Role, RolePermission, Subject, User
+from models.models import Permission, Role, RolePermission, User
 
 logger = logging.getLogger(__name__)
 
@@ -185,11 +185,6 @@ class RoleCreateRequest(BaseModel):
     template_role_code: Optional[str] = None
     cloneFrom: Optional[str] = None
 
-
-class RolePermissionsUpdateRequest(BaseModel):
-    """Schema for updating the permission matrix for a role."""
-
-    permissions: Dict[str, bool]
 
 
 class RoleMemberAssignRequest(BaseModel):
@@ -456,14 +451,20 @@ def create_role(
                 )
             )
 
-    db.commit()
+    # Role, permissions and display metadata are committed together.
+    try:
+        upsert_state(
+            db,
+            f"__ROLE_META__:{new_role.role_id}",
+            {"display_name": payload.name.strip()},
+            actor_name=current_user.full_name,
+            commit=False,
+        )
+        db.commit()
+    except Exception:
+        db.rollback()
+        raise
     db.refresh(new_role)
-    upsert_state(
-        db,
-        f"__ROLE_META__:{new_role.role_id}",
-        {"display_name": payload.name.strip()},
-        actor_name=current_user.full_name,
-    )
     PermissionService.invalidate_role_cache()
 
     record_audit_event(
@@ -550,6 +551,16 @@ def update_role_permissions(
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail={"code": "ERR-ADMIN-INVALID_PERMISSIONS", "message": "Invalid permissions payload."},
+        )
+
+    unknown = sorted(set(raw_perms) - set(UI_PERMISSION_CODES))
+    if unknown:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail={
+                "code": "ERR-ADMIN-UNKNOWN_PERMISSIONS",
+                "message": f"Unknown permission codes: {', '.join(unknown)}.",
+            },
         )
 
     ui_perm_ids = [perm_map[code].permission_id for code in UI_PERMISSION_CODES]
