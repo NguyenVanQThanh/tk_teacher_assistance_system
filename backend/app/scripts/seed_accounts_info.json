@@ -612,5 +612,140 @@
     "student_code": "HS10055",
     "class_name": "10A3",
     "password_plain": "Student@1234"
+  },
+  {
+    "user_id": "32d43cca-33f7-4245-9c1e-f4645ce9e251",
+    "phone": "0999000010",
+    "email": "headteacher1@school.com",
+    "full_name": "ThS. Lê Nguyên",
+    "role_name": "head_teacher",
+    "status": "ACTIVE",
+    "password_plain": "Teacher@1234"
+  },
+  {
+    "user_id": "9db4793c-33ff-4f1d-9b4f-f85a8505275d",
+    "phone": "0999000011",
+    "email": "headteacher2@school.com",
+    "full_name": "TS. Phạm Hoàng Nam",
+    "role_name": "head_teacher",
+    "status": "ACTIVE",
+    "password_plain": "Teacher@1234"
+  },
+  {
+    "user_id": "a609896a-0166-4993-8995-e6494007e2c7",
+    "phone": "0999000012",
+    "email": "academicstaff1@school.com",
+    "full_name": "Cô Nguyễn Thị Bích Ngọc",
+    "role_name": "academic_staff",
+    "status": "ACTIVE",
+    "password_plain": "Teacher@1234"
+  },
+  {
+    "user_id": "01a7e01e-003c-4479-a3a4-4c3d104d4578",
+    "phone": "0999000013",
+    "email": "academicstaff2@school.com",
+    "full_name": "Thầy Trần Minh Khôi",
+    "role_name": "academic_staff",
+    "status": "ACTIVE",
+    "password_plain": "Teacher@1234"
+  },
+  {
+    "user_id": "13e4fcfe-86b8-4855-99ba-969c79f961be",
+    "phone": "0999000014",
+    "email": "teacher_inactive1@school.com",
+    "full_name": "Thầy Vũ Minh Đức",
+    "role_name": "Teacher",
+    "status": "INACTIVE",
+    "password_plain": "Teacher@1234"
+  },
+  {
+    "user_id": "7852633a-44be-4f77-b3dc-bbbd0ba7beb9",
+    "phone": "0999000015",
+    "email": "teacher_inactive2@school.com",
+    "full_name": "Cô Hoàng Bích Liên",
+    "role_name": "Teacher",
+    "status": "INACTIVE",
+    "password_plain": "Teacher@1234"
+  },
+  {
+    "user_id": "b4df32df-934b-458f-854d-27aa4e865f1b",
+    "phone": "0999200001",
+    "email": "student_inactive1@school.com",
+    "full_name": "Lê Gia Bảo",
+    "role_name": "Student",
+    "status": "INACTIVE",
+    "password_plain": "Student@1234"
+  },
+  {
+    "user_id": "7c5e9178-194b-40f1-816a-963260b1bd58",
+    "phone": "0999200002",
+    "email": "unassigned_student2@school.com",
+    "full_name": "Trần Thảo Vy",
+    "role_name": "Student",
+    "status": "ACTIVE",
+    "password_plain": "Student@1234"
+  },
+  {
+    "user_id": "b160aca7-dfad-44e5-a352-28a32350a568",
+    "phone": "0999200003",
+    "email": "unassigned_student3@school.com",
+    "full_name": "Nguyễn Nhật Minh",
+    "role_name": "Student",
+    "status": "ACTIVE",
+    "password_plain": "Student@1234"
+  },
+  {
+    "user_id": "6056bb16-9b37-4192-ab49-d16718d512c3",
+    "phone": "0999200004",
+    "email": "unassigned_student4@school.com",
+    "full_name": "Phạm Khánh Linh",
+    "role_name": "Student",
+    "status": "ACTIVE",
+    "password_plain": "Student@1234"
+  },
+  {
+    "user_id": "ce2c47aa-af7d-4911-a8af-477f886498c9",
+    "phone": "0999200005",
+    "email": "unassigned_student5@school.com",
+    "full_name": "Hoàng Quốc Huy",
+    "role_name": "Student",
+    "status": "ACTIVE",
+    "password_plain": "Student@1234"
+  },
+  {
+    "user_id": "600f1177-deb1-495e-8c47-754014cea5b6",
+    "phone": "0999200006",
+    "email": "unassigned_student6@school.com",
+    "full_name": "Võ Ngọc Anh",
+    "role_name": "Student",
+    "status": "ACTIVE",
+    "password_plain": "Student@1234"
+  },
+  {
+    "user_id": "9abc3144-4aa9-4800-8b44-d704148e1d0e",
+    "phone": "0999200007",
+    "email": "unassigned_student7@school.com",
+    "full_name": "Đỗ Tuấn Kiệt",
+    "role_name": "Student",
+    "status": "ACTIVE",
+    "password_plain": "Student@1234"
+  },
+  {
+    "user_id": "8e88869d-f69e-4ad4-a11f-247431bd7ce3",
+    "phone": "0999200008",
+    "email": "unassigned_student8@school.com",
+    "full_name": "Bùi Minh Thư",
+    "role_name": "Student",
+    "status": "ACTIVE",
+    "password_plain": "Student@1234"
+  },
+  {
+    "user_id": "8219cab3-7d29-4df8-9165-347c1d390506",
+    "phone": "0999200009",
+    "email": "unassigned_student9@school.com",
+    "full_name": "Dương Hải Đăng",
+    "role_name": "Student",
+    "status": "ACTIVE",
+    "password_plain": "Student@1234"
   }
 ]
