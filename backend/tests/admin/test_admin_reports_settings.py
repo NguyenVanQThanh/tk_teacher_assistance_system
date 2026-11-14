@@ -128,7 +128,7 @@ class TestAdminSettingsRouter:
         assert put_res.json()["general"]["schoolName"] == "Updated Smart High School"
         assert put_res.json()["ai"]["temperature"] == 0.5
         assert "secret-test-key" not in put_res.json()["ai"]["apiKey"]
-        assert put_res.json()["ai"]["apiKey"].endswith("9876")
+        assert "9876" not in put_res.json()["ai"]["apiKey"]
 
         # Verify persisted on subsequent GET
         get_after = client.get("/api/v1/admin/settings", headers=headers)
@@ -142,7 +142,7 @@ class TestAdminSettingsRouter:
             json={"provider": "google_gemini", "model": "gemini-2.5-flash"},
         )
         assert ping_res.status_code == status.HTTP_200_OK
-        assert ping_res.json()["status"] == "connected"
+        assert ping_res.json()["status"] == "configured"
         assert ping_res.json()["latency_ms"] >= 1
 
         # Backups create, list, download
