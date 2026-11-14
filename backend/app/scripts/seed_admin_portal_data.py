@@ -7,6 +7,7 @@
 
 import json
 import logging
+import os
 import sys
 from datetime import date, datetime, timedelta, timezone
 from decimal import Decimal
@@ -1590,6 +1591,9 @@ def seed_admin_portal_data(
 def main() -> None:
     """CLI entrypoint for running Admin Portal seed script."""
     logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(name)s: %(message)s")
+    # The seed creates accounts with known demo passwords; never run it against production.
+    if os.getenv("APP_ENV", "").strip().lower() in ("prod", "production"):
+        raise SystemExit("Refusing to seed demo accounts when APP_ENV is production.")
     result = seed_admin_portal_data()
     print(json.dumps(result, indent=2, ensure_ascii=False))
 
