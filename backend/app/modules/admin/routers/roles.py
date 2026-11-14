@@ -450,6 +450,12 @@ def create_role(
 
     template_code = payload.template_role_code or payload.cloneFrom
     source_role = _resolve_role(db, template_code) if template_code else None
+    # Cloning the Admin role would mint a custom role with full admin permissions.
+    if source_role and _canonical_role_code(source_role) == "admin":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail={"code": "ERR-ADMIN-ADMIN_ROLE_LOCKED", "message": "The Admin role cannot be used as a template."},
+        )
 
     new_role = Role(
         role_id=uuid.uuid4(),
@@ -554,6 +560,13 @@ def update_role_permissions(
     perm_map = _ensure_seeded(db)
     role = _resolve_role(db, role_code)
     canonical = _canonical_role_code(role)
+
+    # Self-lockout protection: the Admin permission matrix is read-only.
+    if canonical == "admin":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail={"code": "ERR-ADMIN-ADMIN_PERMS_LOCKED", "message": "Admin role permissions cannot be modified."},
+        )
 
     raw_perms = payload.get("permissions") if isinstance(payload.get("permissions"), dict) else payload
     if not isinstance(raw_perms, dict):
@@ -672,6 +685,27 @@ def assign_user_to_role(
             detail={"code": "ERR-ADMIN-USER_NOT_FOUND", "message": "User not found or deleted."},
         )
 
+    # Policy: no new admins. Assigning the Admin role is forbidden.
+    if canonical == "admin" and target_user.role_id != role.role_id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail={"code": "ERR-ADMIN-ADMIN_ROLE_LOCKED", "message": "Admin accounts cannot be created or assigned."},
+        )
+
+    if target_user.user_id == current_user.user_id and target_user.role_id != role.role_id:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail={"code": "ERR-ADMIN-SELF_ROLE_CHANGE", "message": "You cannot change your own role."},
+        )
+
+    # An Admin account can never be moved to another role (also prevents demoting the last Admin).
+    admin_role = db.query(Role).filter(func.lower(Role.name) == "admin").first()
+    if admin_role and target_user.role_id == admin_role.role_id and role.role_id != admin_role.role_id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail={"code": "ERR-ADMIN-ADMIN_ROLE_LOCKED", "message": "The role of an Admin account cannot be changed."},
+        )
+
     target_user.role_id = role.role_id
     db.commit()
     db.refresh(target_user)
@@ -681,7 +715,7 @@ def assign_user_to_role(
         title="Assigned User to Role",
         description=f"Assigned user '{target_user.full_name}' to role '{canonical}'.",
         actor_name=current_user.full_name,
-        severity="info",
+        severity="warning" if canonical == "admin" else "info",
     )
 
     return {

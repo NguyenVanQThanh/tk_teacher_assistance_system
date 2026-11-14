@@ -69,6 +69,33 @@ class AdminUserService:
                 }
             )
 
+    @staticmethod
+    def reject_admin_role(role_name: Optional[str]) -> None:
+        """Raise 403 when the given role is Admin; no new admin accounts may be created or promoted."""
+        if (role_name or "").strip().lower() == "admin":
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail={
+                    "code": "ERR-ADMIN-ADMIN_ROLE_LOCKED",
+                    "message": "Admin accounts cannot be created or assigned.",
+                },
+            )
+
+    @staticmethod
+    def reject_self_block(user_id: UUID, acting_user_id: Optional[UUID], new_status: Optional[str]) -> None:
+        """Raise 403 when the acting admin tries to deactivate, suspend or delete their own account."""
+        if acting_user_id and user_id == acting_user_id and new_status and new_status.strip().upper() != "ACTIVE":
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail={"code": "ERR-ADMIN-SELF_BLOCK_LOCKED", "message": "You cannot block or deactivate your own account."},
+            )
+
+    @staticmethod
+    def _is_admin_user(db: Session, user) -> bool:
+        from models.models import Role
+        role = db.query(Role).filter(Role.role_id == user.role_id).first()
+        return bool(role and role.name.strip().lower() == "admin")
+
     @classmethod
     def create_user(cls, db: Session, payload: AdminUserCreateRequest) -> AdminUserCreateResponse:
         """
@@ -85,6 +112,9 @@ class AdminUserService:
                     "message": f"Role '{payload.role}' does not exist in the system."
                 }
             )
+
+        # Admin accounts cannot be created through the API (policy: no new admins).
+        cls.reject_admin_role(role_obj.name)
 
         # 2. Validate uniqueness of phone number
         if payload.phone:
@@ -183,7 +213,8 @@ class AdminUserService:
         )
 
     @classmethod
-    def update_user(cls, db: Session, user_id: UUID, payload: AdminUserUpdateRequest) -> Dict[str, Any]:
+    def update_user(cls, db: Session, user_id: UUID, payload: AdminUserUpdateRequest, acting_user_id: Optional[UUID] = None) -> Dict[str, Any]:
+        cls.reject_self_block(user_id, acting_user_id, payload.status)
         user = AdminUserRepository.get_user_by_id(db, user_id)
         if not user or user.status == "DELETED":
             raise HTTPException(
@@ -218,6 +249,18 @@ class AdminUserService:
                     status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
                     detail={"code": "ERR-ADMIN-INVALID_ROLE", "message": f"Role '{payload.role}' does not exist."}
                 )
+            if target_role.role_id != user.role_id:
+                # Promotion to Admin is blocked, and an Admin can never be demoted
+                # (this also makes demoting the last Admin impossible).
+                cls.reject_admin_role(target_role.name)
+                if cls._is_admin_user(db, user):
+                    raise HTTPException(
+                        status_code=status.HTTP_403_FORBIDDEN,
+                        detail={
+                            "code": "ERR-ADMIN-ADMIN_ROLE_LOCKED",
+                            "message": "The role of an Admin account cannot be changed.",
+                        },
+                    )
 
         role_name_to_check = target_role.name if target_role else None
         if not role_name_to_check:
@@ -267,7 +310,8 @@ class AdminUserService:
         }
 
     @classmethod
-    def update_status(cls, db: Session, user_id: UUID, new_status: str, reason: Optional[str] = None) -> Dict[str, Any]:
+    def update_status(cls, db: Session, user_id: UUID, new_status: str, reason: Optional[str] = None, acting_user_id: Optional[UUID] = None) -> Dict[str, Any]:
+        cls.reject_self_block(user_id, acting_user_id, new_status)
         user = AdminUserRepository.get_user_by_id(db, user_id)
         if not user:
             raise HTTPException(
@@ -277,6 +321,11 @@ class AdminUserService:
 
         valid_statuses = {"ACTIVE", "INACTIVE", "SUSPENDED", "DELETED"}
         normalized = new_status.strip().upper()
+        if normalized == "DELETED" and cls._is_admin_user(db, user):
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail={"code": "ERR-ADMIN-ADMIN_DELETE_LOCKED", "message": "Admin accounts cannot be deleted."},
+            )
         if normalized not in valid_statuses:
             raise HTTPException(
                 status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
@@ -292,7 +341,7 @@ class AdminUserService:
         }
 
     @classmethod
-    def soft_delete_user(cls, db: Session, user_id: UUID) -> Dict[str, Any]:
+    def soft_delete_user(cls, db: Session, user_id: UUID, acting_user_id: Optional[UUID] = None) -> Dict[str, Any]:
         """
         Soft-delete a user by updating status to DELETED.
         """
@@ -301,6 +350,13 @@ class AdminUserService:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail={"code": "ERR-ADMIN-USER_NOT_FOUND", "message": "User not found."}
+            )
+
+        cls.reject_self_block(user_id, acting_user_id, "DELETED")
+        if cls._is_admin_user(db, user):
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail={"code": "ERR-ADMIN-ADMIN_DELETE_LOCKED", "message": "Admin accounts cannot be deleted."},
             )
 
         AdminUserRepository.soft_delete_user(db, user)

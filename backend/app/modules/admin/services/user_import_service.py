@@ -50,8 +50,7 @@ TEMPLATE_SAMPLE_ROWS = [
 _ROLE_ALIASES = {
     "student": "Student", "hocsinh": "Student", "hs": "Student",
     "teacher": "Teacher", "giaovien": "Teacher", "gv": "Teacher",
-    "admin": "Admin", "quantri": "Admin", "quantrivien": "Admin",
-}
+}  # Admin is intentionally absent: admin accounts cannot be imported.
 
 
 def _norm(text: Any) -> str:
@@ -167,7 +166,7 @@ class UserImportService:
         role_key = _norm(row.get("role", ""))
         role = _ROLE_ALIASES.get(role_key)
         if not role:
-            raise ValueError(f"Vai trò '{row.get('role', '')}' không hợp lệ (Student, Teacher hoặc Admin).")
+            raise ValueError(f"Vai trò '{row.get('role', '')}' không hợp lệ (Student hoặc Teacher).")
         return AdminUserCreateRequest(
             full_name=row.get("full_name", ""),
             role=role,
@@ -274,7 +273,7 @@ class UserImportService:
         for line in (
             ["Column", "Required", "Notes"],
             ["full_name", "Yes", "Họ và tên, 2-100 ký tự, không chứa số hoặc ký tự đặc biệt"],
-            ["role", "Yes", "Student, Teacher hoặc Admin"],
+            ["role", "Yes", "Student hoặc Teacher"],
             ["phone", "No", "10 chữ số bắt đầu bằng 0 (định dạng ô là Text để giữ số 0)"],
             ["email", "No", "Email hợp lệ, không trùng"],
             ["birthday", "No", "YYYY-MM-DD hoặc DD/MM/YYYY. Học sinh >= 16 tuổi, giáo viên >= 22 tuổi"],
