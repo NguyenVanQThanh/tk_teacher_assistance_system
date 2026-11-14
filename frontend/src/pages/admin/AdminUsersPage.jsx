@@ -662,6 +662,12 @@ export default function AdminUsersPage() {
       return { valid: false, trimmedName };
     }
 
+    // The identifier code is used in student emails, so wait until it has been generated.
+    if (!newUserForm.code) {
+      if (showFeedback) showToast('Mã định danh chưa được tạo. Vui lòng đợi hoặc bấm tạo lại mã.');
+      return { valid: false, trimmedName };
+    }
+
     const dateCheck = validateCalendarDate(newUserForm.birthDate);
     if (!dateCheck.valid) {
       if (showFeedback) {
@@ -727,7 +733,14 @@ export default function AdminUsersPage() {
     const matchedClass = isStudent
       ? classesCatalog.find(c => (c.class_name || c.name) === newUserForm.classRoom)
       : null;
-    const slugName = trimmedName.toLowerCase().replace(/\s+/g, '.');
+    // ASCII-only slug: strip Vietnamese diacritics so generated emails are portable.
+    const slugName = trimmedName
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .replace(/đ/gi, 'd')
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, '.')
+      .replace(/^\.+|\.+$/g, '');
     const emailToUse = isStudent
       ? `${slugName}.${(newUserForm.code || 'hs').toLowerCase()}@student.clarity.edu.vn`
       : (newUserForm.teacherEmail?.trim() || `${slugName}@clarity.edu.vn`);
