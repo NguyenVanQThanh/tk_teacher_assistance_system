@@ -22,6 +22,7 @@ from app.modules.admin.schemas import (
     AdminUserResetPasswordResponse
 )
 from app.modules.admin.services.notification_service import NotificationService
+from app.modules.notification import service as notification_service
 from models.models import Class
 
 
@@ -332,6 +333,14 @@ class AdminUserService:
                 detail={"code": "ERR-ADMIN-INVALID_STATUS", "message": f"Status must be one of: {', '.join(valid_statuses)}"}
             )
 
+        if normalized in ("SUSPENDED", "INACTIVE") and user.status != normalized:
+            # Tell the other admins; staged here, committed with the status change below.
+            notification_service.notify(
+                db, [a for a in notification_service.admin_user_ids(db) if a != acting_user_id],
+                "ACCOUNT_STATUS_CHANGED", "Tài khoản bị khóa hoặc ngừng hoạt động",
+                f"Tài khoản {user.full_name} đã được chuyển sang trạng thái {normalized}.",
+                "/admin/users",
+            )
         AdminUserRepository.update_status(db, user, normalized)
         return {
             "message": f"User status updated to {normalized} successfully.",

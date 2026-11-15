@@ -11,6 +11,7 @@ from uuid import UUID
 
 from fastapi import HTTPException, status
 from sqlalchemy.orm import Session
+from app.modules.notification import service as notification_service
 
 from models.models import User, Role
 from app.modules.academic.models import TeacherSubject
@@ -109,6 +110,13 @@ class TeacherAssignmentService:
         if status_val and status_val != "ACTIVE":
             kwargs["status"] = status_val
 
+        if status_val == "ACTIVE":
+            # Staged first; the repository commit persists assignment and notification together.
+            notification_service.notify(
+                db, [teacher_id], "TEACHING_ASSIGNED", "Phân công giảng dạy mới",
+                f"Bạn được phân công dạy môn {subject.subject_name} tại lớp {cls.class_name}.",
+                "/teacher/classes",
+            )
         assignment = TeacherAssignmentRepository.create(
             db=db,
             class_id=class_id,

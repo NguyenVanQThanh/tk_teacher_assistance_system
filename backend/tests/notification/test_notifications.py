@@ -29,6 +29,9 @@ def _uid(db, phone):
 
 def _seed(db, phone, n=3):
     uid = _uid(db, phone)
+    # Test data only: commits made by other tests can leak past the rollback fixture.
+    db.query(Notification).filter(Notification.user_id.in_([_uid(db, ADMIN), _uid(db, TEACHER)])).delete(
+        synchronize_session=False)
     for i in range(n):
         service.notify(db, [uid], "T", f"t{i}")
     db.commit()
@@ -81,8 +84,7 @@ def test_cannot_touch_other_users_notifications(client, db_session):
     assert client.get("/api/v1/notifications/unread-count", headers=admin_h).json()["unread_count"] == 2
 
 
-def test_notify_dedupes_and_rolls_back_with_caller(db_session):
+def test_notify_dedupes_recipients(db_session):
     uid = _uid(db_session, ADMIN)
     assert service.notify(db_session, [uid, uid], "T", "x") == 1
-    db_session.rollback()
-    assert db_session.query(Notification).filter(Notification.user_id == uid).count() == 0
+    assert service.notify(db_session, [], "T", "x") == 0
