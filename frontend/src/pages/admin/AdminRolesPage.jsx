@@ -63,127 +63,6 @@ const ROLE_VISUAL_MAP = {
   },
 };
 
-const FALLBACK_ROLES = [
-  {
-    id: 'admin',
-    code: 'admin',
-    name: 'Quản trị viên',
-    description: 'Toàn quyền quản trị hệ thống',
-    memberCount: 16,
-    icon: Shield,
-    iconBg: '#F3ECFF',
-    iconColor: '#4D308D',
-    status: 'active',
-    isSystem: true,
-  },
-  {
-    id: 'head_teacher',
-    code: 'head_teacher',
-    name: 'Tổ trưởng chuyên môn',
-    description: 'Duyệt giáo án, giám sát bộ môn',
-    memberCount: 14,
-    icon: ShieldCheck,
-    iconBg: '#EDE9FE',
-    iconColor: '#6D28D9',
-    status: 'active',
-    isSystem: true,
-  },
-  {
-    id: 'subject_teacher',
-    code: 'subject_teacher',
-    name: 'Giáo viên bộ môn',
-    description: 'Lớp phụ trách, Chấm bài & Soạn đề',
-    memberCount: 112,
-    icon: UserCheck,
-    iconBg: '#F3ECFF',
-    iconColor: '#4D308D',
-    status: 'active',
-    isSystem: true,
-  },
-  {
-    id: 'academic_staff',
-    code: 'academic_staff',
-    name: 'Giáo vụ đào tạo',
-    description: 'Hồ sơ học sinh & Điểm danh lớp',
-    memberCount: 6,
-    icon: BookOpen,
-    iconBg: '#FEF3C7',
-    iconColor: '#D97706',
-    status: 'active',
-    isSystem: true,
-  },
-  {
-    id: 'student_parent',
-    code: 'student_parent',
-    name: 'Học sinh & Phụ huynh',
-    description: 'Học tập trực tuyến, Nộp bài tập',
-    memberCount: 2450,
-    icon: GraduationCap,
-    iconBg: '#E6F8EE',
-    iconColor: '#059669',
-    status: 'active',
-    isSystem: true,
-  },
-];
-
-const FALLBACK_PERMISSIONS = {
-  subject_teacher: {
-    view_schedule: true,
-    create_class: false,
-    assign_teaching: false,
-    ai_exercise: true,
-    auto_grade: true,
-    publish_exam: true,
-    edit_score_closed: false,
-    view_students: true,
-    edit_transcript: false,
-  },
-  admin: {
-    view_schedule: true,
-    create_class: true,
-    assign_teaching: true,
-    ai_exercise: true,
-    auto_grade: true,
-    publish_exam: true,
-    edit_score_closed: true,
-    view_students: true,
-    edit_transcript: true,
-  },
-  head_teacher: {
-    view_schedule: true,
-    create_class: false,
-    assign_teaching: true,
-    ai_exercise: true,
-    auto_grade: true,
-    publish_exam: true,
-    edit_score_closed: true,
-    view_students: true,
-    edit_transcript: false,
-  },
-  academic_staff: {
-    view_schedule: true,
-    create_class: true,
-    assign_teaching: false,
-    ai_exercise: false,
-    auto_grade: false,
-    publish_exam: false,
-    edit_score_closed: false,
-    view_students: true,
-    edit_transcript: true,
-  },
-  student_parent: {
-    view_schedule: true,
-    create_class: false,
-    assign_teaching: false,
-    ai_exercise: false,
-    auto_grade: false,
-    publish_exam: false,
-    edit_score_closed: false,
-    view_students: false,
-    edit_transcript: false,
-  },
-};
-
 const mapApiRoleToUi = (roleDto) => {
   const code = roleDto.code || roleDto.id;
   const visual = ROLE_VISUAL_MAP[code];
@@ -272,13 +151,14 @@ export default function AdminRolesPage() {
     }, 3500);
   };
 
-  // Roles list with initial fallback so UI renders immediately
-  const [roles, setRoles] = useState(FALLBACK_ROLES);
-
-  // Permission groups with permissions state for the currently active role
-  const [permissionsState, setPermissionsState] = useState(FALLBACK_PERMISSIONS);
+  // Roles and permissions come only from the server; no fabricated defaults are ever shown.
+  const [roles, setRoles] = useState([]);
+  const [permissionsState, setPermissionsState] = useState({});
+  const [isLoadingRoles, setIsLoadingRoles] = useState(true);
+  const [rolesLoadError, setRolesLoadError] = useState(false);
 
   const fetchRoles = useCallback(async () => {
+    setIsLoadingRoles(true);
     try {
       const res = await adminRolesApi.getRoles();
       if (res && Array.isArray(res.roles) && res.roles.length > 0) {
@@ -294,8 +174,12 @@ export default function AdminRolesPage() {
           ...res.permissions_matrix,
         }));
       }
+      setRolesLoadError(false);
     } catch (err) {
       console.error('Failed to load RBAC roles and permissions:', err);
+      setRolesLoadError(true);
+    } finally {
+      setIsLoadingRoles(false);
     }
   }, []);
 
@@ -471,7 +355,8 @@ export default function AdminRolesPage() {
 
   // Save changes handler
   const handleSaveChanges = async () => {
-    if (!activeRole || isSaving) return;
+    // Never save before the real matrix has been loaded from the server.
+    if (!activeRole || isSaving || rolesLoadError || !permissionsState[activeRoleId]) return;
     setIsSaving(true);
     try {
       const payloadPerms = permissionsState[activeRoleId] || {};
@@ -570,6 +455,32 @@ export default function AdminRolesPage() {
       setIsExporting(false);
     }
   };
+
+  if (isLoadingRoles || rolesLoadError || !activeRole) {
+    return (
+      <div className="admin-roles-page-container">
+        <section className="roles-page-header">
+          <div className="roles-header-title-block">
+            <h1 className="roles-page-title">Phân quyền & Vai trò</h1>
+            <p className="roles-page-subtitle">
+              {isLoadingRoles
+                ? 'Đang tải dữ liệu phân quyền...'
+                : (rolesLoadError
+                  ? 'Không thể tải dữ liệu phân quyền từ máy chủ. Các thay đổi đã bị vô hiệu hóa để tránh ghi đè dữ liệu thật.'
+                  : 'Chưa có vai trò nào.')}
+            </p>
+          </div>
+          {!isLoadingRoles && (
+            <div className="roles-header-actions">
+              <button type="button" className="btn-roles-add" onClick={fetchRoles}>
+                <span>Thử lại</span>
+              </button>
+            </div>
+          )}
+        </section>
+      </div>
+    );
+  }
 
   return (
     <div className="admin-roles-page-container">
