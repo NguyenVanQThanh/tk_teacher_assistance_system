@@ -104,6 +104,7 @@ from app.modules.exercise.routers.teacher_dashboard import router as teacher_das
 from app.modules.monitoring.collector import collector
 from app.modules.monitoring.middleware import monitoring_middleware, static_cache_middleware
 from app.modules.monitoring.router import router as monitoring_router
+from app.modules.notification.routers.notifications import router as notifications_router
 
 
 # ---------------------------------------------------------------------------
@@ -331,6 +332,7 @@ app.include_router(student_dashboard_router)
 app.include_router(teacher_schedule_router)
 app.include_router(teacher_dashboard_router)
 app.include_router(monitoring_router)
+app.include_router(notifications_router)
 
 # Serve question images from BE storage (path configurable via .env, see app/core/config.py).
 # Both mounts stay unconditional: the SGK figures are local static data loaded from
