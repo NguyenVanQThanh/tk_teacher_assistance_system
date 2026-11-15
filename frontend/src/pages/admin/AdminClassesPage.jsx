@@ -420,9 +420,14 @@ export default function AdminClassesPage() {
     }
     try {
       const normalizedYear = (editClassForm.schoolYear || '').replace(/\s+/g, '');
+      // Reject an invalid school year instead of silently dropping it and reporting success.
+      if (normalizedYear && !/^\d{4}-\d{4}$/.test(normalizedYear)) {
+        toast.error('Niên khóa không hợp lệ. Vui lòng nhập theo dạng YYYY-YYYY, ví dụ 2024-2025.');
+        return;
+      }
       await classesApi.updateClass(editClassForm.id, {
         class_name: editClassForm.name.trim(),
-        school_year: /^\d{4}-\d{4}$/.test(normalizedYear) ? normalizedYear : undefined,
+        ...(normalizedYear ? { school_year: normalizedYear } : {}),
         homeroom_teacher_id: editClassForm.homeroomTeacherId || null,
         status: editClassForm.status || 'ACTIVE',
       });
@@ -632,9 +637,21 @@ export default function AdminClassesPage() {
         return;
       }
 
+      const failed = toAdd
+        .map((cand, i) => ({ cand, result: results[i] }))
+        .filter(({ result }) => result.status === 'rejected');
+      await Promise.all([fetchStudentsForClass(selectedClass.id), fetchClassesAndTeachers()]);
+      if (failed.length > 0) {
+        // Keep the modal open with only the failed students selected so the admin can retry or fix them.
+        setSelectedCandidateIds(failed.map(({ cand }) => cand.id));
+        const names = failed.map(({ cand }) => cand.name || cand.id).join(', ');
+        const reason = failed[0].result.reason;
+        const detail = reason?.response?.data?.detail?.message || reason?.response?.data?.detail || reason?.message || '';
+        toast.error(`Đã thêm ${succeeded} học sinh, ${failed.length} học sinh thất bại: ${names}. ${detail}`.trim());
+        return;
+      }
       setSelectedCandidateIds([]);
       setIsAddStudentToClassModalOpen(false);
-      await Promise.all([fetchStudentsForClass(selectedClass.id), fetchClassesAndTeachers()]);
       showToast(`Đã thêm thành công ${succeeded} học sinh vào lớp ${selectedClass.name}!`);
     } catch (err) {
       const errMsg = err.response?.data?.detail?.message || err.response?.data?.detail || err.message || 'Lỗi khi ghi danh học sinh.';
