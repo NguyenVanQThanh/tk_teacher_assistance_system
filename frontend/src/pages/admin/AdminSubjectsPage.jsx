@@ -2,14 +2,15 @@
 // Description: Admin page to assign the head of each subject department (head sees department-wide resources).
 // Created At: 2026-11-13
 // Created By: AI Agent
-// Updated At: 2026-11-13
+// Updated At: 2026-11-15
 // Updated By: AI Agent
 
 import React, { useCallback, useEffect, useState } from 'react';
 import { subjectsApi } from '../../services/api';
+import { getErrorMessage } from '../../utils/errorMessages';
 
 const errorText = (err) =>
-  err?.response?.data?.detail?.message || err?.response?.data?.detail || 'Không thể cập nhật tổ trưởng bộ môn.';
+  getErrorMessage(err, 'Không thể cập nhật tổ trưởng bộ môn.');
 
 export default function AdminSubjectsPage() {
   const [subjects, setSubjects] = useState([]);

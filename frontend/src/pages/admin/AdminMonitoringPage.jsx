@@ -139,7 +139,7 @@ function alertText(alert) {
   if (alert.type === 'error_rate') {
     return `Tỷ lệ lỗi ${formatPercent(alert.value)} vượt ngưỡng ${formatPercent(alert.threshold)}.`;
   }
-  return alert.message || 'Cảnh báo hệ thống';
+  return 'Cảnh báo hệ thống';
 }
 
 function StatusBadge({ code }) {
@@ -845,7 +845,7 @@ export default function AdminMonitoringPage() {
                   >
                     {alert?.severity === 'critical' ? 'Critical' : 'Warning'}
                   </span>
-                  <span title={alert?.message || ''}>{alertText(alert)}</span>
+                  <span>{alertText(alert)}</span>
                 </li>
               ))}
             </ul>

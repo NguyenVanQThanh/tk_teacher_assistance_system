@@ -42,6 +42,7 @@ import { classesApi, adminUsersApi } from '../../services/api';
 import './AdminClassesPage.css';
 import confirmDialog from '../../components/common/confirmDialog';
 import toast from '../../components/common/toast';
+import { getErrorMessage } from '../../utils/errorMessages';
 
 const AVATAR_PALETTE = [
   { avatarBg: '#EDE9FE', avatarColor: '#5B32A8' },
@@ -435,7 +436,7 @@ export default function AdminClassesPage() {
       setIsEditModalOpen(false);
       showToast(`Đã cập nhật thông tin lớp ${editClassForm.name.trim()} thành công!`);
     } catch (err) {
-      const errMsg = err.response?.data?.detail?.message || err.response?.data?.detail || err.message || 'Lỗi khi cập nhật lớp học.';
+      const errMsg = getErrorMessage(err, 'Lỗi khi cập nhật lớp học.');
       toast.error(errMsg);
     }
   };
@@ -450,7 +451,7 @@ export default function AdminClassesPage() {
       await fetchClassesAndTeachers();
       showToast(`Lớp ${cls.name} đã được lưu trữ (Soft Delete).`);
     } catch (err) {
-      const errMsg = err.response?.data?.detail?.message || err.response?.data?.detail || err.message || 'Lỗi khi xóa mềm lớp học.';
+      const errMsg = getErrorMessage(err, 'Lỗi khi xóa mềm lớp học.');
       toast.error(errMsg);
     }
   };
@@ -632,7 +633,7 @@ export default function AdminClassesPage() {
       const succeeded = results.filter(r => r.status === 'fulfilled').length;
       if (succeeded === 0) {
         const firstErr = results[0]?.reason;
-        const msg = firstErr?.response?.data?.detail?.message || firstErr?.response?.data?.detail || firstErr?.message || 'Không thể thêm học sinh vào lớp.';
+        const msg = getErrorMessage(firstErr, 'Không thể thêm học sinh vào lớp.');
         toast.error(msg);
         return;
       }
@@ -654,7 +655,7 @@ export default function AdminClassesPage() {
       setIsAddStudentToClassModalOpen(false);
       showToast(`Đã thêm thành công ${succeeded} học sinh vào lớp ${selectedClass.name}!`);
     } catch (err) {
-      const errMsg = err.response?.data?.detail?.message || err.response?.data?.detail || err.message || 'Lỗi khi ghi danh học sinh.';
+      const errMsg = getErrorMessage(err, 'Lỗi khi ghi danh học sinh.');
       toast.error(errMsg);
     }
   };
@@ -701,7 +702,7 @@ export default function AdminClassesPage() {
       await Promise.all([fetchStudentsForClass(selectedClass.id), fetchClassesAndTeachers()]);
       showToast(`Đã tạo và thêm học sinh ${createdName} vào lớp ${selectedClass.name}. Thông tin phụ huynh, email, địa chỉ và ghi chú chưa được lưu lên máy chủ.`);
     } catch (err) {
-      const errMsg = err.response?.data?.detail?.message || err.response?.data?.detail || err.message || 'Lỗi khi tạo và ghi danh học sinh.';
+      const errMsg = getErrorMessage(err, 'Lỗi khi tạo và ghi danh học sinh.');
       toast.error(errMsg);
     }
   };
@@ -729,7 +730,7 @@ export default function AdminClassesPage() {
           : `Đã nhập danh sách học sinh từ tập tin ${fileLabel} vào lớp ${selectedClass.name}${suffixErr}!`
       );
     } catch (err) {
-      const errMsg = err.response?.data?.detail?.message || err.response?.data?.detail || err.message || 'Lỗi khi nhập danh sách học sinh từ tập tin.';
+      const errMsg = getErrorMessage(err, 'Lỗi khi nhập danh sách học sinh từ tập tin.');
       toast.error(errMsg);
     }
   };
@@ -788,7 +789,7 @@ export default function AdminClassesPage() {
       setEditingStudent(null);
       showToast(`Đã cập nhật họ tên, email, ngày sinh và số điện thoại của ${editStudentForm.name}. Giới tính, phụ huynh, điểm TB và xếp loại chưa được lưu lên máy chủ.`);
     } catch (err) {
-      const errMsg = err.response?.data?.detail?.message || err.response?.data?.detail || err.message || 'Lỗi khi cập nhật thông tin học sinh.';
+      const errMsg = getErrorMessage(err, 'Lỗi khi cập nhật thông tin học sinh.');
       toast.error(errMsg);
     }
   };
@@ -807,7 +808,7 @@ export default function AdminClassesPage() {
       setIsAssignModalOpen(false);
       showToast(`Đã phân công ${matched?.fullName || 'giáo viên'} làm GVCN lớp ${selectedClass.name}!`);
     } catch (err) {
-      const errMsg = err.response?.data?.detail?.message || err.response?.data?.detail || err.message || 'Lỗi khi phân công giáo viên chủ nhiệm.';
+      const errMsg = getErrorMessage(err, 'Lỗi khi phân công giáo viên chủ nhiệm.');
       toast.error(errMsg);
     }
   };
@@ -842,7 +843,7 @@ export default function AdminClassesPage() {
         teacher: ''
       });
     } catch (err) {
-      const errMsg = err.response?.data?.detail?.message || err.response?.data?.detail || err.message || 'Lỗi khi tạo lớp học mới.';
+      const errMsg = getErrorMessage(err, 'Lỗi khi tạo lớp học mới.');
       toast.error(errMsg);
     }
   };
@@ -854,7 +855,7 @@ export default function AdminClassesPage() {
       setIsExportModalOpen(false);
       showToast('Đã xuất và tải xuống tập tin danh sách lớp học (.csv).');
     } catch (err) {
-      const errMsg = err.response?.data?.detail?.message || err.response?.data?.detail || err.message || 'Không thể xuất danh sách lớp học.';
+      const errMsg = getErrorMessage(err, 'Không thể xuất danh sách lớp học.');
       toast.error(errMsg);
     }
   };

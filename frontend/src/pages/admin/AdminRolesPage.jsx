@@ -2,8 +2,8 @@
 // Description: Comprehensive Roles & Permissions management screen for Admin portal with master-detail layout, module grouping, and interactive toggle matrix.
 // Created At: 2026-09-19
 // Created By: Tam Khang
-// Updated At: 2026-11-14
-// Updated By: Tam Khang
+// Updated At: 2026-11-15
+// Updated By: AI Agent
 
 import React, { useState, useEffect, useCallback } from 'react';
 import { 
@@ -24,6 +24,7 @@ import {
 } from 'lucide-react';
 import { adminRolesApi, adminUsersApi } from '../../services/api';
 import './AdminRolesPage.css';
+import { getErrorMessage } from '../../utils/errorMessages';
 
 const ROLE_VISUAL_MAP = {
   admin: {
@@ -370,7 +371,7 @@ export default function AdminRolesPage() {
       showToast(`Đã lưu cập nhật ma trận phân quyền cho vai trò "${activeRole.name}"!`);
     } catch (err) {
       console.error('Failed to update role permissions:', err);
-      const errMsg = err.response?.data?.detail?.message || err.message || 'Lỗi khi lưu phân quyền.';
+      const errMsg = getErrorMessage(err, 'Lỗi khi lưu phân quyền.');
       showToast(`Lỗi: ${errMsg}`);
     } finally {
       setIsSaving(false);
@@ -404,7 +405,7 @@ export default function AdminRolesPage() {
       setNewRole({ name: '', code: '', description: '', cloneFrom: 'subject_teacher' });
     } catch (err) {
       console.error('Failed to create role:', err);
-      const errMsg = err.response?.data?.detail?.message || err.message || 'Không thể tạo vai trò mới.';
+      const errMsg = getErrorMessage(err, 'Không thể tạo vai trò mới.');
       showToast(`Lỗi: ${errMsg}`);
     } finally {
       setIsCreatingRole(false);
@@ -429,7 +430,7 @@ export default function AdminRolesPage() {
       await fetchRoles();
     } catch (err) {
       console.error('Failed to assign user to role:', err);
-      const errMsg = err.response?.data?.detail?.message || err.message || 'Không thể gán người dùng.';
+      const errMsg = getErrorMessage(err, 'Không thể gán người dùng.');
       showToast(`Lỗi: ${errMsg}`);
     } finally {
       setIsAssigningUser(false);
@@ -449,7 +450,7 @@ export default function AdminRolesPage() {
       showToast('Đã tải xuống ma trận phân quyền RBAC thành công!');
     } catch (err) {
       console.error('Failed to export RBAC matrix:', err);
-      const errMsg = err.response?.data?.detail?.message || err.message || 'Không thể xuất cấu hình phân quyền.';
+      const errMsg = getErrorMessage(err, 'Không thể xuất cấu hình phân quyền.');
       showToast(`Lỗi: ${errMsg}`);
     } finally {
       setIsExporting(false);

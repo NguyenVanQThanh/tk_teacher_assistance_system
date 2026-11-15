@@ -27,6 +27,7 @@ import {
 import { adminDashboardApi, adminUsersApi } from '../../services/api';
 import './AdminDashboard.css';
 import toast from '../../components/common/toast';
+import { getErrorMessage } from '../../utils/errorMessages';
 
 export default function AdminDashboard() {
   const [timeframe, setTimeframe] = useState('week'); // 'week' | 'month'
@@ -229,7 +230,7 @@ export default function AdminDashboard() {
       });
       fetchDashboardData();
     } catch (err) {
-      const errMsg = err.response?.data?.detail?.message || err.response?.data?.detail || err.message || 'Lỗi khi tạo tài khoản.';
+      const errMsg = getErrorMessage(err, 'Lỗi khi tạo tài khoản.');
       toast.error(errMsg);
     }
   };
