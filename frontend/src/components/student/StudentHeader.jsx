@@ -8,7 +8,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { 
   Menu, 
-  Bell, 
   HelpCircle, 
   User, 
   LogOut, 
@@ -19,31 +18,22 @@ import {
 } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
-import NotificationDropdown from '../common/NotificationDropdown';
+import NotificationBell from '../common/NotificationBell';
 import TeacherProfileModal from '../teacher/TeacherProfileModal';
-import QADiscussionModal from './QADiscussionModal';
-import AllNotificationsModal from '../common/AllNotificationsModal';
 import './StudentHeader.css';
 
 export default function StudentHeader({ onToggleSidebar }) {
   const { user, logout } = useAuth();
   const [showDropdown, setShowDropdown] = useState(false);
-  const [showNotifications, setShowNotifications] = useState(false);
   const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
   const [modalInitialTab, setModalInitialTab] = useState('profile');
-  const [isQAModalOpen, setIsQAModalOpen] = useState(false);
-  const [isAllNotifsModalOpen, setIsAllNotifsModalOpen] = useState(false);
   const navigate = useNavigate();
 
-  const notifRef = useRef(null);
   const userMenuRef = useRef(null);
 
   // Close popups when clicking outside
   useEffect(() => {
     function handleClickOutside(event) {
-      if (notifRef.current && !notifRef.current.contains(event.target)) {
-        setShowNotifications(false);
-      }
       if (userMenuRef.current && !userMenuRef.current.contains(event.target)) {
         setShowDropdown(false);
       }
@@ -82,34 +72,7 @@ export default function StudentHeader({ onToggleSidebar }) {
 
         <div className="header-right">
           {/* Notifications Popover */}
-          <div style={{ position: 'relative' }} ref={notifRef}>
-            <button 
-              className="icon-btn notif-btn" 
-              onClick={() => {
-                setShowNotifications(!showNotifications);
-                setShowDropdown(false);
-              }} 
-              aria-label="Notifications"
-            >
-              <Bell size={19} />
-              <span className="notif-dot"></span>
-            </button>
-
-            {showNotifications && (
-              <div style={{
-                position: 'absolute',
-                top: '46px',
-                right: '-40px',
-                zIndex: 100
-              }}>
-                <NotificationDropdown 
-                  onClose={() => setShowNotifications(false)} 
-                  onOpenQA={() => setIsQAModalOpen(true)}
-                  onOpenAllNotifs={() => setIsAllNotifsModalOpen(true)}
-                />
-              </div>
-            )}
-          </div>
+          <NotificationBell />
 
           <button className="icon-btn" aria-label="Help" title="Trợ giúp & Hướng dẫn">
             <HelpCircle size={19} />
@@ -121,7 +84,6 @@ export default function StudentHeader({ onToggleSidebar }) {
               className="user-profile-btn" 
               onClick={() => {
                 setShowDropdown(!showDropdown);
-                setShowNotifications(false);
               }}
               title={displayName}
             >
@@ -210,22 +172,6 @@ export default function StudentHeader({ onToggleSidebar }) {
         isOpen={isProfileModalOpen}
         onClose={() => setIsProfileModalOpen(false)}
         defaultTab={modalInitialTab}
-      />
-
-      {/* Q&A Discussion Modal */}
-      <QADiscussionModal 
-        isOpen={isQAModalOpen} 
-        onClose={() => setIsQAModalOpen(false)} 
-      />
-
-      {/* Fullscreen All Notifications Modal Dialog */}
-      <AllNotificationsModal
-        isOpen={isAllNotifsModalOpen}
-        onClose={() => setIsAllNotifsModalOpen(false)}
-        onOpenQA={() => {
-          setIsAllNotifsModalOpen(false);
-          setIsQAModalOpen(true);
-        }}
       />
     </>
   );
