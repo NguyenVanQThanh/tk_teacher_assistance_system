@@ -6,17 +6,15 @@
 // Updated By: Tam Khang
 
 import React, { useState, useRef, useEffect } from 'react';
+import NotificationBell from '../common/NotificationBell';
 import { Outlet, useNavigate, useLocation } from 'react-router-dom';
 import { 
   Home, 
   HelpCircle, 
-  Bell, 
   User, 
   Menu, 
   X, 
   LogOut, 
-  CheckCircle2, 
-  ShieldAlert,
   ChevronDown,
   Search
 } from 'lucide-react';
@@ -29,17 +27,12 @@ export default function AdminLayout() {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
-  const [showNotifMenu, setShowNotifMenu] = useState(false);
   const [showUserMenu, setShowUserMenu] = useState(false);
-  const notifRef = useRef(null);
   const userRef = useRef(null);
 
   // Close dropdowns on outside click
   useEffect(() => {
     function handleClickOutside(event) {
-      if (notifRef.current && !notifRef.current.contains(event.target)) {
-        setShowNotifMenu(false);
-      }
       if (userRef.current && !userRef.current.contains(event.target)) {
         setShowUserMenu(false);
       }
@@ -52,23 +45,6 @@ export default function AdminLayout() {
     await logout();
     navigate('/login');
   };
-
-  const notifications = [
-    {
-      id: 1,
-      title: '5 lần đăng nhập thất bại liên tiếp',
-      time: '10 phút trước',
-      type: 'warning',
-      desc: 'IP: 118.70.12.91 đã bị tạm khóa bảo mật 30 phút'
-    },
-    {
-      id: 2,
-      title: 'Yêu cầu cấp tài khoản mới',
-      time: '15 phút trước',
-      type: 'info',
-      desc: 'ThS. Lê Nguyên yêu cầu tài khoản Giảng viên'
-    }
-  ];
 
   const location = useLocation();
   const getSubBreadcrumb = () => {
@@ -156,46 +132,7 @@ export default function AdminLayout() {
               <HelpCircle size={20} strokeWidth={1.8} />
             </button>
 
-            {/* Notifications Button & Dropdown */}
-            <div className="admin-dropdown-wrapper" ref={notifRef}>
-              <button 
-                type="button" 
-                className="admin-icon-btn" 
-                title="Thông báo hệ thống"
-                onClick={() => setShowNotifMenu(prev => !prev)}
-              >
-                <Bell size={20} strokeWidth={1.8} />
-                <span className="admin-notif-badge">2</span>
-              </button>
-
-              {showNotifMenu && (
-                <div className="admin-dropdown-menu admin-notif-menu">
-                  <div className="admin-dropdown-header">
-                    <span className="admin-dropdown-title">Thông báo hệ thống</span>
-                    <span className="admin-notif-count-pill">2 mới</span>
-                  </div>
-                  <div className="admin-notif-list">
-                    {notifications.map(item => (
-                      <div key={item.id} className="admin-notif-item">
-                        <div className={`admin-notif-icon-box ${item.type}`}>
-                          {item.type === 'warning' ? <ShieldAlert size={16} /> : <CheckCircle2 size={16} />}
-                        </div>
-                        <div className="admin-notif-details">
-                          <p className="admin-notif-title">{item.title}</p>
-                          <p className="admin-notif-desc">{item.desc}</p>
-                          <span className="admin-notif-time">{item.time}</span>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                  <div className="admin-dropdown-footer">
-                    <button type="button" onClick={() => setShowNotifMenu(false)}>
-                      Đánh dấu tất cả đã đọc
-                    </button>
-                  </div>
-                </div>
-              )}
-            </div>
+            <NotificationBell />
 
             {/* Admin User Profile Capsule */}
             <div className="admin-dropdown-wrapper" ref={userRef}>

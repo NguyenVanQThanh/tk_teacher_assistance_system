@@ -688,6 +688,13 @@ export const teacherApi = {
   },
 };
 
+export const notificationApi = {
+  list: async (params = {}) => (await api.get('/api/v1/notifications', { params })).data,
+  unreadCount: async () => (await api.get('/api/v1/notifications/unread-count')).data,
+  markRead: async (id) => (await api.post(`/api/v1/notifications/${id}/read`)).data,
+  markAllRead: async () => (await api.post('/api/v1/notifications/read-all')).data,
+};
+
 export default api;
 
 
