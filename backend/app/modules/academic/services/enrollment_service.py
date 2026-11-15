@@ -2,10 +2,11 @@
 # Description: Service layer for Enrollment business logic — validation of class, student role/status, duplicate checks, RBAC Data Scoping, CRUD, and restore operations.
 # Created At: 2026-07-23
 # Created By: Tam Khang
-# Updated At: 2026-11-14
-# Updated By: Tam Khang
+# Updated At: 2026-11-15
+# Updated By: AI Agent
 
 import logging
+import re
 import secrets
 from typing import List, Optional
 from uuid import UUID
@@ -62,6 +63,16 @@ class EnrollmentService:
                     }
                 )
 
+            phone = re.sub(r"[\s\-\.]", "", (phone or "").strip())
+            if not re.fullmatch(r"0\d{9}", phone):
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail={
+                        "code": "ERR-ACAD-INVALID_PHONE",
+                        "message": "Phone number is required: exactly 10 digits starting with 0."
+                    }
+                )
+
             # Age validation (Student >= 16)
             if birthday:
                 today = date.today()
@@ -90,7 +101,7 @@ class EnrollmentService:
             new_user = User(
                 user_id=new_user_id,
                 full_name=student_name.strip(),
-                phone=phone or None,
+                phone=phone,
                 birthday=b_date_val,
                 role_id=student_role.role_id,
                 # Random unknown password; admin must issue a reset to enable login.
@@ -530,9 +541,12 @@ class EnrollmentService:
                 )
                 return
 
-            if phone and not re.match(r"^0\d{9,10}$", phone):
+            if not phone or not re.match(r"^0\d{9}$", phone):
                 errors.append(
-                    StudentImportErrorItem(row=row_num, message=f"Invalid phone number '{raw_phone}'.")
+                    StudentImportErrorItem(
+                        row=row_num,
+                        message=f"Phone number is required: 10 digits starting with 0 (got '{raw_phone or ''}').",
+                    )
                 )
                 return
 

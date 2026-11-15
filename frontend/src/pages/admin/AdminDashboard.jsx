@@ -2,8 +2,8 @@
 // Description: Master Admin Dashboard with system operations metrics, server status, LMS traffic chart, approval queue, and audit logs connected to Backend API.
 // Created At: 2026-09-19
 // Created By: Tam Khang
-// Updated At: 2026-11-14
-// Updated By: Tam Khang
+// Updated At: 2026-11-15
+// Updated By: AI Agent
 
 import React, { useState, useEffect, useCallback } from 'react';
 import { 
@@ -203,12 +203,17 @@ export default function AdminDashboard() {
       toast.error('Vui lòng nhập đầy đủ họ tên và email.');
       return;
     }
+    const cleanPhone = (newUser.phone || '').replace(/[\s.-]/g, '');
+    if (!/^0\d{9}$/.test(cleanPhone)) {
+      toast.error('Số điện thoại phải gồm đúng 10 chữ số và bắt đầu bằng số 0 (ví dụ: 0912345678).');
+      return;
+    }
     try {
       const mappedRole = newUser.role === 'HomeroomTeacher' ? 'Teacher' : newUser.role;
       await adminUsersApi.createUser({
         full_name: newUser.fullName.trim(),
         email: newUser.email.trim(),
-        phone: newUser.phone ? newUser.phone.trim() : null,
+        phone: cleanPhone,
         role: mappedRole,
         department: newUser.department || null,
         is_active_immediately: true
@@ -635,9 +640,10 @@ export default function AdminDashboard() {
               </div>
 
               <div className="admin-form-group">
-                <label className="admin-form-label">Số điện thoại</label>
-                <input 
-                  type="text" 
+                <label className="admin-form-label">Số điện thoại *</label>
+                <input
+                  type="text"
+                  required
                   className="admin-form-input" 
                   placeholder="0912345678" 
                   value={newUser.phone}

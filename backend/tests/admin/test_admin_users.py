@@ -2,8 +2,8 @@
 # Description: Integration tests for Admin User Management (F-ADMIN-01), validation rules, auto default password, and soft delete.
 # Created At: 2026-09-29
 # Created By: Tam Khang
-# Updated At: 2026-09-29
-# Updated By: Tam Khang
+# Updated At: 2026-11-15
+# Updated By: AI Agent
 
 import uuid
 import pytest
@@ -78,6 +78,7 @@ class TestAdminUserValidation:
             json={
                 "full_name": "Time Traveler",
                 "role": "Student",
+                "phone": "0912345601",
                 "birthday": "2030-01-01"
             },
             headers=headers
@@ -85,6 +86,16 @@ class TestAdminUserValidation:
         assert resp.status_code == status.HTTP_422_UNPROCESSABLE_ENTITY
         detail = resp.json()["detail"]
         assert "Birthday cannot be in the future" in detail["message"]
+
+    def test_create_user_missing_phone_fails(self, client: TestClient):
+        """Verify phone is required when creating a user."""
+        token = get_admin_token(client)
+        resp = client.post(
+            "/api/v1/admin/users",
+            json={"full_name": "No Phone User", "role": "Student", "birthday": "2006-01-01"},
+            headers={"Authorization": f"Bearer {token}"},
+        )
+        assert resp.status_code == status.HTTP_422_UNPROCESSABLE_ENTITY
 
     def test_create_user_invalid_phone_fails(self, client: TestClient):
         """Verify invalid Vietnamese phone format is rejected with 422."""

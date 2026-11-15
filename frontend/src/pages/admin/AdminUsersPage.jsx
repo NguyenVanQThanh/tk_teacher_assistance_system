@@ -2,8 +2,8 @@
 // Description: Comprehensive User Management screen for Admin portal with strict name, phone, and DD/MM/YYYY date validations, auto-generated unique identifier code, backend connection, and original layout aesthetics.
 // Created At: 2026-09-19
 // Created By: Tam Khang
-// Updated At: 2026-11-14
-// Updated By: Tam Khang
+// Updated At: 2026-11-15
+// Updated By: AI Agent
 
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { 
@@ -2288,7 +2288,7 @@ export default function AdminUsersPage() {
                 <h5>Lưu ý định dạng:</h5>
                 <ul>
                   <li>Hỗ trợ tệp .xlsx hoặc .csv (tối đa 2MB, 1000 dòng). Cột nhận theo tên tiêu đề.</li>
-                  <li>Cột: full_name, role (Student/Teacher), phone, email, birthday, code, class_name, department. Bắt buộc: Họ và tên, Vai trò.</li>
+                  <li>Cột: full_name, role (Student/Teacher), phone, email, birthday, code, class_name, department. Bắt buộc: Họ và tên, Vai trò, Số điện thoại.</li>
                   <li>Mật khẩu được tạo tự động; danh sách mật khẩu tạm thời hiển thị bên dưới sau khi nhập.</li>
                 </ul>
                 <button type="button" data-testid="download-template-xlsx" onClick={() => handleDownloadTemplate('xlsx')}>Tải mẫu .xlsx</button>{' '}

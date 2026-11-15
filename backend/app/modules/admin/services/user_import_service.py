@@ -5,7 +5,7 @@ Description: Bulk user import for the Admin portal. Parses CSV/XLSX by header na
     downloadable template files.
 Created At: 2026-11-14
 Created By: AI Agent
-Updated At: 2026-11-14
+Updated At: 2026-11-15
 Updated By: AI Agent
 """
 import csv
@@ -170,7 +170,7 @@ class UserImportService:
         return AdminUserCreateRequest(
             full_name=row.get("full_name", ""),
             role=role,
-            phone=_normalize_phone(row["phone"]) if row.get("phone") else None,
+            phone=_normalize_phone(row["phone"]) if row.get("phone") else "",
             email=row.get("email") or None,
             birthday=_parse_birthday(row.get("birthday", "")),
             code=row.get("code") or None,
