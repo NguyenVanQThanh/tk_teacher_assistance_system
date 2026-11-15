@@ -2,8 +2,8 @@
 // Description: Teacher Classes overview page with real-time database sync, academic year filtering defaulting to current year, refresh button, and dynamic cards.
 // Created At: 2026-08-31
 // Created By: Tam Khang
-// Updated At: 2026-10-28
-// Updated By: Tam Khang
+// Updated At: 2026-11-15
+// Updated By: AI Agent
 
 import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { 
@@ -23,6 +23,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { classesApi, subjectsApi } from '../../services/api';
 import { useAuth } from '../../context/AuthContext';
 import './TeacherClassesPage.css';
+import { getErrorMessage } from '../../utils/errorMessages';
 
 /**
  * Calculates current academic school year (e.g., '2026-2027' for October 2026).
@@ -172,7 +173,7 @@ export default function TeacherClassesPage() {
 
       setClassesList(enrichedClasses);
     } catch (err) {
-      setError(err.response?.data?.detail?.message || 'Không thể tải danh sách lớp học.');
+      setError(getErrorMessage(err, 'Không thể tải danh sách lớp học.'));
     } finally {
       if (isInitial) setLoading(false);
       setIsRefreshing(false);

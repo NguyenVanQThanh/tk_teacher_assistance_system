@@ -2,8 +2,8 @@
 // Description: Modal component for assigning an exercise from the repository to multiple target classes simultaneously.
 // Created At: 2026-09-12
 // Created By: Tam Khang
-// Updated At: 2026-09-27
-// Updated By: Tam Khang
+// Updated At: 2026-11-15
+// Updated By: AI Agent
 
 import React, { useState, useEffect } from 'react';
 import { 
@@ -19,6 +19,7 @@ import {
 } from 'lucide-react';
 import { classesApi, assignmentsApi } from '../../services/api';
 import './AssignExerciseModal.css';
+import { getErrorMessage } from '../../utils/errorMessages';
 
 export default function AssignExerciseModal({ isOpen, onClose, exercise, onAssignedSuccess }) {
   const [classes, setClasses] = useState([]);
@@ -60,7 +61,7 @@ export default function AssignExerciseModal({ isOpen, onClose, exercise, onAssig
           setSelectedClassIds(classList.map(c => c.class_id));
         }
       } catch (err) {
-        setErrorMessage(err.response?.data?.detail?.message || 'Không thể tải danh sách lớp học.');
+        setErrorMessage(getErrorMessage(err, 'Không thể tải danh sách lớp học.'));
       } finally {
         setLoadingClasses(false);
       }
@@ -138,8 +139,7 @@ export default function AssignExerciseModal({ isOpen, onClose, exercise, onAssig
         setErrorMessage(firstErr);
       }
     } catch (err) {
-      const detail = err.response?.data?.detail;
-      const msg = typeof detail === 'string' ? detail : detail?.message || 'Không thể giao bài tập. Vui lòng thử lại.';
+      const msg = getErrorMessage(err, 'Không thể giao bài tập. Vui lòng thử lại.');
       setErrorMessage(msg);
     } finally {
       setSubmitting(false);

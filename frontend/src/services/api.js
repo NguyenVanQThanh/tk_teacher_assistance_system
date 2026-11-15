@@ -2,10 +2,11 @@
 // Description: Centralized Axios API client configuration with token management, academic, assignment, admin, and schedule service APIs.
 // Created At: 2026-08-30
 // Created By: Tam Khang
-// Updated At: 2026-11-14
-// Updated By: Tam Khang
+// Updated At: 2026-11-15
+// Updated By: AI Agent
 
 import axios from 'axios';
+import { getErrorMessage } from '../utils/errorMessages';
 
 const api = axios.create({
   baseURL: import.meta.env.VITE_API_BASE_URL || '',
@@ -274,7 +275,7 @@ export const assignmentsApi = {
         .catch((err) => ({
           classId: cid,
           success: false,
-          error: err.response?.data?.detail?.message || err.message,
+          error: getErrorMessage(err),
           code: err.response?.data?.detail?.code,
         }))
     );

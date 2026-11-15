@@ -2,12 +2,13 @@
 // Description: Popup listing exercises of a class grade with checkboxes; assigns the selected ones to the class without leaving the page.
 // Created At: 2026-11-12
 // Created By: AI Agent
-// Updated At: 2026-11-12
+// Updated At: 2026-11-15
 // Updated By: AI Agent
 
 import React, { useEffect, useState } from 'react';
 import { X, Loader2 } from 'lucide-react';
 import { exercisesApi, assignmentsApi } from '../../services/api';
+import { getErrorMessage } from '../../utils/errorMessages';
 
 const S = {
   overlay: { position: 'fixed', inset: 0, zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16, background: 'rgba(51,43,79,0.45)', fontFamily: 'Be Vietnam Pro, sans-serif' },
@@ -40,7 +41,7 @@ export default function AssignExercisesDialog({ isOpen, onClose, classId, grade,
         const all = Array.isArray(res) ? res : res?.items || [];
         setItems(all.filter((ex) => !grade || gradeOf(ex) === String(grade)));
       })
-      .catch((e) => setError(e.response?.data?.detail?.message || 'Could not load exercises.'))
+      .catch((e) => setError(getErrorMessage(e, 'Không thể tải danh sách bài tập.')))
       .finally(() => setLoading(false));
   }, [isOpen, grade]);
 
@@ -59,8 +60,7 @@ export default function AssignExercisesDialog({ isOpen, onClose, classId, grade,
     setSaving(false);
     const failed = results.filter((r) => r.status === 'rejected');
     if (failed.length) {
-      const d = failed[0].reason?.response?.data?.detail;
-      setError(`${failed.length} assignment(s) failed: ${typeof d === 'string' ? d : d?.message || 'unknown error'}`);
+      setError(`${failed.length} bài tập giao không thành công: ${getErrorMessage(failed[0].reason, 'Lỗi không xác định.')}`);
     }
     if (failed.length < picked.length) onAssigned?.();
     if (!failed.length) onClose();
@@ -70,12 +70,12 @@ export default function AssignExercisesDialog({ isOpen, onClose, classId, grade,
     <div style={S.overlay} onClick={onClose} role="presentation">
       <div style={S.box} role="dialog" aria-modal="true" onClick={(e) => e.stopPropagation()}>
         <div style={S.head}>
-          <h3 style={{ margin: 0, color: '#332B4F' }}>Assign exercises (Grade {grade})</h3>
-          <button type="button" aria-label="Close" onClick={onClose} style={{ border: 'none', background: 'none', cursor: 'pointer' }}><X size={18} /></button>
+          <h3 style={{ margin: 0, color: '#332B4F' }}>Giao bài tập (Khối {grade})</h3>
+          <button type="button" aria-label="Đóng" onClick={onClose} style={{ border: 'none', background: 'none', cursor: 'pointer' }}><X size={18} /></button>
         </div>
         <div style={S.list}>
-          {loading && <div style={{ padding: 16 }}><Loader2 size={16} /> Loading...</div>}
-          {!loading && !items.length && <div style={{ padding: 16, color: '#6E6784' }}>No exercises for this grade.</div>}
+          {loading && <div style={{ padding: 16 }}><Loader2 size={16} /> Đang tải...</div>}
+          {!loading && !items.length && <div style={{ padding: 16, color: '#6E6784' }}>Không có bài tập nào cho khối này.</div>}
           {items.map((ex) => (
             <label key={ex.exercise_id} style={S.item}>
               <input type="checkbox" checked={picked.includes(ex.exercise_id)} onChange={() => toggle(ex.exercise_id)} />
@@ -85,9 +85,9 @@ export default function AssignExercisesDialog({ isOpen, onClose, classId, grade,
         </div>
         {error && <p role="alert" style={{ color: '#B91C1C', fontSize: 13 }}>{error}</p>}
         <div style={S.row}>
-          <button type="button" style={S.cancel} onClick={onClose}>Cancel</button>
+          <button type="button" style={S.cancel} onClick={onClose}>Hủy</button>
           <button type="button" style={{ ...S.ok, opacity: picked.length && !saving ? 1 : 0.5 }} disabled={!picked.length || saving} onClick={submit}>
-            {saving ? 'Assigning...' : `Assign (${picked.length})`}
+            {saving ? 'Đang giao...' : `Giao bài (${picked.length})`}
           </button>
         </div>
       </div>

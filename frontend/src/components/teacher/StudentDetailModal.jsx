@@ -1253,7 +1253,7 @@ export default function StudentDetailModal({
                       const res = await attemptsApi.getAttempts({ student_id: student.id });
                       downloadGradebookCsv(Array.isArray(res) ? res : res?.items || [], `gradebook_${student.code || student.id}.csv`);
                     } catch (e) {
-                      toast.error('Could not export the gradebook.');
+                      toast.error('Không thể xuất sổ điểm.');
                     }
                   }}
                   title="Export gradebook (all subjects) as CSV"

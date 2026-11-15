@@ -2,8 +2,8 @@
 // Description: Detailed class view connected to backend APIs with student roster, assigned exercises tab, search, deletion, and full-screen student analytics modal.
 // Created At: 2026-08-31
 // Created By: Tam Khang
-// Updated At: 2026-09-12
-// Updated By: Tam Khang
+// Updated At: 2026-11-15
+// Updated By: AI Agent
 
 import React, { useState, useEffect, useMemo } from 'react';
 import { 
@@ -33,6 +33,7 @@ import confirmDialog from '../../components/common/confirmDialog';
 import AssignExercisesDialog from '../../components/teacher/AssignExercisesDialog';
 import { downloadGradebookCsv } from '../../utils/gradebookExport';
 import toast from '../../components/common/toast';
+import { getErrorMessage } from '../../utils/errorMessages';
 
 export default function TeacherClassDetailPage() {
   const { classId } = useParams();
@@ -62,7 +63,7 @@ export default function TeacherClassDetailPage() {
       );
       downloadGradebookCsv(items, `gradebook_${classInfo?.name || classId}.csv`);
     } catch (err) {
-      toast.error('Could not export the gradebook.');
+      toast.error('Không thể xuất sổ điểm.');
     }
   };
 
@@ -156,7 +157,7 @@ export default function TeacherClassDetailPage() {
         setAssignments([]);
       }
     } catch (err) {
-      setError(err.response?.data?.detail?.message || 'Không thể tải thông tin lớp học.');
+      setError(getErrorMessage(err, 'Không thể tải thông tin lớp học.'));
     } finally {
       setLoading(false);
     }
@@ -200,8 +201,7 @@ export default function TeacherClassDetailPage() {
       setTimeout(() => setActionSuccess(''), 3000);
       setAssignments((prev) => prev.filter((a) => a.assignment_id !== assignmentId));
     } catch (err) {
-      const detail = err.response?.data?.detail;
-      const msg = typeof detail === 'string' ? detail : detail?.message || 'Không thể hủy bài tập.';
+      const msg = getErrorMessage(err, 'Không thể hủy bài tập.');
       toast.error(msg);
     } finally {
       setDeletingId(null);

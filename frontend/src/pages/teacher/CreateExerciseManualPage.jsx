@@ -2,8 +2,8 @@
 // Description: Full-page direct exercise creation layout connected to backend APIs (Multiple Choice, True/False, Short Answer).
 // Created At: 2026-08-30
 // Created By: Tam Khang
-// Updated At: 2026-10-06
-// Updated By: Tam Khang
+// Updated At: 2026-11-15
+// Updated By: AI Agent
 
 import React, { useState, useEffect } from 'react';
 import { 
@@ -20,6 +20,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { exercisesApi, subjectsApi } from '../../services/api';
 import './CreateExerciseManualPage.css';
 import toast from '../../components/common/toast';
+import { getErrorMessage } from '../../utils/errorMessages';
 
 export default function CreateExerciseManualPage() {
   const [showSidebar, setShowSidebar] = useState(true);
@@ -303,7 +304,7 @@ export default function CreateExerciseManualPage() {
       toast.success(`Đã tạo thành công bài tập "${title}" với ${totalValidQuestions} câu hỏi!`);
       navigate('/teacher/exercises');
     } catch (err) {
-      setErrorMsg(err.response?.data?.detail?.message || 'Có lỗi xảy ra khi lưu bài tập.');
+      setErrorMsg(getErrorMessage(err, 'Có lỗi xảy ra khi lưu bài tập.'));
       window.scrollTo({ top: 0, behavior: 'smooth' });
     } finally {
       setIsSaving(false);
