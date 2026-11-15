@@ -2,8 +2,8 @@
 // Description: Multi-method Exercise Creation Modal supporting Direct Manual, Multi-file Upload (Question File & Separate Answer Key), and AI Generation.
 // Created At: 2026-08-30
 // Created By: Tam Khang
-// Updated At: 2026-09-13
-// Updated By: Tam Khang
+// Updated At: 2026-11-15
+// Updated By: AI Agent
 
 import React, { useState, useRef, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
@@ -30,6 +30,7 @@ import {
 } from 'lucide-react';
 import { exercisesApi, subjectsApi, documentsApi } from '../../services/api';
 import './CreateExerciseModal.css';
+import { getErrorMessage } from '../../utils/errorMessages';
 
 const formatFileSize = (bytes) => {
   if (!bytes || bytes <= 0) return '0 KB';
@@ -346,7 +347,7 @@ export default function CreateExerciseModal({ isOpen, onClose, onCreateSuccess }
       setAiFailed(Boolean(isGenFailed));
       const msg = isGenFailed
         ? 'AI không thể tạo bài tập từ nội dung đã chọn. Hệ thống không tự động thay thế bằng nội dung khác. Thầy/Cô vui lòng thử lại.'
-        : (detail && typeof detail === 'object' ? detail.message : detail) || err.message || 'Tạo bài tập AI thất bại. Vui lòng thử lại.';
+        : getErrorMessage(err, 'Tạo bài tập AI thất bại. Vui lòng thử lại.');
       setErrorMsg(msg);
       showToast(msg, 'error', 'Bài tập tạo sinh gặp lỗi');
     } finally {
@@ -467,7 +468,7 @@ export default function CreateExerciseModal({ isOpen, onClose, onCreateSuccess }
       handleClose();
     } catch (err) {
       if (progressTimer) clearInterval(progressTimer);
-      setErrorMsg(err.response?.data?.detail?.message || 'Có lỗi xảy ra khi tải lên và bóc tách câu hỏi từ file.');
+      setErrorMsg(getErrorMessage(err, 'Có lỗi xảy ra khi tải lên và bóc tách câu hỏi từ file.'));
     } finally {
       if (progressTimer) clearInterval(progressTimer);
       setIsSubmitting(false);

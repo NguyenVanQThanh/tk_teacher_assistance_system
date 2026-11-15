@@ -2,7 +2,7 @@
 // Description: Interactive modal for previewing exercise content, real questions, options, and assigning to classes.
 // Created At: 2026-08-30
 // Created By: Tam Khang
-// Updated At: 2026-11-12
+// Updated At: 2026-11-15
 // Updated By: AI Agent
 
 import React, { useState, useEffect, useRef } from 'react';
@@ -23,7 +23,8 @@ import MathRenderer from '../common/MathRenderer';
 import { getQuestionItems } from '../../utils/questionItems';
 import QuestionMedia from './QuestionMedia';
 import './ExercisePreviewModal.css';
-import toast from '../../components/common/toast';
+import toast from '../../components/common/toast';
+import { getErrorMessage } from '../../utils/errorMessages';
 
 export default function ExercisePreviewModal({ exercise, isOpen, onClose }) {
   const [exerciseDetail, setExerciseDetail] = useState(null);
@@ -200,8 +201,7 @@ export default function ExercisePreviewModal({ exercise, isOpen, onClose }) {
         setAssignError(firstError);
       }
     } catch (err) {
-      const detail = err.response?.data?.detail;
-      const msg = typeof detail === 'string' ? detail : detail?.message || 'Không thể giao bài tập.';
+      const msg = getErrorMessage(err, 'Không thể giao bài tập.');
       setAssignError(msg);
     } finally {
       setAssigning(false);

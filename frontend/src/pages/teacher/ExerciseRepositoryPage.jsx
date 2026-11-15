@@ -2,8 +2,8 @@
 // Description: Teacher Exercise Repository Page connected to backend RESTful APIs with Cursor-based Keyset Pagination, centered delete confirmation modal, and toast notifications.
 // Created At: 2026-08-30
 // Created By: Tam Khang
-// Updated At: 2026-11-11
-// Updated By: Tam Khang
+// Updated At: 2026-11-15
+// Updated By: AI Agent
 
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { 
@@ -28,6 +28,7 @@ const EditExerciseModal = React.lazy(() => import('../../components/documents/Ed
 import AssignExerciseModal from '../../components/exercises/AssignExerciseModal';
 import { exercisesApi, subjectsApi } from '../../services/api';
 import './ExerciseRepositoryPage.css';
+import { getErrorMessage } from '../../utils/errorMessages';
 
 const PAGE_SIZE = 6;
 
@@ -188,7 +189,7 @@ export default function ExerciseRepositoryPage() {
 
       setExercises(enriched);
     } catch (err) {
-      setError(err.response?.data?.detail?.message || 'Không thể tải danh sách bài tập.');
+      setError(getErrorMessage(err, 'Không thể tải danh sách bài tập.'));
     } finally {
       setLoading(false);
     }

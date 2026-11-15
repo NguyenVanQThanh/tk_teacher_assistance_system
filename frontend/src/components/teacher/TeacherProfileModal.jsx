@@ -2,8 +2,8 @@
 // Description: Interactive Modal for Teacher Profile Information and Security / Password Management.
 // Created At: 2026-09-01
 // Created By: Tam Khang
-// Updated At: 2026-11-11
-// Updated By: Tam Khang
+// Updated At: 2026-11-15
+// Updated By: AI Agent
 
 import React, { useState, useEffect } from 'react';
 import { 
@@ -32,7 +32,8 @@ import { useAuth } from '../../context/AuthContext';
 import { authApi } from '../../services/api';
 import { getTeacherProfileDefaults } from '../../utils/teacherSubjectHelper';
 import './TeacherProfileModal.css';
-import toast from '../../components/common/toast';
+import toast from '../../components/common/toast';
+import { getErrorMessage } from '../../utils/errorMessages';
 
 export default function TeacherProfileModal({ 
   isOpen, 
@@ -140,8 +141,7 @@ export default function TeacherProfileModal({
       setToastMessage('Đã đổi mật khẩu thành công! Vui lòng sử dụng mật khẩu mới cho lần đăng nhập sau.');
       setTimeout(() => setToastMessage(null), 3500);
     } catch (err) {
-      const detail = err.response?.data?.detail;
-      const msg = typeof detail === 'string' ? detail : detail?.message || 'Không thể đổi mật khẩu. Vui lòng kiểm tra lại mật khẩu hiện tại.';
+      const msg = getErrorMessage(err, 'Không thể đổi mật khẩu. Vui lòng kiểm tra lại mật khẩu hiện tại.');
       setErrorMessage(msg);
     } finally {
       setIsChangingPass(false);

@@ -2,8 +2,8 @@
 // Description: Teacher Profile and Security Settings page with tabs for Personal Information and Password/Security Management.
 // Created At: 2026-09-01
 // Created By: Tam Khang
-// Updated At: 2026-11-11
-// Updated By: Tam Khang
+// Updated At: 2026-11-15
+// Updated By: AI Agent
 
 import React, { useState, useEffect } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
@@ -35,7 +35,8 @@ import { useAuth } from '../../context/AuthContext';
 import { getTeacherProfileDefaults } from '../../utils/teacherSubjectHelper';
 import { authApi } from '../../services/api';
 import './TeacherProfilePage.css';
-import toast from '../../components/common/toast';
+import toast from '../../components/common/toast';
+import { getErrorMessage } from '../../utils/errorMessages';
 
 export default function TeacherProfilePage() {
   const { user } = useAuth();
@@ -191,8 +192,7 @@ export default function TeacherProfilePage() {
       setToastMessage('Đã đổi mật khẩu thành công! Vui lòng sử dụng mật khẩu mới cho lần đăng nhập tiếp theo.');
       setTimeout(() => setToastMessage(null), 4000);
     } catch (err) {
-      const detail = err.response?.data?.detail;
-      const msg = typeof detail === 'string' ? detail : detail?.message || 'Không thể đổi mật khẩu. Vui lòng kiểm tra lại mật khẩu hiện tại.';
+      const msg = getErrorMessage(err, 'Không thể đổi mật khẩu. Vui lòng kiểm tra lại mật khẩu hiện tại.');
       setErrorMessage(msg);
     } finally {
       setIsChangingPass(false);
