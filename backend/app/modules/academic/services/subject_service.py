@@ -12,6 +12,7 @@ from uuid import UUID
 from fastapi import HTTPException, status
 from sqlalchemy import func
 from sqlalchemy.orm import Session
+from app.modules.notification import service as notification_service
 
 from models.models import User
 from app.modules.academic.models import Subject
@@ -150,7 +151,14 @@ class SubjectService:
         subject = SubjectService.get_subject(db, subject_id)
         if teacher_id is not None:
             SubjectService._validate_head_teacher(db, subject.subject_id, teacher_id)
+        changed = teacher_id is not None and subject.head_teacher_id != teacher_id
         subject.head_teacher_id = teacher_id
+        if changed:
+            notification_service.notify(
+                db, [teacher_id], "SUBJECT_HEAD_ASSIGNED", "Được bổ nhiệm tổ trưởng chuyên môn",
+                f"Bạn được bổ nhiệm làm tổ trưởng chuyên môn môn {subject.subject_name}.",
+                "/teacher",
+            )
         db.commit()
         db.refresh(subject)
         logger.info(

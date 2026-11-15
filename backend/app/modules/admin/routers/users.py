@@ -29,6 +29,7 @@ from app.modules.admin.schemas import (
 )
 from app.modules.admin.repository import AdminUserRepository
 from app.modules.admin.services.user_service import AdminUserService
+from app.modules.notification import service as notification_service
 from app.modules.admin.services.user_import_service import UserImportService, MAX_IMPORT_BYTES
 
 router = APIRouter(prefix="/api/v1/admin/users", tags=["admin-users"])
@@ -153,7 +154,8 @@ def download_import_template(fmt: str = Query("xlsx", alias="format", pattern="^
 def import_users_excel(
     file: UploadFile = File(...),
     dry_run: bool = Query(False),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
 ):
     """
     Imports users from a .csv or .xlsx file (columns matched by header name).
@@ -162,7 +164,17 @@ def import_users_excel(
     """
     contents = file.file.read(MAX_IMPORT_BYTES + 1)
     with IMPORT_SEMAPHORE:
-        return UserImportService.import_users(db, file.filename or "", contents, dry_run=dry_run)
+        result = UserImportService.import_users(db, file.filename or "", contents, dry_run=dry_run)
+    if not dry_run and result["successful_count"] > 0:
+        # Per-row commits already happened; tell the other admins the outcome.
+        notification_service.notify(
+            db, [a for a in notification_service.admin_user_ids(db) if a != current_user.user_id],
+            "USER_IMPORT_FINISHED", "Nhập danh sách người dùng hoàn tất",
+            f"{current_user.full_name} đã nhập {result['successful_count']} tài khoản, "
+            f"{result['failed_count']} dòng lỗi.", "/admin/users",
+        )
+        db.commit()
+    return result
 
 
 @router.get("/generate-code", dependencies=[Depends(require_admin_privilege)])

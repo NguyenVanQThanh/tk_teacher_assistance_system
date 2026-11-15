@@ -12,12 +12,21 @@ from fastapi import APIRouter, Depends, Query, status
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
+from app.modules.notification import service as notification_service
 from models.models import User
 from app.modules.auth.dependencies import require_perm, get_current_user
 from app.modules.academic.schemas import ClassCreate, ClassUpdate, ClassOut, AcademicStatusEnum
 from app.modules.academic.services.class_service import ClassService, matches_grade, normalize_grade
 
 router = APIRouter(prefix="/api/v1/classes", tags=["academic-classes"])
+
+
+def _notify_homeroom(db: Session, teacher_id: UUID, class_name: str) -> None:
+    """Stage a notification for a newly assigned homeroom teacher (committed by the caller)."""
+    notification_service.notify(
+        db, [teacher_id], "HOMEROOM_ASSIGNED", "Được phân công chủ nhiệm",
+        f"Bạn được phân công làm giáo viên chủ nhiệm lớp {class_name}.", "/teacher/homeroom",
+    )
 
 
 @router.post(
@@ -52,6 +61,8 @@ def create_class(
             update_specialization="specialization" in payload.model_fields_set,
             commit=False,
         )
+        if payload.homeroom_teacher_id:
+            _notify_homeroom(db, payload.homeroom_teacher_id, cls.class_name)
         db.commit()
     except Exception:
         db.rollback()
@@ -189,6 +200,7 @@ def update_class(
     """
     update_homeroom = "homeroom_teacher_id" in payload.model_fields_set
     status_val = payload.status.value if payload.status else None
+    old_homeroom = ClassService.get_class(db, class_id).homeroom_teacher_id
     try:
         cls = ClassService.update_class(
             db=db,
@@ -209,6 +221,8 @@ def update_class(
             update_specialization="specialization" in payload.model_fields_set,
             commit=False,
         )
+        if update_homeroom and payload.homeroom_teacher_id and payload.homeroom_teacher_id != old_homeroom:
+            _notify_homeroom(db, payload.homeroom_teacher_id, cls.class_name)
         db.commit()
     except Exception:
         db.rollback()

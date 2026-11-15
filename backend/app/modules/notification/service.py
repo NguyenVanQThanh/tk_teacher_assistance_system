@@ -13,7 +13,7 @@ from uuid import UUID
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
-from models.models import Notification
+from models.models import Notification, Role, StudentClass, User
 
 logger = logging.getLogger("notification")
 
@@ -29,14 +29,39 @@ def notify(
     """Stage notifications for the given users in the caller's transaction (flush, no commit).
 
     The caller owns the commit, so a rolled-back business action leaves no notification.
-    Duplicate recipients are collapsed. Returns the number of rows staged.
+    Duplicate recipients are collapsed. Never raises: failures are logged and 0 is returned.
     """
     unique = list(dict.fromkeys(user_ids))
-    for uid in unique:
-        db.add(Notification(user_id=uid, type=type, title=title, body=body, link=link))
-    if unique:
-        db.flush()
+    if not unique:
+        return 0
+    try:
+        # SAVEPOINT: a failing insert rolls back only the notifications, never the caller's data.
+        with db.begin_nested():
+            for uid in unique:
+                db.add(Notification(user_id=uid, type=type, title=title, body=body, link=link))
+    except Exception:
+        logger.exception("Failed to stage notifications of type %s", type)
+        return 0
     return len(unique)
+
+
+def class_student_ids(db: Session, class_id: UUID) -> List[UUID]:
+    """Active students enrolled (ACTIVE) in the class."""
+    rows = db.query(StudentClass.student_id).filter(
+        StudentClass.class_id == class_id, StudentClass.status == "ACTIVE"
+    ).all()
+    return [r[0] for r in rows]
+
+
+def admin_user_ids(db: Session) -> List[UUID]:
+    """Active users holding the Admin role."""
+    rows = (
+        db.query(User.user_id)
+        .join(Role, Role.role_id == User.role_id)
+        .filter(func.lower(Role.name) == "admin", func.upper(User.status) == "ACTIVE")
+        .all()
+    )
+    return [r[0] for r in rows]
 
 
 def _own(db: Session, user_id: UUID):
