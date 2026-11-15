@@ -3,7 +3,7 @@ File Name: models.py
 Description: Database models definition for tables (User, Role, Permission, Exercise, Question, ScheduleNote, etc.).
 Created At: 2026-07-04
 Created By: Tam Khang
-Updated At: 2026-11-13
+Updated At: 2026-11-15
 Updated By: AI Agent
 """
 import uuid
@@ -24,7 +24,7 @@ class User(Base):
     __tablename__ = 'users'
 
     user_id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    phone = Column(String(20), unique=True, nullable=True)
+    phone = Column(String(20), unique=True, nullable=False)
     email = Column(String(100), unique=True, nullable=True)
     password_hash = Column(String(255), nullable=False)
     full_name = Column(String(100), nullable=False)

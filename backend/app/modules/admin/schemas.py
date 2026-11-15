@@ -2,8 +2,8 @@
 # Description: Pydantic schemas for Admin User Management module.
 # Created At: 2026-09-29
 # Created By: Tam Khang
-# Updated At: 2026-09-30
-# Updated By: Tam Khang
+# Updated At: 2026-11-15
+# Updated By: AI Agent
 
 import re
 from datetime import date, datetime
@@ -52,7 +52,7 @@ class AdminUserCreateRequest(BaseModel):
     """
     full_name: str = Field(..., min_length=2, max_length=100, description="Full name of the user")
     role: str = Field(..., description="Role of the user: Student, Teacher, or Admin")
-    phone: Optional[str] = Field(None, description="Vietnamese 10-digit phone number starting with 0")
+    phone: str = Field(..., description="Vietnamese 10-digit phone number starting with 0")
     email: Optional[str] = Field(None, description="Valid email address")
     birthday: Optional[date] = Field(None, description="Birth date (YYYY-MM-DD)")
     code: Optional[str] = Field(None, max_length=50, description="Identifier code (e.g. HS2024108, GV2024042)")
@@ -78,12 +78,10 @@ class AdminUserCreateRequest(BaseModel):
 
     @field_validator("phone")
     @classmethod
-    def validate_phone(cls, v: Optional[str]) -> Optional[str]:
-        if not v:
-            return None
-        cleaned = re.sub(r"[\s\-\.]", "", v.strip())
+    def validate_phone(cls, v: str) -> str:
+        cleaned = re.sub(r"[\s\-\.]", "", (v or "").strip())
         if not cleaned:
-            return None
+            raise ValueError("Phone number is required.")
         if not re.match(r"^0\d{9}$", cleaned):
             raise ValueError("Phone number must contain exactly 10 digits starting with 0 (e.g. 0912345678) and no letters or special characters.")
         return cleaned

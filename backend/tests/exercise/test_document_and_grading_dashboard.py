@@ -104,6 +104,7 @@ def test_age_validation_on_enrollment(client: TestClient):
         headers=headers,
         json={
             "student_name": "Hoc Sinh Tre Em",
+            "phone": "0912345602",
             "birthday": young_birthday,
             "student_code": f"HS_YOUNG_{uuid.uuid4().hex[:4]}"
         }

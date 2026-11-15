@@ -2,8 +2,8 @@
 // Description: Comprehensive School & Class Management screen for Admin portal with capacity indicators and teacher assignment.
 // Created At: 2026-09-19
 // Created By: Tam Khang
-// Updated At: 2026-11-14
-// Updated By: Tam Khang
+// Updated At: 2026-11-15
+// Updated By: AI Agent
 
 import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import { 
@@ -667,13 +667,18 @@ export default function AdminClassesPage() {
       return;
     }
 
+    const cleanPhone = (newStudentForm.phone || newStudentForm.parentPhone || '').replace(/\D/g, '');
+    if (!/^0\d{9}$/.test(cleanPhone)) {
+      toast.error('Số điện thoại phải gồm đúng 10 chữ số và bắt đầu bằng số 0 (ví dụ: 0912345678).');
+      return;
+    }
+
     try {
-      const cleanPhone = (newStudentForm.phone || newStudentForm.parentPhone || '').replace(/\D/g, '');
       await classesApi.enrollStudent(selectedClass.id, {
         student_name: newStudentForm.name.trim(),
         birthday: convertDateToISO(newStudentForm.birthDate),
         gender: newStudentForm.gender || 'Nam',
-        phone: cleanPhone || null,
+        phone: cleanPhone,
         student_code: newStudentForm.code.trim() || null,
         status: 'ACTIVE',
       });
@@ -2224,7 +2229,7 @@ export default function AdminClassesPage() {
                     </div>
 
                     <div className="form-field-group">
-                      <label className="field-label">Số điện thoại học sinh</label>
+                      <label className="field-label">Số điện thoại học sinh <span className="text-red">*</span></label>
                       <input 
                         type="tel" 
                         placeholder="VD: 0912.345.678"
