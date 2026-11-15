@@ -457,3 +457,24 @@ class ApiRequestMetric(Base):
         Index('ix_api_request_metrics_status_code', 'status_code'),
     )
 
+
+
+class Notification(Base):
+    """In-app notification addressed to exactly one user. Soft delete via status=DELETED."""
+    __tablename__ = 'notifications'
+
+    notification_id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    user_id = Column(UUID(as_uuid=True), ForeignKey('users.user_id'), nullable=False)
+    type = Column(String(50), nullable=False)
+    title = Column(String(255), nullable=False)
+    body = Column(Text, nullable=True)
+    link = Column(String(255), nullable=True)  # Frontend route to open on click
+    is_read = Column(Boolean, nullable=False, default=False)
+    read_at = Column(DateTime(timezone=True), nullable=True)
+    status = Column(String(20), nullable=False, default='ACTIVE')  # ACTIVE | DELETED (Strict Soft Delete)
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+
+    __table_args__ = (
+        CheckConstraint("status IN ('ACTIVE', 'DELETED')", name='chk_notification_status'),
+        Index('ix_notifications_user_status_created', 'user_id', 'status', 'created_at'),
+    )
