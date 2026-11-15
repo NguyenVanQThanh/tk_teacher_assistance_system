@@ -13,6 +13,7 @@ from uuid import UUID
 
 from fastapi import HTTPException, status
 from sqlalchemy.orm import Session
+from app.modules.notification import service as notification_service
 
 from models.models import User, Role
 from app.modules.academic.models import StudentClass
@@ -195,6 +196,11 @@ class EnrollmentService:
             if gender and str(gender).strip():
                 EnrollmentService.save_student_metadata(
                     db, student_id=student_id, gender=str(gender).strip(), commit=False
+                )
+            if (status_val or "ACTIVE") == "ACTIVE":
+                notification_service.notify(
+                    db, [student_id], "ENROLLED", "Đã được thêm vào lớp",
+                    f"Bạn đã được thêm vào lớp {cls.class_name}.", "/student",
                 )
             db.commit()
             db.refresh(enrollment)

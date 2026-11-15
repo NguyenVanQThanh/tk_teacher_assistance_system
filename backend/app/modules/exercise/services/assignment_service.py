@@ -14,6 +14,7 @@ from uuid import UUID
 from fastapi import HTTPException, status
 from sqlalchemy.orm import Session, joinedload
 from sqlalchemy import or_
+from app.modules.notification import service as notification_service
 
 from models.models import User, Class, Exercise, TeacherSubject, ClassAssignment, Subject, StudentClass, StudentExerciseAttempt, Question
 from app.modules.exercise.schemas import (
@@ -252,6 +253,13 @@ class AssignmentService:
             exercise_id=payload.exercise_id,
             assigned_by=current_user.user_id,
             due_at=payload.due_at
+        )
+        # Staged in the same transaction; repo.create commits both together.
+        notification_service.notify(
+            self.db, notification_service.class_student_ids(self.db, class_id),
+            "ASSIGNMENT_CREATED", "Bài tập mới",
+            f"Lớp {class_obj.class_name} có bài tập mới: {exercise.title}.",
+            "/student/exercises",
         )
         return self.repo.create(assignment)
 
@@ -623,7 +631,15 @@ class AssignmentService:
                 detail={"code": "ERR-EXE-ASSIGNMENT_NOT_FOUND", "message": "Class assignment record not found."}
             )
         self._ensure_can_manage(assignment, current_user)
+        was_released = assignment.answers_released_at is not None
         assignment.answers_released_at = datetime.now(timezone.utc) if released else None
+        if released and not was_released:
+            title = assignment.exercise.title if assignment.exercise else "bài tập"
+            notification_service.notify(
+                self.db, notification_service.class_student_ids(self.db, assignment.class_id),
+                "ANSWERS_RELEASED", "Đã công bố đáp án",
+                f"Giáo viên đã công bố đáp án và kết quả của {title}.", "/student/exercises",
+            )
         self.db.commit()
         self.db.refresh(assignment)
         return assignment

@@ -12,6 +12,7 @@ from typing import Any, List, Optional
 from uuid import UUID
 from fastapi import HTTPException, status
 from sqlalchemy.orm import Session
+from app.modules.notification import service as notification_service
 
 from models.models import User, Subject, Exercise, ClassAssignment, StudentClass, StudentExerciseAttempt
 from app.modules.exercise.schemas import (
@@ -474,6 +475,14 @@ class AttemptService:
         # per-attempt shuffle seed, otherwise the review order would change after a grade save.
         detailed_results = self._with_preserved_shuffle_seed(attempt.detailed_results, detailed_results)
 
+        if (payload.status or "approved") == "approved" and payload.is_published is not False:
+            # Staged before update_grade, which commits grade and notification together.
+            ex = exercise
+            notification_service.notify(
+                self.db, [attempt.student_id], "ATTEMPT_GRADED", "Bài làm đã được chấm",
+                f"Giáo viên đã chấm bài làm{': ' + ex.title if ex else ''}.",
+                "/student/exercises",
+            )
         return self.repo.update_grade(
             attempt=attempt,
             score=score,
