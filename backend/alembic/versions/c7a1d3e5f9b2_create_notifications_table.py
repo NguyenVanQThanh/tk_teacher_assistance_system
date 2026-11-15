@@ -1,7 +1,7 @@
 """create notifications table
 
 Revision ID: c7a1d3e5f9b2
-Revises: b2d4f6a8c0e1
+Revises: c3a5e7b9d1f2
 Create Date: 2026-11-15
 """
 
@@ -12,7 +12,7 @@ import sqlalchemy as sa
 
 # revision identifiers, used by Alembic.
 revision: str = 'c7a1d3e5f9b2'
-down_revision: Union[str, Sequence[str], None] = 'b2d4f6a8c0e1'
+down_revision: Union[str, Sequence[str], None] = 'c3a5e7b9d1f2'
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 
