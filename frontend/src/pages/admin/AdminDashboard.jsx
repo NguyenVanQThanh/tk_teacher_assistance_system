@@ -2,8 +2,8 @@
 // Description: Master Admin Dashboard with system operations metrics, server status, LMS traffic chart, approval queue, and audit logs connected to Backend API.
 // Created At: 2026-09-19
 // Created By: Tam Khang
-// Updated At: 2026-11-14
-// Updated By: Tam Khang
+// Updated At: 2026-11-15
+// Updated By: AI Agent
 
 import React, { useState, useEffect, useCallback } from 'react';
 import { 
@@ -27,6 +27,7 @@ import {
 import { adminDashboardApi, adminUsersApi } from '../../services/api';
 import './AdminDashboard.css';
 import toast from '../../components/common/toast';
+import { getErrorMessage } from '../../utils/errorMessages';
 
 export default function AdminDashboard() {
   const [timeframe, setTimeframe] = useState('week'); // 'week' | 'month'
@@ -224,7 +225,7 @@ export default function AdminDashboard() {
       });
       fetchDashboardData();
     } catch (err) {
-      const errMsg = err.response?.data?.detail?.message || err.response?.data?.detail || err.message || 'Lỗi khi tạo tài khoản.';
+      const errMsg = getErrorMessage(err, 'Lỗi khi tạo tài khoản.');
       toast.error(errMsg);
     }
   };

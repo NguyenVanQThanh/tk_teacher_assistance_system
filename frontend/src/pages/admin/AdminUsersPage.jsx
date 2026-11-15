@@ -2,8 +2,8 @@
 // Description: Comprehensive User Management screen for Admin portal with strict name, phone, and DD/MM/YYYY date validations, auto-generated unique identifier code, backend connection, and original layout aesthetics.
 // Created At: 2026-09-19
 // Created By: Tam Khang
-// Updated At: 2026-11-14
-// Updated By: Tam Khang
+// Updated At: 2026-11-15
+// Updated By: AI Agent
 
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { 
@@ -40,6 +40,7 @@ import { adminUsersApi, classesApi, subjectsApi } from '../../services/api';
 import { useAuth } from '../../context/AuthContext';
 import './AdminUsersPage.css';
 import confirmDialog from '../../components/common/confirmDialog';
+import { getErrorMessage } from '../../utils/errorMessages';
 
 const DEFAULT_CLASS_OPTIONS = [
   'Lớp 12A1 (Chuyên Toán)',
@@ -776,7 +777,7 @@ export default function AdminUsersPage() {
       resetNewUserForm();
       await fetchUsers();
     } catch (err) {
-      const errMsg = err.response?.data?.detail?.message || err.response?.data?.detail || err.message || 'Lỗi khi tạo người dùng.';
+      const errMsg = getErrorMessage(err, 'Lỗi khi tạo người dùng.');
       showToast(`Lỗi: ${errMsg}`);
     } finally {
       setLoading(false);
@@ -963,7 +964,7 @@ export default function AdminUsersPage() {
       showToast(`Đã lưu thay đổi cho người dùng ${selectedUser.fullName}.`);
       await fetchUsers();
     } catch (err) {
-      const errMsg = err.response?.data?.detail?.message || err.message || 'Lỗi khi cập nhật.';
+      const errMsg = getErrorMessage(err, 'Lỗi khi cập nhật.');
       showToast(`Lỗi: ${errMsg}`);
     } finally {
       setLoading(false);
@@ -1014,7 +1015,7 @@ export default function AdminUsersPage() {
       showToast(`Nhập dữ liệu hoàn tất! Thành công: ${res.successful_count}/${res.total_processed} tài khoản.`);
       await fetchUsers();
     } catch (err) {
-      const errMsg = err.response?.data?.detail?.message || 'Lỗi khi nhập file.';
+      const errMsg = getErrorMessage(err, 'Lỗi khi nhập file.');
       showToast(`Lỗi: ${errMsg}`);
     } finally {
       e.target.value = '';

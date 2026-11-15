@@ -2,8 +2,8 @@
 // Description: Comprehensive System Settings screen for Admin portal with modular use cases: General, AI Assistant, Grading, Security, Notifications, and Backup.
 // Created At: 2026-09-20
 // Created By: Tam Khang
-// Updated At: 2026-11-14
-// Updated By: Tam Khang
+// Updated At: 2026-11-15
+// Updated By: AI Agent
 
 import React, { useState, useEffect, useCallback } from 'react';
 import { 
@@ -27,6 +27,7 @@ import {
 } from 'lucide-react';
 import { adminSettingsApi } from '../../services/api';
 import './AdminSettingsPage.css';
+import { getErrorMessage } from '../../utils/errorMessages';
 
 const YEAR_VALUE_MAP = {
   '2025-2026': '2025 - 2026',
@@ -276,7 +277,7 @@ export default function AdminSettingsPage() {
       showToast('Đã lưu cấu hình cài đặt hệ thống thành công!');
     } catch (err) {
       console.error('Failed to update system settings:', err);
-      const errMsg = err.response?.data?.detail?.message || err.message || 'Không thể lưu cấu hình hệ thống.';
+      const errMsg = getErrorMessage(err, 'Không thể lưu cấu hình hệ thống.');
       showToast(`Lỗi: ${errMsg}`);
     } finally {
       setIsSaving(false);
@@ -309,7 +310,7 @@ export default function AdminSettingsPage() {
     } catch (err) {
       console.error('Failed to ping AI endpoint:', err);
       setPingStatus(null);
-      const errMsg = err.response?.data?.detail?.message || err.message || 'Không thể kết nối tới API AI.';
+      const errMsg = getErrorMessage(err, 'Không thể kết nối tới API AI.');
       showToast(`Lỗi kiểm tra API AI: ${errMsg}`);
     }
   };
@@ -335,7 +336,7 @@ export default function AdminSettingsPage() {
       showToast(`Tạo bản sao lưu "${createdSnap?.filename || 'snapshot'}" thành công!`);
     } catch (err) {
       console.error('Failed to create backup snapshot:', err);
-      const errMsg = err.response?.data?.detail?.message || err.message || 'Không thể tạo bản sao lưu.';
+      const errMsg = getErrorMessage(err, 'Không thể tạo bản sao lưu.');
       showToast(`Lỗi: ${errMsg}`);
     } finally {
       setIsCreatingBackup(false);
@@ -351,7 +352,7 @@ export default function AdminSettingsPage() {
       showToast(`Đã tải xuống bản sao lưu ${snap.filename || snap.id}!`);
     } catch (err) {
       console.error('Failed to download backup snapshot:', err);
-      const errMsg = err.response?.data?.detail?.message || err.message || 'Không thể tải xuống bản sao lưu.';
+      const errMsg = getErrorMessage(err, 'Không thể tải xuống bản sao lưu.');
       showToast(`Lỗi: ${errMsg}`);
     } finally {
       setDownloadingBackupId(null);

@@ -2,8 +2,8 @@
 // Description: Comprehensive Reports & Analytics screen for Admin portal with GPA distributions, dual spline trend charts, Bloom taxonomy donut, and early intervention alerts.
 // Created At: 2026-09-19
 // Created By: Tam Khang
-// Updated At: 2026-11-14
-// Updated By: Tam Khang
+// Updated At: 2026-11-15
+// Updated By: AI Agent
 
 import React, { useState, useEffect, useCallback } from 'react';
 import { 
@@ -23,6 +23,7 @@ import {
 } from 'lucide-react';
 import { adminReportsApi } from '../../services/api';
 import './AdminReportsPage.css';
+import { getErrorMessage } from '../../utils/errorMessages';
 
 const FALLBACK_KPIS = {
   total_exercises: 517,
@@ -293,7 +294,7 @@ export default function AdminReportsPage() {
       showToast('Đã tạo và tải xuống tài liệu báo cáo thành công!');
     } catch (err) {
       console.error('Failed to export report:', err);
-      const errMsg = err.response?.data?.detail?.message || err.message || 'Lỗi khi xuất báo cáo.';
+      const errMsg = getErrorMessage(err, 'Lỗi khi xuất báo cáo.');
       showToast(`Lỗi: ${errMsg}`);
     } finally {
       setIsExporting(false);
@@ -321,7 +322,7 @@ export default function AdminReportsPage() {
       showToast(`Đã tạo mẫu báo cáo tùy chỉnh "${createdTitle}"!`);
     } catch (err) {
       console.error('Failed to create custom report:', err);
-      const errMsg = err.response?.data?.detail?.message || err.message || 'Không thể tạo báo cáo tùy chỉnh.';
+      const errMsg = getErrorMessage(err, 'Không thể tạo báo cáo tùy chỉnh.');
       showToast(`Lỗi: ${errMsg}`);
     } finally {
       setIsCreatingCustom(false);
@@ -359,7 +360,7 @@ export default function AdminReportsPage() {
       showToast('Đã thiết lập lịch gửi email báo cáo tự động thành công!');
     } catch (err) {
       console.error('Failed to create report schedule:', err);
-      const errMsg = err.response?.data?.detail?.message || err.message || 'Không thể lưu lịch gửi báo cáo.';
+      const errMsg = getErrorMessage(err, 'Không thể lưu lịch gửi báo cáo.');
       showToast(`Lỗi: ${errMsg}`);
     } finally {
       setIsCreatingSchedule(false);
