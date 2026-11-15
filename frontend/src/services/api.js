@@ -565,6 +565,35 @@ export const adminReportsApi = {
   },
 };
 
+export const adminSettingsApi = {
+  getSettings: async () => {
+    const response = await api.get('/api/v1/admin/settings');
+    return response.data;
+  },
+  updateSettings: async (data) => {
+    const response = await api.put('/api/v1/admin/settings', data);
+    return response.data;
+  },
+  pingAi: async (data) => {
+    const response = await api.post('/api/v1/admin/settings/ai-ping', data);
+    return response.data;
+  },
+  getBackups: async () => {
+    const response = await api.get('/api/v1/admin/settings/backups');
+    return response.data;
+  },
+  createBackup: async () => {
+    const response = await api.post('/api/v1/admin/settings/backups');
+    return response.data;
+  },
+  downloadBackup: async (backupId) => {
+    const response = await api.get(`/api/v1/admin/settings/backups/${backupId}/download`, {
+      responseType: 'blob',
+    });
+    return response.data;
+  },
+};
+
 // Admin-only realtime monitoring API. The SSE stream is consumed with fetch() in
 // AdminMonitoringPage because EventSource cannot attach the Authorization header.
 export const monitoringApi = {
