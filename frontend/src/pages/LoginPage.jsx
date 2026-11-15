@@ -2,8 +2,8 @@
 // Description: Split-screen Login Page component connected to backend authentication API.
 // Created At: 2026-08-30
 // Created By: Tam Khang
-// Updated At: 2026-09-20
-// Updated By: Tam Khang
+// Updated At: 2026-11-15
+// Updated By: AI Agent
 
 import React, { useState, useEffect } from 'react';
 import { 
@@ -21,6 +21,7 @@ import {
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import usePageMeta from '../hooks/usePageMeta';
+import { getErrorMessage } from '../utils/errorMessages';
 import './LoginPage.css';
 
 export default function LoginPage() {
@@ -121,17 +122,7 @@ export default function LoginPage() {
       }, 500);
     } catch (err) {
       console.error('Login error:', err);
-      const detail = err.response?.data?.detail;
-      let msg = 'Đăng nhập thất bại. Vui lòng kiểm tra lại tài khoản hoặc mật khẩu.';
-      
-      if (typeof detail === 'string') {
-        msg = detail;
-      } else if (typeof detail === 'object' && detail?.message) {
-        msg = detail.message;
-      } else if (Array.isArray(detail) && detail[0]?.msg) {
-        msg = detail[0].msg;
-      }
-      
+      const msg = getErrorMessage(err, 'Đăng nhập thất bại. Vui lòng kiểm tra lại tài khoản hoặc mật khẩu.');
       setErrorMsg(msg);
     } finally {
       setLoading(false);

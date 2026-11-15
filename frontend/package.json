@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "test:unit": "node src/components/common/mathDocSerializer.selfcheck.mjs",
+    "test:unit": "node src/components/common/mathDocSerializer.selfcheck.mjs && node src/utils/errorMessages.selfcheck.mjs",
     "build": "vite build",
     "preview": "vite preview",
     "test:e2e": "playwright test"
