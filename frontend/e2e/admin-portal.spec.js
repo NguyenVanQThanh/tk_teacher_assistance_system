@@ -2,7 +2,7 @@
 // Description: Comprehensive Playwright end-to-end automation test suite covering all Admin Portal features.
 // Created At: 2026-10-07
 // Created By: Tam Khang
-// Updated At: 2026-10-07
+// Updated At: 2026-11-14
 // Updated By: Tam Khang
 
 import { test, expect } from '@playwright/test';
@@ -413,5 +413,345 @@ test.describe('Admin Portal End-to-End Automation Test Suite', () => {
     await page.goto('/admin');
     await page.waitForURL('**/login', { timeout: 10000 });
     expect(page.url()).toContain('/login');
+  });
+
+  // Shared helper for TC-14..TC-18: logs in as Admin and records console, page, and >=400 API errors (excluding notify).
+  async function loginAndAttachMonitors(page) {
+    const errors = { consoleErrors: [], pageErrors: [], apiErrors: [] };
+    page.on('console', (msg) => {
+      if (msg.type() === 'error') {
+        const txt = msg.text();
+        if (!txt.includes('/notify')) errors.consoleErrors.push(txt);
+      }
+    });
+    page.on('pageerror', (err) => {
+      errors.pageErrors.push(err.message);
+    });
+    page.on('response', (res) => {
+      const url = res.url();
+      if (url.includes('/api/') && !url.includes('/notify') && res.status() >= 400) {
+        errors.apiErrors.push(`${res.request().method()} ${new URL(url).pathname} -> ${res.status()}`);
+      }
+    });
+
+    await page.fill('#identifier-input', ADMIN_PHONE);
+    await page.fill('#password-input', ADMIN_PASS);
+    await page.click('button[type="submit"]');
+    await page.waitForURL('**/admin', { timeout: 10000 });
+    await page.waitForLoadState('networkidle');
+    return errors;
+  }
+
+  function assertCleanRuntime(errors) {
+    expect(errors.consoleErrors, 'Expected zero console.error logs').toEqual([]);
+    expect(errors.pageErrors, 'Expected zero uncaught page errors').toEqual([]);
+    expect(errors.apiErrors, 'Expected zero 4xx/5xx API responses').toEqual([]);
+  }
+
+  async function getAuthToken(page) {
+    return page.evaluate(() => localStorage.getItem('access_token'));
+  }
+
+  test('TC-14: Admin Routes Live API Calls, Filters & Zero Runtime/4xx/5xx Errors', async ({ page }) => {
+    const errors = await loginAndAttachMonitors(page);
+
+    // 1. /admin: toggle activity chart timeframe and inspect audit modal
+    const [chartMonthRes] = await Promise.all([
+      page.waitForResponse((r) => r.url().includes('/api/v1/admin/dashboard/activity-chart') && r.status() === 200),
+      page.getByRole('button', { name: 'Theo tháng' }).click(),
+    ]);
+    expect(chartMonthRes.ok()).toBeTruthy();
+
+    const [auditRes] = await Promise.all([
+      page.waitForResponse((r) => r.url().includes('/api/v1/admin/dashboard/audit-logs') && r.status() === 200),
+      page.getByRole('button', { name: 'Xem toàn bộ nhật ký kiểm toán' }).click(),
+    ]);
+    expect(auditRes.ok()).toBeTruthy();
+    await page.getByRole('button', { name: /Đóng/i }).first().click();
+
+    // 2. /admin/users: switch tabs & trigger grade filter API call
+    await page.goto('/admin/users');
+    await page.waitForLoadState('networkidle');
+    const [teacherTabRes] = await Promise.all([
+      page.waitForResponse((r) => r.url().includes('/api/v1/admin/users') && r.url().includes('role=teacher') && r.status() === 200),
+      page.getByRole('button', { name: /^Giáo viên/ }).click(),
+    ]);
+    expect(teacherTabRes.ok()).toBeTruthy();
+
+    await Promise.all([
+      page.waitForResponse((r) => r.url().includes('/api/v1/admin/users') && r.status() === 200),
+      page.getByRole('button', { name: /^Tất cả/ }).click(),
+    ]);
+
+    const gradeSelect = page.locator('select:has(option[value="10"])').first();
+    if (await gradeSelect.isVisible().catch(() => false)) {
+      const [gradeRes] = await Promise.all([
+        page.waitForResponse((r) => r.url().includes('/api/v1/admin/users') && r.url().includes('grade=10') && r.status() === 200),
+        gradeSelect.selectOption('10'),
+      ]);
+      expect(gradeRes.ok()).toBeTruthy();
+    }
+
+    // 3. Visit remaining Admin pages and assert clean loads
+    for (const route of ['/admin/classes', '/admin/roles', '/admin/reports', '/admin/settings']) {
+      await page.goto(route);
+      await page.waitForLoadState('networkidle');
+      await expect(page.locator('h1, h2').first()).toBeVisible();
+    }
+
+    assertCleanRuntime(errors);
+  });
+
+  test('TC-15: Classes API CRUD, DB Persistence, Detail & Soft Delete Cleanup (/admin/classes)', async ({ page, request }) => {
+    const errors = await loginAndAttachMonitors(page);
+    const authToken = await getAuthToken(page);
+    await page.goto('/admin/classes');
+    await page.waitForLoadState('networkidle');
+
+    const uniqueName = `E2E_10Z_${Date.now().toString().slice(-5)}`;
+    const updatedName = `${uniqueName}_Ed`;
+    let createdClassId = null;
+    let deletedViaUi = false;
+
+    const filterClassRow = async (name) => {
+      const searchBox = page.getByPlaceholder('Tìm theo tên lớp, mã, GVCN...');
+      await searchBox.fill(name);
+      const row = page.locator('tbody tr').filter({ hasText: name }).first();
+      await expect(row).toBeVisible();
+      return row;
+    };
+
+    try {
+      // Create class via UI -> POST /api/v1/classes
+      await page.getByRole('button', { name: 'Thêm lớp học mới' }).click();
+      await page.getByPlaceholder('Ví dụ: 10A1 - Chuyên Toán').fill(uniqueName);
+      await page.getByPlaceholder('Ví dụ: Ban Khoa học Tự nhiên').fill('Khoa hoc Tu nhien E2E');
+      const [createRes] = await Promise.all([
+        page.waitForResponse((r) => r.url().includes('/api/v1/classes') && r.request().method() === 'POST'),
+        page.getByRole('button', { name: 'Tạo lớp học' }).click(),
+      ]);
+      expect(createRes.status()).toBe(201);
+      const createdJson = await createRes.json();
+      createdClassId = createdJson.class_id;
+      expect(createdClassId).toBeTruthy();
+
+      // Reload & assert DB persistence via search filter
+      await page.reload();
+      await page.waitForLoadState('networkidle');
+      const row = await filterClassRow(uniqueName);
+
+      // Inspect class students detail -> GET /api/v1/classes/{id}/students
+      const [studentsRes] = await Promise.all([
+        page.waitForResponse((r) => r.url().includes(`/api/v1/classes/${createdClassId}/students`) && r.status() === 200),
+        row.locator('button[title="Xem chi tiết lớp học"]').click(),
+      ]);
+      expect(studentsRes.ok()).toBeTruthy();
+      await expect(page.getByText(`Thông tin Lớp học: ${uniqueName}`)).toBeVisible();
+      const closeBtn = page.getByRole('button', { name: /Đóng|Quay lại/i }).first();
+      if (await closeBtn.isVisible().catch(() => false)) {
+        await closeBtn.click();
+      } else {
+        await page.reload();
+        await page.waitForLoadState('networkidle');
+      }
+
+      // Edit class name -> PUT /api/v1/classes/{id}
+      const rowForEdit = await filterClassRow(uniqueName);
+      await rowForEdit.locator('button[title="Chỉnh sửa thông tin"]').click();
+      await page.locator('.admin-modal-body input').first().fill(updatedName);
+      const [updateRes] = await Promise.all([
+        page.waitForResponse((r) => r.url().includes(`/api/v1/classes/${createdClassId}`) && r.request().method() === 'PUT'),
+        page.getByRole('button', { name: 'Lưu thay đổi' }).click(),
+      ]);
+      expect(updateRes.status()).toBe(200);
+      const updatedJson = await updateRes.json();
+      expect(updatedJson.class_name).toBe(updatedName);
+
+      await page.reload();
+      await page.waitForLoadState('networkidle');
+      const rowForDelete = await filterClassRow(updatedName);
+
+      // Soft delete class via UI -> DELETE /api/v1/classes/{id}
+      await rowForDelete.locator('button[title="Lưu trữ lớp học (Soft Delete)"]').click();
+      const [deleteRes] = await Promise.all([
+        page.waitForResponse((r) => r.url().includes(`/api/v1/classes/${createdClassId}`) && r.request().method() === 'DELETE'),
+        page.getByRole('button', { name: 'Đồng ý' }).click(),
+      ]);
+      expect(deleteRes.status()).toBe(204);
+      deletedViaUi = true;
+
+      await page.reload();
+      await page.waitForLoadState('networkidle');
+      await page.getByPlaceholder('Tìm theo tên lớp, mã, GVCN...').fill(updatedName);
+      await expect(page.locator('tbody tr').filter({ hasText: updatedName })).toHaveCount(0);
+    } finally {
+      if (createdClassId && !deletedViaUi && authToken) {
+        await request.delete(`/api/v1/classes/${createdClassId}`, {
+          headers: { Authorization: `Bearer ${authToken}` },
+        });
+      }
+    }
+
+    assertCleanRuntime(errors);
+  });
+
+  test('TC-16: Roles Permissions Matrix Persistence, Restore & Members Modal (/admin/roles)', async ({ page }) => {
+    const errors = await loginAndAttachMonitors(page);
+    await page.goto('/admin/roles');
+    await page.waitForLoadState('networkidle');
+
+    // Open Members modal -> GET /api/v1/admin/roles/subject_teacher/members
+    const [membersRes] = await Promise.all([
+      page.waitForResponse((r) => r.url().includes('/api/v1/admin/roles/') && r.url().includes('/members') && r.status() === 200),
+      page.getByRole('button', { name: /Chi tiết thành viên/ }).click(),
+    ]);
+    expect(membersRes.ok()).toBeTruthy();
+    await page.getByRole('button', { name: 'Đóng' }).click();
+
+    // Toggle first checkbox via its visible label wrapper, save -> reload -> verify persistence -> restore
+    const firstCheckbox = page.locator('input[type="checkbox"]').first();
+    const initialChecked = await firstCheckbox.isChecked();
+
+    try {
+      await firstCheckbox.locator('..').click();
+      const [saveRes] = await Promise.all([
+        page.waitForResponse((r) => r.url().includes('/api/v1/admin/roles/') && r.url().includes('/permissions') && r.request().method() === 'PUT'),
+        page.getByRole('button', { name: 'Lưu thay đổi' }).click(),
+      ]);
+      expect(saveRes.status()).toBe(200);
+
+      await page.reload();
+      await page.waitForLoadState('networkidle');
+      expect(await page.locator('input[type="checkbox"]').first().isChecked()).toBe(!initialChecked);
+    } finally {
+      const cbAfter = page.locator('input[type="checkbox"]').first();
+      if ((await cbAfter.isChecked()) !== initialChecked) {
+        await cbAfter.locator('..').click();
+        const [restoreRes] = await Promise.all([
+          page.waitForResponse((r) => r.url().includes('/api/v1/admin/roles/') && r.url().includes('/permissions') && r.request().method() === 'PUT'),
+          page.getByRole('button', { name: 'Lưu thay đổi' }).click(),
+        ]);
+        expect(restoreRes.status()).toBe(200);
+      }
+    }
+
+    assertCleanRuntime(errors);
+  });
+
+  test('TC-17: Reports Analytics Filters, Schedule Persistence & Cleanup (/admin/reports)', async ({ page }) => {
+    const errors = await loginAndAttachMonitors(page);
+    await page.goto('/admin/reports');
+    await page.waitForLoadState('networkidle');
+
+    // Filter analytics by grade=k10 & timeframe=month
+    const gradeSelect = page.locator('select:has(option[value="k10"])').first();
+    const [gradeFilterRes] = await Promise.all([
+      page.waitForResponse((r) => r.url().includes('/api/v1/admin/reports/analytics') && r.url().includes('grade=k10') && r.status() === 200),
+      gradeSelect.selectOption('k10'),
+    ]);
+    expect(gradeFilterRes.ok()).toBeTruthy();
+
+    const [monthRes] = await Promise.all([
+      page.waitForResponse((r) => r.url().includes('/api/v1/admin/reports/analytics') && r.url().includes('timeframe=month') && r.status() === 200),
+      page.getByRole('button', { name: 'Theo tháng' }).click(),
+    ]);
+    expect(monthRes.ok()).toBeTruthy();
+
+    // Create report schedule, verify persistence across reload, and clean up
+    const schedTitle = `E2E_Sched_${Date.now().toString().slice(-5)}`;
+    let createdSchedId = null;
+
+    try {
+      await page.getByRole('button', { name: 'Lên lịch gửi' }).click();
+      await page.getByPlaceholder('Ví dụ: Báo cáo điểm danh định kỳ thứ Sáu').fill(schedTitle);
+      await page.getByPlaceholder('hieutruong@school.edu.vn, bgh@school.edu.vn').fill('qa-e2e@example.com');
+      const [createSchedRes] = await Promise.all([
+        page.waitForResponse((r) => r.url().includes('/api/v1/admin/reports/schedules') && r.request().method() === 'POST'),
+        page.getByRole('button', { name: 'Lưu lịch gửi' }).click(),
+      ]);
+      expect(createSchedRes.status()).toBe(201);
+      const schedJson = await createSchedRes.json();
+      createdSchedId = schedJson.id || schedJson.item?.id;
+
+      await page.reload();
+      await page.waitForLoadState('networkidle');
+      await expect(page.getByText(schedTitle)).toBeVisible();
+    } finally {
+      if (createdSchedId) {
+        const token = await getAuthToken(page);
+        if (token) {
+          const delRes = await page.request.delete(`/api/v1/admin/reports/schedules/${createdSchedId}`, {
+            headers: { Authorization: `Bearer ${token}` },
+          });
+          expect(delRes.ok()).toBeTruthy();
+        }
+      }
+    }
+
+    assertCleanRuntime(errors);
+  });
+
+  test('TC-18: Settings Persistence, AI Ping & Backup Creation (/admin/settings)', async ({ page }) => {
+    const errors = await loginAndAttachMonitors(page);
+    await page.goto('/admin/settings');
+    await page.waitForLoadState('networkidle');
+
+    // 1. General tab: save temporary change, verify persistence across reload, and restore
+    const schoolInput = page.locator('input[type="text"]:not([placeholder*="Tìm kiếm"])').first();
+    const originalSchoolName = await schoolInput.inputValue();
+    expect(originalSchoolName.length).toBeGreaterThan(0);
+
+    try {
+      await schoolInput.fill(`${originalSchoolName} E2E`);
+      const [saveRes] = await Promise.all([
+        page.waitForResponse((r) => r.url().endsWith('/api/v1/admin/settings') && r.request().method() === 'PUT'),
+        page.getByRole('button', { name: 'Lưu tất cả thay đổi' }).click(),
+      ]);
+      expect(saveRes.status()).toBe(200);
+
+      await page.reload();
+      await page.waitForLoadState('networkidle');
+      await expect(page.locator('input[type="text"]:not([placeholder*="Tìm kiếm"])').first()).toHaveValue(`${originalSchoolName} E2E`);
+    } finally {
+      const restoreInput = page.locator('input[type="text"]:not([placeholder*="Tìm kiếm"])').first();
+      if ((await restoreInput.inputValue()) !== originalSchoolName) {
+        await restoreInput.fill(originalSchoolName);
+        const [restoreRes] = await Promise.all([
+          page.waitForResponse((r) => r.url().endsWith('/api/v1/admin/settings') && r.request().method() === 'PUT'),
+          page.getByRole('button', { name: 'Lưu tất cả thay đổi' }).click(),
+        ]);
+        expect(restoreRes.status()).toBe(200);
+      }
+    }
+
+    // 2. AI Services tab: ping AI endpoint (skip Email & Notification tab intentionally)
+    await page.getByRole('button', { name: 'Trợ lý AI & Dịch vụ' }).click();
+    const [pingRes] = await Promise.all([
+      page.waitForResponse((r) => r.url().includes('/api/v1/admin/settings/ai-ping') && r.request().method() === 'POST'),
+      page.getByRole('button', { name: 'Kiểm tra kết nối API' }).click(),
+    ]);
+    expect(pingRes.status()).toBe(200);
+    const pingJson = await pingRes.json();
+    expect(pingJson.status).toBe('configured');
+
+    // 3. Backup & Maintenance tab: trigger manual backup & verify persisted across reload
+    await page.getByRole('button', { name: 'Sao lưu & Bảo trì' }).click();
+    const [backupRes] = await Promise.all([
+      page.waitForResponse((r) => r.url().endsWith('/api/v1/admin/settings/backups') && r.request().method() === 'POST'),
+      page.getByRole('button', { name: 'Tạo bản sao lưu ngay' }).click(),
+    ]);
+    expect(backupRes.status()).toBe(201);
+    const backupJson = await backupRes.json();
+    const backupLabel = backupJson.item?.filename || backupJson.item?.name;
+    expect(backupJson.item?.id).toBeTruthy();
+
+    await page.reload();
+    await page.waitForLoadState('networkidle');
+    await page.getByRole('button', { name: 'Sao lưu & Bảo trì' }).click();
+    if (backupLabel) {
+      await expect(page.getByText(backupLabel).first()).toBeVisible();
+    }
+
+    assertCleanRuntime(errors);
   });
 });
