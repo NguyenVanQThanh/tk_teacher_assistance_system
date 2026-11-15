@@ -2,8 +2,8 @@
 # Description: Service layer for Class business logic — duplicate check, homeroom teacher validation, RBAC Data Scoping, CRUD, and restore operations.
 # Created At: 2026-07-22
 # Created By: Tam Khang
-# Updated At: 2026-11-14
-# Updated By: Tam Khang
+# Updated At: 2026-11-15
+# Updated By: AI Agent
 
 import logging
 import re
@@ -405,7 +405,6 @@ class ClassService:
             "Class Name",
             "Academic Year",
             "Homeroom Teacher",
-            "Teacher Code",
             "Student Count",
             "Room",
             "Specialization",
@@ -417,7 +416,6 @@ class ClassService:
                 item.class_name,
                 item.school_year or "",
                 item.homeroom_teacher_name or "",
-                item.homeroom_teacher_code or "",
                 item.student_count,
                 item.room_name or "",
                 item.specialization or "",
