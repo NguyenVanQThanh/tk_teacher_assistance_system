@@ -23,7 +23,7 @@ import MathRenderer from '../common/MathRenderer';
 import { getQuestionItems } from '../../utils/questionItems';
 import QuestionMedia from './QuestionMedia';
 import './ExercisePreviewModal.css';
-import toast from '../../components/common/toast';
+import toast from '../../components/common/toast';
 import { getErrorMessage } from '../../utils/errorMessages';
 
 export default function ExercisePreviewModal({ exercise, isOpen, onClose }) {

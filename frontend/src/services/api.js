@@ -5,7 +5,7 @@
 // Updated At: 2026-11-15
 // Updated By: AI Agent
 
-import axios from 'axios';
+import axios from 'axios';
 import { getErrorMessage } from '../utils/errorMessages';
 
 const api = axios.create({

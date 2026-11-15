@@ -32,7 +32,7 @@ import { useAuth } from '../../context/AuthContext';
 import { authApi } from '../../services/api';
 import { getTeacherProfileDefaults } from '../../utils/teacherSubjectHelper';
 import './TeacherProfileModal.css';
-import toast from '../../components/common/toast';
+import toast from '../../components/common/toast';
 import { getErrorMessage } from '../../utils/errorMessages';
 
 export default function TeacherProfileModal({ 

@@ -35,7 +35,7 @@ import { useAuth } from '../../context/AuthContext';
 import { getTeacherProfileDefaults } from '../../utils/teacherSubjectHelper';
 import { authApi } from '../../services/api';
 import './TeacherProfilePage.css';
-import toast from '../../components/common/toast';
+import toast from '../../components/common/toast';
 import { getErrorMessage } from '../../utils/errorMessages';
 
 export default function TeacherProfilePage() {
