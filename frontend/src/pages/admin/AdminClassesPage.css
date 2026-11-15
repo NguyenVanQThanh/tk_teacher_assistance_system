@@ -610,6 +610,15 @@ Updated By: Tam Khang
   color: #B45309;
 }
 
+.class-status-pill .status-dot.gray {
+  background-color: #8A8696;
+}
+
+.class-status-pill.inactive {
+  background-color: #F1F1F4;
+  color: #5F5A6B;
+}
+
 /* 6. Pagination Footer */
 .classes-pagination-footer {
   display: flex;
