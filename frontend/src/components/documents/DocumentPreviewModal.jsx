@@ -2,8 +2,8 @@
 // Description: Interactive PDF Document Viewer modal with close button; download/print via native PDF toolbar and native PDF controls.
 // Created At: 2026-08-30
 // Created By: Tam Khang
-// Updated At: 2026-11-03
-// Updated By: Tam Khang
+// Updated At: 2026-11-15
+// Updated By: AI Agent
 
 import React, { useState, useEffect, useRef } from 'react';
 import { 
@@ -14,6 +14,7 @@ import {
   FileQuestion
 } from 'lucide-react';
 import { documentsApi } from '../../services/api';
+import { getErrorMessage } from '../../utils/errorMessages';
 import './DocumentPreviewModal.css';
 
 export default function DocumentPreviewModal({ doc, isOpen, onClose }) {
@@ -72,9 +73,7 @@ export default function DocumentPreviewModal({ doc, isOpen, onClose }) {
       } catch (err) {
         if (!isMounted) return;
         console.error('Failed to load PDF preview:', err);
-        const detailMsg = err.response?.data?.detail;
-        const msg = typeof detailMsg === 'string' ? detailMsg : detailMsg?.message;
-        setError(msg || 'Không thể tải tệp PDF để xem trực tiếp. Tệp có thể đã bị di chuyển hoặc định dạng không hợp lệ.');
+        setError(getErrorMessage(err, 'Không thể tải tệp PDF để xem trực tiếp. Tệp có thể đã bị di chuyển hoặc định dạng không hợp lệ.'));
       } finally {
         if (isMounted) {
           setLoading(false);
