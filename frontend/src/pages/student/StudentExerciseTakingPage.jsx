@@ -2,7 +2,7 @@
 // Description: Interactive student examination interface supporting 3 question types: Multiple Choice (4 options), True/False (4 sub-items), and Short Answer (with on-screen numpad helper).
 // Created At: 2026-09-07
 // Created By: Tam Khang
-// Updated At: 2026-11-12
+// Updated At: 2026-11-15
 // Updated By: AI Agent
 
 import React, { useState, useEffect, useMemo, useRef } from 'react';
@@ -38,6 +38,7 @@ import {
 import { useNavigate, Link, useParams, useLocation } from 'react-router-dom';
 import { attemptsApi, assignmentsApi } from '../../services/api';
 import { studentTakingApi, sanitizeQuestionsForStudent } from '../../services/studentTakingApi';
+import { getErrorMessage } from '../../utils/errorMessages';
 import MathRenderer from '../../components/common/MathRenderer';
 import QuestionContentView from '../../components/common/QuestionContentView';
 import MathTextEditor from '../../components/common/MathTextEditor';
@@ -415,7 +416,7 @@ export default function StudentExerciseTakingPage() {
         } catch (err) {
           console.error('Failed to initialize backend exam:', err);
           if (isMounted) {
-            setBackendError(err.response?.data?.detail?.message || 'Không thể tải đề thi từ hệ thống.');
+            setBackendError(getErrorMessage(err, 'Không thể tải đề thi từ hệ thống.'));
           }
         } finally {
           if (isMounted) {
@@ -1004,8 +1005,6 @@ export default function StudentExerciseTakingPage() {
         setIsSubmitModalOpen(false);
       } catch (err) {
         console.error('Submit attempt failed:', err);
-        const errDetail = err.response?.data?.detail;
-        const msg = typeof errDetail === 'object' ? errDetail?.message : errDetail;
         if (err.response?.status === 401 || !localStorage.getItem('access_token')) {
           try {
             sessionStorage.setItem(`tk_exam_draft_${currentExamId}`, JSON.stringify(answers));
@@ -1013,7 +1012,7 @@ export default function StudentExerciseTakingPage() {
           toast.error('Phiên làm việc đã hết hạn. Các câu trả lời của bạn đã được lưu tạm, vui lòng đăng nhập lại để nộp bài.');
           setTimeout(() => { window.location.href = '/login'; }, 2500);
         } else {
-          toast.error(msg || 'Có lỗi xảy ra khi nộp bài. Vui lòng thử lại.');
+          toast.error(getErrorMessage(err, 'Có lỗi xảy ra khi nộp bài. Vui lòng thử lại.'));
         }
       } finally {
         setIsSubmitting(false);

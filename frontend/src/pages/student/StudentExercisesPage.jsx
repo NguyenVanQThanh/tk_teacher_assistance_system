@@ -2,8 +2,8 @@
 // Description: Student exercise repository page connected to backend assignments feed, with session caching, tabs filtering, subject and title search filtering, briefing cards, and AI exercise generator modal.
 // Created At: 2026-09-07
 // Created By: Tam Khang
-// Updated At: 2026-10-11
-// Updated By: Tam Khang
+// Updated At: 2026-11-15
+// Updated By: AI Agent
 
 import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
@@ -42,6 +42,7 @@ import {
 } from 'lucide-react';
 import AiSourcesList from '../../components/exercises/AiSourcesList';
 import { classesApi, assignmentsApi, attemptsApi, subjectsApi, aiExercisesApi } from '../../services/api';
+import { getErrorMessage } from '../../utils/errorMessages';
 import useDataSync from '../../hooks/useDataSync';
 import './StudentExercisesPage.css';
 import toast from '../../components/common/toast';
@@ -91,7 +92,7 @@ const mapAiErrorMessage = (err, fallback) => {
   if (status === 415) return 'Định dạng tệp không được hỗ trợ (chỉ PDF, DOCX, TXT).';
   if (status === 503) return AI_ERROR_MESSAGES['ERR-EXE-AI_BUSY'];
   if (status === 403) return 'Bạn chưa thuộc lớp học nào nên chưa thể tạo bài tập AI.';
-  return (typeof detail === 'object' && detail?.message) || fallback || err?.message || 'Có lỗi khi tạo bài tập trên máy chủ. Vui lòng thử lại.';
+  return getErrorMessage(err, fallback || 'Có lỗi khi tạo bài tập trên máy chủ. Vui lòng thử lại.');
 };
 
 // Session cache helpers: stores raw assignments, attempts and subjects for the current browser session
