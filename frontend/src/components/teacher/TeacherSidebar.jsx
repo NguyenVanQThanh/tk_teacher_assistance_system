@@ -20,7 +20,10 @@ import {
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { getTeacherProfileDefaults } from '../../utils/teacherSubjectHelper';
+import GuestLock from '../common/GuestLock';
 import './TeacherSidebar.css';
+
+const GUEST_ALLOWED_NAV = ['documents', 'exercises'];
 
 export default function TeacherSidebar({ 
   activeNav, 
@@ -149,28 +152,31 @@ export default function TeacherSidebar({
           const Icon = item.icon;
           const isActive = currentActive === item.id;
           return (
-            <button
-              key={item.id}
-              className={`nav-item-btn ${isActive ? 'active' : ''}`}
-              onClick={() => handleItemClick(item.id)}
-            >
-              <Icon size={18} className="nav-icon" />
-              <span className="nav-label">{item.label}</span>
-            </button>
+            <GuestLock key={item.id} block locked={!GUEST_ALLOWED_NAV.includes(item.id)}>
+              <button
+                className={`nav-item-btn ${isActive ? 'active' : ''}`}
+                onClick={() => handleItemClick(item.id)}
+              >
+                <Icon size={18} className="nav-icon" />
+                <span className="nav-label">{item.label}</span>
+              </button>
+            </GuestLock>
           );
         })}
       </nav>
 
       {/* Bottom Settings Link */}
       <div className="sidebar-bottom-actions">
-        <button
-          type="button"
-          className={`nav-item-btn bottom-setting-btn ${currentActive === 'settings' ? 'active' : ''}`}
-          onClick={() => handleItemClick('settings')}
-        >
-          <Settings size={18} className="nav-icon" />
-          <span className="nav-label">Cài đặt</span>
-        </button>
+        <GuestLock block>
+          <button
+            type="button"
+            className={`nav-item-btn bottom-setting-btn ${currentActive === 'settings' ? 'active' : ''}`}
+            onClick={() => handleItemClick('settings')}
+          >
+            <Settings size={18} className="nav-icon" />
+            <span className="nav-label">Cài đặt</span>
+          </button>
+        </GuestLock>
       </div>
     </aside>
   );

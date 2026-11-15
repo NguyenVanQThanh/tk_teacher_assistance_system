@@ -58,7 +58,8 @@ class AdminUserRepository:
         role: Optional[str] = None,
         status: Optional[str] = None,
         grade: Optional[str] = None,
-        department: Optional[str] = None
+        department: Optional[str] = None,
+        is_guest: Optional[bool] = None
     ) -> Tuple[List[Dict[str, Any]], int]:
         """
         Retrieves a paginated list of users with associated metadata (role, class, department).
@@ -76,6 +77,9 @@ class AdminUserRepository:
         else:
             # Default: exclude soft-deleted users
             query = query.filter(func.upper(User.status) != "DELETED")
+
+        if is_guest is not None:
+            query = query.filter(User.is_guest.is_(is_guest))
 
         # Role filter
         if role and role.lower() != "all":
@@ -215,6 +219,8 @@ class AdminUserRepository:
                 "birthday": user.birthday,
                 "role": role_obj.name,
                 "role_key": role_obj.name.lower(),
+                "is_guest": bool(user.is_guest),
+                "guest_ip": user.guest_ip,
                 "status": user.status.upper() if user.status else "ACTIVE",
                 "department": dept_name,
                 "class_name": class_name,
@@ -329,6 +335,7 @@ class AdminDashboardRepository:
         if student_role:
             total_students = db.query(User).filter(
                 User.role_id == student_role.role_id,
+                User.is_guest.is_(False),
                 User.status != "DELETED"
             ).count()
 
@@ -336,6 +343,7 @@ class AdminDashboardRepository:
         if teacher_role:
             total_teachers = db.query(User).filter(
                 User.role_id == teacher_role.role_id,
+                User.is_guest.is_(False),
                 User.status != "DELETED"
             ).count()
 
@@ -374,8 +382,8 @@ class AdminDashboardRepository:
                 return None
             return round((current - previous) * 100.0 / previous, 1)
 
-        student_growth = _growth(User, [User.role_id == student_role.role_id]) if student_role else None
-        teacher_growth = _growth(User, [User.role_id == teacher_role.role_id]) if teacher_role else None
+        student_growth = _growth(User, [User.role_id == student_role.role_id, User.is_guest.is_(False)]) if student_role else None
+        teacher_growth = _growth(User, [User.role_id == teacher_role.role_id, User.is_guest.is_(False)]) if teacher_role else None
         classes_growth = _growth(Class)
 
         return {

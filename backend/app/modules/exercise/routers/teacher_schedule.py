@@ -13,11 +13,21 @@ from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
-from app.modules.auth.dependencies import require_roles
+from app.modules.admin.state_store import get_current_academic_year
+from app.modules.auth.dependencies import require_roles, get_current_user as _base_current_user
 from models.models import User, ScheduleNote
 
 # Schedule and notes are teacher-facing; students must not reach these endpoints.
-get_current_user = require_roles("Teacher", "HomeroomTeacher", "Admin")
+_role_user = require_roles("Teacher", "HomeroomTeacher", "Admin")
+
+def get_current_user(user: User = Depends(_role_user)) -> User:
+    """Teacher/Admin only; guest accounts have no timetable and are rejected with 403."""
+    if user.is_guest:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail={"code": "ERR-AUTH-GUEST_FORBIDDEN", "message": "Guest accounts cannot access the schedule."},
+        )
+    return user
 
 router = APIRouter(prefix="/api/v1/teacher/schedule", tags=["Teacher Schedule"])
 
@@ -93,7 +103,7 @@ class TeacherScheduleItemOut(BaseModel):
 
 class TeacherScheduleResponse(BaseModel):
     semester: str = "Học kỳ I"
-    academic_year: str = "2026 - 2027"
+    academic_year: str = ""
     items: List[TeacherScheduleItemOut]
 
 
@@ -155,7 +165,7 @@ def get_teacher_schedule(
     """
     return TeacherScheduleResponse(
         semester="Học kỳ I",
-        academic_year="2026 - 2027",
+        academic_year=get_current_academic_year(db),
         items=get_synced_schedule_items(),
     )
 

@@ -3,7 +3,7 @@
 #              mappings) plus an idempotent seeder shared by seed.py and bootstrap_admin.py.
 # Created At: 2026-11-14
 # Created By: AI Agent
-# Updated At: 2026-11-14
+# Updated At: 2026-11-15
 # Updated By: AI Agent
 
 """RBAC seed data + idempotent seeder.
@@ -83,6 +83,17 @@ ROLE_PERMISSIONS: Dict[str, List[str]] = {
     ],
 }
 
+
+# Permissions denied (per-user "deny" override) to guest accounts, keyed by role name.
+# Guests have no class, so anything that reads or manages class data is blocked.
+GUEST_DENIED_PERMISSIONS: Dict[str, List[str]] = {
+    "Teacher": [
+        "ACAD_CLASS_VIEW", "ACAD_ENROLLMENT_VIEW", "ACAD_TEACHER_ASSIGN_VIEW",
+        "EXE_ASSIGNMENT_MANAGE", "EXE_ASSIGNMENT_VIEW", "EXE_ATTEMPT_VIEW",
+        "AUTH_PASSWORD_CHANGE",
+    ],
+    "Student": ["ACAD_CLASS_VIEW", "ACAD_ENROLLMENT_VIEW", "AUTH_PASSWORD_CHANGE"],
+}
 
 def seed_rbac(session: Session) -> Dict[str, Role]:
     """Insert missing roles/permissions and role-permission mappings.

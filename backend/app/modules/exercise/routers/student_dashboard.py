@@ -171,11 +171,12 @@ def get_student_dashboard(
 
     upcoming_list: List[UpcomingAssignmentItemOut] = []
     now = datetime.now(timezone.utc)
-    if class_ids:
+    if True:  # personal (guest/AI) assignments are included even without any class
         assignments = db.query(ClassAssignment).join(
             Exercise, ClassAssignment.exercise_id == Exercise.exercise_id
         ).filter(
-            ClassAssignment.class_id.in_(class_ids),
+            or_(ClassAssignment.class_id.in_(class_ids),
+                ClassAssignment.owner_student_id == current_user.user_id),
             ClassAssignment.status != "DELETED",
             # Hide other students' personal AI assignments
             or_(ClassAssignment.owner_student_id.is_(None),

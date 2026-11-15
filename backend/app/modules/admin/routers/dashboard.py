@@ -146,7 +146,7 @@ def get_activity_chart(
         for ts in (
             _window(StudentExerciseAttempt.created_at, attempt_ok)
             + _window(Document.created_at, doc_ok)
-            + _window(User.created_at, User.status != "DELETED")
+            + _window(User.created_at, User.status != "DELETED", User.is_guest.is_(False))
             + _window(
                 AuditLog.created_at,
                 AuditLog.status != "DELETED",

@@ -109,3 +109,31 @@ AI_PART_WORKERS = _env_int("AI_PART_WORKERS", 3)
 AI_PART_MAX_RETRIES = _env_int("AI_PART_MAX_RETRIES", 2, minimum=0)
 # Mistral model for question generation (tried before Gemini)
 AI_MISTRAL_MODEL = os.environ.get("AI_MISTRAL_MODEL", "mistral-large-latest")
+
+# ---------------------------------------------------------------------------
+# Guest access (POST /api/v1/auth/guest) and academic year.
+# ---------------------------------------------------------------------------
+def _env_bool(name: str, default: bool) -> bool:
+    return os.environ.get(name, "true" if default else "false").strip().lower() in ("1", "true", "yes")
+
+GUEST_ACCESS_ENABLED = _env_bool("GUEST_ACCESS_ENABLED", True)
+# Maximum guest accounts created per client IP per rolling hour.
+GUEST_CREATE_PER_IP_HOUR = _env_int("GUEST_CREATE_PER_IP_HOUR", 5)
+# Maximum documents a guest account may upload.
+GUEST_DOC_LIMIT = _env_int("GUEST_DOC_LIMIT", 3, minimum=0)
+# Fallback academic year ("YYYY-YYYY") used when no admin setting exists; empty -> derived from calendar.
+CURRENT_ACADEMIC_YEAR = os.environ.get("CURRENT_ACADEMIC_YEAR", "").strip()
+# Honor CF-Connecting-IP / X-Forwarded-For only behind a trusted reverse proxy.
+TRUST_PROXY_HEADERS = _env_bool("TRUST_PROXY_HEADERS", False)
+
+
+def client_ip(request) -> str:
+    """Return the caller IP, honoring proxy headers only when TRUST_PROXY_HEADERS is enabled."""
+    if TRUST_PROXY_HEADERS:
+        cf = request.headers.get("cf-connecting-ip")
+        if cf:
+            return cf.strip()[:45]
+        xff = request.headers.get("x-forwarded-for")
+        if xff:
+            return xff.split(",")[0].strip()[:45]
+    return (request.client.host if request.client else "unknown")[:45]

@@ -26,14 +26,9 @@ import {
   Download
 } from 'lucide-react';
 import { adminSettingsApi } from '../../services/api';
+import { academicYearOptions, fallbackAcademicYear } from '../../hooks/useAcademicYear';
 import './AdminSettingsPage.css';
 import { getErrorMessage } from '../../utils/errorMessages';
-
-const YEAR_VALUE_MAP = {
-  '2025-2026': '2025 - 2026',
-  '2024-2025': '2024 - 2025',
-  '2023-2024': '2023 - 2024',
-};
 
 const SEMESTER_VALUE_MAP = {
   HK1: 'Học kỳ I',
@@ -53,7 +48,7 @@ const STORAGE_VALUE_MAP = {
 
 const normalizeGeneralSettings = (raw = {}) => ({
   ...raw,
-  academicYear: YEAR_VALUE_MAP[raw.academicYear] || raw.academicYear,
+  academicYear: raw.academicYear ? String(raw.academicYear).replace(/\s+/g, '') : raw.academicYear,
   semester: SEMESTER_VALUE_MAP[raw.semester] || raw.semester,
 });
 
@@ -119,7 +114,7 @@ export default function AdminSettingsPage() {
     address: 'Số 123 Đường Sáng Tạo, Quận Tri Thức, TP. Hồ Chí Minh',
     phone: '028 3822 1234',
     email: 'contact@school.edu.vn',
-    academicYear: '2024 - 2025',
+    academicYear: fallbackAcademicYear(),
     semester: 'Học kỳ II',
     semesterStartDate: '2025-01-15',
     semesterEndDate: '2025-05-30',
@@ -547,9 +542,9 @@ export default function AdminSettingsPage() {
                   value={generalSettings.academicYear}
                   onChange={e => setGeneralSettings(p => ({ ...p, academicYear: e.target.value }))}
                 >
-                  <option value="2024 - 2025">Năm học 2024 - 2025</option>
-                  <option value="2023 - 2024">Năm học 2023 - 2024</option>
-                  <option value="2025 - 2026">Năm học 2025 - 2026</option>
+                  {academicYearOptions(generalSettings.academicYear || fallbackAcademicYear()).map((y) => (
+                    <option key={y} value={y}>Năm học {y.replace('-', ' - ')}</option>
+                  ))}
                 </select>
               </div>
 

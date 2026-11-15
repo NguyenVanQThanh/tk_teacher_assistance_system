@@ -2,10 +2,11 @@
 # Description: Shared PostgreSQL and SQLite compatible state persistence and audit event helpers backed by AuditLog.
 # Created At: 2026-11-14
 # Created By: Tam Khang
-# Updated At: 2026-11-14
-# Updated By: Tam Khang
+# Updated At: 2026-11-15
+# Updated By: AI Agent
 
 import json
+import re
 import logging
 import uuid
 from datetime import datetime, timezone
@@ -15,6 +16,7 @@ from uuid import UUID
 from sqlalchemy import func, text
 from sqlalchemy.orm import Session
 
+from app.core import config as app_config
 from models.models import AuditLog
 
 logger = logging.getLogger(__name__)
@@ -259,3 +261,30 @@ def record_audit_event(
     db.commit()
     db.refresh(entry)
     return entry
+
+
+_YEAR_RE = re.compile(r"^\s*(\d{4})\s*-\s*(\d{4})\s*$")
+
+def normalize_academic_year(raw: Any) -> Optional[str]:
+    """Normalize '2024 - 2025' to '2024-2025'; None when malformed or end != start + 1."""
+    match = _YEAR_RE.match(str(raw or ""))
+    if not match or int(match.group(2)) != int(match.group(1)) + 1:
+        return None
+    return f"{match.group(1)}-{match.group(2)}"
+
+def get_current_academic_year(db: Session) -> str:
+    """Current academic year: admin setting general.academicYear, else env CURRENT_ACADEMIC_YEAR, else calendar."""
+    try:
+        saved = get_latest_state(db, "__SYS_SETTINGS__") or {}
+        year = normalize_academic_year((saved.get("general") or {}).get("academicYear"))
+    except Exception:  # noqa: BLE001 - settings lookup must never break callers
+        logger.warning("Could not read academic year setting; using fallback")
+        year = None
+    if year:
+        return year
+    year = normalize_academic_year(app_config.CURRENT_ACADEMIC_YEAR)
+    if year:
+        return year
+    today = datetime.now().date()
+    start = today.year if today.month >= 8 else today.year - 1
+    return f"{start}-{start + 1}"
