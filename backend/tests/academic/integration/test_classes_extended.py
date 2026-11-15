@@ -2,8 +2,8 @@
 # Description: Integration tests for enriched ClassOut/EnrollmentOut, available-students, export-csv, and import-excel endpoints.
 # Created At: 2026-11-14
 # Created By: Tam Khang
-# Updated At: 2026-11-14
-# Updated By: Tam Khang
+# Updated At: 2026-11-15
+# Updated By: AI Agent
 
 import io
 import uuid
@@ -99,6 +99,7 @@ class TestExtendedAcademicClasses:
         csv_text = csv_res.content.decode("utf-8-sig")
         assert "10A9" in csv_text
         assert "Room B204" in csv_text
+        assert "Teacher Code" not in csv_text.splitlines()[0]
 
     def test_import_students_excel_csv_and_xlsx(self, client: TestClient, db_session):
         from openpyxl import Workbook

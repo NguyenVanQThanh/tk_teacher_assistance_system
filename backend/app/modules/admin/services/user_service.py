@@ -2,8 +2,8 @@
 # Description: Business logic and validation layer for Admin User Management module.
 # Created At: 2026-09-29
 # Created By: Tam Khang
-# Updated At: 2026-09-29
-# Updated By: Tam Khang
+# Updated At: 2026-11-15
+# Updated By: AI Agent
 
 import csv
 import io
@@ -449,7 +449,6 @@ class AdminUserService:
 
         headers = [
             "ID",
-            "Mã Định Danh",
             "Họ và Tên",
             "Vai Trò",
             "Số Điện Thoại",
@@ -464,7 +463,6 @@ class AdminUserService:
         for item in items:
             writer.writerow([
                 str(item["id"]),
-                item.get("code") or "",
                 item.get("full_name") or "",
                 item.get("role") or "",
                 item.get("phone") or "",

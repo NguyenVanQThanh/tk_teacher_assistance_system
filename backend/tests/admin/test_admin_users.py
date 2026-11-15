@@ -2,8 +2,8 @@
 # Description: Integration tests for Admin User Management (F-ADMIN-01), validation rules, auto default password, and soft delete.
 # Created At: 2026-09-29
 # Created By: Tam Khang
-# Updated At: 2026-09-29
-# Updated By: Tam Khang
+# Updated At: 2026-11-15
+# Updated By: AI Agent
 
 import uuid
 import pytest
@@ -285,6 +285,10 @@ class TestAdminUserLifecycleAndSoftDelete:
         )
         assert resp.status_code == status.HTTP_200_OK
         assert "text/csv" in resp.headers["content-type"]
+        # Auto-generated identifier code must not be exported
+        header = resp.content.decode("utf-8-sig").splitlines()[0]
+        assert "Mã Định Danh" not in header
+        assert "Họ và Tên" in header
         # Must start with UTF-8 BOM for Excel compatibility
         assert resp.content.startswith(b"\xef\xbb\xbf")
 
