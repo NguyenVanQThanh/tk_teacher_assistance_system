@@ -19,6 +19,8 @@ export const ERROR_CODE_MESSAGES = {
   'ERR-ACAD-ENROLLMENT_NOT_FOUND': 'Không tìm thấy thông tin ghi danh.',
   'ERR-ACAD-INVALID_HEAD_TEACHER': 'Tổ trưởng bộ môn không hợp lệ.',
   'ERR-ACAD-INVALID_HOMEROOM_TEACHER': 'Giáo viên chủ nhiệm không hợp lệ.',
+  'ERR-ACAD-INVALID_PHONE': 'Số điện thoại không hợp lệ.',
+  'ERR-NOTIFICATION-NOT_FOUND': 'Không tìm thấy thông báo.',
   'ERR-ACAD-INVALID_STUDENT_ROLE': 'Người dùng được chọn không phải là học sinh.',
   'ERR-ACAD-INVALID_TEACHER_ROLE': 'Người dùng được chọn không phải là giáo viên.',
   'ERR-ACAD-MISSING_STUDENT_INFO': 'Thiếu thông tin bắt buộc của học sinh.',

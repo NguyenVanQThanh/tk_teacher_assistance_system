@@ -152,6 +152,30 @@ test.describe('Teacher Portal End-to-End Automation Test Suite', () => {
     expect(pageText.toLowerCase()).toMatch(/(tạo bài tập|thêm bài tập|thủ công|tiêu đề)/i);
   });
 
+  test('TC-05a: Create page split editor adds, switches and validates questions (no save)', async ({ page }) => {
+    await page.fill('#identifier-input', TEACHER_PHONE);
+    await page.fill('#password-input', TEACHER_PASS);
+    await page.click('button[type="submit"]');
+    await page.waitForURL('**/teacher');
+
+    await page.goto('/teacher/exercises/create-manual');
+    await expect(page.locator('.question-item-card')).toHaveCount(1);
+    await page.getByRole('button', { name: 'Thêm câu hỏi' }).click();
+    await expect(page.locator('.question-item-card')).toHaveCount(2);
+    await expect(page.locator('.editor-q-label')).toHaveText('Soạn Câu 2');
+
+    const group = page.getByRole('radiogroup', { name: 'Question type' });
+    await group.getByRole('radio', { name: 'Trả lời ngắn', exact: true }).click();
+    await expect(page.locator('.solution-header-hint')).toHaveText('Nhập đáp án');
+
+    await page.locator('.question-item-card').first().click();
+    await expect(page.locator('.editor-q-label')).toHaveText('Soạn Câu 1');
+
+    // Empty title must be rejected without calling the backend
+    await page.getByRole('button', { name: /Lưu & Đăng/ }).click();
+    await expect(page.getByRole('alert')).toContainText('Vui lòng nhập tên bài tập');
+  });
+
   test('TC-05b: Edit modal switches question type and answer section (no save)', async ({ page }) => {
     // Themed data-loss confirm is accepted below; nothing is saved in this test
     await page.fill('#identifier-input', TEACHER_PHONE);

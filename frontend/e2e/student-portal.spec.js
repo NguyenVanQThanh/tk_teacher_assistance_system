@@ -49,6 +49,8 @@ test.describe('Student Portal End-to-End Automation Test Suite', () => {
     await page.fill('#password-input', STUDENT_PASS);
     await page.click('button[type="submit"]');
     await page.waitForURL('**/student**');
+    // Wait for dashboard data so the card layout is stable before clicking it
+    await page.waitForLoadState('networkidle');
 
     // 1. Verify Homework checklist card
     const homeworkCard = page.locator('.pending-assignments-card');
@@ -68,7 +70,8 @@ test.describe('Student Portal End-to-End Automation Test Suite', () => {
     await expect(feedbackCards.first()).toBeVisible();
 
     // 5. Test clicking Homework card to toggle right panel
-    await homeworkCard.click();
+    // Click the header: clicking the card centre can hit a task row, which navigates away
+    await homeworkCard.locator('.pending-card-title').click();
     await page.waitForTimeout(500);
     const rightPanel = page.locator('.student-dashboard-right-panel');
     await expect(rightPanel).toBeVisible();

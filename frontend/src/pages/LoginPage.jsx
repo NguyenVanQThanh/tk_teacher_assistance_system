@@ -109,17 +109,8 @@ export default function LoginPage() {
       
       setSuccessMsg(`Đăng nhập thành công! Chào mừng ${result.user?.full_name || 'bạn'}. Đang chuyển hướng...`);
       
-      setTimeout(() => {
-        const userRole = result.user?.role || '';
-        let defaultPath = '/teacher';
-        if (userRole === 'Admin') {
-          defaultPath = '/admin';
-        } else if (userRole === 'Student') {
-          defaultPath = '/student';
-        }
-        const fromPath = location.state?.from?.pathname || defaultPath;
-        navigate(fromPath, { replace: true });
-      }, 500);
+      // Redirect is handled by the isAuthenticated effect above. A delayed navigate here
+      // would override any navigation the user makes right after logging in.
     } catch (err) {
       console.error('Login error:', err);
       const msg = getErrorMessage(err, 'Đăng nhập thất bại. Vui lòng kiểm tra lại tài khoản hoặc mật khẩu.');
