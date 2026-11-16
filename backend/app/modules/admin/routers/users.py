@@ -24,7 +24,6 @@ from app.modules.admin.schemas import (
     AdminUserCreateResponse,
     AdminUserUpdateRequest,
     AdminUserStatusUpdateRequest,
-    AdminUserResetPasswordRequest,
     AdminUserResetPasswordResponse
 )
 from app.modules.admin.repository import AdminUserRepository
@@ -66,6 +65,7 @@ def list_users(
     status_filter: Optional[str] = Query(None, alias="status", description="Status filter: all, ACTIVE, INACTIVE, SUSPENDED, DELETED"),
     grade: Optional[str] = Query(None, description="Grade filter"),
     department: Optional[str] = Query(None, description="Department filter"),
+    is_guest: Optional[bool] = Query(None, description="Filter guest (true) or regular (false) accounts"),
     db: Session = Depends(get_db)
 ):
     """
@@ -80,7 +80,8 @@ def list_users(
         role=role,
         status=status_filter,
         grade=grade,
-        department=department
+        department=department,
+        is_guest=is_guest
     )
     total_pages = math.ceil(total / page_size) if total > 0 else 1
 
@@ -96,6 +97,7 @@ def list_users(
 @router.post("", response_model=AdminUserCreateResponse, status_code=status.HTTP_201_CREATED, dependencies=[Depends(require_admin_privilege)])
 def create_user(
     payload: AdminUserCreateRequest,
+    response: Response,
     db: Session = Depends(get_db)
 ):
     """
@@ -103,7 +105,9 @@ def create_user(
     Automatically generates a secure default password if omitted, hashes it,
     saves it to the database, and dispatches an SMS / system notification to the recipient.
     """
-    return AdminUserService.create_user(db=db, payload=payload)
+    result = AdminUserService.create_user(db=db, payload=payload)
+    response.headers["Cache-Control"] = "no-store"
+    return result
 
 
 @router.get("/export-excel", dependencies=[Depends(require_admin_privilege)])
@@ -291,11 +295,14 @@ def restore_user(
 @router.post("/{user_id}/reset-password", response_model=AdminUserResetPasswordResponse, dependencies=[Depends(require_admin_privilege)])
 def reset_user_password(
     user_id: UUID,
-    payload: AdminUserResetPasswordRequest,
+    response: Response,
     db: Session = Depends(get_db)
 ):
     """
-    Resets user password, generating a default password and dispatching via SMS / system notification.
+    Resets user password to a freshly generated temporary password (returned once, never logged).
+    Guest accounts and Admin accounts are rejected with 403.
     """
-    return AdminUserService.reset_password(db=db, user_id=user_id, custom_password=payload.new_password)
+    result = AdminUserService.reset_password(db=db, user_id=user_id)
+    response.headers["Cache-Control"] = "no-store"
+    return result
 

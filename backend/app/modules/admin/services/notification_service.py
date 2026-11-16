@@ -1,30 +1,36 @@
 # File Name: notification_service.py
-# Description: Service for generating default passwords and dispatching SMS / system notifications.
+# Description: Service for generating temporary passwords and describing credential hand-off.
 # Created At: 2026-09-29
 # Created By: Tam Khang
-# Updated At: 2026-09-29
-# Updated By: Tam Khang
+# Updated At: 2026-11-15
+# Updated By: AI Agent
 
 import logging
 import secrets
-import string
 from typing import Dict, Any, Optional
 
 logger = logging.getLogger("admin.notifications")
 
 
+# Unambiguous alphabets (no 0/O, 1/l/I) so a password can be read out or typed from paper.
+_UPPER = "ABCDEFGHJKLMNPQRSTUVWXYZ"
+_LOWER = "abcdefghijkmnopqrstuvwxyz"
+_DIGITS = "23456789"
+_SYMBOLS = "@#$%&*+=?"
+PASSWORD_LENGTH = 12
+
 class NotificationService:
     @staticmethod
     def generate_default_password() -> str:
         """
-        Generates a secure, human-friendly default password.
-        Format: Prefix 'Edu@' followed by 6 random alphanumeric characters (digits and uppercase).
-        Example: Edu@839102
+        Generate a 12-character random temporary password using `secrets`, guaranteed to contain
+        at least one uppercase letter, lowercase letter, digit and symbol.
         """
-        digits = "".join(secrets.choice(string.digits) for _ in range(4))
-        chars = "".join(secrets.choice(string.ascii_uppercase) for _ in range(2))
-        suffix = "".join(secrets.choice(string.digits) for _ in range(2))
-        return f"Edu@{digits}{chars}{suffix}"
+        chars = [secrets.choice(_UPPER), secrets.choice(_LOWER), secrets.choice(_DIGITS), secrets.choice(_SYMBOLS)]
+        pool = _UPPER + _LOWER + _DIGITS + _SYMBOLS
+        chars += [secrets.choice(pool) for _ in range(PASSWORD_LENGTH - len(chars))]
+        secrets.SystemRandom().shuffle(chars)
+        return "".join(chars)
 
     @staticmethod
     def send_password_notification(
@@ -35,35 +41,13 @@ class NotificationService:
         action: str = "create"
     ) -> Dict[str, Any]:
         """
-        Dispatches account credentials to the user via SMS and/or system notification channel.
-        Logs the transaction cleanly without icons or emojis.
+        Describe the credential hand-off. No SMS gateway exists, so nothing is sent: the admin
+        must pass the temporary password on securely. The password is never logged.
         """
-        channel = "SMS & System Notification" if phone else "System Notification"
-        recipient = phone if phone else (email if email else "Internal User")
-
-        if action == "create":
-            sms_text = (
-                f"[SmartLMS] Hello {full_name}, your account has been created. "
-                f"Default password: {password}. Please log in and change your password."
-            )
-        else:
-            sms_text = (
-                f"[SmartLMS] Hello {full_name}, your password has been reset. "
-                f"New default password: {password}. Please log in and change your password."
-            )
-
-        # Log cleanly without emojis/icons
-        logger.info(
-            "DISPATCH: Action=%s, Recipient=%s, Channel=%s, MessagePreview=%s",
-            action,
-            recipient,
-            channel,
-            sms_text
-        )
-
+        logger.info("Temporary password issued: action=%s, delivery=manual", action)
         return {
-            "sent": True,
-            "channel": channel,
-            "recipient": recipient,
-            "message": f"Default password dispatched to {recipient} via {channel}."
+            "sent": False,
+            "channel": "Manual hand-off",
+            "recipient": phone or email or "Internal User",
+            "message": "No SMS or email was sent. Share the temporary password with the user securely."
         }

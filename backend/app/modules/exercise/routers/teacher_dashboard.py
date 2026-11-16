@@ -20,6 +20,7 @@ from models.models import (
 )
 from app.modules.auth.dependencies import require_perm, get_current_user
 from app.modules.academic.scoping import get_user_role_name
+from app.modules.admin.state_store import get_current_academic_year
 from app.modules.exercise.routers.teacher_schedule import get_synced_schedule_items, week_start
 from app.modules.exercise.services.attempt_service import AttemptService
 from app.modules.exercise.services.learning_quality_service import LearningQualityService
@@ -147,9 +148,7 @@ def get_teacher_dashboard(
     role_name = get_user_role_name(db, current_user)
 
     # 1. Fetch assigned classes and homeroom class (prioritizing current academic year)
-    today = date.today()
-    start_year = today.year if today.month >= 8 else today.year - 1
-    current_year = f"{start_year}-{start_year + 1}"
+    current_year = get_current_academic_year(db)
 
     assigned_records = db.query(TeacherSubject.class_id).filter(
         TeacherSubject.teacher_id == teacher_id,

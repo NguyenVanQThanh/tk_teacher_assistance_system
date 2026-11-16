@@ -144,7 +144,8 @@ class AuthService:
             role=role_name,
             email_masked=email_masked,
             phone_masked=phone_masked,
-            permissions=perms
+            permissions=perms,
+            is_guest=bool(user.is_guest),
         )
 
         # 5. Log success event

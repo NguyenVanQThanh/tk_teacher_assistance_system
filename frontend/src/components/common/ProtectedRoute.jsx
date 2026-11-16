@@ -9,6 +9,17 @@ import React from 'react';
 import { Navigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 
+const GUEST_ALLOWED = {
+  Teacher: ['/teacher/exercises', '/teacher/documents'],
+  Student: ['/student/exercises'],
+};
+
+export const guestHome = (role) => (role === 'Student' ? '/student/exercises' : '/teacher/exercises');
+
+function isGuestPathAllowed(role, pathname) {
+  return (GUEST_ALLOWED[role] || []).some((p) => pathname === p || pathname.startsWith(`${p}/`));
+}
+
 export default function ProtectedRoute({ children, allowedRoles }) {
   const { isAuthenticated, isLoading, user } = useAuth();
   const location = useLocation();
@@ -60,6 +71,11 @@ export default function ProtectedRoute({ children, allowedRoles }) {
       }
       return <Navigate to="/teacher" replace />;
     }
+  }
+
+  // Guests may only reach a small allow-list of pages.
+  if (user?.is_guest && !isGuestPathAllowed(user.role, location.pathname)) {
+    return <Navigate to={guestHome(user.role)} replace />;
   }
 
   return children;

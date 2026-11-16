@@ -48,7 +48,7 @@ class ExerciseService:
             )
 
         # 2. Scope check for Teacher
-        if access_policy.is_teacher(role_name):
+        if access_policy.is_teacher(role_name) and not current_user.is_guest:
             active_subject_ids = self._get_teacher_active_subject_ids(current_user.user_id)
             if payload.subject_id not in active_subject_ids:
                 raise HTTPException(

@@ -30,6 +30,10 @@ export function getTeacherSubjectInfo(user) {
     const known = SUBJECT_MAP[id];
     return { subjectId: id, subjectName: dbSubject, shortName: known?.shortName || dbSubject };
   }
+  // Guest teachers have no assigned subject: return an empty (non-defaulted) result.
+  if (user?.is_guest) {
+    return { subjectId: '', subjectName: '', shortName: '' };
+  }
   const name = (user?.full_name || '').toLowerCase();
   const email = (user?.email || '').toLowerCase();
   const phone = (user?.phone || '');
@@ -80,6 +84,9 @@ export function getSubjectIdByName(name) {
 export function getTeacherProfileDefaults(user) {
   const base = legacyProfileDefaults(user);
   const dbSubject = user?.teaching_subjects?.[0];
+  if (user?.is_guest) {
+    return { ...base, department: '', position: 'Giáo viên khách', isHomeroom: false, homeroomClass: null };
+  }
   if (!dbSubject) return base;
   // Keep position/department consistent with the DB-assigned subject.
   const homeroomSuffix = base.isHomeroom && base.homeroomClass ? ` • Chủ nhiệm ${base.homeroomClass}` : '';

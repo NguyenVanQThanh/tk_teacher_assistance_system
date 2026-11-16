@@ -24,7 +24,10 @@ const S = {
 // Same grade resolution as the exercise repository page
 const gradeOf = (ex) => String(ex.ai_metadata?.grade ?? (ex.title.match(/\b(10|11|12)\b/)?.[1] || '12')).replace(/\D/g, '');
 
+import { useAuth } from '../../context/AuthContext';
+
 export default function AssignExercisesDialog({ isOpen, onClose, classId, grade, onAssigned }) {
+  const { isGuest } = useAuth();
   const [items, setItems] = useState([]);
   const [picked, setPicked] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -45,7 +48,7 @@ export default function AssignExercisesDialog({ isOpen, onClose, classId, grade,
       .finally(() => setLoading(false));
   }, [isOpen, grade]);
 
-  if (!isOpen) return null;
+  if (!isOpen || isGuest) return null;
 
   const toggle = (id) => setPicked((p) => (p.includes(id) ? p.filter((x) => x !== id) : [...p, id]));
 
