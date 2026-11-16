@@ -8,7 +8,7 @@
 import React from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from './context/AuthContext';
-import ProtectedRoute from './components/common/ProtectedRoute';
+import ProtectedRoute, { guestHome } from './components/common/ProtectedRoute';
 import TeacherLayout from './components/layout/TeacherLayout';
 import StudentLayout from './components/layout/StudentLayout';
 import LoginPage from './pages/LoginPage';
@@ -47,6 +47,9 @@ const AdminMonitoringPage = React.lazy(() => import('./pages/admin/AdminMonitori
 
 function RootRedirector() {
   const { user } = useAuth();
+  if (user?.is_guest) {
+    return <Navigate to={guestHome(user.role)} replace />;
+  }
   if (user?.role === 'Admin') {
     return <Navigate to="/admin" replace />;
   }

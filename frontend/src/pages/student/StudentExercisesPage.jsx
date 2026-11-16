@@ -41,6 +41,7 @@ import {
   Search
 } from 'lucide-react';
 import AiSourcesList from '../../components/exercises/AiSourcesList';
+import { useAuth } from '../../context/AuthContext';
 import { classesApi, assignmentsApi, attemptsApi, subjectsApi, aiExercisesApi } from '../../services/api';
 import { getErrorMessage } from '../../utils/errorMessages';
 import useDataSync from '../../hooks/useDataSync';
@@ -165,6 +166,7 @@ const clearSessionCache = () => {
 export default function StudentExercisesPage() {
   const navigate = useNavigate();
   const location = useLocation();
+  const { isGuest } = useAuth();
   const [selectedTab, setSelectedTab] = useState('all'); // 'all', 'active', 'overdue', 'completed'
   const [searchTitle, setSearchTitle] = useState('');
   const [selectedSubject, setSelectedSubject] = useState('all');
@@ -484,7 +486,7 @@ export default function StudentExercisesPage() {
             assignment_id: a.assignment_id,
             exercise_id: a.exercise_id,
             class_id: a.class_id,
-            className: a.class_name || 'Lớp học',
+            className: a.class_name || (isGuest ? 'Bài tập AI' : 'Lớp học'),
             type: 'quiz',
             category: a.category || (isAi ? 'ai_generated' : 'class_exercise'),
             categoryLabel: a.categoryLabel || (isAi ? 'Bài tập tạo sinh AI' : 'Bài tập trên lớp'),
@@ -708,6 +710,7 @@ export default function StudentExercisesPage() {
   const [generatedAiResult, setGeneratedAiResult] = useState(null);
 
   // Form Configuration for AI Exercise
+  const [aiGrade, setAiGrade] = useState(''); // guests only: 10-12, required
   const [aiSubjectId, setAiSubjectId] = useState('');
   const [aiDuration, setAiDuration] = useState(45);
   const [aiTopicPrompt, setAiTopicPrompt] = useState('');
@@ -811,6 +814,10 @@ export default function StudentExercisesPage() {
 
   // Submit AI Generation Handler (Persisted to Database)
   const handleGenerateAiExercise = async () => {
+    if (isGuest && !aiGrade) {
+      toast.error('Vui lòng chọn khối lớp.');
+      return;
+    }
     if (!aiSubjectId) {
       toast.error('Vui lòng chọn môn học.');
       return;
@@ -847,6 +854,7 @@ export default function StudentExercisesPage() {
       const toLevels = (l) => ({ NhanBiet: l.know, ThongHieu: l.comp, VanDung: l.app });
       const payload = {
         subject_id: aiSubjectId,
+        ...(isGuest ? { grade: Number(aiGrade) } : {}),
         chapters: aiSelectedChapters,
         topic_prompt: aiTopicPrompt.trim(),
         duration_minutes: aiDuration,
@@ -966,6 +974,8 @@ export default function StudentExercisesPage() {
   // Client-side query and filter on cached data in the current session
   const filteredAssignments = useMemo(() => {
     return assignmentsList.filter(item => {
+      // Guests only see their own AI-generated exercises.
+      if (isGuest && item.category !== 'ai_generated' && !item.isAiGenerated) return false;
       // 1. Category / Type filter
       if (selectedType !== 'all') {
         const itemCat = item.category || (item.isAiGenerated ? 'ai_generated' : 'class_exercise');
@@ -1019,7 +1029,7 @@ export default function StudentExercisesPage() {
 
       return true;
     });
-  }, [assignmentsList, selectedType, selectedSubject, searchTitle, selectedTab]);
+  }, [assignmentsList, selectedType, selectedSubject, searchTitle, selectedTab, isGuest]);
 
   const handleStartExercise = (item) => {
     const targetExerciseId = item.exercise_id || item.exerciseId || item.id;
@@ -1451,6 +1461,23 @@ export default function StudentExercisesPage() {
                   </div>
 
                   <div className="ai-config-grid-3cols">
+                    {isGuest && (
+                      <div className="ai-form-group">
+                        <label className="ai-form-label" htmlFor="ai-grade-select">Khối lớp</label>
+                        <select
+                          id="ai-grade-select"
+                          className="ai-form-select"
+                          value={aiGrade}
+                          onChange={(e) => setAiGrade(e.target.value)}
+                        >
+                          <option value="">-- Chọn khối --</option>
+                          <option value="10">Khối 10</option>
+                          <option value="11">Khối 11</option>
+                          <option value="12">Khối 12</option>
+                        </select>
+                      </div>
+                    )}
+
                     <div className="ai-form-group">
                       <label className="ai-form-label" htmlFor="ai-subject-select">Môn học</label>
                       <select
@@ -1915,7 +1942,7 @@ export default function StudentExercisesPage() {
                   type="button" 
                   className="btn-modal-generate-submit"
                   onClick={handleGenerateAiExercise}
-                  disabled={totalAiQuestions === 0 || !aiSubjectId || aiSelectedChapters.length === 0 || Boolean(aiFileError)}
+                  disabled={totalAiQuestions === 0 || !aiSubjectId || (isGuest && !aiGrade) || aiSelectedChapters.length === 0 || Boolean(aiFileError)}
                 >
                   <Sparkles size={16} />
                   <span>Khởi tạo bài tập với AI ({totalAiQuestions} câu)</span>

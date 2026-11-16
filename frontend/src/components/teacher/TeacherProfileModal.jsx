@@ -102,10 +102,24 @@ export default function TeacherProfileModal({
   const [errorMessage, setErrorMessage] = useState(null);
 
   // Save profile changes
-  const handleSaveProfile = (e) => {
+  const handleSaveProfile = async (e) => {
     e.preventDefault();
-    setIsEditingProfile(false);
-    setToastMessage('Đã cập nhật thông tin hồ sơ cá nhân thành công!');
+        const fullName = profileForm.fullName.trim().normalize('NFC');
+    if (!/^[\p{L}\s]+$/u.test(fullName)) {
+      setToastMessage('Họ và tên chỉ được nhập chữ cái và khoảng trắng.');
+      return;
+    }
+    try {
+      await authApi.updateProfile({
+        full_name: fullName,
+        email: profileForm.email,
+        phone: (profileForm.phone || '').replace(/\s+/g, ''),
+      });
+      setIsEditingProfile(false);
+      setToastMessage('Đã cập nhật thông tin hồ sơ cá nhân thành công!');
+    } catch (err) {
+      setToastMessage(getErrorMessage(err, 'Lỗi khi cập nhật hồ sơ cá nhân.'));
+    }
     setTimeout(() => setToastMessage(null), 3000);
   };
 

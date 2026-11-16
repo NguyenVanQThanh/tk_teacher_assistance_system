@@ -5,6 +5,7 @@
 // Updated At: 2026-09-02
 // Updated By: Tam Khang
 
+import useAcademicYear from '../../hooks/useAcademicYear';
 import React, { useState, useMemo, useEffect } from 'react';
 import { 
   X, 
@@ -183,6 +184,7 @@ export default function StudentDetailModal({
   classInfo,
   isHomeroom = classInfo?.roleLabel === 'Lớp chủ nhiệm'
 }) {
+  const currentYear = useAcademicYear();
   if (!isOpen || !student) return null;
 
   const subjectOptions = [
@@ -775,7 +777,7 @@ export default function StudentDetailModal({
           <div className="modal-title-row">
             <div className="title-text-group">
               <h1 className="modal-page-title">
-                Bảng theo dõi năng lực học sinh: Học kỳ 1, {(classInfo?.term || '2025-2026').replace('-', '–')}
+                Bảng theo dõi năng lực học sinh: Học kỳ 1, {(classInfo?.term || currentYear.value).replace('-', '–')}
               </h1>
               <p className="modal-page-subtitle">
                 {isHomeroom && selectedSubject === 'all'

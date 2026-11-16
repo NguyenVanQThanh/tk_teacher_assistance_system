@@ -5,6 +5,7 @@
 // Updated At: 2026-11-15
 // Updated By: AI Agent
 
+import useAcademicYear, { fallbackAcademicYear } from '../../hooks/useAcademicYear';
 import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import { 
   GraduationCap, 
@@ -145,7 +146,7 @@ const mapApiClassToUi = (cls, teacherById = {}) => {
     status: rawStatus === 'INACTIVE' ? 'inactive' : (isPendingTeacher ? 'pending_teacher' : 'active'),
     rawStatus,
     statusLabel,
-    academicYear: (cls.school_year || cls.academic_year || '2024-2025').replace('-', ' - '),
+    academicYear: (cls.school_year || cls.academic_year || fallbackAcademicYear()).replace('-', ' - '),
   };
 };
 
@@ -176,6 +177,7 @@ const mapApiStudentToUi = (st) => {
 };
 
 export default function AdminClassesPage() {
+  const currentYear = useAcademicYear();
   // State for tabs & filters
   const [activeTab, setActiveTab] = useState('all'); // 'all' | 'k10' | 'k11' | 'k12'
   const [searchQuery, setSearchQuery] = useState('');
@@ -188,7 +190,7 @@ export default function AdminClassesPage() {
   // Active filter tags state
   const [filterTags, setFilterTags] = useState([
     { id: 'grade', label: 'Tất cả khối lớp' },
-    { id: 'year', label: 'Niên khóa: 2024 - 2025' }
+    { id: 'year', label: `Niên khóa: ${currentYear.label}` }
   ]);
 
   // Modals & loading state
@@ -285,7 +287,7 @@ export default function AdminClassesPage() {
     grade: 'Khối 10',
     track: 'Chuẩn',
     capacity: 45,
-    schoolYear: '2024-2025',
+    schoolYear: currentYear.value,
     teacher: ''
   });
 
@@ -293,7 +295,7 @@ export default function AdminClassesPage() {
   const [editClassForm, setEditClassForm] = useState({
     id: '',
     name: '',
-    schoolYear: '2024-2025',
+    schoolYear: currentYear.value,
     homeroomTeacherId: '',
     status: 'ACTIVE'
   });
@@ -406,7 +408,7 @@ export default function AdminClassesPage() {
     setEditClassForm({
       id: cls.id,
       name: cls.name,
-      schoolYear: (cls.academicYear || '2024-2025').replace(/\s+/g, ''),
+      schoolYear: (cls.academicYear || currentYear.value).replace(/\s+/g, ''),
       homeroomTeacherId: cls.homeroomTeacherId ? String(cls.homeroomTeacherId) : '',
       status: cls.rawStatus || 'ACTIVE',
     });
@@ -824,7 +826,7 @@ export default function AdminClassesPage() {
     try {
       const created = await classesApi.createClass({
         class_name: newClass.name.trim(),
-        school_year: newClass.schoolYear || '2024-2025',
+        school_year: newClass.schoolYear || currentYear.value,
         homeroom_teacher_id: newClass.teacher || null,
         specialization: newClass.specialty?.trim() || null,
         status: 'ACTIVE',
@@ -839,7 +841,7 @@ export default function AdminClassesPage() {
         grade: 'Khối 10',
         track: 'Chuẩn',
         capacity: 45,
-        schoolYear: '2024-2025',
+        schoolYear: currentYear.value,
         teacher: ''
       });
     } catch (err) {
@@ -1439,7 +1441,7 @@ export default function AdminClassesPage() {
                 <input 
                   type="text" 
                   className="admin-form-input" 
-                  placeholder="2024-2025" 
+                  placeholder={currentYear.value} 
                   value={newClass.schoolYear}
                   onChange={e => setNewClass(p => ({ ...p, schoolYear: e.target.value }))}
                 />
@@ -1486,7 +1488,7 @@ export default function AdminClassesPage() {
                   <input 
                     type="text" 
                     className="admin-form-input" 
-                    placeholder="2024-2025"
+                    placeholder={currentYear.value}
                     value={editClassForm.schoolYear}
                     onChange={e => setEditClassForm(p => ({ ...p, schoolYear: e.target.value }))}
                   />

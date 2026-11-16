@@ -16,6 +16,7 @@ import {
 } from 'lucide-react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
+import GuestLock from '../common/GuestLock';
 import './StudentSidebar.css';
 
 export default function StudentSidebar({ activeNav, onSelectNav }) {
@@ -24,7 +25,7 @@ export default function StudentSidebar({ activeNav, onSelectNav }) {
   const location = useLocation();
 
   const displayName = user?.full_name ? `HS. ${user.full_name}` : 'HS. Nguyễn Hoàng Nam';
-  const displayClass = user?.class_name || '12A1';
+  const displayClass = user?.is_guest ? 'Khách' : (user?.class_name || '12A1');
   const initial = user?.full_name 
     ? user.full_name.split(' ').map(n => n[0]).slice(-2).join('').toUpperCase() 
     : 'HN';
@@ -88,7 +89,7 @@ export default function StudentSidebar({ activeNav, onSelectNav }) {
         >
           {displayName}
         </h3>
-        <p className="student-school">Lớp {displayClass} • Trường THPT Chuyên</p>
+        <p className="student-school">{user?.is_guest ? 'Học sinh khách' : `Lớp ${displayClass}`} • Trường THPT Chuyên</p>
       </div>
 
       {/* Quick Action Button */}
@@ -108,28 +109,31 @@ export default function StudentSidebar({ activeNav, onSelectNav }) {
           const Icon = item.icon;
           const isActive = currentActive === item.id;
           return (
-            <button
-              key={item.id}
-              className={`nav-item-btn ${isActive ? 'active' : ''}`}
-              onClick={() => handleItemClick(item.id)}
-            >
-              <Icon size={18} className="nav-icon" />
-              <span className="nav-label">{item.label}</span>
-            </button>
+            <GuestLock key={item.id} block locked={item.id !== 'exercises'}>
+              <button
+                className={`nav-item-btn ${isActive ? 'active' : ''}`}
+                onClick={() => handleItemClick(item.id)}
+              >
+                <Icon size={18} className="nav-icon" />
+                <span className="nav-label">{item.label}</span>
+              </button>
+            </GuestLock>
           );
         })}
       </nav>
 
       {/* Bottom Settings Link */}
       <div className="sidebar-bottom-actions">
-        <button
-          type="button"
-          className={`nav-item-btn bottom-setting-btn ${currentActive === 'settings' ? 'active' : ''}`}
-          onClick={() => handleItemClick('settings')}
-        >
-          <Settings size={18} className="nav-icon" />
-          <span className="nav-label">Cài đặt</span>
-        </button>
+        <GuestLock block>
+          <button
+            type="button"
+            className={`nav-item-btn bottom-setting-btn ${currentActive === 'settings' ? 'active' : ''}`}
+            onClick={() => handleItemClick('settings')}
+          >
+            <Settings size={18} className="nav-icon" />
+            <span className="nav-label">Cài đặt</span>
+          </button>
+        </GuestLock>
       </div>
     </aside>
   );

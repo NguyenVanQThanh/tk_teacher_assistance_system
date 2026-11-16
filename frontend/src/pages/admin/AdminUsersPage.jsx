@@ -38,6 +38,8 @@ import {
 } from 'lucide-react';
 import { adminUsersApi, classesApi, subjectsApi } from '../../services/api';
 import { useAuth } from '../../context/AuthContext';
+import useAcademicYear from '../../hooks/useAcademicYear';
+import CredentialModal from '../../components/admin/CredentialModal';
 import './AdminUsersPage.css';
 import confirmDialog from '../../components/common/confirmDialog';
 import { getErrorMessage } from '../../utils/errorMessages';
@@ -61,7 +63,9 @@ const DEFAULT_DEPARTMENT_OPTIONS = [
 
 const USER_DRAFT_STORAGE_KEY = 'admin_user_draft';
 const DRAFT_MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000;
-const FULL_NAME_REGEX = /^[a-zA-Z\sàáảãạăắằẳẵặâấầẩẫậđèéẻẽẹêếềểễệìíỉĩịòóỏõọôốồổỗộơớờởỡợùúủũụưứừửữựỳýỷỹỵÀÁẢÃẠĂẮẰẲẴẶÂẤẦẨẪẬĐÈÉẺẼẸÊẾỀỂỄỆÌÍỈĨỊÒÓỎÕỌÔỐỒỔỖỘƠỚỜỞỠỢÙÚỦŨỤƯỨỪỬỮỰỲÝỶỸỴ]+$/;
+// Unicode letters + whitespace only; input is NFC-normalized before the test (Vietnamese IME safe).
+const FULL_NAME_REGEX = /^[\p{L}\s]+$/u;
+const isValidFullName = (v) => FULL_NAME_REGEX.test(String(v).normalize('NFC'));
 
 // Strict Calendar Date Validation (e.g. rejects 31/02/2020)
 const validateCalendarDate = (dateStr) => {
@@ -342,6 +346,7 @@ function DateOfBirthInput({ value, onChange, roleType, error, onErrorChange }) {
 
 export default function AdminUsersPage() {
   const { user: authUser } = useAuth();
+  const currentYear = useAcademicYear();
   const isSelf = (u) => !!authUser && String(u?.id) === String(authUser.user_id);
   // State for tabs & filters
   const [activeTab, setActiveTab] = useState('all'); // 'all' | 'students' | 'teachers' | 'pending'
@@ -349,6 +354,7 @@ export default function AdminUsersPage() {
   const [gradeFilter, setGradeFilter] = useState('all');
   const [deptFilter, setDeptFilter] = useState('all');
   const [statusFilter, setStatusFilter] = useState('all');
+  const [guestFilter, setGuestFilter] = useState('all'); // 'all' | 'guest' | 'regular'
   const [selectedIds, setSelectedIds] = useState([]);
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
@@ -356,7 +362,7 @@ export default function AdminUsersPage() {
   // Active filter tags state
   const [filterTags, setFilterTags] = useState([
     { id: 'role', label: 'Tất cả vai trò' },
-    { id: 'year', label: 'Niên khóa: 2024 - 2025' }
+    { id: 'year', label: `Niên khóa: ${currentYear.label}` }
   ]);
 
   // Data state
@@ -404,7 +410,6 @@ export default function AdminUsersPage() {
     gender: 'Nam',
     phone: '',
     classRoom: DEFAULT_CLASS_OPTIONS[0],
-    academicYear: 'Niên khóa 2024 - 2025 (Hiện tại)',
     parentName: '',
     parentPhone: '',
     department: DEFAULT_DEPARTMENT_OPTIONS[0],
@@ -518,6 +523,7 @@ export default function AdminUsersPage() {
         status: statusParam,
         grade: gradeFilter === 'all' ? undefined : gradeFilter,
         department: deptFilter === 'all' ? undefined : deptFilter,
+        is_guest: guestFilter === 'all' ? undefined : guestFilter === 'guest',
       };
 
       const data = await adminUsersApi.getUsers(params);
@@ -537,6 +543,8 @@ export default function AdminUsersPage() {
         avatarText: (u.full_name || 'US').trim().split(' ').slice(-2).map(w => w[0]).join('').toUpperCase(),
         avatarBg: (u.role || '').toLowerCase() === 'student' ? '#EDE9FE' : '#F3ECFF',
         avatarColor: (u.role || '').toLowerCase() === 'student' ? '#6D28D9' : '#5B32A8',
+        isGuest: !!u.is_guest,
+        guestIp: u.guest_ip || '',
         rawUser: u
       }));
 
@@ -549,7 +557,7 @@ export default function AdminUsersPage() {
     } finally {
       setLoading(false);
     }
-  }, [activeTab, statusFilter, gradeFilter, deptFilter, searchQuery, currentPage, pageSize]);
+  }, [activeTab, statusFilter, guestFilter, gradeFilter, deptFilter, searchQuery, currentPage, pageSize]);
 
   useEffect(() => {
     fetchUsers();
@@ -597,22 +605,18 @@ export default function AdminUsersPage() {
     handleAutoGenerateCode(role);
   };
 
-  // Full name input handler: DISALLOWS NUMBERS AND SPECIAL CHARACTERS
-  const handleFullNameKeyDown = (e) => {
-    if (
-      !/^[a-zA-Z\sàáảãạăắằẳẵặâấầẩẫậđèéẻẽẹêếềểễệìíỉĩịòóỏõọôốồổỗộơớờởỡợùúủũụưứừửữựỳýỷỹỵÀÁẢÃẠĂẮẰẲẴẶÂẤẦẨẪẬĐÈÉẺẼẸÊẾỀỂỄỆÌÍỈĨỊÒÓỎÕỌÔỐỒỔỖỘƠỚỜỞỠỢÙÚỦŨỤƯỨỪỬỮỰỲÝỶỸỴ]$/.test(e.key) &&
-      !['Backspace', 'Delete', 'ArrowLeft', 'ArrowRight', 'Tab', 'Enter', 'Home', 'End'].includes(e.key)
-    ) {
-      e.preventDefault();
-      setNameError('Họ và tên chỉ được nhập chữ cái và khoảng trắng, không chứa chữ số hoặc ký tự đặc biệt.');
-    }
+  // Full name: store the raw value (never filter while typing, so IME composition is not broken);
+  // validation runs on blur and on submit.
+  const handleFullNameChange = (e) => {
+    const value = e.target.value;
+    setNewUserForm(p => ({ ...p, fullName: value }));
+    if (nameError) setNameError(null);
   };
 
-  const handleFullNameChange = (e) => {
-    const filtered = e.target.value.replace(/[^a-zA-Z\sàáảãạăắằẳẵặâấầẩẫậđèéẻẽẹêếềểễệìíỉĩịòóỏõọôốồổỗộơớờởỡợùúủũụưứừửữựỳýỷỹỵÀÁẢÃẠĂẮẰẲẴẶÂẤẦẨẪẬĐÈÉẺẼẸÊẾỀỂỄỆÌÍỈĨỊÒÓỎÕỌÔỐỒỔỖỘƠỚỜỞỠỢÙÚỦŨỤƯỨỪỬỮỰỲÝỶỸỴ]/g, '');
-    setNewUserForm(p => ({ ...p, fullName: filtered }));
-    if (filtered.trim().length >= 2) {
-      setNameError(null);
+  const handleFullNameBlur = (e) => {
+    const v = e.target.value.trim();
+    if (v && !isValidFullName(v)) {
+      setNameError('Họ và tên chỉ được nhập chữ cái và khoảng trắng, không chứa chữ số hoặc ký tự đặc biệt.');
     }
   };
 
@@ -655,7 +659,7 @@ export default function AdminUsersPage() {
       return { valid: false, trimmedName };
     }
 
-    if (!FULL_NAME_REGEX.test(trimmedName)) {
+    if (!isValidFullName(trimmedName)) {
       if (showFeedback) {
         setNameError('Họ và tên không được chứa chữ số hoặc ký tự đặc biệt.');
         showToast('Họ và tên không được chứa chữ số hoặc ký tự đặc biệt.');
@@ -716,7 +720,6 @@ export default function AdminUsersPage() {
       gender: 'Nam',
       phone: '',
       classRoom: DEFAULT_CLASS_OPTIONS[0],
-      academicYear: 'Niên khóa 2024 - 2025 (Hiện tại)',
       parentName: '',
       parentPhone: '',
       department: DEFAULT_DEPARTMENT_OPTIONS[0],
@@ -773,7 +776,17 @@ export default function AdminUsersPage() {
       const res = await adminUsersApi.createUser(buildCreateUserPayload(trimmedName));
       localStorage.removeItem(USER_DRAFT_STORAGE_KEY);
       setIsAddModalOpen(false);
-      showToast(`Tạo thành công ${res.role === 'Student' ? 'Học sinh' : 'Giáo viên'} "${res.full_name}". Mật khẩu mặc định đã tự động sinh và gửi qua SMS / hệ thống.`);
+      if (res?.temporary_password) {
+        setCredentialResult({
+          title: 'Tài khoản đã được tạo',
+          fullName: res.full_name,
+          code: res.code || newUserForm.code,
+          role: res.role,
+          phone: res.phone,
+          temporaryPassword: res.temporary_password,
+        });
+      }
+      showToast(`Tạo thành công ${res.role === 'Student' ? 'Học sinh' : 'Giáo viên'} "${res.full_name}".`);
       resetNewUserForm();
       await fetchUsers();
     } catch (err) {
@@ -899,7 +912,7 @@ export default function AdminUsersPage() {
   // Reset password
   const handleResetPassword = async (user) => {
     setActiveMenuUserId(null);
-    if (await confirmDialog(`Bạn có chắc muốn đặt lại mật khẩu cho ${user.fullName}? Mật khẩu mặc định mới sẽ tự động tạo và gửi thông báo qua SMS/hệ thống.`)) {
+    if (await confirmDialog(`Bạn có chắc muốn đặt lại mật khẩu cho ${user.fullName}? Mật khẩu tạm thời mới sẽ được hiển thị một lần.`)) {
       setLoading(true);
       try {
         const res = await adminUsersApi.resetPassword(user.id);
@@ -911,10 +924,8 @@ export default function AdminUsersPage() {
           phone: user.phone,
           email: user.email,
           temporaryPassword: res.temporary_password,
-          notificationChannel: res.notification_channel || 'SMS & Thông báo hệ thống',
-          notificationMessage: res.notification_message
         });
-        showToast(`Đã đặt lại mật khẩu cho ${user.fullName}. Mật khẩu mới đã tự động gửi qua SMS/hệ thống.`);
+        showToast(`Đã đặt lại mật khẩu cho ${user.fullName}.`);
       } catch (err) {
         showToast('Lỗi khi đặt lại mật khẩu.');
       } finally {
@@ -931,6 +942,10 @@ export default function AdminUsersPage() {
     const trimmedName = selectedUser.fullName.trim();
     if (!trimmedName || trimmedName.length < 2) {
       showToast('Họ và tên không được để trống (tối thiểu 2 ký tự).');
+      return;
+    }
+    if (!isValidFullName(trimmedName)) {
+      showToast('Họ và tên chỉ được nhập chữ cái và khoảng trắng, không chứa chữ số hoặc ký tự đặc biệt.');
       return;
     }
 
@@ -1075,6 +1090,7 @@ export default function AdminUsersPage() {
     setGradeFilter('all');
     setDeptFilter('all');
     setStatusFilter('all');
+    setGuestFilter('all');
     setActiveTab('all');
     setCurrentPage(1);
     showToast('Đã đặt lại tất cả bộ lọc về mặc định.');
@@ -1261,6 +1277,20 @@ export default function AdminUsersPage() {
             <ChevronDown size={14} className="filter-select-arrow" />
           </div>
 
+          {/* Guest Dropdown */}
+          <div className="filter-select-wrapper">
+            <select
+              className="filter-select"
+              value={guestFilter}
+              onChange={e => { setGuestFilter(e.target.value); setCurrentPage(1); }}
+            >
+              <option value="all">Tất cả loại tài khoản</option>
+              <option value="guest">Khách</option>
+              <option value="regular">Chính thức</option>
+            </select>
+            <ChevronDown size={14} className="filter-select-arrow" />
+          </div>
+
           {/* Reset Filters Button (matching original style) */}
           <button 
             type="button" 
@@ -1399,6 +1429,9 @@ export default function AdminUsersPage() {
                         {user.roleKey === 'admin' && (
                           <span className="role-pill admin">Quản trị viên</span>
                         )}
+                        {user.isGuest && (
+                          <span className="role-pill" style={{ marginLeft: 6, background: '#FEF3C7', color: '#92400E' }}>Khách</span>
+                        )}
                       </td>
 
                       {/* Department / Class */}
@@ -1471,15 +1504,17 @@ export default function AdminUsersPage() {
                             <Edit2 size={16} />
                           </button>
 
-                          {/* 3. Reset password */}
-                          <button 
-                            type="button" 
-                            className="table-action-icon-btn text-warning" 
-                            title="Đặt lại mật khẩu"
-                            onClick={() => handleResetPassword(user)}
-                          >
-                            <Key size={16} />
-                          </button>
+                          {/* 3. Reset password (not for guests or Admin accounts) */}
+                          {!user.isGuest && user.roleKey !== 'admin' && (
+                            <button
+                              type="button"
+                              className="table-action-icon-btn text-warning"
+                              title="Đặt lại mật khẩu"
+                              onClick={() => handleResetPassword(user)}
+                            >
+                              <Key size={16} />
+                            </button>
+                          )}
 
                           {/* 4. Quick lock / unlock (never offered for the signed-in admin's own account) */}
                           {!isSelf(user) && (
@@ -1619,7 +1654,7 @@ export default function AdminUsersPage() {
               Cần đồng bộ danh sách học sinh từ cơ sở dữ liệu Bộ GD&ĐT?
             </h4>
             <p className="sync-banner-desc">
-              Hệ thống hỗ trợ nhập liệu hàng loạt qua file Excel / CSV với mẫu chuẩn hóa (tự động cấp mật khẩu và thông báo SMS).
+              Hệ thống hỗ trợ nhập liệu hàng loạt qua file Excel / CSV với mẫu chuẩn hóa (tự động cấp mật khẩu tạm thời).
             </p>
           </div>
         </div>
@@ -1691,6 +1726,12 @@ export default function AdminUsersPage() {
                   <span className="info-label">Trạng thái:</span>
                   <span className="info-value font-bold" style={{ textTransform: 'uppercase' }}>{selectedUser.status}</span>
                 </div>
+                {selectedUser.isGuest && (
+                  <div className="info-item">
+                    <span className="info-label">Loại tài khoản / IP khách:</span>
+                    <span className="info-value">Khách • {selectedUser.guestIp || 'Không rõ'}</span>
+                  </div>
+                )}
                 <div className="info-item">
                   <span className="info-label">Ngày khởi tạo:</span>
                   <span className="info-value">{selectedUser.lastLoginDate}</span>
@@ -1724,10 +1765,7 @@ export default function AdminUsersPage() {
                   type="text" 
                   className="admin-form-input" 
                   value={selectedUser.fullName}
-                  onChange={e => {
-                    const filtered = e.target.value.replace(/[^a-zA-Z\sàáảãạăắằẳẵặâấầẩẫậđèéẻẽẹêếềểễệìíỉĩịòóỏõọôốồổỗộơớờởỡợùúủũụưứừửữựỳýỷỹỵÀÁẢÃẠĂẮẰẲẴẶÂẤẦẨẪẬĐÈÉẺẼẸÊẾỀỂỄỆÌÍỈĨỊÒÓỎÕỌÔỐỒỔỖỘƠỚỜỞỠỢÙÚỦŨỤƯỨỪỬỮỰỲÝỶỸỴ]/g, '');
-                    setSelectedUser(p => ({ ...p, fullName: filtered }));
-                  }}
+                  onChange={e => setSelectedUser(p => ({ ...p, fullName: e.target.value }))}
                   required 
                 />
               </div>
@@ -1894,8 +1932,8 @@ export default function AdminUsersPage() {
                       className={`admin-form-input ${nameError ? 'has-error' : ''}`} 
                       placeholder="Ví dụ: Nguyễn Văn Hoàng"
                       value={newUserForm.fullName}
-                      onKeyDown={handleFullNameKeyDown}
                       onChange={handleFullNameChange}
+                      onBlur={handleFullNameBlur}
                       required 
                     />
                     {nameError ? (
@@ -2010,17 +2048,13 @@ export default function AdminUsersPage() {
                   {/* Niên khóa áp dụng */}
                   <div className="admin-form-group">
                     <label className="admin-form-label">Niên khóa áp dụng</label>
-                    <div className="select-dropdown-wrapper">
-                      <select 
-                        className="admin-form-select"
-                        value={newUserForm.academicYear}
-                        onChange={e => setNewUserForm(p => ({ ...p, academicYear: e.target.value }))}
-                      >
-                        <option value="Niên khóa 2024 - 2025 (Hiện tại)">Niên khóa 2024 - 2025 (Hiện tại)</option>
-                        <option value="Niên khóa 2023 - 2024">Niên khóa 2023 - 2024</option>
-                      </select>
-                      <ChevronDown size={14} className="select-arrow-icon" />
-                    </div>
+                    <input
+                      type="text"
+                      className="admin-form-input"
+                      value={`Niên khóa ${currentYear.label} (Hiện tại)`}
+                      readOnly
+                      disabled
+                    />
                   </div>
 
                   {/* Tên phụ huynh / Bằng cấp */}
@@ -2373,6 +2407,7 @@ export default function AdminUsersPage() {
           </div>
         </div>
       )}
+      <CredentialModal result={credentialResult} onClose={() => { setCredentialResult(null); setCopiedPassword(false); }} />
     </div>
   );
 }

@@ -135,7 +135,7 @@ export default function TeacherClassesPage() {
           }
 
           // Extract real grade from class name (e.g. 10A3 -> 10, 11B2 -> 11, 12A1 -> 12)
-          const gradeMatch = cls.class_name.match(/(10|11|12)/);
+          const gradeMatch = (cls.class_name || "").match(/(10|11|12)/);
           const grade = gradeMatch ? gradeMatch[1] : '';
 
           const subjectName = assignedSubjectName || profileSubjectRef.current || 'Bộ môn';

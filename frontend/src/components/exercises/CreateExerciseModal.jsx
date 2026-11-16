@@ -28,6 +28,7 @@ import {
   FileCheck,
   Lock
 } from 'lucide-react';
+import { useAuth } from '../../context/AuthContext';
 import { exercisesApi, subjectsApi, documentsApi } from '../../services/api';
 import './CreateExerciseModal.css';
 import { getErrorMessage } from '../../utils/errorMessages';
@@ -56,7 +57,9 @@ export default function CreateExerciseModal({ isOpen, onClose, onCreateSuccess }
   const [currentStep, setCurrentStep] = useState('select_method');
   const [title, setTitle] = useState('');
   const [grade, setGrade] = useState('12');
-  const [subject, setSubject] = useState('math');
+  const { isGuest } = useAuth();
+  // Guests must pick a subject explicitly (no default).
+  const [subject, setSubject] = useState('');
   const [type, setType] = useState('quiz');
   const [exerciseKind, setExerciseKind] = useState('PRACTICE');
   
@@ -74,7 +77,7 @@ export default function CreateExerciseModal({ isOpen, onClose, onCreateSuccess }
   const closeTimerRef = useRef(null);
   const [subjectsList, setSubjectsList] = useState([]);
   // Subject selected by the teacher (falls back to the first subject until the list loads)
-  const selectedSubjectName = subjectsList.find((s) => String(s.subject_id) === String(subject))?.subject_name || subjectsList[0]?.subject_name || 'Toán học';
+  const selectedSubjectName = subjectsList.find((s) => String(s.subject_id) === String(subject))?.subject_name || (isGuest ? '' : subjectsList[0]?.subject_name) || 'Toán học';
 
   // AI Generation Specific State
   const [aiPrompt, setAiPrompt] = useState('');
@@ -121,8 +124,8 @@ export default function CreateExerciseModal({ isOpen, onClose, onCreateSuccess }
         const subjs = await subjectsApi.getSubjects();
         if (isMounted && Array.isArray(subjs)) {
           setSubjectsList(subjs);
-          if (subjs.length > 0) {
-            setSubject(subjs[0].subject_id);
+          if (subjs.length > 0 && !isGuest) {
+            setSubject((prev) => prev || subjs[0].subject_id);
           }
         }
       } catch {
@@ -274,6 +277,13 @@ export default function CreateExerciseModal({ isOpen, onClose, onCreateSuccess }
     if (e?.preventDefault) e.preventDefault();
     setAiFailed(false);
 
+    if (!subject) {
+      const msg = 'Vui lòng chọn môn học.';
+      setErrorMsg(msg);
+      showToast(msg, 'error', 'Không thể tạo bài tập');
+      return;
+    }
+
     const totalQuestions = calculateTotalQuestions();
 
     if (totalQuestions === 0 && !aiPrompt.trim()) {
@@ -376,6 +386,11 @@ export default function CreateExerciseModal({ isOpen, onClose, onCreateSuccess }
     }
     if (answerFile && answerFile.size > MAX_IMPORT_BYTES) {
       setErrorMsg('File đáp án vượt quá 1MB. Vui lòng nén hoặc tách nhỏ file trước khi tải lên.');
+      return;
+    }
+
+    if (!subject) {
+      setErrorMsg('Vui lòng chọn môn học.');
       return;
     }
 
@@ -674,6 +689,7 @@ export default function CreateExerciseModal({ isOpen, onClose, onCreateSuccess }
                     onChange={(e) => setSubject(e.target.value)}
                     title="Chọn môn học cho bài tập"
                   >
+                    <option value="" disabled>Chọn môn học</option>
                     {subjectsList.map((s) => (
                       <option key={s.subject_id} value={s.subject_id}>{s.subject_name}</option>
                     ))}
@@ -1177,6 +1193,7 @@ export default function CreateExerciseModal({ isOpen, onClose, onCreateSuccess }
                     value={subject}
                     onChange={(e) => setSubject(e.target.value)}
                   >
+                    <option value="" disabled>Chọn môn học</option>
                     {subjectsList.map((s) => (
                       <option key={s.subject_id} value={s.subject_id}>{s.subject_name}</option>
                     ))}
