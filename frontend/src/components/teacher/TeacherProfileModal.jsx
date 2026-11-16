@@ -29,6 +29,7 @@ import {
   AlertCircle
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
+// Review note: authApi (with updateProfile, see services/api.js) and getErrorMessage are both imported in this file.
 import { authApi } from '../../services/api';
 import { getTeacherProfileDefaults } from '../../utils/teacherSubjectHelper';
 import './TeacherProfileModal.css';

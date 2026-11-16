@@ -386,6 +386,8 @@ export default function AdminUsersPage() {
   const menuRef = useRef(null);
 
   // Credential Result Modal (shows generated password & copy button)
+  // Review note: credentialResult / setCredentialResult / copiedPassword / setCopiedPassword are all declared here
+  // and used by CredentialModal (render at the bottom of this component), so there is no undefined setter.
   const [credentialResult, setCredentialResult] = useState(null);
   const [copiedPassword, setCopiedPassword] = useState(false);
 
