@@ -82,10 +82,18 @@ class AiExerciseService:
             raise _err(status.HTTP_404_NOT_FOUND, "ERR-ACAD-SUBJECT_NOT_FOUND", "Subject not found.")
         return taught, subject
 
+    @staticmethod
+    def _require_guest_grade(user: User, cls: Optional[Class], grade: Optional[int]) -> None:
+        """Guests have no class, so the client must send the grade; fail clearly instead of an empty SGK filter."""
+        if user.is_guest and cls is None and not grade:
+            raise _err(status.HTTP_422_UNPROCESSABLE_ENTITY, "ERR-EXE-AI_GRADE_REQUIRED",
+                       "Grade (10-12) is required for guest accounts.")
+
     def student_chapters(self, user: User, subject_id: uuid.UUID,
                          grade: Optional[int] = None) -> List[Dict[str, Any]]:
         """Chapters for a subject (grade parsed from the student's class name; guests pass `grade` 10-12)."""
         cls, subject = self._student_subject_context(user, subject_id)
+        self._require_guest_grade(user, cls, grade)
         grade = parse_grade(cls.class_name) if cls is not None else grade
         doc_ids = RagRetrievalService.resolve_sgk_filter(self.db, subject.subject_name, grade)
         return RagRetrievalService.list_chapters(self.db, doc_ids)
@@ -138,6 +146,7 @@ class AiExerciseService:
             raise _err(status.HTTP_422_UNPROCESSABLE_ENTITY, "ERR-EXE-AI_MATRIX_TOO_LARGE",
                        f"The matrix may request at most {MAX_TOTAL_QUESTIONS} questions.")
         class_obj, subject = self._student_subject_context(user, payload.subject_id)
+        self._require_guest_grade(user, class_obj, payload.grade)
         grade = parse_grade(class_obj.class_name) if class_obj is not None else payload.grade
         doc_ids = RagRetrievalService.resolve_sgk_filter(self.db, subject.subject_name, grade)
         allowed = {c["chapter"] for c in RagRetrievalService.list_chapters(self.db, doc_ids)}

@@ -141,6 +141,22 @@ def test_student_guest_generate_and_attempt_without_class(client, db_session, mo
     assert att.status_code in (200, 201), att.text
 
 
+def test_student_guest_requires_grade(client, db_session, monkeypatch):
+    _fake_questions(monkeypatch)
+    subject = Subject(subject_name=f"Ly {uuid.uuid4().hex[:6]}", status="ACTIVE")
+    db_session.add(subject)
+    db_session.flush()
+    s = _h(_guest(client, "Student"))
+    r = client.get(f"/api/v1/ai-exercises/chapters?subject_id={subject.subject_id}", headers=s)
+    assert r.status_code == 422 and "ERR-EXE-AI_GRADE_REQUIRED" in r.text
+    payload = {"subject_id": str(subject.subject_id), "chapters": ["C1"],
+               "matrix": {"mcq": {"NhanBiet": 1, "ThongHieu": 0, "VanDung": 0},
+                          "tf": {"NhanBiet": 0, "ThongHieu": 0, "VanDung": 0},
+                          "short": {"NhanBiet": 0, "ThongHieu": 0, "VanDung": 0}}}
+    r = client.post("/api/v1/ai-exercises/student", data={"payload": json.dumps(payload)}, headers=s)
+    assert r.status_code == 422 and "ERR-EXE-AI_GRADE_REQUIRED" in r.text
+
+
 def test_teacher_guest_ai_generate_without_assignment(client, db_session, monkeypatch):
     _fake_questions(monkeypatch)
     monkeypatch.setattr(RagContextService, "build_context_with_sources",

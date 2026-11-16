@@ -104,8 +104,8 @@ def upload_document(
     Upload a new teaching document with metadata.
     """
     if current_user.is_guest:
-        used = db.query(Document).filter(
-            Document.uploaded_by == current_user.user_id, Document.status != "DELETED").count()
+        # Soft-deleted rows still count so delete-and-reupload cannot bypass the cap.
+        used = db.query(Document).filter(Document.uploaded_by == current_user.user_id).count()
         if used >= app_config.GUEST_DOC_LIMIT:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
