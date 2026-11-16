@@ -24,6 +24,7 @@ from sqlalchemy.orm import Session
 from app.core.database import get_db
 from app.modules.admin.routers.users import require_admin_privilege
 from app.modules.admin.state_store import (
+    get_current_academic_year,
     append_state_item,
     list_state_items,
     record_audit_event,
@@ -76,7 +77,7 @@ class CustomReportCreateRequest(BaseModel):
     metricType: str = Field("overview", max_length=64)
     format: str = Field("pdf", max_length=20)
     frequency: str = Field("once", max_length=32)
-    academic_year: Optional[str] = "2025-2026"
+    academic_year: Optional[str] = None
     semester: Optional[str] = "HK1"
     grade: Optional[str] = "all"
     department: Optional[str] = "all"
@@ -116,7 +117,7 @@ def _to_utc(dt: Optional[datetime]) -> Optional[datetime]:
 
 def _compute_analytics(
     db: Session,
-    academic_year: str = "2025-2026",
+    academic_year: Optional[str] = None,
     semester: str = "HK1",
     grade: str = "all",
     department: str = "all",
@@ -125,6 +126,7 @@ def _compute_analytics(
     """
     Compute academic and AI adoption analytics from DB tables; empty data yields zeros.
     """
+    academic_year = academic_year or get_current_academic_year(db)
     norm_grade = _normalize_grade_prefix(grade)
     dept_key = department.strip().lower() if department else "all"
 
@@ -389,7 +391,7 @@ def _compute_analytics(
 
 @router.get("/analytics")
 def get_reports_analytics(
-    academic_year: str = Query("2025-2026"),
+    academic_year: Optional[str] = Query(None, description="Defaults to the current academic year"),
     semester: str = Query("HK1"),
     grade: str = Query("all"),
     department: str = Query("all"),
@@ -412,7 +414,7 @@ def get_reports_analytics(
 @router.get("/export")
 def export_report(
     format: str = Query("csv", description="Export format: csv, json, pdf, or html"),
-    academic_year: str = Query("2025-2026"),
+    academic_year: Optional[str] = Query(None, description="Defaults to the current academic year"),
     semester: str = Query("HK1"),
     grade: str = Query("all"),
     department: str = Query("all"),
@@ -421,6 +423,7 @@ def export_report(
     """
     Stream a downloadable analytics report in CSV, JSON, or printable HTML-PDF format.
     """
+    academic_year = academic_year or get_current_academic_year(db)
     data = _compute_analytics(
         db=db,
         academic_year=academic_year,
@@ -503,7 +506,7 @@ def create_custom_report(
     """
     analytics = _compute_analytics(
         db=db,
-        academic_year=payload.academic_year or "2025-2026",
+        academic_year=payload.academic_year or get_current_academic_year(db),
         semester=payload.semester or "HK1",
         grade=payload.grade or "all",
         department=payload.department or "all",

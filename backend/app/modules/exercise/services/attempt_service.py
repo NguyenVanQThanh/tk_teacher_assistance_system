@@ -69,7 +69,8 @@ class AttemptService:
             )
 
         # 2. Verify student is enrolled in the assigned class
-        enrolled = self.db.query(StudentClass).filter(
+        # Personal assignments (owner == the student, no class) skip the enrollment check.
+        enrolled = assignment.owner_student_id == current_user.user_id or self.db.query(StudentClass).filter(
             StudentClass.student_id == current_user.user_id,
             StudentClass.class_id == assignment.class_id,
             StudentClass.status == 'ACTIVE'

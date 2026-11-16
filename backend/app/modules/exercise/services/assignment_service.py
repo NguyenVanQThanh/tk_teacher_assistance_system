@@ -292,19 +292,26 @@ class AssignmentService:
         role_name = get_user_role_name(self.db, current_user)
         accessible_class_ids = get_accessible_class_ids(self.db, current_user, role_name)
 
-        if accessible_class_ids is not None and len(accessible_class_ids) == 0:
+        is_student = role_name == "Student"
+        if accessible_class_ids is not None and len(accessible_class_ids) == 0 and not is_student:
             return []
 
+        # Outer join: personal assignments of guests/students may have no class at all.
         query = (
             self.db.query(ClassAssignment)
-            .join(ClassAssignment.class_obj)
+            .outerjoin(Class, ClassAssignment.class_id == Class.class_id)
             .join(ClassAssignment.exercise)
-            .filter(ClassAssignment.status != 'DELETED', Class.status != 'DELETED',
+            .filter(ClassAssignment.status != 'DELETED',
+                    or_(Class.class_id.is_(None), Class.status != 'DELETED'),
                     personal_visibility_clause(current_user))
         )
 
         if accessible_class_ids is not None:
-            query = query.filter(ClassAssignment.class_id.in_(accessible_class_ids))
+            if is_student:
+                query = query.filter(or_(ClassAssignment.class_id.in_(accessible_class_ids),
+                                         ClassAssignment.owner_student_id == current_user.user_id))
+            else:
+                query = query.filter(ClassAssignment.class_id.in_(accessible_class_ids))
 
         if subject_id:
             query = query.filter(Exercise.subject_id == subject_id)
@@ -430,7 +437,8 @@ class AssignmentService:
 
         role_name = get_user_role_name(self.db, current_user)
         if role_name == "Student":
-            enrolled = self.db.query(StudentClass).filter(
+            own_personal = assignment.owner_student_id == current_user.user_id
+            enrolled = own_personal or self.db.query(StudentClass).filter(
                 StudentClass.student_id == current_user.user_id,
                 StudentClass.class_id == assignment.class_id,
                 StudentClass.status != 'DELETED'
@@ -926,7 +934,7 @@ class AssignmentService:
             subject_obj = self.db.query(Subject).filter(Subject.subject_id == assignment.exercise.subject_id).first()
         subject_name = subject_obj.subject_name if subject_obj else "Toán học"
         teacher_name = assignment.assigner.full_name if assignment.assigner else "Giáo viên bộ môn"
-        class_name = assignment.class_obj.class_name if assignment.class_obj else "Lớp 12"
+        class_name = assignment.class_obj.class_name if assignment.class_obj else "Lớp 12"  # personal assignments have no class
         grade_name = "Lớp 12"
         if class_name:
             if "10" in class_name:

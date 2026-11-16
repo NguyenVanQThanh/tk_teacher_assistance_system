@@ -46,7 +46,7 @@ class NotificationPage(BaseModel):
 def _not_found() -> HTTPException:
     return HTTPException(
         status_code=status.HTTP_404_NOT_FOUND,
-        detail={"code": "ERR-NOTIFICATION-NOT-FOUND", "message": "Notification not found."},
+        detail={"code": "ERR-NOTIFICATION-NOT_FOUND", "message": "Notification not found."},
     )
 
 

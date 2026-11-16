@@ -146,7 +146,7 @@ class TestAdminPortalSeedData:
         assert len(head_members) > 0
         assert head_role["memberCount"] == len(head_members)
 
-        analytics_res = client.get("/api/v1/admin/reports/analytics", headers=headers)
+        analytics_res = client.get("/api/v1/admin/reports/analytics?academic_year=all", headers=headers)
         assert analytics_res.status_code == status.HTTP_200_OK
         analytics_data = analytics_res.json()
         assert analytics_data["kpis"]["total_exercises"] >= 14
