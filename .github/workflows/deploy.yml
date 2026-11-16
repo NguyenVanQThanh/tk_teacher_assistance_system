@@ -36,6 +36,13 @@
 #   Cùng quy tắc: secret rỗng => giữ nguyên .env.prod. Nếu STORAGE_BACKEND là r2
 #   mà thiếu bất kỳ R2_* nào thì deploy DỪNG trước khi restart.
 #
+# Variables cho guest / reverse proxy (Settings > Secrets and variables > Actions > Variables):
+#   TRUST_PROXY_HEADERS      true khi backend đứng sau Cloudflare Tunnel / nginx (mặc định false)
+#   TRUSTED_PROXY_HOPS       số proxy nối X-Forwarded-For (mặc định 1)
+#   GUEST_ACCESS_ENABLED     true | false (mặc định true)
+#   GUEST_CREATE_PER_IP_HOUR, GUEST_CREATE_GLOBAL_HOUR, GUEST_AI_LIMIT, GUEST_DOC_LIMIT
+#   Đây là cấu hình, không phải secret nên dùng Variables. Biến rỗng => giữ nguyên .env.prod.
+#
 # Secret tuỳ chọn:
 #   GHCR_PAT        PAT quyền read:packages — chỉ cần khi package để private
 # Variable tuỳ chọn:
@@ -184,6 +191,13 @@ jobs:
           R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
           R2_BUCKET: ${{ secrets.R2_BUCKET }}
           R2_PUBLIC_BASE_URL: ${{ secrets.R2_PUBLIC_BASE_URL }}
+          TRUST_PROXY_HEADERS: ${{ vars.TRUST_PROXY_HEADERS }}
+          TRUSTED_PROXY_HOPS: ${{ vars.TRUSTED_PROXY_HOPS }}
+          GUEST_ACCESS_ENABLED: ${{ vars.GUEST_ACCESS_ENABLED }}
+          GUEST_CREATE_PER_IP_HOUR: ${{ vars.GUEST_CREATE_PER_IP_HOUR }}
+          GUEST_CREATE_GLOBAL_HOUR: ${{ vars.GUEST_CREATE_GLOBAL_HOUR }}
+          GUEST_AI_LIMIT: ${{ vars.GUEST_AI_LIMIT }}
+          GUEST_DOC_LIMIT: ${{ vars.GUEST_DOC_LIMIT }}
         run: |
           set -euo pipefail
           umask 077
@@ -191,7 +205,7 @@ jobs:
           for name in IMAGE_TAG GHCR_USER GHCR_TOKEN PROFILE \
                       ADMIN_PHONE ADMIN_PASSWORD ADMIN_EMAIL ADMIN_FULL_NAME \
                       STORAGE_BACKEND R2_ACCOUNT_ID R2_ACCESS_KEY_ID R2_SECRET_ACCESS_KEY \
-                      R2_BUCKET R2_PUBLIC_BASE_URL; do
+                      R2_BUCKET R2_PUBLIC_BASE_URL \n                      TRUST_PROXY_HEADERS TRUSTED_PROXY_HOPS GUEST_ACCESS_ENABLED \n                      GUEST_CREATE_PER_IP_HOUR GUEST_CREATE_GLOBAL_HOUR GUEST_AI_LIMIT GUEST_DOC_LIMIT; do
             val="${!name:-}"
             if [ -n "$val" ]; then
               printf '%s=%s\n' "$name" "$val" >> /tmp/deploy.env

@@ -14,7 +14,8 @@
 # Input:
 #   $1                    thư mục project trên server (mặc định: thư mục hiện tại)
 #   <target>/.deploy.env  biến do CI đẩy lên: IMAGE_TAG, GHCR_USER, GHCR_TOKEN,
-#                         PROFILE, ADMIN_*, STORAGE_BACKEND, R2_*
+#                         PROFILE, ADMIN_*, STORAGE_BACKEND, R2_*, TRUST_PROXY_HEADERS,
+#                         TRUSTED_PROXY_HOPS, GUEST_*
 #                         File này bị xoá sau khi chạy xong.
 #
 # Không bao giờ in giá trị secret ra stdout.
