@@ -11,7 +11,7 @@ from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, List, Optional, Tuple
 
 from fastapi import HTTPException, status
-from sqlalchemy import func
+from sqlalchemy import func, text
 from sqlalchemy.orm import Session
 
 from app.core import config as app_config
@@ -88,6 +88,10 @@ class AiExerciseService:
         """Cap paid LLM generations per guest account; soft-deleted exercises still count."""
         if not user.is_guest:
             return
+        if self.db.get_bind().dialect.name == "postgresql":
+            # Transaction-scoped per-user lock, held until the exercise is committed in _persist, so parallel
+            # requests from one guest cannot all pass the count check.
+            self.db.execute(text("SELECT pg_advisory_xact_lock(hashtext(:k))"), {"k": "guest_quota:" + str(user.user_id)})
         used = self.db.query(func.count(Exercise.exercise_id)).filter(Exercise.created_by == user.user_id).scalar() or 0
         if used >= app_config.GUEST_AI_LIMIT:
             raise _err(status.HTTP_403_FORBIDDEN, "ERR-EXE-GUEST_AI_LIMIT",
