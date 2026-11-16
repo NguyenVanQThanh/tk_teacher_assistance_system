@@ -166,6 +166,9 @@ export default function AdminReportsPage() {
   const [timeframe, setTimeframe] = useState('week'); // 'week' | 'month'
   const currentYear = useAcademicYear();
   const [academicYear, setAcademicYear] = useState(currentYear.value);
+  // The profile may finish loading after the first render; follow it until the admin picks a year manually.
+  const [yearTouched, setYearTouched] = useState(false);
+  useEffect(() => { if (!yearTouched) setAcademicYear(currentYear.value); }, [currentYear.value, yearTouched]);
   const [semester, setSemester] = useState('Học kỳ II');
   const [gradeFilter, setGradeFilter] = useState('all');
   const [deptFilter, setDeptFilter] = useState('all');
@@ -533,7 +536,7 @@ export default function AdminReportsPage() {
       <section className="reports-subheader-filters">
         <div className="reports-dropdowns-group">
           <div className="report-select-wrapper">
-            <select value={academicYear} onChange={e => setAcademicYear(e.target.value)} className="report-select">
+            <select value={academicYear} onChange={e => { setYearTouched(true); setAcademicYear(e.target.value); }} className="report-select">
               {academicYearOptions(currentYear.value).map((y) => (
                 <option key={y} value={y}>Năm học {y.replace('-', ' - ')}</option>
               ))}
