@@ -219,3 +219,10 @@ def test_admin_list_stats_and_reset(client, db_session):
     assert all(i["is_guest"] for i in lst)
     r = client.post(f"/api/v1/admin/users/{gid}/reset-password", headers=admin)
     assert r.status_code == 403
+
+
+def test_guest_phone_fits_column(client, db_session):
+    """SQLite ignores VARCHAR length, so assert the generated phone fits users.phone explicitly."""
+    uid = uuid.UUID(_guest(client, "Student").json()["user"]["user_id"])
+    phone = db_session.query(User).filter(User.user_id == uid).one().phone
+    assert len(phone) <= User.__table__.c.phone.type.length
