@@ -89,14 +89,25 @@ def test_empty_scopes_short_circuit():
     db.execute.assert_not_called()
 
 
+def _fake_mistral(content=None, exc=None):
+    client = MagicMock()
+    if exc:
+        client.chat.complete.side_effect = exc
+    else:
+        client.chat.complete.return_value.choices = [MagicMock(message=MagicMock(content=content))]
+    return client
+
 def test_expand_query_fallback_and_parse(monkeypatch):
-    monkeypatch.setattr(rag, "_llm_text", lambda p: '["a", "b", "c", "d"]')
+    monkeypatch.setenv("MISTRAL_API_KEY", "k")
+    monkeypatch.setattr(rag, "_get_mistral_client", lambda: _fake_mistral('["a", "b", "c", "d"]'))
     assert Svc.expand_query("x") == ["a", "b", "c"]
 
-    def boom(p):
-        raise RuntimeError("x")
+    monkeypatch.setattr(rag, "_get_mistral_client", lambda: _fake_mistral(exc=RuntimeError("x")))
+    assert Svc.expand_query("x") == ["x"]
 
-    monkeypatch.setattr(rag, "_llm_text", boom)
+    # No Mistral key: skip the LLM and return the raw prompt
+    monkeypatch.delenv("MISTRAL_API_KEY", raising=False)
+    monkeypatch.delenv("MISTRAL_KEY", raising=False)
     assert Svc.expand_query("x") == ["x"]
 
 
