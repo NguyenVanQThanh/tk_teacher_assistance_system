@@ -200,20 +200,75 @@ def _embed(query: str) -> Optional[List[float]]:
 
 _UNSET: Any = object()
 
+# Lazy-initialized LLM clients (module-level singletons)
+_llm_lock = threading.Lock()
+_gemini_client: Optional[Any] = None
+_mistral_client: Optional[Any] = None
+
+
+def _get_gemini_client() -> Optional[Any]:
+    """Lazy initialization of Gemini client (reused across calls)."""
+    global _gemini_client
+    if _gemini_client is None:
+        key = _gemini_key()
+        if key:
+            with _llm_lock:
+                if _gemini_client is None:  # Double-check after acquiring lock
+                    try:
+                        from google import genai
+                        _gemini_client = genai.Client(api_key=key)
+                    except Exception as e:
+                        logger.warning("Failed to create Gemini client: %s", e)
+                        return None
+        else:
+            return None
+    return _gemini_client
+
+
+def _get_mistral_client() -> Optional[Any]:
+    """Lazy initialization of Mistral client (reused across calls)."""
+    global _mistral_client
+    if _mistral_client is None:
+        key = _mistral_key()
+        if key:
+            with _llm_lock:
+                if _mistral_client is None:  # Double-check after acquiring lock
+                    try:
+                        from mistralai.client import Mistral
+                        _mistral_client = Mistral(api_key=key)
+                    except Exception as e:
+                        logger.warning("Failed to create Mistral client: %s", e)
+                        return None
+        else:
+            return None
+    return _mistral_client
+
+
 def _llm_text(prompt: str) -> Optional[str]:
     """One short LLM completion (Gemini first, then Mistral); None when no key is configured."""
-    key = _gemini_key()
-    if key:
-        from google import genai
-        resp = genai.Client(api_key=key).models.generate_content(
-            model=config.RAG_QUERY_EXPANSION_GEMINI_MODEL, contents=prompt)
-        return resp.text
-    key = _mistral_key()
-    if key:
-        from mistralai.client import Mistral
-        resp = Mistral(api_key=key).chat.complete(
-            model=config.RAG_QUERY_EXPANSION_MISTRAL_MODEL, messages=[{"role": "user", "content": prompt}])
-        return resp.choices[0].message.content
+    # Try Gemini first
+    gemini_client = _get_gemini_client()
+    if gemini_client:
+        try:
+            resp = gemini_client.models.generate_content(
+                model=config.RAG_QUERY_EXPANSION_GEMINI_MODEL, contents=prompt)
+            return resp.text
+        except Exception as e:
+            logger.debug("Gemini query expansion failed: %s", e)
+            # Don't fail, try Mistral
+            pass
+    
+    # Try Mistral
+    mistral_client = _get_mistral_client()
+    if mistral_client:
+        try:
+            resp = mistral_client.chat.complete(
+                model=config.RAG_QUERY_EXPANSION_MISTRAL_MODEL, messages=[{"role": "user", "content": prompt}])
+            return resp.choices[0].message.content
+        except Exception as e:
+            logger.debug("Mistral query expansion failed: %s", e)
+            pass
+    
     return None
 
 
@@ -362,10 +417,20 @@ class RagRetrievalService:
         if not config.RAG_QUERY_EXPANSION_ENABLED or not (topic_prompt or "").strip():
             return fallback
         try:
-            raw = _llm_text(
-                "Split this exam topic request into at most 3 short, distinct search queries for a textbook "
-                "search. Keep the original language. Return only a JSON array of strings.\n\nRequest: "
-                + topic_prompt)
+            # Use Mistral only (no Gemini fallback)
+            mistral_key = _mistral_key()
+            if not mistral_key:
+                logger.debug("RAG query expansion skipped: no Mistral API key")
+                return fallback
+            
+            from mistralai.client import Mistral
+            resp = _get_mistral_client().chat.complete(
+                model=config.RAG_QUERY_EXPANSION_MISTRAL_MODEL,
+                messages=[{"role": "user", "content": 
+                    "Split this exam topic request into at most 3 short, distinct search queries for a textbook "
+                    "search. Keep the original language. Return only a JSON array of strings.\n\nRequest: "
+                    + topic_prompt}])
+            raw = resp.choices[0].message.content
             if not raw:
                 return fallback
             match = re.search(r"\[.*\]", raw, re.S)
