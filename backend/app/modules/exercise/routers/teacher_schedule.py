@@ -14,7 +14,7 @@ from sqlalchemy.orm import Session
 
 from app.core.database import get_db
 from app.modules.admin.state_store import get_current_academic_year
-from app.modules.auth.dependencies import require_roles, get_current_user as _base_current_user
+from app.modules.auth.dependencies import require_roles
 from models.models import User, ScheduleNote
 
 # Schedule and notes are teacher-facing; students must not reach these endpoints.

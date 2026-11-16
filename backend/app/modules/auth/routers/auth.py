@@ -102,6 +102,8 @@ def guest_login(payload: GuestRequest, request: Request, db: Session = Depends(g
         # Serialize count-then-insert per IP so concurrent requests cannot exceed the hourly cap.
         # The transaction-scoped lock is released by the commit/rollback below.
         db.execute(text("SELECT pg_advisory_xact_lock(hashtext(:k))"), {"k": "guest_create:" + ip})
+        # Second lock on a fixed key so the global cap is also serialized across different IPs.
+        db.execute(text("SELECT pg_advisory_xact_lock(hashtext(:k))"), {"k": "guest_create:global"})
     since = datetime.now(timezone.utc) - timedelta(hours=1)
     created = db.query(User).filter(
         User.is_guest.is_(True), User.guest_ip == ip, User.created_at >= since).count()
