@@ -104,9 +104,10 @@ export default function TeacherProfileModal({
   // Save profile changes
   const handleSaveProfile = async (e) => {
     e.preventDefault();
-        const fullName = profileForm.fullName.trim().normalize('NFC');
+    const fullName = profileForm.fullName.trim().normalize('NFC');
     if (!/^[\p{L}\s]+$/u.test(fullName)) {
       setToastMessage('Họ và tên chỉ được nhập chữ cái và khoảng trắng.');
+      setTimeout(() => setToastMessage(null), 3000);
       return;
     }
     try {
