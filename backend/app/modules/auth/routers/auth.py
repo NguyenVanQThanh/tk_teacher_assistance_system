@@ -11,6 +11,7 @@ import uuid
 from datetime import datetime, timedelta, timezone
 
 from fastapi import APIRouter, Depends, Request, status, HTTPException
+from sqlalchemy import text
 from sqlalchemy.orm import Session
 
 from app.core import config as app_config
@@ -98,6 +99,10 @@ def guest_login(payload: GuestRequest, request: Request, db: Session = Depends(g
             return AuthService.issue_access_token(db=db, user=existing)
 
     ip = app_config.client_ip(request)
+    if db.get_bind().dialect.name == "postgresql":
+        # Serialize count-then-insert per IP so concurrent requests cannot exceed the hourly cap.
+        # The transaction-scoped lock is released by the commit/rollback below.
+        db.execute(text("SELECT pg_advisory_xact_lock(hashtext(:k))"), {"k": "guest_create:" + ip})
     since = datetime.now(timezone.utc) - timedelta(hours=1)
     created = db.query(User).filter(
         User.is_guest.is_(True), User.guest_ip == ip, User.created_at >= since).count()
