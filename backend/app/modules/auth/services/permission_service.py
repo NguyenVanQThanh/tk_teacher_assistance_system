@@ -9,6 +9,8 @@ from typing import Dict, Set
 from uuid import UUID
 from sqlalchemy.orm import Session
 from app.modules.auth.permission_repository import PermissionRepository
+from app.scripts.rbac_seed import GUEST_ALLOWED_PERMISSIONS
+from models.models import Role, User
 
 # In-memory dictionary for role permission cache
 # Keys: role_id (UUID), Values: Set[str] of permission_codes
@@ -59,4 +61,11 @@ class PermissionService:
         
         # Effective = (Role permissions + Allow overrides) - Deny overrides
         effective_perms = (role_perms | allow_overrides) - deny_overrides
+
+        # 4. Guests are restricted to an explicit allow-list (identity-map hits, no extra SQL in a request)
+        user = db.get(User, user_id)
+        if user is not None and user.is_guest:
+            role = db.get(Role, role_id)
+            allowed = GUEST_ALLOWED_PERMISSIONS.get(role.name if role else "", [])
+            effective_perms = effective_perms & set(allowed)
         return effective_perms

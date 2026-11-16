@@ -31,6 +31,10 @@ class User(Base):
     birthday = Column(Date, nullable=True)
     role_id = Column(UUID(as_uuid=True), ForeignKey('roles.role_id'), nullable=False) # Note: You need to define the roles table first if errors occur
     status = Column(String(20), default='ACTIVE')
+    # Guest accounts: real users rows created without credentials (see POST /auth/guest).
+    is_guest = Column(Boolean, nullable=False, default=False, server_default='false')
+    guest_key_hash = Column(String(64), unique=True, nullable=True)
+    guest_ip = Column(String(45), nullable=True, index=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
 
@@ -275,7 +279,8 @@ class ClassAssignment(Base):
     __tablename__ = 'class_assignments'
 
     assignment_id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    class_id = Column(UUID(as_uuid=True), ForeignKey('classes.class_id', ondelete='CASCADE'), nullable=False)
+    # NULL only for personal assignments (owner_student_id set).
+    class_id = Column(UUID(as_uuid=True), ForeignKey('classes.class_id', ondelete='CASCADE'), nullable=True)
     exercise_id = Column(UUID(as_uuid=True), ForeignKey('exercises.exercise_id', ondelete='CASCADE'), nullable=False)
     assigned_by = Column(UUID(as_uuid=True), ForeignKey('users.user_id', ondelete='CASCADE'), nullable=False)
     assigned_at = Column(DateTime(timezone=True), server_default=func.now())
@@ -292,6 +297,10 @@ class ClassAssignment(Base):
     class_obj = relationship("Class", backref="assignments")
     exercise = relationship("Exercise", backref="assignments")
     assigner = relationship("User", foreign_keys=[assigned_by], backref="created_assignments")
+
+    __table_args__ = (
+        CheckConstraint('class_id IS NOT NULL OR owner_student_id IS NOT NULL', name='chk_assignment_class_or_owner'),
+    )
 
 
 
