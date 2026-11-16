@@ -22,6 +22,7 @@ export default function GuestLock({ locked = true, children, block = false }) {
       title={GUEST_LOCK_LABEL}
       style={{ position: 'relative', display: block ? 'block' : 'inline-flex', flexDirection: 'column', maxWidth: '100%' }}
     >
+      {/* React 18 has no boolean `inert` prop; the empty string renders the native attribute, which also blocks keyboard focus. */}
       <div aria-disabled="true" style={{ opacity: 0.45, pointerEvents: 'none', userSelect: 'none' }} inert="">
         {children}
       </div>

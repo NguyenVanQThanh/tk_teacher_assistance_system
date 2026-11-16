@@ -975,6 +975,8 @@ export default function StudentExercisesPage() {
   const filteredAssignments = useMemo(() => {
     return assignmentsList.filter(item => {
       // Guests only see their own AI-generated exercises.
+      // UI convenience only: the server already returns just a guest's own personal assignments, so a wrong
+      // category cannot expose other data (isAi is derived from is_ai_generated OR category at mapping time).
       if (isGuest && item.category !== 'ai_generated' && !item.isAiGenerated) return false;
       // 1. Category / Type filter
       if (selectedType !== 'all') {
