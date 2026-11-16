@@ -25,11 +25,15 @@ import {
   X
 } from 'lucide-react';
 import { adminDashboardApi, adminUsersApi } from '../../services/api';
+import useAcademicYear from '../../hooks/useAcademicYear';
+import CredentialModal from '../../components/admin/CredentialModal';
 import './AdminDashboard.css';
 import toast from '../../components/common/toast';
 import { getErrorMessage } from '../../utils/errorMessages';
 
 export default function AdminDashboard() {
+  const currentYear = useAcademicYear();
+  const [credentialResult, setCredentialResult] = useState(null);
   const [timeframe, setTimeframe] = useState('week'); // 'week' | 'month'
   const [hoveredIndex, setHoveredIndex] = useState(null);
   const [showCreateUserModal, setShowCreateUserModal] = useState(false);
@@ -211,7 +215,7 @@ export default function AdminDashboard() {
     }
     try {
       const mappedRole = newUser.role === 'HomeroomTeacher' ? 'Teacher' : newUser.role;
-      await adminUsersApi.createUser({
+      const created = await adminUsersApi.createUser({
         full_name: newUser.fullName.trim(),
         email: newUser.email.trim(),
         phone: cleanPhone,
@@ -221,6 +225,14 @@ export default function AdminDashboard() {
       });
       setShowCreateUserModal(false);
       showToast(`Đã tạo tài khoản cho ${newUser.fullName} thành công!`);
+      if (created?.temporary_password) {
+        setCredentialResult({
+          title: 'Tài khoản đã được tạo',
+          fullName: created.full_name || newUser.fullName,
+          phone: created.phone || cleanPhone,
+          temporaryPassword: created.temporary_password,
+        });
+      }
       setNewUser({
         fullName: '',
         email: '',
@@ -278,7 +290,7 @@ export default function AdminDashboard() {
           <div className="admin-semester-badge">
             <span className="admin-semester-tag">BẢNG ĐIỀU KHIỂN QUẢN TRỊ</span>
             <span className="admin-semester-dot">•</span>
-            <span className="admin-semester-term">HỌC KỲ II - 2024</span>
+            <span className="admin-semester-term">HỌC KỲ II - {currentYear.label}</span>
           </div>
           <h1 className="admin-welcome-title">
             Xin chào, Quản trị viên! <span className="greeting-wave">👋</span>
@@ -739,7 +751,7 @@ export default function AdminDashboard() {
               <div className="admin-form-group">
                 <label className="admin-form-label">Kỳ thống kê</label>
                 <select className="admin-form-select">
-                  <option>Học kỳ II (Năm học 2024 - 2025)</option>
+                  <option>Học kỳ II (Năm học {currentYear.label})</option>
                   <option>Tháng hiện tại (Tháng 09/2026)</option>
                   <option>Tuần này</option>
                 </select>
@@ -823,6 +835,7 @@ export default function AdminDashboard() {
           </div>
         </div>
       )}
+      <CredentialModal result={credentialResult} onClose={() => setCredentialResult(null)} />
     </div>
   );
 }

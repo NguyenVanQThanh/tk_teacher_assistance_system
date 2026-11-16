@@ -75,9 +75,8 @@ def _fake_questions(monkeypatch):
             return [{"content": f"T{i}", "segments": [
                 {"key": k, "statement": f"s{k}", "is_correct": k in "ac"} for k in "abcd"]} for i in range(n)]
         return [{"content": f"S{i}", "correct_answer": "7"} for i in range(n)]
-    monkeypatch.setattr(AiExerciseGeneratorService, "_call_gemini_part", classmethod(fake))
-    monkeypatch.setattr("app.modules.exercise.services.ai_generator_service.GeminiVisionParserService.get_api_key",
-                        lambda: "k")
+    monkeypatch.setattr(AiExerciseGeneratorService, "_call_mistral_part", classmethod(fake))
+    monkeypatch.setenv("MISTRAL_API_KEY", "k")
 
 
 def test_success_personal_assignment_and_tf_options(client, db_session, world, monkeypatch):

@@ -12,6 +12,7 @@ from uuid import UUID
 from sqlalchemy.orm import Session
 from sqlalchemy import func
 
+from app.modules.admin.state_store import get_current_academic_year
 from models.models import (
     User, Class, StudentClass, TeacherSubject, Subject,
     ClassAssignment, Exercise, StudentExerciseAttempt
@@ -47,9 +48,7 @@ class LearningQualityService:
         and comparative observations for the target homeroom class.
         Strictly computes from actual student exercise attempts without fabricated benchmarks.
         """
-        today = date.today()
-        start_year = today.year if today.month >= 8 else today.year - 1
-        current_year = f"{start_year}-{start_year + 1}"
+        current_year = get_current_academic_year(self.db)
 
         # 1. Resolve target homeroom class
         target_class = None

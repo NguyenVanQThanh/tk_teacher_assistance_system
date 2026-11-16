@@ -273,9 +273,9 @@ class AiExerciseGeneratorService:
         matrix is {mcq|tf|short: {NhanBiet, ThongHieu, VanDung}}; without it the counts are spread over the
         difficulties. Raises RuntimeError on failure: placeholder questions are never fabricated.
         """
-        api_key = GeminiVisionParserService.get_api_key()
-        if not api_key and not os.environ.get("MISTRAL_API_KEY"):
-            raise RuntimeError("AI generation is not configured (missing API key).")
+        mistral_key = os.environ.get("MISTRAL_API_KEY")
+        if not mistral_key:
+            raise RuntimeError("AI generation is not configured (missing Mistral API key).")
         counts = {"Part1": part1_count, "Part2": part2_count, "Part3": part3_count}
         plans: Dict[str, List[str]] = {}
         for part, spec in PART_SPECS.items():
@@ -287,7 +287,7 @@ class AiExerciseGeneratorService:
             raise RuntimeError("No questions requested.")
 
         def run(part: str) -> List[Dict[str, Any]]:
-            return cls.generate_part(api_key, part, plans[part], context, student_file, topic_prompt,
+            return cls.generate_part(part, plans[part], context, student_file, topic_prompt,
                                      subject_name, grade_name)
 
         try:
@@ -295,12 +295,12 @@ class AiExerciseGeneratorService:
                 futures = {part: pool.submit(run, part) for part in plans}
                 results = {part: fut.result() for part, fut in futures.items()}
         except Exception as e:
-            logger.error("Gemini AI generation failed: %s", e)
+            logger.error("Mistral AI generation failed: %s", e)
             raise RuntimeError("AI generation failed.") from e
         return [q for part in PART_SPECS if part in results for q in results[part]]
 
     @classmethod
-    def generate_part(cls, api_key: str, part: str, slots: List[str], context: str, student_file: str,
+    def generate_part(cls, part: str, slots: List[str], context: str, student_file: str,
                       student_request: str, subject_name: str, grade_name: str) -> List[Dict[str, Any]]:
         """Generate one part; invalid items are dropped and only the missing count is re-requested."""
         valid: List[Dict[str, Any]] = []
@@ -313,7 +313,7 @@ class AiExerciseGeneratorService:
             prompt = build_part_prompt(part, remaining, context, student_file, student_request,
                                        subject_name, grade_name, errors)
             raw_items = cls._call_llm_part(
-                api_key=api_key, part=part, prompt=prompt,
+                part=part, prompt=prompt,
                 temperature=FIRST_TEMPERATURE if attempt == 0 else RETRY_TEMPERATURE)
             errors = []
             for raw in raw_items or []:
@@ -335,17 +335,12 @@ class AiExerciseGeneratorService:
         return valid
 
     @classmethod
-    def _call_llm_part(cls, api_key: Optional[str], part: str, prompt: str, temperature: float) -> List[Dict[str, Any]]:
-        """Mistral first; fall back to Gemini when Mistral is unavailable or fails."""
+    def _call_llm_part(cls, part: str, prompt: str, temperature: float) -> List[Dict[str, Any]]:
+        """Use Mistral only for AI generation."""
         mistral_key = os.environ.get("MISTRAL_API_KEY")
-        if mistral_key:
-            try:
-                return cls._call_mistral_part(mistral_key, part, prompt, temperature)
-            except Exception as e:
-                logger.warning("Mistral generation failed, falling back to Gemini: %s", e)
-        if not api_key:
-            raise RuntimeError("Mistral failed and no Gemini key is configured.")
-        return cls._call_gemini_part(api_key=api_key, part=part, prompt=prompt, temperature=temperature)
+        if not mistral_key:
+            raise RuntimeError("AI generation is not configured (missing Mistral API key).")
+        return cls._call_mistral_part(mistral_key, part, prompt, temperature)
 
     @classmethod
     def _call_mistral_part(cls, api_key: str, part: str, prompt: str, temperature: float) -> List[Dict[str, Any]]:

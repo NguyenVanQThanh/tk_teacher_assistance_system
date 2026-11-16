@@ -2,8 +2,8 @@
 # Description: Admin system configuration, AI connectivity ping, and backup snapshot API router.
 # Created At: 2026-11-14
 # Created By: Tam Khang
-# Updated At: 2026-11-14
-# Updated By: Tam Khang
+# Updated At: 2026-11-15
+# Updated By: AI Agent
 
 import copy
 import io
@@ -26,7 +26,9 @@ from app.modules.admin.routers.users import require_admin_privilege
 from app.modules.admin.state_store import (
     INTERNAL_STATE_MARKER,
     append_state_item,
+    get_current_academic_year,
     get_latest_state,
+    normalize_academic_year,
     get_state_by_log_id,
     list_state_items,
     record_audit_event,
@@ -59,6 +61,15 @@ router = APIRouter(
 _MASK_CHAR = "•"
 
 
+def _fallback_academic_year() -> str:
+    """Default year when nothing is saved: env override, else derived from the calendar."""
+    return normalize_academic_year(app_config.CURRENT_ACADEMIC_YEAR) or _calendar_year()
+
+def _calendar_year() -> str:
+    today = datetime.now().date()
+    start = today.year if today.month >= 8 else today.year - 1
+    return f"{start}-{start + 1}"
+
 def _default_settings_payload() -> Dict[str, Dict[str, Any]]:
     default_model = (
         getattr(app_config, "RAG_QUERY_EXPANSION_GEMINI_MODEL", None)
@@ -78,7 +89,7 @@ def _default_settings_payload() -> Dict[str, Dict[str, Any]]:
             "address": "123 Education Boulevard, Ho Chi Minh City",
             "phone": "02838123456",
             "email": "admin@smartlms.edu.vn",
-            "academicYear": "2025-2026",
+            "academicYear": _fallback_academic_year(),
             "semester": "HK1",
             "semesterStartDate": "2025-09-05",
             "semesterEndDate": "2026-01-18",
@@ -198,6 +209,17 @@ def update_system_settings(
                     current["ai"]["apiKey"] = str(value).strip()
                 elif value == "":
                     current["ai"]["apiKey"] = ""
+            elif section == "general" and key == "academicYear":
+                normalized = normalize_academic_year(value)
+                if normalized is None:
+                    raise HTTPException(
+                        status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                        detail={
+                            "code": "ERR-ADMIN-INVALID_ACADEMIC_YEAR",
+                            "message": "Academic year must look like 2025-2026 (end year = start year + 1).",
+                        },
+                    )
+                current[section][key] = normalized
             elif key in current[section]:
                 current[section][key] = value
 

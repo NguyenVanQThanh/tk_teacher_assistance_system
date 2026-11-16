@@ -156,7 +156,7 @@ class AdminUserService:
         cls.validate_user_age(role_obj.name, payload.birthday)
 
         # 5. Handle password (auto-generate default password per user requirement)
-        raw_password = payload.password.strip() if (payload.password and payload.password.strip()) else NotificationService.generate_default_password()
+        raw_password = NotificationService.generate_default_password()
         hashed_password = get_password_hash(raw_password)
 
         # 6. Resolve class if specified
@@ -395,10 +395,9 @@ class AdminUserService:
         }
 
     @classmethod
-    def reset_password(cls, db: Session, user_id: UUID, custom_password: Optional[str] = None) -> AdminUserResetPasswordResponse:
+    def reset_password(cls, db: Session, user_id: UUID) -> AdminUserResetPasswordResponse:
         """
-        Resets user password, auto-generating a secure default password if custom is not provided,
-        and dispatches SMS / system notification to the user.
+        Resets user password to a generated temporary password (never client-supplied).
         """
         user = AdminUserRepository.get_user_by_id(db, user_id)
         if not user or user.status == "DELETED":
@@ -407,7 +406,17 @@ class AdminUserService:
                 detail={"code": "ERR-ADMIN-USER_NOT_FOUND", "message": "User not found or has been deleted."}
             )
 
-        new_plain_password = custom_password.strip() if (custom_password and custom_password.strip()) else NotificationService.generate_default_password()
+        if user.is_guest:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail={"code": "ERR-ADMIN-GUEST_PASSWORD_LOCKED", "message": "Guest accounts have no password to reset."},
+            )
+        if cls._is_admin_user(db, user):
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail={"code": "ERR-ADMIN-ADMIN_PASSWORD_LOCKED", "message": "The password of an Admin account cannot be reset here."},
+            )
+        new_plain_password = NotificationService.generate_default_password()
         hashed_password = get_password_hash(new_plain_password)
         AdminUserRepository.reset_password(db, user, hashed_password)
 
@@ -420,7 +429,7 @@ class AdminUserService:
         )
 
         return AdminUserResetPasswordResponse(
-            message="Password reset successfully. Default password dispatched via SMS/system notification.",
+            message="Password reset successfully. Share the temporary password with the user securely.",
             temporary_password=new_plain_password,
             notification_sent=dispatch_result["sent"],
             notification_channel=dispatch_result["channel"],

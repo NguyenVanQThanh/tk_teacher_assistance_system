@@ -61,6 +61,9 @@ class SubjectService:
         Return subjects filtered by status.
         If student, can filter subjects relevant to their enrolled classes.
         """
+        if current_user and current_user.is_guest:
+            # Guests have no classes: every ACTIVE subject is available.
+            return SubjectRepository.filter_subjects(db, status="ACTIVE")
         if current_user:
             role_name = get_user_role_name(db, current_user)
             if role_name == "Teacher":

@@ -160,12 +160,12 @@ class TestAutoPasswordAndNotification:
         # Check auto-generated password structure
         temp_pwd = data.get("temporary_password")
         assert temp_pwd is not None
-        assert temp_pwd.startswith("Edu@")
-        assert len(temp_pwd) >= 8
+        assert len(temp_pwd) == 12
 
         # Check notification confirmation
-        assert data.get("notification_sent") is True
-        assert "SMS" in data.get("notification_channel")
+        assert data.get("notification_sent") is False
+        assert data.get("notification_channel") == "Manual hand-off"
+        assert resp.headers["cache-control"] == "no-store"
 
         # Verify new user can actually authenticate with this generated password
         login_resp = client.post(
@@ -202,7 +202,7 @@ class TestAutoPasswordAndNotification:
         assert reset_resp.status_code == status.HTTP_200_OK
         data = reset_resp.json()
         assert data.get("temporary_password") is not None
-        assert data.get("notification_sent") is True
+        assert data.get("notification_sent") is False
 
         # Verify new login works with reset password
         new_pwd = data["temporary_password"]
@@ -352,3 +352,50 @@ class TestAdminBulkImport:
     def test_rejects_bad_type_and_missing_column(self, client: TestClient):
         assert self._post(client, "u.txt", b"x", "text/plain").status_code == 415
         assert self._post(client, "u.csv", b"foo,bar\n1,2\n", "text/csv").status_code == 400
+
+
+class TestNamesAndPasswordPolicy:
+    def _create(self, client, headers, **over):
+        body = {"full_name": "Nguyen Van An", "role": "Student", "birthday": "2007-06-15",
+                "phone": f"09{uuid.uuid4().int % 100000000:08d}"}
+        body.update(over)
+        return client.post("/api/v1/admin/users", json=body, headers=headers)
+
+    def test_nfd_name_stored_as_nfc(self, client: TestClient):
+        import unicodedata
+        headers = {"Authorization": f"Bearer {get_admin_token(client)}"}
+        nfd = unicodedata.normalize("NFD", "Nguyễn Văn Ánh")
+        resp = self._create(client, headers, full_name=nfd)
+        assert resp.status_code == 201, resp.text
+        assert resp.json()["full_name"] == unicodedata.normalize("NFC", nfd)
+
+    @pytest.mark.parametrize("name", ["An123", "An_Binh", "A@ B"])
+    def test_digits_and_symbols_rejected(self, client: TestClient, name):
+        headers = {"Authorization": f"Bearer {get_admin_token(client)}"}
+        assert self._create(client, headers, full_name=name).status_code == 422
+
+    def test_password_policy_ignores_client_password_and_not_logged(self, client: TestClient, caplog):
+        import logging
+        headers = {"Authorization": f"Bearer {get_admin_token(client)}"}
+        with caplog.at_level(logging.DEBUG):
+            resp = self._create(client, headers, password="Chosen#Pass1")
+        assert resp.status_code == 201
+        pwd = resp.json()["temporary_password"]
+        assert pwd != "Chosen#Pass1"
+        assert len(pwd) == 12
+        assert any(c.isupper() for c in pwd) and any(c.islower() for c in pwd)
+        assert any(c.isdigit() for c in pwd) and any(not c.isalnum() for c in pwd)
+        assert pwd not in caplog.text
+
+    def test_reset_ignores_client_password_and_rejects_admin_target(self, client: TestClient, db_session):
+        from models.models import User
+        headers = {"Authorization": f"Bearer {get_admin_token(client)}"}
+        created = self._create(client, headers).json()
+        r = client.post(f"/api/v1/admin/users/{created['user_id']}/reset-password",
+                        json={"new_password": "Chosen#Pass1"}, headers=headers)
+        assert r.status_code == 200
+        assert r.json()["temporary_password"] != "Chosen#Pass1"
+        assert r.headers["cache-control"] == "no-store"
+        other_admin = db_session.query(User).filter(User.phone == "0987654322").one()
+        r = client.post(f"/api/v1/admin/users/{other_admin.user_id}/reset-password", headers=headers)
+        assert r.status_code == 403
