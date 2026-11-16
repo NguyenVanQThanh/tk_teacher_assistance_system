@@ -119,6 +119,8 @@ def _env_bool(name: str, default: bool) -> bool:
 GUEST_ACCESS_ENABLED = _env_bool("GUEST_ACCESS_ENABLED", True)
 # Maximum guest accounts created per client IP per rolling hour.
 GUEST_CREATE_PER_IP_HOUR = _env_int("GUEST_CREATE_PER_IP_HOUR", 5)
+# Global ceiling on guest accounts created per rolling hour, independent of IP (bounds paid LLM spend).
+GUEST_CREATE_GLOBAL_HOUR = _env_int("GUEST_CREATE_GLOBAL_HOUR", 200)
 # Maximum documents a guest account may upload.
 GUEST_DOC_LIMIT = _env_int("GUEST_DOC_LIMIT", 3, minimum=0)
 # Maximum AI generations (exercises created) per guest account; soft-deleted ones still count.
@@ -137,5 +139,6 @@ def client_ip(request) -> str:
             return cf.strip()[:45]
         xff = request.headers.get("x-forwarded-for")
         if xff:
-            return xff.split(",")[0].strip()[:45]
+            # The LAST entry is appended by our own proxy; earlier entries are client-controlled and spoofable.
+            return xff.split(",")[-1].strip()[:45]
     return (request.client.host if request.client else "unknown")[:45]

@@ -105,7 +105,8 @@ def guest_login(payload: GuestRequest, request: Request, db: Session = Depends(g
     since = datetime.now(timezone.utc) - timedelta(hours=1)
     created = db.query(User).filter(
         User.is_guest.is_(True), User.guest_ip == ip, User.created_at >= since).count()
-    if created >= app_config.GUEST_CREATE_PER_IP_HOUR:
+    total_recent = db.query(User).filter(User.is_guest.is_(True), User.created_at >= since).count()
+    if created >= app_config.GUEST_CREATE_PER_IP_HOUR or total_recent >= app_config.GUEST_CREATE_GLOBAL_HOUR:
         raise HTTPException(
             status_code=status.HTTP_429_TOO_MANY_REQUESTS,
             detail={"code": "ERR-AUTH-GUEST_RATE_LIMITED",

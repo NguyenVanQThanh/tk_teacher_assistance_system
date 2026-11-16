@@ -226,3 +226,16 @@ def test_guest_phone_fits_column(client, db_session):
     uid = uuid.UUID(_guest(client, "Student").json()["user"]["user_id"])
     phone = db_session.query(User).filter(User.user_id == uid).one().phone
     assert len(phone) <= User.__table__.c.phone.type.length
+
+
+def test_global_cap_and_xff_uses_last_entry(client, monkeypatch):
+    monkeypatch.setattr(app_config, "GUEST_CREATE_GLOBAL_HOUR", 1)
+    assert _guest(client).status_code == 200
+    r = _guest(client)
+    assert r.status_code == 429 and "ERR-AUTH-GUEST_RATE_LIMITED" in r.text
+
+    class Req:
+        client = None
+        headers = {"x-forwarded-for": "6.6.6.6, 1.2.3.4"}
+    monkeypatch.setattr(app_config, "TRUST_PROXY_HEADERS", True)
+    assert app_config.client_ip(Req()) == "1.2.3.4"
