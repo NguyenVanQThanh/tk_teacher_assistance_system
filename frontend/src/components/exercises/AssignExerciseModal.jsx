@@ -21,7 +21,10 @@ import { classesApi, assignmentsApi } from '../../services/api';
 import './AssignExerciseModal.css';
 import { getErrorMessage } from '../../utils/errorMessages';
 
+import { useAuth } from '../../context/AuthContext';
+
 export default function AssignExerciseModal({ isOpen, onClose, exercise, onAssignedSuccess }) {
+  const { isGuest } = useAuth();
   const [classes, setClasses] = useState([]);
   const [loadingClasses, setLoadingClasses] = useState(false);
   const [selectedClassIds, setSelectedClassIds] = useState([]);
@@ -70,7 +73,8 @@ export default function AssignExerciseModal({ isOpen, onClose, exercise, onAssig
     fetchClasses();
   }, [isOpen]);
 
-  if (!isOpen || !exercise) return null;
+  // Guests cannot assign to classes (feature locked server-side too).
+  if (!isOpen || !exercise || isGuest) return null;
 
   const handleQuickPreset = (days) => {
     setDueAt(getDefaultDueDate(days));

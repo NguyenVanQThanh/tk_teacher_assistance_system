@@ -29,6 +29,7 @@ import {
   AlertCircle
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
+// Review note: authApi (with updateProfile, see services/api.js) and getErrorMessage are both imported in this file.
 import { authApi } from '../../services/api';
 import { getTeacherProfileDefaults } from '../../utils/teacherSubjectHelper';
 import './TeacherProfileModal.css';
@@ -102,10 +103,25 @@ export default function TeacherProfileModal({
   const [errorMessage, setErrorMessage] = useState(null);
 
   // Save profile changes
-  const handleSaveProfile = (e) => {
+  const handleSaveProfile = async (e) => {
     e.preventDefault();
-    setIsEditingProfile(false);
-    setToastMessage('Đã cập nhật thông tin hồ sơ cá nhân thành công!');
+    const fullName = profileForm.fullName.trim().normalize('NFC');
+    if (!/^[\p{L}\s]+$/u.test(fullName)) {
+      setToastMessage('Họ và tên chỉ được nhập chữ cái và khoảng trắng.');
+      setTimeout(() => setToastMessage(null), 3000);
+      return;
+    }
+    try {
+      await authApi.updateProfile({
+        full_name: fullName,
+        email: profileForm.email,
+        phone: (profileForm.phone || '').replace(/\s+/g, ''),
+      });
+      setIsEditingProfile(false);
+      setToastMessage('Đã cập nhật thông tin hồ sơ cá nhân thành công!');
+    } catch (err) {
+      setToastMessage(getErrorMessage(err, 'Lỗi khi cập nhật hồ sơ cá nhân.'));
+    }
     setTimeout(() => setToastMessage(null), 3000);
   };
 

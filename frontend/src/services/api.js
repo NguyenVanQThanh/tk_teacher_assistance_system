@@ -64,6 +64,11 @@ export const authApi = {
     const response = await api.post('/api/v1/auth/login', credentials);
     return response.data;
   },
+  guestLogin: async (role, guestKey = null) => {
+    const payload = guestKey ? { role, guest_key: guestKey } : { role };
+    const response = await api.post('/api/v1/auth/guest', payload);
+    return response.data;
+  },
   getMe: async () => {
     const response = await api.get('/api/v1/auth/me');
     return response.data;
@@ -415,7 +420,11 @@ export const documentsApi = {
 
 export const adminUsersApi = {
   getUsers: async (params = {}) => {
-    const response = await api.get('/api/v1/admin/users', { params });
+    // is_guest (true/false) is passed through as a query param when set; empty values are dropped.
+    const clean = Object.fromEntries(
+      Object.entries(params).filter(([, v]) => v !== '' && v !== null && v !== undefined)
+    );
+    const response = await api.get('/api/v1/admin/users', { params: clean });
     return response.data;
   },
   getUserDetail: async (userId) => {
@@ -442,9 +451,8 @@ export const adminUsersApi = {
     const response = await api.post(`/api/v1/admin/users/${userId}/restore`);
     return response.data;
   },
-  resetPassword: async (userId, newPassword = null) => {
-    const payload = newPassword ? { new_password: newPassword } : {};
-    const response = await api.post(`/api/v1/admin/users/${userId}/reset-password`, payload);
+  resetPassword: async (userId) => {
+    const response = await api.post(`/api/v1/admin/users/${userId}/reset-password`, {});
     return response.data;
   },
   exportExcel: async (params = {}) => {

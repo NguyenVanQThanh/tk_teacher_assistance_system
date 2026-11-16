@@ -17,6 +17,7 @@ import {
   Loader2
 } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
+import { useAuth } from '../../context/AuthContext';
 import { exercisesApi, subjectsApi } from '../../services/api';
 import './CreateExerciseManualPage.css';
 import toast from '../../components/common/toast';
@@ -30,6 +31,7 @@ export default function CreateExerciseManualPage() {
   const [title, setTitle] = useState('');
   const [exerciseType, setExerciseType] = useState('exam'); // 'exam' (Bài kiểm tra), 'practice' (Luyện tập tại nhà)
   const [grade, setGrade] = useState('12');
+  const { isGuest } = useAuth();
   const [subject, setSubject] = useState('');
   const [duration, setDuration] = useState('15');
   const [level, setLevel] = useState('basic');
@@ -86,7 +88,8 @@ export default function CreateExerciseManualPage() {
         const subjs = await subjectsApi.getSubjects();
         if (isMounted && Array.isArray(subjs)) {
           setSubjectsList(subjs);
-          if (subjs.length > 0) {
+          // Guests must choose a subject explicitly; others keep the first as default.
+          if (subjs.length > 0 && !isGuest) {
             setSubject(subjs[0].subject_id);
           }
         }
@@ -221,6 +224,12 @@ export default function CreateExerciseManualPage() {
 
     if (totalValidQuestions === 0) {
       setErrorMsg('Vui lòng nhập nội dung cho ít nhất 1 câu hỏi.');
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+      return;
+    }
+
+    if (isGuest && !subject) {
+      setErrorMsg('Vui lòng chọn môn học.');
       window.scrollTo({ top: 0, behavior: 'smooth' });
       return;
     }
@@ -379,6 +388,21 @@ export default function CreateExerciseManualPage() {
                   <option value="10">Khối 10</option>
                   <option value="11">Khối 11</option>
                   <option value="12">Khối 12</option>
+                </select>
+              </div>
+
+              <div className="form-field-item">
+                <label className="field-label">Môn học {isGuest ? '*' : ''}</label>
+                <select
+                  className="custom-select-input"
+                  value={subject}
+                  onChange={(e) => setSubject(e.target.value)}
+                  required={isGuest}
+                >
+                  <option value="" disabled={isGuest}>{isGuest ? 'Chọn môn học' : 'Mặc định'}</option>
+                  {subjectsList.map((s) => (
+                    <option key={s.subject_id} value={s.subject_id}>{s.subject_name}</option>
+                  ))}
                 </select>
               </div>
 

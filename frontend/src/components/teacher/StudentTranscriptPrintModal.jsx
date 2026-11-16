@@ -5,6 +5,7 @@
 // Updated At: 2026-09-01
 // Updated By: Tam Khang
 
+import useAcademicYear from '../../hooks/useAcademicYear';
 import React from 'react';
 import { X, Printer, Download } from 'lucide-react';
 import { classifyStudent, CLASSIFICATION_LABELS } from '../../utils/gradeClassification';
@@ -16,6 +17,7 @@ export default function StudentTranscriptPrintModal({
   student, 
   classInfo 
 }) {
+  const currentYear = useAcademicYear();
   if (!isOpen || !student) return null;
 
   const handlePrint = () => {
@@ -24,7 +26,7 @@ export default function StudentTranscriptPrintModal({
 
   const className = classInfo?.name?.split(' - ')[0] || '12A1';
   const schoolName = 'TRƯỜNG THPT NGUYỄN THƯỢNG HIỀN';
-  const academicYear = (classInfo?.term || '2025-2026').replace('-', ' – ');
+  const academicYear = (classInfo?.term || currentYear.value).replace('-', ' – ');
 
   // 13 standard subjects list with detailed scores matching Vietnam curriculum
   const transcriptSubjects = [
@@ -189,7 +191,7 @@ export default function StudentTranscriptPrintModal({
             {/* Section 4: Signatures & Validations (Phần 4) */}
             <div className="a4-section-signatures">
               <div className="signature-date-row">
-                <em>Ngày ...... tháng ...... năm 2024</em>
+                <em>Ngày ...... tháng ...... năm {currentYear.value.slice(0, 4)}</em>
               </div>
               <div className="signatures-grid">
                 {/* Giáo viên chủ nhiệm on Left */}

@@ -51,7 +51,7 @@ export default function StudentHeader({ onToggleSidebar }) {
 
   const displayName = user?.full_name ? `HS. ${user.full_name}` : 'HS. Nguyễn Hoàng Nam';
   const displayEmail = user?.email || 'student01@school.com';
-  const displayClass = user?.class_name || '12A1';
+  const displayClass = user?.is_guest ? 'Khách' : (user?.class_name || '12A1');
   const initial = user?.full_name 
     ? user.full_name.split(' ').map(n => n[0]).slice(-2).join('').toUpperCase() 
     : 'HN';
@@ -109,7 +109,7 @@ export default function StudentHeader({ onToggleSidebar }) {
                     </div>
                     <div className="popover-meta-item">
                       <GraduationCap size={11} className="popover-meta-icon" />
-                      <span>Lớp {displayClass} • Trường THPT Chuyên</span>
+                      <span>{user?.is_guest ? 'Học sinh khách' : `Lớp ${displayClass}`} • Trường THPT Chuyên</span>
                     </div>
                   </div>
                 </div>
