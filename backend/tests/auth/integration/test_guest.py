@@ -273,3 +273,27 @@ def test_guest_routes_use_only_allowed_permissions():
     for name in ("ai_generation.py", "student_dashboard.py"):
         used = set(re.findall(r'require_perm\("([A-Z_]+)"\)', (root / name).read_text(encoding="utf-8")))
         assert used <= allowed, (name, used - allowed)
+
+
+def test_xff_respects_trusted_hops(monkeypatch):
+    class Req:
+        client = None
+        headers = {"x-forwarded-for": "6.6.6.6, 1.2.3.4, 10.0.0.1"}
+    monkeypatch.setattr(app_config, "TRUST_PROXY_HEADERS", True)
+    monkeypatch.setattr(app_config, "TRUSTED_PROXY_HOPS", 2)
+    assert app_config.client_ip(Req()) == "1.2.3.4"
+    monkeypatch.setattr(app_config, "TRUSTED_PROXY_HOPS", 9)
+    assert app_config.client_ip(Req()) == "6.6.6.6"
+
+
+def test_purge_stale_guests_soft_deletes_only_old_guests(client, db_session):
+    from datetime import datetime, timedelta, timezone
+    from app.scripts.purge_stale_guests import purge_stale_guests
+    old = uuid.UUID(_guest(client).json()["user"]["user_id"])
+    new = uuid.UUID(_guest(client).json()["user"]["user_id"])
+    db_session.query(User).filter(User.user_id == old).update(
+        {"created_at": datetime.now(timezone.utc) - timedelta(days=40)})
+    db_session.flush()
+    assert purge_stale_guests(db_session, 30) >= 1
+    assert db_session.query(User).filter(User.user_id == old).one().status == "DELETED"
+    assert db_session.query(User).filter(User.user_id == new).one().status == "ACTIVE"

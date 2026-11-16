@@ -129,6 +129,8 @@ GUEST_AI_LIMIT = _env_int("GUEST_AI_LIMIT", 3, minimum=0)
 CURRENT_ACADEMIC_YEAR = os.environ.get("CURRENT_ACADEMIC_YEAR", "").strip()
 # Honor CF-Connecting-IP / X-Forwarded-For only behind a trusted reverse proxy.
 TRUST_PROXY_HEADERS = _env_bool("TRUST_PROXY_HEADERS", False)
+# Number of trusted proxy hops that append to X-Forwarded-For (the client IP is the Nth entry from the right).
+TRUSTED_PROXY_HOPS = _env_int("TRUSTED_PROXY_HOPS", 1)
 
 
 def client_ip(request) -> str:
@@ -140,5 +142,7 @@ def client_ip(request) -> str:
         xff = request.headers.get("x-forwarded-for")
         if xff:
             # The LAST entry is appended by our own proxy; earlier entries are client-controlled and spoofable.
-            return xff.split(",")[-1].strip()[:45]
+            parts = [p.strip() for p in xff.split(",") if p.strip()]
+            if parts:
+                return parts[max(-len(parts), -TRUSTED_PROXY_HOPS)][:45]
     return (request.client.host if request.client else "unknown")[:45]
