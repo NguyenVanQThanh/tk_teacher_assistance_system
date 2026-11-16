@@ -328,7 +328,7 @@ class AnswerReleaseRequest(BaseModel):
 
 class AssignmentOut(BaseModel):
     assignment_id: UUID
-    class_id: UUID
+    class_id: Optional[UUID] = None
     exercise_id: UUID
     assigned_by: UUID
     assigned_at: Optional[datetime] = None
@@ -494,7 +494,7 @@ class AttemptListItemOut(BaseModel):
     student_id: UUID
     student_name: str
     student_code: Optional[str] = None
-    class_id: UUID
+    class_id: Optional[UUID] = None
     class_name: str
     exercise_id: UUID
     exercise_title: str
@@ -541,7 +541,7 @@ class GradingScoreDistribution(BaseModel):
 
 
 class GradingClassSummary(BaseModel):
-    class_id: UUID
+    class_id: Optional[UUID] = None
     class_name: str
     total_submissions: int = 0
     graded_count: int = 0
@@ -646,6 +646,8 @@ class StudentAiGenerateRequest(BaseModel):
     topic_prompt: str = Field("", max_length=300)
     duration_minutes: int = Field(45, ge=5, le=180)
     matrix: AiMatrix
+    # Grade 10-12; only used by guest students (enrolled students derive it from their class).
+    grade: Optional[int] = Field(None, ge=10, le=12)
 
     @field_validator("chapters")
     @classmethod
@@ -681,13 +683,13 @@ class AiExerciseGenerateRequest(BaseModel):
 
 class AiExerciseGenerateOut(BaseModel):
     exercise_id: UUID
-    assignment_id: UUID
+    assignment_id: Optional[UUID] = None
     title: str
     subject_name: str
     total_questions: int
     duration_minutes: int
-    class_id: UUID
-    class_name: str
+    class_id: Optional[UUID] = None
+    class_name: Optional[str] = None
     due_at: Optional[datetime] = None
     created_at: datetime
     sources: List[dict] = []
@@ -788,7 +790,7 @@ class StudentOpenAttemptOut(BaseModel):
 class AssignmentTakingInfoOut(BaseModel):
     assignment_id: UUID
     exercise_id: UUID
-    class_id: UUID
+    class_id: Optional[UUID] = None
     due_at: Optional[datetime] = None
     duration_minutes: int = 45
     max_attempts: int = 1

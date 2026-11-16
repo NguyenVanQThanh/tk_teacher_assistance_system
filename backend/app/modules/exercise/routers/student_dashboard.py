@@ -171,40 +171,41 @@ def get_student_dashboard(
 
     upcoming_list: List[UpcomingAssignmentItemOut] = []
     now = datetime.now(timezone.utc)
-    if class_ids:
-        assignments = db.query(ClassAssignment).join(
-            Exercise, ClassAssignment.exercise_id == Exercise.exercise_id
-        ).filter(
-            ClassAssignment.class_id.in_(class_ids),
-            ClassAssignment.status != "DELETED",
-            # Hide other students' personal AI assignments
-            or_(ClassAssignment.owner_student_id.is_(None),
-                ClassAssignment.owner_student_id == current_user.user_id)
-        ).order_by(ClassAssignment.due_at.asc()).all()
+    # Personal (guest/AI) assignments are included even without any class.
+    assignments = db.query(ClassAssignment).join(
+        Exercise, ClassAssignment.exercise_id == Exercise.exercise_id
+    ).filter(
+        or_(ClassAssignment.class_id.in_(class_ids),
+            ClassAssignment.owner_student_id == current_user.user_id),
+        ClassAssignment.status != "DELETED",
+        # Hide other students' personal AI assignments
+        or_(ClassAssignment.owner_student_id.is_(None),
+            ClassAssignment.owner_student_id == current_user.user_id)
+    ).order_by(ClassAssignment.due_at.asc()).all()
 
-        finished_assignment_ids = {att.assignment_id for att in attempts}
+    finished_assignment_ids = {att.assignment_id for att in attempts}
 
-        for a in assignments:
-            is_finished = a.assignment_id in finished_assignment_ids
-            due_at = a.due_at if a.due_at.tzinfo else a.due_at.replace(tzinfo=timezone.utc)
-            is_overdue = due_at < now and not is_finished
-            is_ai = bool((a.exercise.ai_metadata or {}).get("is_ai_generated"))
-            s_name = a.exercise.subject.subject_name if hasattr(a.exercise, "subject") and a.exercise.subject else "Bộ môn"
-            upcoming_list.append(
-                UpcomingAssignmentItemOut(
-                    assignment_id=a.assignment_id,
-                    exercise_id=a.exercise_id,
-                    title=a.exercise.title,
-                    subject_name=s_name,
-                    due_at=a.due_at,
-                    duration_minutes=45,
-                    total_questions=a.exercise.total_questions or 0,
-                    is_overdue=is_overdue,
-                    is_completed=is_finished,
-                    is_ai_generated=is_ai,
-                    category="ai_generated" if is_ai else ("exam" if a.exercise.exercise_kind == "EXAM" else "class_exercise")
-                )
+    for a in assignments:
+        is_finished = a.assignment_id in finished_assignment_ids
+        due_at = a.due_at if a.due_at.tzinfo else a.due_at.replace(tzinfo=timezone.utc)
+        is_overdue = due_at < now and not is_finished
+        is_ai = bool((a.exercise.ai_metadata or {}).get("is_ai_generated"))
+        s_name = a.exercise.subject.subject_name if hasattr(a.exercise, "subject") and a.exercise.subject else "Bộ môn"
+        upcoming_list.append(
+            UpcomingAssignmentItemOut(
+                assignment_id=a.assignment_id,
+                exercise_id=a.exercise_id,
+                title=a.exercise.title,
+                subject_name=s_name,
+                due_at=a.due_at,
+                duration_minutes=45,
+                total_questions=a.exercise.total_questions or 0,
+                is_overdue=is_overdue,
+                is_completed=is_finished,
+                is_ai_generated=is_ai,
+                category="ai_generated" if is_ai else ("exam" if a.exercise.exercise_kind == "EXAM" else "class_exercise")
             )
+        )
 
     # 5. Weekly Schedule
     weekly_schedule = [

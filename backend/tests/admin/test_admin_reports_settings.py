@@ -169,3 +169,17 @@ class TestAdminSettingsRouter:
         assert "Updated System Settings" in titles
 
 
+
+
+class TestAcademicYearSetting:
+    def test_year_normalization_invalid_and_me(self, client: TestClient):
+        headers = _login_headers(client)
+        ok = client.put("/api/v1/admin/settings", json={"general": {"academicYear": "2024 - 2025"}}, headers=headers)
+        assert ok.status_code == status.HTTP_200_OK
+        assert ok.json()["general"]["academicYear"] == "2024-2025"
+        me = client.get("/api/v1/auth/me", headers=headers)
+        assert me.json()["current_academic_year"] == "2024-2025"
+        for bad in ("2024-2026", "abcd-efgh", "2024"):
+            r = client.put("/api/v1/admin/settings", json={"general": {"academicYear": bad}}, headers=headers)
+            assert r.status_code == status.HTTP_422_UNPROCESSABLE_ENTITY
+        client.put("/api/v1/admin/settings", json={"general": {"academicYear": "2025-2026"}}, headers=headers)

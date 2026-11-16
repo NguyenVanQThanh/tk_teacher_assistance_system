@@ -2,7 +2,7 @@
 # Description: Orchestrates AI exercise generation (teacher and student flows): context retrieval, LLM generation and persistence.
 # Created At: 2026-11-13
 # Created By: AI Agent
-# Updated At: 2026-11-13
+# Updated At: 2026-11-15
 # Updated By: AI Agent
 
 import logging
@@ -11,8 +11,10 @@ from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, List, Optional, Tuple
 
 from fastapi import HTTPException, status
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 
+from app.core import config as app_config
 from app.core.resource_limits import AI_GENERATE_ACQUIRE_TIMEOUT_SECONDS, AI_GENERATE_SEMAPHORE
 from app.modules.academic.scoping import check_class_access, get_user_role_name
 from app.modules.exercise.schemas import (
@@ -53,8 +55,17 @@ class AiExerciseService:
             .all()
         )
 
-    def _student_subject_context(self, user: User, subject_id: uuid.UUID) -> Tuple[Class, Subject]:
-        """Return (class, subject) where the subject is taught in one of the student's classes; else 403/404."""
+    def _student_subject_context(self, user: User, subject_id: uuid.UUID) -> Tuple[Optional[Class], Subject]:
+        """Return (class, subject) where the subject is taught in one of the student's classes; else 403/404.
+
+        Guests have no class: any ACTIVE subject is allowed and the class is None.
+        """
+        if user.is_guest:
+            subject = self.db.query(Subject).filter(
+                Subject.subject_id == subject_id, Subject.status == "ACTIVE").first()
+            if subject is None:
+                raise _err(status.HTTP_404_NOT_FOUND, "ERR-ACAD-SUBJECT_NOT_FOUND", "Subject not found.")
+            return None, subject
         classes = self._student_classes(user.user_id)
         if not classes:
             raise _err(status.HTTP_403_FORBIDDEN, "ERR-EXE-AI_NO_CLASS", "You are not enrolled in any class.")
@@ -73,18 +84,38 @@ class AiExerciseService:
             raise _err(status.HTTP_404_NOT_FOUND, "ERR-ACAD-SUBJECT_NOT_FOUND", "Subject not found.")
         return taught, subject
 
-    def student_chapters(self, user: User, subject_id: uuid.UUID) -> List[Dict[str, Any]]:
-        """Chapters available to the student for a subject (grade parsed from the student's class name)."""
+    def _enforce_guest_ai_limit(self, user: User) -> None:
+        """Cap paid LLM generations per guest account; soft-deleted exercises still count."""
+        if not user.is_guest:
+            return
+        used = self.db.query(func.count(Exercise.exercise_id)).filter(Exercise.created_by == user.user_id).scalar() or 0
+        if used >= app_config.GUEST_AI_LIMIT:
+            raise _err(status.HTTP_403_FORBIDDEN, "ERR-EXE-GUEST_AI_LIMIT",
+                       "Guest accounts have reached the AI generation limit.")
+
+    @staticmethod
+    def _require_guest_grade(user: User, cls: Optional[Class], grade: Optional[int]) -> None:
+        """Guests have no class, so the client must send the grade; fail clearly instead of an empty SGK filter."""
+        if user.is_guest and cls is None and not grade:
+            raise _err(status.HTTP_422_UNPROCESSABLE_ENTITY, "ERR-EXE-AI_GRADE_REQUIRED",
+                       "Grade (10-12) is required for guest accounts.")
+
+    def student_chapters(self, user: User, subject_id: uuid.UUID,
+                         grade: Optional[int] = None) -> List[Dict[str, Any]]:
+        """Chapters for a subject (grade parsed from the student's class name; guests pass `grade` 10-12)."""
         cls, subject = self._student_subject_context(user, subject_id)
-        grade = parse_grade(cls.class_name)
+        self._require_guest_grade(user, cls, grade)
+        grade = parse_grade(cls.class_name) if cls is not None else grade
         doc_ids = RagRetrievalService.resolve_sgk_filter(self.db, subject.subject_name, grade)
         return RagRetrievalService.list_chapters(self.db, doc_ids)
 
     # ------------------------------------------------------------------ generation entry points
     def generate(self, user: User, payload: AiExerciseGenerateRequest) -> AiExerciseGenerateOut:
         """Teacher/Admin flow: class-wide assignment for a class the caller can access; nothing is auto-created."""
+        self._enforce_guest_ai_limit(user)
         subject = self._resolve_teacher_subject(payload)
-        class_obj = self._resolve_teacher_class(user, subject, payload)
+        # Guest teachers have no classes: the exercise lands in the bank without an assignment.
+        class_obj = None if user.is_guest else self._resolve_teacher_class(user, subject, payload)
         grade_name = payload.grade_name or "Lớp 12"
         context, sources = RagContextService.build_context_with_sources(
             self.db,
@@ -93,7 +124,7 @@ class AiExerciseService:
             grade_name=grade_name,
             subject_id=subject.subject_id,
             role_name=get_user_role_name(self.db, user),
-            class_id=class_obj.class_id,
+            class_id=class_obj.class_id if class_obj is not None else None,
             document_ids=payload.document_ids,
         )
         matrix = payload.matrix.as_dict() if payload.matrix else None
@@ -115,6 +146,7 @@ class AiExerciseService:
                              file_text: Optional[str] = None,
                              file_name: Optional[str] = None) -> AiExerciseGenerateOut:
         """Student flow: validated chapters/matrix, personal assignment (owner_student_id = the student)."""
+        self._enforce_guest_ai_limit(user)
         if not payload.chapters:
             raise _err(status.HTTP_422_UNPROCESSABLE_ENTITY, "ERR-EXE-AI_CHAPTER_REQUIRED",
                        "Select at least one chapter.")
@@ -127,13 +159,14 @@ class AiExerciseService:
             raise _err(status.HTTP_422_UNPROCESSABLE_ENTITY, "ERR-EXE-AI_MATRIX_TOO_LARGE",
                        f"The matrix may request at most {MAX_TOTAL_QUESTIONS} questions.")
         class_obj, subject = self._student_subject_context(user, payload.subject_id)
-        grade = parse_grade(class_obj.class_name)
+        self._require_guest_grade(user, class_obj, payload.grade)
+        grade = parse_grade(class_obj.class_name) if class_obj is not None else payload.grade
         doc_ids = RagRetrievalService.resolve_sgk_filter(self.db, subject.subject_name, grade)
         allowed = {c["chapter"] for c in RagRetrievalService.list_chapters(self.db, doc_ids)}
         if any(ch not in allowed for ch in payload.chapters):
             raise _err(status.HTTP_422_UNPROCESSABLE_ENTITY, "ERR-EXE-AI_INVALID_CHAPTER",
                        "One or more chapters are not available for this subject.")
-        grade_name = f"Lớp {grade}" if grade else class_obj.class_name
+        grade_name = f"Lớp {grade}" if grade else (class_obj.class_name if class_obj is not None else "")
         context, sources = RagContextService.build_student_context(
             self.db, student_id=user.user_id, subject_id=subject.subject_id, subject_name=subject.subject_name,
             grade=grade, chapters=payload.chapters, topic_prompt=payload.topic_prompt)
@@ -210,7 +243,7 @@ class AiExerciseService:
         finally:
             AI_GENERATE_SEMAPHORE.release()
 
-    def _persist(self, user: User, subject: Subject, class_obj: Class, questions: List[Dict[str, Any]],
+    def _persist(self, user: User, subject: Subject, class_obj: Optional[Class], questions: List[Dict[str, Any]],
                  metadata: Dict[str, Any], duration_minutes: int, topic: str, grade_name: str,
                  owner_student_id: Optional[uuid.UUID]) -> AiExerciseGenerateOut:
         """Store Exercise, Questions, AnswerOptions (MCQ and True/False) and the assignment in one commit."""
@@ -235,19 +268,27 @@ class AiExerciseService:
             for opt in q.get("answer_options", []):
                 self.db.add(AnswerOption(question_id=question.question_id, content=opt["content"],
                                          is_correct=bool(opt["is_correct"]), display_order=opt["display_order"]))
-        now = datetime.now(timezone.utc)
-        assignment = ClassAssignment(
-            class_id=class_obj.class_id, exercise_id=exercise.exercise_id, assigned_by=user.user_id,
-            assigned_at=now, due_at=now + timedelta(days=DEFAULT_DUE_DAYS), status="ACTIVE",
-            owner_student_id=owner_student_id,
-        )
-        self.db.add(assignment)
+        assignment = None
+        if class_obj is not None or owner_student_id is not None:
+            now = datetime.now(timezone.utc)
+            assignment = ClassAssignment(
+                class_id=class_obj.class_id if class_obj is not None else None,
+                exercise_id=exercise.exercise_id, assigned_by=user.user_id,
+                assigned_at=now, due_at=now + timedelta(days=DEFAULT_DUE_DAYS), status="ACTIVE",
+                owner_student_id=owner_student_id,
+            )
+            self.db.add(assignment)
         self.db.commit()
-        self.db.refresh(assignment)
+        if assignment is not None:
+            self.db.refresh(assignment)
         self.db.refresh(exercise)
         return AiExerciseGenerateOut(
-            exercise_id=exercise.exercise_id, assignment_id=assignment.assignment_id, title=exercise.title,
+            exercise_id=exercise.exercise_id,
+            assignment_id=assignment.assignment_id if assignment is not None else None,
+            title=exercise.title,
             subject_name=subject.subject_name, total_questions=len(questions), duration_minutes=duration_minutes,
-            class_id=class_obj.class_id, class_name=class_obj.class_name, due_at=assignment.due_at,
+            class_id=class_obj.class_id if class_obj is not None else None,
+            class_name=class_obj.class_name if class_obj is not None else None,
+            due_at=assignment.due_at if assignment is not None else None,
             created_at=exercise.created_at, sources=metadata.get("sources", []),
         )
