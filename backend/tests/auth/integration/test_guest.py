@@ -139,6 +139,12 @@ def test_student_guest_generate_and_attempt_without_class(client, db_session, mo
     assert taking.status_code == 200, taking.text
     att = client.post(f"/api/v1/assignments/{body['assignment_id']}/attempts", headers=s)
     assert att.status_code in (200, 201), att.text
+    aid = att.json()["attempt_id"]
+    sub = client.put(f"/api/v1/attempts/{aid}/submit", headers=s, json={"answers": []})
+    assert sub.status_code == 200, sub.text
+    assert client.get(f"/api/v1/assignments/{body['assignment_id']}/attempts", headers=s).status_code == 200
+    assert client.get("/api/v1/attempts", headers=s).status_code == 200
+    assert client.get("/api/v1/student/dashboard", headers=s).status_code == 200
 
 
 def test_guest_permissions_are_allow_list_only(client, db_session):
