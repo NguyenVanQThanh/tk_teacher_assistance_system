@@ -34,7 +34,7 @@ export default function LoginPage() {
   const [successMsg, setSuccessMsg] = useState('');
   const [fieldErrors, setFieldErrors] = useState({});
 
-  const { login, isAuthenticated, user } = useAuth();
+  const { login, guestLogin, isAuthenticated, user } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -54,7 +54,9 @@ export default function LoginPage() {
   useEffect(() => {
     if (isAuthenticated) {
       let defaultPath = '/teacher';
-      if (user?.role === 'Admin') {
+      if (user?.is_guest) {
+        defaultPath = user.role === 'Student' ? '/student/exercises' : '/teacher/exercises';
+      } else if (user?.role === 'Admin') {
         defaultPath = '/admin';
       } else if (user?.role === 'Student') {
         defaultPath = '/student';
@@ -124,6 +126,22 @@ export default function LoginPage() {
       console.error('Login error:', err);
       const msg = getErrorMessage(err, 'Đăng nhập thất bại. Vui lòng kiểm tra lại tài khoản hoặc mật khẩu.');
       setErrorMsg(msg);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleGuestLogin = async (role) => {
+    setErrorMsg('');
+    setSuccessMsg('');
+    setLoading(true);
+    try {
+      const result = await guestLogin(role);
+      navigate(role === 'Student' ? '/student/exercises' : '/teacher/exercises', { replace: true });
+      return result;
+    } catch (err) {
+      console.error('Guest login error:', err);
+      setErrorMsg(getErrorMessage(err, 'Không thể đăng nhập với tư cách khách. Vui lòng thử lại.'));
     } finally {
       setLoading(false);
     }
@@ -363,6 +381,15 @@ export default function LoginPage() {
               )}
             </button>
           </form>
+
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginTop: '16px' }}>
+            <button type="button" className="btn-submit" disabled={loading} onClick={() => handleGuestLogin('Teacher')}>
+              Tiếp tục với tư cách giáo viên khách
+            </button>
+            <button type="button" className="btn-submit" disabled={loading} onClick={() => handleGuestLogin('Student')}>
+              Tiếp tục với tư cách học sinh khách
+            </button>
+          </div>
 
           {/* Footer Note */}
           <div className="form-footer">
