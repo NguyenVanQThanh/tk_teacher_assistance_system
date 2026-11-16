@@ -239,3 +239,37 @@ def test_global_cap_and_xff_uses_last_entry(client, monkeypatch):
         headers = {"x-forwarded-for": "6.6.6.6, 1.2.3.4"}
     monkeypatch.setattr(app_config, "TRUST_PROXY_HEADERS", True)
     assert app_config.client_ip(Req()) == "1.2.3.4"
+
+
+def test_guest_student_cannot_read_or_start_class_assignment(client, db_session):
+    """Guest students are enrolled nowhere: class assignments must stay 403/404, not be treated as enrolled."""
+    from datetime import datetime, timedelta, timezone
+    from models.models import Class, Exercise
+    teacher = _guest(client, "Teacher").json()["user"]["user_id"]
+    subject = Subject(subject_name=f"Ly {uuid.uuid4().hex[:6]}", status="ACTIVE")
+    cls = Class(class_name=f"G{uuid.uuid4().hex[:6]}", status="ACTIVE")
+    db_session.add_all([subject, cls])
+    db_session.flush()
+    ex = Exercise(title="E", subject_id=subject.subject_id, created_by=uuid.UUID(teacher), status="ACTIVE")
+    db_session.add(ex)
+    db_session.flush()
+    asg = ClassAssignment(class_id=cls.class_id, exercise_id=ex.exercise_id, assigned_by=uuid.UUID(teacher),
+                          due_at=datetime.now(timezone.utc) + timedelta(days=1), status="ACTIVE")
+    db_session.add(asg)
+    db_session.flush()
+    s = _h(_guest(client, "Student"))
+    aid = asg.assignment_id
+    assert client.get(f"/api/v1/assignments/{aid}/taking", headers=s).status_code in (403, 404)
+    assert client.post(f"/api/v1/assignments/{aid}/attempts", headers=s).status_code in (403, 404)
+
+
+def test_guest_routes_use_only_allowed_permissions():
+    """Every require_perm code on guest-facing routes must be in the guest allow-list."""
+    import re
+    from pathlib import Path
+    from app.scripts.rbac_seed import GUEST_ALLOWED_PERMISSIONS
+    root = Path(__file__).resolve().parents[3] / "app" / "modules" / "exercise" / "routers"
+    allowed = set(GUEST_ALLOWED_PERMISSIONS["Student"])
+    for name in ("ai_generation.py", "student_dashboard.py"):
+        used = set(re.findall(r'require_perm\("([A-Z_]+)"\)', (root / name).read_text(encoding="utf-8")))
+        assert used <= allowed, (name, used - allowed)
