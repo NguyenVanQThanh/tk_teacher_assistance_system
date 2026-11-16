@@ -30,6 +30,10 @@ jobs:
           --deselect tests/exercise/unit/test_grading_service.py::TestGradingServiceUnit::test_short_answer_pending_manual_grade
           --deselect tests/exercise/unit/test_grading_service.py::TestGradingServiceUnit::test_all_short_answer_score_is_null
         working-directory: backend
+      # A second Alembic head breaks `alembic upgrade head` on deploy (see #69), so fail early in CI.
+      - run: |
+          test "$(alembic heads | grep -c '(head)')" = "1"
+        working-directory: backend
       - uses: actions/setup-node@v4
         with:
           node-version: 22
@@ -39,4 +43,7 @@ jobs:
         working-directory: frontend
       # No lint/test scripts in frontend yet; build is the only gate.
       - run: npm run build
+        working-directory: frontend
+      # Every backend ERR-XXX-YYY code needs a Vietnamese message; the selfcheck fails otherwise.
+      - run: node src/utils/errorMessages.selfcheck.mjs
         working-directory: frontend
