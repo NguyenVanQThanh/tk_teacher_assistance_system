@@ -193,6 +193,12 @@ def test_teacher_guest_ai_generate_without_assignment(client, db_session, monkey
     assert r.status_code == 201, r.text
     assert r.json()["assignment_id"] is None and r.json()["class_id"] is None
 
+    monkeypatch.setattr(app_config, "GUEST_AI_LIMIT", 1)
+    r = client.post("/api/v1/exercises/ai-generate", headers=t, json={
+        "subject_id": str(subject.subject_id), "topic_prompt": "x", "part1_count": 1,
+        "part2_count": 0, "part3_count": 0})
+    assert r.status_code == 403 and "ERR-EXE-GUEST_AI_LIMIT" in r.text
+
 
 def test_admin_list_stats_and_reset(client, db_session):
     admin = _admin(client)

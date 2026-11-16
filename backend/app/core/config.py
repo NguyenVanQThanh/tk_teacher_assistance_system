@@ -121,6 +121,8 @@ GUEST_ACCESS_ENABLED = _env_bool("GUEST_ACCESS_ENABLED", True)
 GUEST_CREATE_PER_IP_HOUR = _env_int("GUEST_CREATE_PER_IP_HOUR", 5)
 # Maximum documents a guest account may upload.
 GUEST_DOC_LIMIT = _env_int("GUEST_DOC_LIMIT", 3, minimum=0)
+# Maximum AI generations (exercises created) per guest account; soft-deleted ones still count.
+GUEST_AI_LIMIT = _env_int("GUEST_AI_LIMIT", 3, minimum=0)
 # Fallback academic year ("YYYY-YYYY") used when no admin setting exists; empty -> derived from calendar.
 CURRENT_ACADEMIC_YEAR = os.environ.get("CURRENT_ACADEMIC_YEAR", "").strip()
 # Honor CF-Connecting-IP / X-Forwarded-For only behind a trusted reverse proxy.

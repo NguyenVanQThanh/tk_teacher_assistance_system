@@ -11,8 +11,10 @@ from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, List, Optional, Tuple
 
 from fastapi import HTTPException, status
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 
+from app.core import config as app_config
 from app.core.resource_limits import AI_GENERATE_ACQUIRE_TIMEOUT_SECONDS, AI_GENERATE_SEMAPHORE
 from app.modules.academic.scoping import check_class_access, get_user_role_name
 from app.modules.exercise.schemas import (
@@ -82,6 +84,15 @@ class AiExerciseService:
             raise _err(status.HTTP_404_NOT_FOUND, "ERR-ACAD-SUBJECT_NOT_FOUND", "Subject not found.")
         return taught, subject
 
+    def _enforce_guest_ai_limit(self, user: User) -> None:
+        """Cap paid LLM generations per guest account; soft-deleted exercises still count."""
+        if not user.is_guest:
+            return
+        used = self.db.query(func.count(Exercise.exercise_id)).filter(Exercise.created_by == user.user_id).scalar() or 0
+        if used >= app_config.GUEST_AI_LIMIT:
+            raise _err(status.HTTP_403_FORBIDDEN, "ERR-EXE-GUEST_AI_LIMIT",
+                       "Guest accounts have reached the AI generation limit.")
+
     @staticmethod
     def _require_guest_grade(user: User, cls: Optional[Class], grade: Optional[int]) -> None:
         """Guests have no class, so the client must send the grade; fail clearly instead of an empty SGK filter."""
@@ -101,6 +112,7 @@ class AiExerciseService:
     # ------------------------------------------------------------------ generation entry points
     def generate(self, user: User, payload: AiExerciseGenerateRequest) -> AiExerciseGenerateOut:
         """Teacher/Admin flow: class-wide assignment for a class the caller can access; nothing is auto-created."""
+        self._enforce_guest_ai_limit(user)
         subject = self._resolve_teacher_subject(payload)
         # Guest teachers have no classes: the exercise lands in the bank without an assignment.
         class_obj = None if user.is_guest else self._resolve_teacher_class(user, subject, payload)
@@ -134,6 +146,7 @@ class AiExerciseService:
                              file_text: Optional[str] = None,
                              file_name: Optional[str] = None) -> AiExerciseGenerateOut:
         """Student flow: validated chapters/matrix, personal assignment (owner_student_id = the student)."""
+        self._enforce_guest_ai_limit(user)
         if not payload.chapters:
             raise _err(status.HTTP_422_UNPROCESSABLE_ENTITY, "ERR-EXE-AI_CHAPTER_REQUIRED",
                        "Select at least one chapter.")

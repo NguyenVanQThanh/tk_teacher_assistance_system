@@ -99,6 +99,7 @@ export const ERROR_CODE_MESSAGES = {
   'ERR-EXE-AI_LENGTH_REQUIRED': 'Không xác định được kích thước tệp tải lên.',
   'ERR-EXE-AI_MATRIX_TOO_LARGE': 'Số lượng câu hỏi yêu cầu vượt quá giới hạn.',
   'ERR-EXE-AI_GRADE_REQUIRED': 'Vui lòng chọn khối lớp (10-12) để tạo bài tập AI.',
+  'ERR-EXE-GUEST_AI_LIMIT': 'Tài khoản khách đã hết lượt tạo bài tập AI. Vui lòng đăng ký tài khoản để tiếp tục.',
   'ERR-EXE-AI_NO_CLASS': 'Bạn chưa thuộc lớp học nào nên chưa thể tạo bài tập AI.',
   'ERR-EXE-AI_PAYLOAD_REQUIRED': 'Thiếu dữ liệu tạo bài tập bằng AI.',
   'ERR-EXE-AI_TEACHER_ONLY': 'Chức năng này chỉ dành cho giáo viên.',
