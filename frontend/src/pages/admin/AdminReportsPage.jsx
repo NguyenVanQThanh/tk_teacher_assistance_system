@@ -6,6 +6,7 @@
 // Updated By: AI Agent
 
 import React, { useState, useEffect, useCallback } from 'react';
+import useAcademicYear, { academicYearOptions } from '../../hooks/useAcademicYear';
 import { 
   BarChart3, 
   Download, 
@@ -163,7 +164,11 @@ const triggerBlobDownload = (blobData, filename, mimeType) => {
 export default function AdminReportsPage() {
   // State for filters
   const [timeframe, setTimeframe] = useState('week'); // 'week' | 'month'
-  const [academicYear, setAcademicYear] = useState('2024 - 2025');
+  const currentYear = useAcademicYear();
+  const [academicYear, setAcademicYear] = useState(currentYear.value);
+  // The profile may finish loading after the first render; follow it until the admin picks a year manually.
+  const [yearTouched, setYearTouched] = useState(false);
+  useEffect(() => { if (!yearTouched) setAcademicYear(currentYear.value); }, [currentYear.value, yearTouched]);
   const [semester, setSemester] = useState('Học kỳ II');
   const [gradeFilter, setGradeFilter] = useState('all');
   const [deptFilter, setDeptFilter] = useState('all');
@@ -409,7 +414,7 @@ export default function AdminReportsPage() {
             <span className="status-dot purple"></span>
             <span>TRUNG TÂM PHÂN TÍCH DỮ LIỆU TOÀN TRƯỜNG</span>
             <span className="dot">•</span>
-            <span className="tag-accent">NĂM HỌC {academicYear}</span>
+            <span className="tag-accent">NĂM HỌC {academicYear.replace('-', ' - ')}</span>
           </div>
 
           <div className="reports-title-with-actions-row">
@@ -531,9 +536,10 @@ export default function AdminReportsPage() {
       <section className="reports-subheader-filters">
         <div className="reports-dropdowns-group">
           <div className="report-select-wrapper">
-            <select value={academicYear} onChange={e => setAcademicYear(e.target.value)} className="report-select">
-              <option value="2024 - 2025">Năm học 2024 - 2025</option>
-              <option value="2023 - 2024">Năm học 2023 - 2024</option>
+            <select value={academicYear} onChange={e => { setYearTouched(true); setAcademicYear(e.target.value); }} className="report-select">
+              {academicYearOptions(currentYear.value).map((y) => (
+                <option key={y} value={y}>Năm học {y.replace('-', ' - ')}</option>
+              ))}
             </select>
             <ChevronDown size={13} className="select-icon" />
           </div>
@@ -915,7 +921,7 @@ export default function AdminReportsPage() {
             </div>
             <div className="admin-modal-body">
               <p className="admin-modal-desc">
-                Tải xuống bản báo cáo tổng hợp toàn diện các chỉ số học lực, chuyên cần và hiệu suất {semester} ({academicYear}).
+                Tải xuống bản báo cáo tổng hợp toàn diện các chỉ số học lực, chuyên cần và hiệu suất {semester} ({academicYear.replace('-', ' - ')}).
               </p>
               <div className="admin-form-group">
                 <label className="admin-form-label">Định dạng tập tin</label>

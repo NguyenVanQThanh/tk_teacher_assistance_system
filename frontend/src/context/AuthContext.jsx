@@ -54,6 +54,23 @@ export function AuthProvider({ children }) {
     return data;
   };
 
+  const guestLogin = async (role) => {
+    // By design the guest key is kept across logout so the same guest account (and its quota) can be resumed;
+    // clearing it would let a user mint a fresh guest, which the server rate limits per IP.
+    const storageKey = `guest_key_${role}`;
+    let guestKey = null;
+    try { guestKey = localStorage.getItem(storageKey); } catch (e) { /* storage unavailable */ }
+    const data = await authApi.guestLogin(role, guestKey);
+    if (data.guest_key) {
+      try { localStorage.setItem(storageKey, data.guest_key); } catch (e) { /* storage unavailable */ }
+    }
+    localStorage.setItem('access_token', data.access_token);
+    localStorage.setItem('user_info', JSON.stringify(data.user));
+    setToken(data.access_token);
+    setUser(data.user);
+    return data;
+  };
+
   const logout = async () => {
     try {
       await authApi.logout();
@@ -79,6 +96,9 @@ export function AuthProvider({ children }) {
     isAuthenticated: !!token && !!user,
     isLoading,
     login,
+    guestLogin,
+    isGuest: !!user?.is_guest,
+    currentAcademicYear: user?.current_academic_year || null,
     logout,
     hasPermission,
   };

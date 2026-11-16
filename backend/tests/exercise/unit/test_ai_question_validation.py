@@ -85,6 +85,7 @@ def test_slots_from_matrix_order():
 
 
 def test_retry_only_missing_and_difficulty_by_slot(monkeypatch):
+    monkeypatch.setenv("MISTRAL_API_KEY", "k")
     monkeypatch.setattr(gen.config, "AI_PART_MAX_RETRIES", 2)
     calls = []
 
@@ -94,9 +95,9 @@ def test_retry_only_missing_and_difficulty_by_slot(monkeypatch):
             return [{**mcq(list("abcd"), {0}), "content": "Q1"}, {**mcq(list("abcd"), {0, 1}), "content": "Q2"}]
         return [{**mcq(list("wxyz"), {2}), "content": "Q2b"}]
 
-    monkeypatch.setattr(Svc, "_call_gemini_part", classmethod(fake))
+    monkeypatch.setattr(Svc, "_call_mistral_part", classmethod(fake))
     slots = ["NhanBiet", "VanDung"]
-    out = Svc.generate_part("k", "Part1", slots, "", "", "req", "Hoa", "Lop 12")
+    out = Svc.generate_part("Part1", slots, "", "", "req", "Hoa", "Lop 12")
     assert [q["difficulty"] for q in out] == slots
     assert len(calls) == 2 and calls[1][1] == gen.RETRY_TEMPERATURE
     assert "exactly 1 NEW" in calls[1][0]
@@ -104,20 +105,22 @@ def test_retry_only_missing_and_difficulty_by_slot(monkeypatch):
 
 
 def test_still_short_raises(monkeypatch):
+    monkeypatch.setenv("MISTRAL_API_KEY", "k")
     monkeypatch.setattr(gen.config, "AI_PART_MAX_RETRIES", 1)
-    monkeypatch.setattr(Svc, "_call_gemini_part", classmethod(lambda *a, **k: []))
+    monkeypatch.setattr(Svc, "_call_mistral_part", classmethod(lambda *a, **k: []))
     with pytest.raises(RuntimeError):
-        Svc.generate_part("k", "Part3", ["NhanBiet"], "", "", "r", "Hoa", "12")
+        Svc.generate_part("Part3", ["NhanBiet"], "", "", "r", "Hoa", "12")
 
 
 def test_extras_trimmed(monkeypatch):
+    monkeypatch.setenv("MISTRAL_API_KEY", "k")
     items = [{"content": f"Q{i}", "correct_answer": str(i)} for i in range(5)]
-    monkeypatch.setattr(Svc, "_call_gemini_part", classmethod(lambda *a, **k: items))
-    assert len(Svc.generate_part("k", "Part3", ["NhanBiet"] * 3, "", "", "r", "Hoa", "12")) == 3
+    monkeypatch.setattr(Svc, "_call_mistral_part", classmethod(lambda *a, **k: items))
+    assert len(Svc.generate_part("Part3", ["NhanBiet"] * 3, "", "", "r", "Hoa", "12")) == 3
 
 
 def test_generate_questions_parallel_parts(monkeypatch):
-    monkeypatch.setattr(gen.GeminiVisionParserService, "get_api_key", lambda: "k")
+    monkeypatch.setenv("MISTRAL_API_KEY", "k")
 
     def fake(cls, api_key, part, prompt, temperature):
         if part == "Part1":
@@ -126,7 +129,7 @@ def test_generate_questions_parallel_parts(monkeypatch):
             return [{"content": "T", "segments": tf_segments([True] * 4)}]
         return [{"content": "S", "correct_answer": "1"}]
 
-    monkeypatch.setattr(Svc, "_call_gemini_part", classmethod(fake))
+    monkeypatch.setattr(Svc, "_call_mistral_part", classmethod(fake))
     matrix = {"mcq": {"NhanBiet": 1}, "tf": {"ThongHieu": 1}, "short": {"VanDung": 1}}
     out = Svc.generate_questions("Hoa", "Lop 12", "t", 1, 1, 1, matrix=matrix)
     assert [q["question_type"] for q in out] == ["MultipleChoice", "TrueFalse", "ShortAnswer"]

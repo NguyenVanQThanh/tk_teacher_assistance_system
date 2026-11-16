@@ -5,16 +5,27 @@
 // Updated At: 2026-09-27
 // Updated By: Tam Khang
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { X, UploadCloud, File, CheckCircle2, AlertCircle } from 'lucide-react';
-import { documentsApi } from '../../services/api';
+import { documentsApi, subjectsApi } from '../../services/api';
 import './UploadDocumentModal.css';
 
 export default function UploadDocumentModal({ isOpen, onClose, onUploadSuccess }) {
   const [file, setFile] = useState(null);
   const [title, setTitle] = useState('');
   const [grade, setGrade] = useState('12');
-  const [subject, setSubject] = useState('math');
+  const [subject, setSubject] = useState('');
+  const [subjectsList, setSubjectsList] = useState([]);
+
+  // Subject has no default; the user must choose one (loaded from the subjects API).
+  useEffect(() => {
+    if (!isOpen) return undefined;
+    let mounted = true;
+    subjectsApi.getSubjects()
+      .then((subjs) => { if (mounted && Array.isArray(subjs)) setSubjectsList(subjs); })
+      .catch((err) => console.error('Failed to load subjects:', err));
+    return () => { mounted = false; };
+  }, [isOpen]);
   const [docType, setDocType] = useState('lecture');
   const [isDragging, setIsDragging] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
@@ -67,6 +78,10 @@ export default function UploadDocumentModal({ isOpen, onClose, onUploadSuccess }
       setErrorMsg('Vui lòng nhập tên tài liệu.');
       return;
     }
+    if (!subject) {
+      setErrorMsg('Vui lòng chọn môn học.');
+      return;
+    }
 
     setIsUploading(true);
     setErrorMsg('');
@@ -76,7 +91,7 @@ export default function UploadDocumentModal({ isOpen, onClose, onUploadSuccess }
       formData.append('file', file);
       formData.append('title', title.trim());
       formData.append('grade', grade);
-      formData.append('subject', subject);
+      formData.append('subject_id', subject);
       formData.append('document_type', docType);
 
       const uploaded = await documentsApi.uploadDocument(formData);
@@ -88,7 +103,7 @@ export default function UploadDocumentModal({ isOpen, onClose, onUploadSuccess }
         uploadDate: new Date().toLocaleDateString('vi-VN'),
         fileType: docType,
         grade: grade,
-        subject: subject,
+        subject: subjectsList.find((x) => String(x.subject_id) === String(subject))?.subject_name || subject,
         authorName: 'Giáo viên',
         authorInitial: 'GV',
         fileUrl: uploaded.file_url,
@@ -215,13 +230,10 @@ export default function UploadDocumentModal({ isOpen, onClose, onUploadSuccess }
                 value={subject}
                 onChange={(e) => setSubject(e.target.value)}
               >
-                <option value="math">Toán học</option>
-                <option value="physics">Vật lý</option>
-                <option value="chemistry">Hóa học</option>
-                <option value="biology">Sinh học</option>
-                <option value="history">Lịch sử</option>
-                <option value="english">Tiếng Anh</option>
-                <option value="it">Tin học</option>
+                <option value="" disabled>Chọn môn học</option>
+                {subjectsList.map((s) => (
+                  <option key={s.subject_id} value={s.subject_id}>{s.subject_name}</option>
+                ))}
               </select>
             </div>
 

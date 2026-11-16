@@ -98,12 +98,13 @@ def extract_text(ext: str, data: bytes) -> str:
 )
 def list_chapters(
     subject_id: UUID = Query(..., description="Subject taught in one of the student's classes"),
+    grade: Optional[int] = Query(None, ge=10, le=12, description="Grade 10-12; used by guest students only"),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
     """List textbook chapters for a subject (grade taken from the student's class)."""
     _require_student(db, current_user)
-    return AiExerciseService(db).student_chapters(current_user, subject_id)
+    return AiExerciseService(db).student_chapters(current_user, subject_id, grade)
 
 
 @router.post(

@@ -10,11 +10,13 @@ from urllib.parse import quote
 from uuid import UUID
 from fastapi import BackgroundTasks, APIRouter, Depends, Query, UploadFile, File, Form, status, HTTPException
 from fastapi.responses import FileResponse, Response
+from sqlalchemy import text
 from sqlalchemy.orm import Session
 
+from app.core import config as app_config
 from app.core.database import get_db
 from app.core.storage import LocalStorage, get_storage
-from models.models import User
+from models.models import Document, User
 from app.modules.auth.dependencies import require_roles
 from app.modules.document.schemas import DocumentOut, DocumentListOut, DocumentDashboardOut, DocumentUpdate
 from app.modules.document.services import document_service
@@ -102,6 +104,18 @@ def upload_document(
     """
     Upload a new teaching document with metadata.
     """
+    if current_user.is_guest:
+        if db.get_bind().dialect.name == "postgresql":
+            # Serialize the count-then-insert per guest; the lock is released when upload_document commits.
+            db.execute(text("SELECT pg_advisory_xact_lock(hashtext(:k))"), {"k": "guest_quota:" + str(current_user.user_id)})
+        # Soft-deleted rows still count so delete-and-reupload cannot bypass the cap.
+        used = db.query(Document).filter(Document.uploaded_by == current_user.user_id).count()
+        if used >= app_config.GUEST_DOC_LIMIT:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail={"code": "ERR-DOC-GUEST_LIMIT",
+                        "message": f"Guest accounts can upload at most {app_config.GUEST_DOC_LIMIT} documents."},
+            )
     out = DocumentService.upload_document(
         db=db,
         current_user=current_user,
