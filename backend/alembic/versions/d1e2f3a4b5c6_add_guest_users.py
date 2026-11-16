@@ -33,6 +33,12 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
+    # Personal assignments have no class; NOT NULL cannot hold them and hard delete is not allowed here.
+    orphans = op.get_bind().execute(
+        sa.text("SELECT count(*) FROM class_assignments WHERE class_id IS NULL")).scalar()
+    if orphans:
+        raise RuntimeError(
+            f"Cannot downgrade: {orphans} personal assignment(s) have no class. Resolve them manually first.")
     op.drop_constraint('chk_assignment_class_or_owner', 'class_assignments', type_='check')
     op.alter_column('class_assignments', 'class_id', existing_type=sa.UUID(), nullable=False)
     op.drop_index('ix_users_guest_ip', table_name='users')

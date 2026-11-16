@@ -18,7 +18,7 @@ from app.core import config as app_config
 from app.core.database import get_db
 from app.core.security import get_password_hash
 from app.core.rate_limit import check_rate_limit, record_login_failure, reset_login_failures
-from models.models import Permission, UserPermission, User, Role, StudentClass, Class, TeacherSubject, Subject
+from models.models import User, Role, StudentClass, Class, TeacherSubject, Subject
 from app.modules.auth.schemas import (
     GuestRequest, LoginRequest, LoginResponse, UserProfileOut, ChangePasswordRequest, RegisterRequest, UserProfileUpdateRequest
 )
@@ -75,7 +75,6 @@ def guest_login(payload: GuestRequest, request: Request, db: Session = Depends(g
     otherwise a new guest is created, rate limited per client IP, and guest_key is returned once.
     """
     from app.modules.admin.services.user_service import AdminUserService
-    from app.scripts.rbac_seed import GUEST_DENIED_PERMISSIONS
 
     AdminUserService.reject_admin_role(payload.role)
     if not app_config.GUEST_ACCESS_ENABLED:
@@ -129,10 +128,6 @@ def guest_login(payload: GuestRequest, request: Request, db: Session = Depends(g
     )
     db.add(guest)
     db.flush()
-    denied = GUEST_DENIED_PERMISSIONS.get(payload.role, [])
-    perm_ids = db.query(Permission.permission_id).filter(Permission.permission_code.in_(denied)).all()
-    for (pid,) in perm_ids:
-        db.add(UserPermission(user_id=guest.user_id, permission_id=pid, effect="deny"))
     db.commit()
     db.refresh(guest)
     response = AuthService.issue_access_token(db=db, user=guest)

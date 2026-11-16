@@ -141,6 +141,28 @@ def test_student_guest_generate_and_attempt_without_class(client, db_session, mo
     assert att.status_code in (200, 201), att.text
 
 
+def test_guest_permissions_are_allow_list_only(client, db_session):
+    from app.modules.auth.services.permission_service import PermissionService
+    from app.scripts.rbac_seed import GUEST_ALLOWED_PERMISSIONS
+    from models.models import Permission, RolePermission, User
+
+    for role in ("Teacher", "Student"):
+        body = _guest(client, role).json()
+        user = db_session.query(User).filter(User.user_id == uuid.UUID(body["user"]["user_id"])).one()
+        perms = PermissionService.get_effective_permissions(db_session, user.user_id, user.role_id)
+        assert perms <= set(GUEST_ALLOWED_PERMISSIONS[role])
+
+        # A permission added to the role later must not leak to existing guests.
+        perm = Permission(permission_code=f"NEW_{uuid.uuid4().hex[:6].upper()}", name="New", description="x")
+        db_session.add(perm)
+        db_session.flush()
+        db_session.add(RolePermission(role_id=user.role_id, permission_id=perm.permission_id))
+        db_session.flush()
+        PermissionService.invalidate_role_cache()
+        assert perm.permission_code not in PermissionService.get_effective_permissions(
+            db_session, user.user_id, user.role_id)
+
+
 def test_student_guest_requires_grade(client, db_session, monkeypatch):
     _fake_questions(monkeypatch)
     subject = Subject(subject_name=f"Ly {uuid.uuid4().hex[:6]}", status="ACTIVE")

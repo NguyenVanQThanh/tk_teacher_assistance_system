@@ -84,15 +84,18 @@ ROLE_PERMISSIONS: Dict[str, List[str]] = {
 }
 
 
-# Permissions denied (per-user "deny" override) to guest accounts, keyed by role name.
-# Guests have no class, so anything that reads or manages class data is blocked.
-GUEST_DENIED_PERMISSIONS: Dict[str, List[str]] = {
+# Allow-list for guest accounts, keyed by role name. Guests have no class, so anything that reads or
+# manages class data is excluded. Applied at permission-check time (intersection with the role's
+# permissions), so a permission added to a role later is NOT granted to guests automatically.
+GUEST_ALLOWED_PERMISSIONS: Dict[str, List[str]] = {
     "Teacher": [
-        "ACAD_CLASS_VIEW", "ACAD_ENROLLMENT_VIEW", "ACAD_TEACHER_ASSIGN_VIEW",
-        "EXE_ASSIGNMENT_MANAGE", "EXE_ASSIGNMENT_VIEW", "EXE_ATTEMPT_VIEW",
-        "AUTH_PASSWORD_CHANGE",
+        "AUTH_ME_VIEW", "ACAD_SUBJECT_VIEW",
+        "EXE_EXERCISE_MANAGE", "EXE_EXERCISE_VIEW", "EXE_QUESTION_IMPORT",
     ],
-    "Student": ["ACAD_CLASS_VIEW", "ACAD_ENROLLMENT_VIEW", "AUTH_PASSWORD_CHANGE"],
+    "Student": [
+        "AUTH_ME_VIEW", "ACAD_SUBJECT_VIEW",
+        "EXE_EXERCISE_VIEW", "EXE_ASSIGNMENT_VIEW", "EXE_ATTEMPT_SUBMIT", "EXE_ATTEMPT_VIEW",
+    ],
 }
 
 def seed_rbac(session: Session) -> Dict[str, Role]:
