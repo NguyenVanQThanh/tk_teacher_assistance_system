@@ -544,12 +544,11 @@ export default function StudentExercisesPage() {
   useEffect(() => {
     // 1. Check if session cache already has data for this session
     const cached = readSessionCache();
-    if (cached) {
+    // A cache without subjects comes from a failed subjects call (e.g. 401): refetch instead.
+    if (cached && cached.subjects && cached.subjects.length > 0) {
       setBackendAssignments(cached.assignments);
       setBackendAttempts(cached.attempts);
-      if (cached.subjects && cached.subjects.length > 0) {
-        setAvailableSubjects(cached.subjects);
-      }
+      setAvailableSubjects(cached.subjects);
       return; // Early return: no backend call needed within the same session
     }
 
