@@ -108,7 +108,7 @@ LOAD_TEST_DEFAULT_USERS = _env_int("LOAD_TEST_DEFAULT_USERS", 30)
 # retry rounds for missing questions.
 AI_GENERATE_CONCURRENCY = _env_int("AI_GENERATE_CONCURRENCY", 4)
 AI_PART_WORKERS = _env_int("AI_PART_WORKERS", 3)
-AI_PART_MAX_RETRIES = _env_int("AI_PART_MAX_RETRIES", 2, minimum=0)
+AI_PART_MAX_RETRIES = _env_int("AI_PART_MAX_RETRIES", 5, minimum=0)
 AI_PART_MAX_TOKENS = _env_int("AI_PART_MAX_TOKENS", 3500, minimum=500)
 # Questions requested per model call; smaller batches avoid replies cut off at max_tokens.
 AI_PART_BATCH_SIZE = _env_int("AI_PART_BATCH_SIZE", 5, minimum=1)
