@@ -2157,12 +2157,12 @@ export default function StudentExerciseTakingPage() {
                     <div className="short-answer-review-comparison">
                       <div className={`comparison-box student-ans-box ${mine && right && mine.key === right.key ? 'sa-correct' : 'sa-wrong'}`}>
                         <span className="comparison-label">Lựa chọn của bạn:</span>
-                        <span className="comparison-value">{mine ? fmt(mine) : '(Chưa trả lời)'}</span>
+                        <span className="comparison-value">{mine ? <QuestionContentView text={fmt(mine)} /> : '(Chưa trả lời)'}</span>
                       </div>
                       {right && (
                         <div className="comparison-box correct-ans-box">
                           <span className="comparison-label">Đáp án đúng:</span>
-                          <span className="comparison-value">{fmt(right)}</span>
+                          <span className="comparison-value"><QuestionContentView text={fmt(right)} /></span>
                         </div>
                       )}
                     </div>
@@ -2457,7 +2457,7 @@ export default function StudentExerciseTakingPage() {
                       questionData.isCorrect === true ? 'sa-correct' : (questionData.isCorrect === false || !answers[currentQuestionIdx]) ? 'sa-wrong' : ''
                     }`}>
                       <span className="comparison-label">Câu trả lời của bạn:</span>
-                      <span className="comparison-value">{answers[currentQuestionIdx] || '(Chưa trả lời)'}</span>
+                      <span className="comparison-value">{answers[currentQuestionIdx] ? <MathRenderer text={String(answers[currentQuestionIdx])} /> : '(Chưa trả lời)'}</span>
                       {questionData.isCorrect === null && answers[currentQuestionIdx] && (
                         <span className="sa-pending-pill">Chờ giáo viên chấm</span>
                       )}
@@ -2465,7 +2465,7 @@ export default function StudentExerciseTakingPage() {
                     {questionData.correctAnswer && (
                       <div className="comparison-box correct-ans-box">
                         <span className="comparison-label">Đáp án đúng:</span>
-                        <span className="comparison-value">{String(questionData.correctAnswer).replace('.', ',')}</span>
+                        <span className="comparison-value"><MathRenderer text={String(questionData.correctAnswer).replace('.', ',')} /></span>
                       </div>
                     )}
                   </div>
