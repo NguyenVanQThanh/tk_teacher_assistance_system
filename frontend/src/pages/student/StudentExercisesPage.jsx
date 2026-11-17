@@ -5,6 +5,7 @@
 // Updated At: 2026-11-15
 // Updated By: AI Agent
 
+import { subjectAllowsPart3, PART3_NOT_SUPPORTED_MESSAGE } from '../../utils/subjectParts';
 import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { 
@@ -827,6 +828,10 @@ export default function StudentExercisesPage() {
     }
     if (!aiSubjectId) {
       toast.error('Vui lòng chọn môn học.');
+      return;
+    }
+    if (part3Total > 0 && !subjectAllowsPart3(aiSubject)) {
+      toast.error(PART3_NOT_SUPPORTED_MESSAGE);
       return;
     }
     if (aiSelectedChapters.length < 1) {

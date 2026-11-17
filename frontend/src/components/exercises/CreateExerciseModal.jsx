@@ -5,6 +5,7 @@
 // Updated At: 2026-11-15
 // Updated By: AI Agent
 
+import { subjectAllowsPart3, PART3_NOT_SUPPORTED_MESSAGE } from '../../utils/subjectParts';
 import React, { useState, useRef, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { 
@@ -285,6 +286,12 @@ export default function CreateExerciseModal({ isOpen, onClose, onCreateSuccess }
     }
 
     const totalQuestions = calculateTotalQuestions();
+    const shortTotal = Object.values(questionCounts.shortAnswer).reduce((a, b) => a + b, 0);
+    if (shortTotal > 0 && !subjectAllowsPart3(selectedSubjectName)) {
+      setErrorMsg(PART3_NOT_SUPPORTED_MESSAGE);
+      showToast(PART3_NOT_SUPPORTED_MESSAGE, 'error', 'Không thể tạo bài tập');
+      return;
+    }
 
     if (totalQuestions === 0 && !aiPrompt.trim()) {
       const msg = 'Vui lòng thiết lập số lượng câu hỏi hoặc nhập mô tả yêu cầu.';

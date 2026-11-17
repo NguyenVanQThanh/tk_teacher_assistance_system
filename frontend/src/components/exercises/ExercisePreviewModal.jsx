@@ -21,6 +21,7 @@ import {
 } from 'lucide-react';
 import { exercisesApi, classesApi, assignmentsApi } from '../../services/api';
 import MathRenderer from '../common/MathRenderer';
+import QuestionContentView from '../common/QuestionContentView';
 import { getQuestionItems } from '../../utils/questionItems';
 import QuestionMedia from './QuestionMedia';
 import './ExercisePreviewModal.css';
@@ -278,7 +279,7 @@ export default function ExercisePreviewModal({ exercise, isOpen, onClose }) {
                     <span className="q-number">Câu {idx + 1}:</span>
                     <div style={{ flex: 1 }}>
                       <div className="q-text">
-                        <MathRenderer text={q.content || q.content_latex} />
+                        <QuestionContentView text={q.content || q.content_latex} />
                       </div>
                       <QuestionMedia question={q} />
  

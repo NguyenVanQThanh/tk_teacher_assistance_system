@@ -90,16 +90,16 @@ def test_judge_rejects_and_regenerates_only_rejected(monkeypatch):
     monkeypatch.setattr(Svc, "_call_mistral_part", _two_mcq_fake(calls))
     judged = []
 
-    def judge(cls, part, items_json, context):
+    def judge(cls, part, items_json, context, subject_name=""):
         judged.append(items_json)
         if len(judged) == 1:
-            return [{"i": 0, "ans": "A", "ok": True}, {"i": 1, "ans": "C", "ok": True}]
+            return [{"i": 0, "ans": "A", "ok": True}, {"i": 1, "ans": "C", "ok": False, "why": "ambiguous"}]
         return [{"i": 0, "ans": "A", "ok": True}]
 
     monkeypatch.setattr(Svc, "_call_judge", classmethod(judge))
     out = Svc.generate_part("Part1", ["NhanBiet"] * 2, "", "", "r", "Hoa", "12")
     assert [q["content"] for q in out] == ["Q1", "Q3"]
-    assert "exactly 1 NEW" in calls[1] and "answer key disputed" in calls[1]
+    assert "exactly 1 NEW" in calls[1] and "reviewer: ambiguous" in calls[1]
     assert "is_correct" not in judged[0]
 
 
@@ -121,7 +121,7 @@ def test_judge_rejected_questions_are_never_persisted(monkeypatch):
     monkeypatch.setattr(gen.config, "AI_PART_MAX_RETRIES", 0)
     monkeypatch.setattr(Svc, "_call_mistral_part", _two_mcq_fake([]))
     monkeypatch.setattr(Svc, "_call_judge", classmethod(
-        lambda cls, part, items, ctx: [{"i": 0, "ok": False, "why": "bad"}, {"i": 1, "ok": False, "why": "bad"}]))
+        lambda cls, part, items, ctx, subj="": [{"i": 0, "ok": False, "why": "bad"}, {"i": 1, "ok": False, "why": "bad"}]))
     with pytest.raises(RuntimeError):
         Svc.generate_part("Part1", ["NhanBiet"] * 2, "", "", "r", "Hoa", "12")
 
@@ -142,7 +142,44 @@ def test_reviewing_stage_reported(monkeypatch):
     monkeypatch.setenv("MISTRAL_API_KEY", "k")
     monkeypatch.setattr(gen.config, "AI_JUDGE_ENABLED", True)
     monkeypatch.setattr(Svc, "_call_mistral_part", _two_mcq_fake([]))
-    monkeypatch.setattr(Svc, "_call_judge", classmethod(lambda cls, part, items, ctx: []))
+    monkeypatch.setattr(Svc, "_call_judge", classmethod(lambda cls, part, items, ctx, subj="": []))
     stages = []
     Svc.generate_part("Part1", ["NhanBiet"] * 2, "", "", "r", "Hoa", "12", on_stage=stages.append)
     assert stages == ["REVIEWING", "GENERATING"]
+
+
+def test_passage_reference_allowed_with_long_stem_only():
+    long_stem = "Đọc đoạn trích sau. " + "x" * 300 + " Theo đoạn trích trên, ý nào đúng?"
+    assert validate_question("Part1", mcq(long_stem))[0] is not None
+    assert validate_question("Part1", mcq("Theo đoạn trích trên, ý nào đúng?"))[0] is None
+    assert validate_question("Part1", mcq("Theo SGK " + "x" * 300))[0] is None
+    assert validate_question("Part1", mcq("Theo SGK, chất nào đúng?"))[0] is None
+
+
+def test_subject_rule_in_prompt():
+    args = ("Part1", ["NhanBiet"], "", "", "")
+    assert "in English" in gen.build_part_prompt(*args, "Tiếng Anh", "Lớp 12")
+    assert "in English" not in gen.build_part_prompt(*args, "Hóa học", "Lớp 12")
+    assert gen._subject_rule("Âm nhạc") == ""
+
+
+def test_judge_answer_replaces_disputed_key():
+    q1 = {"answer_options": [{"content": c, "is_correct": c == "a"} for c in "abcd"], "explanation": "old"}
+    q2 = {"segments": [{"key": k, "statement": k, "is_correct": True} for k in "abcd"],
+          "answer_options": [{"content": k, "is_correct": True} for k in "abcd"], "explanation": "old"}
+    q3 = {"correct_answer": "5", "explanation": "old"}
+    assert gen._adopt_judge_key("Part1", q1, "c") and [o["is_correct"] for o in q1["answer_options"]] == [False, False, True, False]
+    assert gen._adopt_judge_key("Part2", q2, "DSSD")
+    assert [s["is_correct"] for s in q2["segments"]] == [True, False, False, True]
+    assert [o["is_correct"] for o in q2["answer_options"]] == [True, False, False, True]
+    assert gen._adopt_judge_key("Part3", q3, "12,5") and q3["correct_answer"] == "12,5" and q3["explanation"] is None
+    assert not gen._adopt_judge_key("Part1", q1, "E") and not gen._adopt_judge_key("Part2", q2, "DSX")
+    assert not gen._adopt_judge_key("Part3", q3, "twelve")
+
+
+def test_review_batch_adopts_reviewer_answer(monkeypatch):
+    monkeypatch.setattr(gen.config, "AI_JUDGE_ENABLED", True)
+    monkeypatch.setattr(Svc, "_call_judge", classmethod(lambda cls, part, items, ctx, subj="": [{"i": 0, "ans": "B", "ok": True}]))
+    q = {"content": "Q", "answer_options": [{"content": c, "is_correct": c == "a"} for c in "abcd"]}
+    assert Svc.review_batch("Part1", [q], "") == [None]
+    assert [o["is_correct"] for o in q["answer_options"]] == [False, True, False, False]
