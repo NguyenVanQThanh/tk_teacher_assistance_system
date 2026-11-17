@@ -46,6 +46,21 @@ def current_job_id() -> Optional[UUID]:
     return getattr(_local, "job_id", None)
 
 
+def hold_ownership(session) -> None:
+    """Lock this thread's job row until the caller commits and verify this run still owns it.
+
+    Call right before a non-idempotent write: recovery cannot re-queue the job while the lock is held, and a
+    run that was already re-queued or re-claimed gets a 409 instead of writing a duplicate. No-op outside a job."""
+    job_id = current_job_id()
+    if job_id is None:
+        return
+    job = session.query(BackgroundJob).filter(BackgroundJob.job_id == job_id).with_for_update().first()
+    if job is None or job.status != "RUNNING" or job.attempts != getattr(_local, "attempt", job.attempts):
+        session.rollback()
+        raise HTTPException(status_code=409, detail={
+            "code": "ERR-EXE-AI_GENERATION_FAILED", "message": "Job was superseded by a newer run."})
+
+
 def report_for(job_id: Optional[UUID], stage: str, progress: int) -> None:
     """Publish progress of a job from any thread; a no-op without a job id. Never raises."""
     if job_id is None:
@@ -217,7 +232,7 @@ def run_one(job_id: UUID) -> None:
     threading.Thread(target=_heartbeat, args=(job_id, hb_stop), daemon=True).start()
     try:
         job = session.get(BackgroundJob, job_id)
-        attempt = job.attempts
+        attempt = _local.attempt = job.attempts
         fn = _HANDLERS[job.kind][0]
         user = session.get(User, job.user_id)
         outcome = (True, jsonable_encoder(fn(session, user, job.payload)), None)

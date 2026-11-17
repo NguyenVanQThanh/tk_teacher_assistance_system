@@ -281,6 +281,7 @@ class AiExerciseService:
         if not all(_has_answer_key(q) for q in questions):
             raise _err(status.HTTP_502_BAD_GATEWAY, "ERR-EXE-AI_ANSWER_KEY_MISSING",
                        "AI output is missing a correct answer for at least one question.")
+        background_jobs.hold_ownership(self.db)  # no duplicate Exercise from a superseded job run
         clean = (topic or "").strip()
         short = clean[:50] + "..." if len(clean) > 50 else clean
         exercise = Exercise(

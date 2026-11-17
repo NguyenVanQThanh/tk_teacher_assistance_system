@@ -82,3 +82,20 @@ def test_finish_ignores_job_requeued_by_recovery(db_session):
     bj._finish(job.job_id, True, {"x": 1}, attempt=1)
     db_session.expire_all()
     assert db_session.get(BackgroundJob, job.job_id).status == "QUEUED"
+
+
+def test_hold_ownership_rejects_superseded_run(db_session):
+    bj.register_handler("T_OWN", lambda s, u, p: 1, "Test", "/t")
+    u = _user(db_session)
+    job = bj.enqueue(db_session, u.user_id, "T_OWN", {})
+    job.status, job.attempts = "RUNNING", 2
+    db_session.commit()
+    bj._local.job_id, bj._local.attempt = job.job_id, 2
+    try:
+        bj.hold_ownership(db_session)  # owner: passes
+        bj._local.attempt = 1  # an older run
+        with pytest.raises(HTTPException) as e:
+            bj.hold_ownership(db_session)
+        assert e.value.status_code == 409
+    finally:
+        bj._local.job_id = bj._local.attempt = None
