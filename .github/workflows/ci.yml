@@ -30,6 +30,10 @@ jobs:
       - run: |
           test "$(alembic heads | grep -c '(head)')" = "1"
         working-directory: backend
+      # A second Alembic head breaks `alembic upgrade head` on deploy (see #69), so fail early in CI.
+      - run: |
+          test "$(alembic heads | grep -c '(head)')" = "1"
+        working-directory: backend
       - uses: actions/setup-node@v4
         with:
           node-version: 22

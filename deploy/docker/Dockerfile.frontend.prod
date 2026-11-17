@@ -11,7 +11,7 @@ RUN npm ci
 COPY . .
 
 # URL API được baked vào bundle lúc build (đọc từ build arg của compose)
-ARG VITE_API_BASE_URL=/api
+ARG VITE_API_BASE_URL=
 ENV VITE_API_BASE_URL=$VITE_API_BASE_URL
 
 RUN npm run build
