@@ -312,9 +312,15 @@ class AiExerciseGeneratorService:
                 break
             prompt = build_part_prompt(part, remaining, context, student_file, student_request,
                                        subject_name, grade_name, errors)
-            raw_items = cls._call_llm_part(
-                part=part, prompt=prompt,
-                temperature=FIRST_TEMPERATURE if attempt == 0 else RETRY_TEMPERATURE)
+            try:
+                raw_items = cls._call_llm_part(
+                    part=part, prompt=prompt,
+                    temperature=FIRST_TEMPERATURE if attempt == 0 else RETRY_TEMPERATURE)
+            except json.JSONDecodeError as exc:
+                # Truncated or malformed JSON from the model is retried like any invalid output.
+                logger.warning("Mistral returned invalid JSON for %s (attempt %d): %s", part, attempt + 1, exc)
+                errors = ["the previous reply was not valid JSON; return a complete, valid JSON object"]
+                continue
             errors = []
             for raw in raw_items or []:
                 normalized, err = validate_question(part, raw)
@@ -358,6 +364,8 @@ class AiExerciseGeneratorService:
             temperature=temperature,
             max_tokens=8192,
         )
+        if getattr(resp.choices[0], "finish_reason", None) == "length":
+            logger.warning("Mistral reply for %s was cut off (finish_reason=length)", part)
         content = resp.choices[0].message.content
         if isinstance(content, list):  # content may come back as a list of text chunks
             content = "".join(getattr(c, "text", None) or (c.get("text", "") if isinstance(c, dict) else "") for c in content)

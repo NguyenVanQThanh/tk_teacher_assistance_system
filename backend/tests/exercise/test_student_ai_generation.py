@@ -189,3 +189,19 @@ def test_job_endpoints_validate_and_scope(client, world):
     r = client.post(URL + "/jobs", data={"payload": json.dumps(bad)}, headers=h)
     assert r.status_code == 422
     assert client.get(URL + "/jobs/doesnotexist", headers=h).status_code == 404
+
+
+def test_invalid_json_is_retried(monkeypatch):
+    """A malformed model reply must be retried instead of failing the whole generation."""
+    calls = {"n": 0}
+
+    def flaky(cls, api_key, part, prompt, temperature):
+        calls["n"] += 1
+        if calls["n"] == 1:
+            json.loads('{"questions": [{"content": "unterminated')
+        return [{"content": "S0", "correct_answer": "7"}]
+
+    monkeypatch.setattr(AiExerciseGeneratorService, "_call_mistral_part", classmethod(flaky))
+    monkeypatch.setenv("MISTRAL_API_KEY", "k")
+    out = AiExerciseGeneratorService.generate_part("Part3", ["NhanBiet"], "ctx", "", "req", "Hóa", "Lớp 12")
+    assert len(out) == 1 and calls["n"] == 2
