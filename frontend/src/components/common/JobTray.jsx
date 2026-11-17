@@ -7,12 +7,13 @@
 
 import React, { useEffect, useState } from 'react';
 import { useAuth } from '../../context/AuthContext';
-import api from '../../services/api';
+import api, { awaitedJobs } from '../../services/api';
 
 const STAGES = {
   STARTING: 'Đang khởi động',
   RETRIEVING_CONTEXT: 'Đang tìm tài liệu liên quan',
   GENERATING: 'AI đang tạo câu hỏi',
+  REVIEWING: 'AI đang kiểm tra chất lượng câu hỏi',
   SAVING: 'Đang lưu kết quả',
 };
 const KINDS = {
@@ -33,7 +34,7 @@ export default function JobTray() {
     const tick = async () => {
       try {
         const { data } = await api.get('/api/v1/jobs', { params: { active: true } });
-        if (alive) setJobs(Array.isArray(data) ? data : data.items || []);
+        if (alive) setJobs((Array.isArray(data) ? data : data.items || []).filter((j) => !awaitedJobs.has(j.job_id)));
       } catch {
         /* best effort: the tray is informational */
       }

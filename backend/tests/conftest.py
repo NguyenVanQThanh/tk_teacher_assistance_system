@@ -2,8 +2,8 @@
 # Description: Testing configuration, database setup using SQLite in-memory, and fixtures.
 # Created At: 2026-07-17
 # Created By: Tam Khang
-# Updated At: 2026-09-30
-# Updated By: Tam Khang
+# Updated At: 2026-11-17
+# Updated By: AI Agent
 
 
 import os
@@ -393,3 +393,5 @@ def client(db_session: Session, monkeypatch) -> Generator[TestClient, None, None
 def _isolate_llm_keys(monkeypatch):
     """Keep tests off real LLM APIs: generation tests mock the Gemini path, so Mistral must be disabled."""
     monkeypatch.delenv("MISTRAL_API_KEY", raising=False)
+    from app.core import config
+    monkeypatch.setattr(config, "AI_JUDGE_ENABLED", False)

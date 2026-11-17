@@ -2,6 +2,8 @@
 # Description: Application-level configuration loaded from environment variables (.env).
 # Created At: 2026-11-08
 # Created By: Tam Khang
+# Updated At: 2026-11-17
+# Updated By: AI Agent
 
 import os
 from pathlib import Path
@@ -115,12 +117,18 @@ JOB_WORKERS = _env_int("JOB_WORKERS", 2, minimum=0)
 # Mistral model for question generation (tried before Gemini)
 AI_MISTRAL_MODEL = os.environ.get("AI_MISTRAL_MODEL", "mistral-large-latest")
 
-# ---------------------------------------------------------------------------
-# Guest access (POST /api/v1/auth/guest) and academic year.
-# ---------------------------------------------------------------------------
+
 def _env_bool(name: str, default: bool) -> bool:
     return os.environ.get(name, "true" if default else "false").strip().lower() in ("1", "true", "yes")
 
+# Second-pass LLM review of generated questions (solves each question blind and compares keys).
+AI_JUDGE_ENABLED = _env_bool("AI_JUDGE_ENABLED", True)
+AI_JUDGE_MODEL = os.environ.get("AI_JUDGE_MODEL", AI_MISTRAL_MODEL)
+AI_JUDGE_MAX_TOKENS = _env_int("AI_JUDGE_MAX_TOKENS", 600, minimum=200)
+
+# ---------------------------------------------------------------------------
+# Guest access (POST /api/v1/auth/guest) and academic year.
+# ---------------------------------------------------------------------------
 GUEST_ACCESS_ENABLED = _env_bool("GUEST_ACCESS_ENABLED", True)
 # Maximum guest accounts created per client IP per rolling hour.
 GUEST_CREATE_PER_IP_HOUR = _env_int("GUEST_CREATE_PER_IP_HOUR", 5)
