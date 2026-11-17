@@ -2,7 +2,7 @@
 # Description: API Router for Exercise endpoints (F-EXE-01).
 # Created At: 2026-07-31
 # Created By: Tam Khang
-# Updated At: 2026-11-13
+# Updated At: 2026-11-17
 # Updated By: AI Agent
 
 import json
@@ -35,6 +35,7 @@ from app.modules.exercise.services.question_service import QuestionService
 from app.modules.exercise.services.import_parser_service import ImportParserService
 from app.modules.exercise.services.answer_solver_service import AnswerSolverService
 from app.modules.exercise.services.pdf_export_service import PdfExportService
+from app.modules.exercise.services.question_order import question_sort_key
 from app.core.resource_limits import (
     IMPORT_SEMAPHORE,
     PDF_EXPORT_ACQUIRE_TIMEOUT_SECONDS,
@@ -205,7 +206,9 @@ def get_exercise_detail(
     exercise = service.get_exercise_detail(current_user, exercise_id)
     # Hide soft-deleted questions (e.g. ones replaced by a re-import) so filters
     # and detail views never show stale duplicates.
-    exercise.questions = [q for q in (exercise.questions or []) if q.status != "DELETED"]
+    exercise.questions = sorted(
+        (q for q in (exercise.questions or []) if q.status != "DELETED"), key=question_sort_key
+    )
     return exercise
 
 

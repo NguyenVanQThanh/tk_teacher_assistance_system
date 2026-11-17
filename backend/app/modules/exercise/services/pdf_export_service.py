@@ -2,7 +2,7 @@
 # Description: Service for generating formatted PDF documents from exercise data including LaTeX math rendering.
 # Created At: 2026-08-12
 # Created By: Tam Khang
-# Updated At: 2026-11-13
+# Updated At: 2026-11-17
 # Updated By: AI Agent
 
 import io
@@ -33,6 +33,7 @@ from reportlab.pdfbase.ttfonts import TTFont
 from models.models import Exercise, Question, AnswerOption
 from app.modules.exercise.schemas import QuestionTypeEnum
 from app.core.storage import read_bytes_from_url
+from app.modules.exercise.services.question_order import question_sort_key
 
 
 # ---------------------------------------------------------------------------
@@ -814,7 +815,9 @@ class PdfExportService:
             for q in sorted(active_questions, key=get_sort_key):
                 latest_questions_map[q.display_order] = q
 
-            questions = sorted(latest_questions_map.values(), key=lambda q: q.display_order)
+            questions = sorted(latest_questions_map.values(), key=question_sort_key)
+            # Continuous paper number (stored display_order may be gapped or interleaved by type)
+            number = {id(q): i for i, q in enumerate(questions, 1)}
 
             part1_questions = [q for q in questions if q.question_type in (QuestionTypeEnum.MultipleChoice.value, "MultipleChoice")]
             part2_questions = [q for q in questions if q.question_type in (QuestionTypeEnum.TrueFalse.value, "TrueFalse")]
@@ -831,7 +834,7 @@ class PdfExportService:
                 """Inline question header ("Câu 3. [Vận dụng] ") rendered before the stem."""
                 difficulty = getattr(q, 'difficulty', None)
                 diff_str = f"[{difficulty}] " if isinstance(difficulty, str) and difficulty else ""
-                return f"Câu {q.display_order}. {diff_str}"
+                return f"Câu {number[id(q)]}. {diff_str}"
 
             # 2. Render Part I (Multiple Choice 4 Options)
             if part1_questions:
@@ -935,7 +938,7 @@ class PdfExportService:
                     q_elements = []
                     q_elements.extend(cls._format_content_blocks(
                         cls._question_content_text(q), question_text_style, temp_files,
-                        prefix=f"Câu {q.display_order}. "
+                        prefix=f"Câu {number[id(q)]}. "
                     ))
                     q_elements.extend(cls._question_image_flowables(q, image_cache, image_warning_style))
                     q_elements.extend(cls._segment_table_flowables(q, temp_files, question_text_style))
@@ -968,7 +971,7 @@ class PdfExportService:
                         if opt.is_correct:
                             ans = labels[idx] if idx < len(labels) else "A"
                             break
-                    p1_answers[q.display_order] = ans
+                    p1_answers[number[id(q)]] = ans
 
                 for row_idx in range(1, 5):
                     c1, c2, c3 = row_idx, row_idx + 4, row_idx + 8
@@ -1007,7 +1010,7 @@ class PdfExportService:
                     c_stat = "Đ" if len(opts) > 2 and opts[2].is_correct else "S"
                     d_stat = "Đ" if len(opts) > 3 and opts[3].is_correct else "S"
                     p2_matrix.append([
-                        Paragraph(str(q.display_order), answer_key_cell_style),
+                        Paragraph(str(number[id(q)]), answer_key_cell_style),
                         Paragraph(a_stat, answer_key_cell_style),
                         Paragraph(b_stat, answer_key_cell_style),
                         Paragraph(c_stat, answer_key_cell_style),
@@ -1036,7 +1039,7 @@ class PdfExportService:
                 for q in part3_questions:
                     answer_text = q.correct_answer if isinstance(q.correct_answer, str) else ""
                     p3_matrix.append([
-                        Paragraph(str(q.display_order), answer_key_cell_style),
+                        Paragraph(str(number[id(q)]), answer_key_cell_style),
                         Paragraph(answer_text, answer_key_cell_style)
                     ])
 

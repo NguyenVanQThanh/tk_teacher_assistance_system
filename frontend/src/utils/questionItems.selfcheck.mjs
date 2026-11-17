@@ -5,7 +5,7 @@
 // Updated At: 2026-11-12
 // Updated By: AI Agent
 import assert from 'node:assert';
-import { getQuestionItems } from './questionItems.js';
+import { getQuestionItems, sortQuestionsByPart } from './questionItems.js';
 
 const shortAnswer = {
   question_type: 'ShortAnswer', answer_options: [],
@@ -18,4 +18,11 @@ const tf = {
   segments: [{ key: 'a', statement: 'S1', is_correct: true }, { key: 'b', statement: 'S2', is_correct: false }],
 };
 assert.strictEqual(getQuestionItems(tf).length, 2);
+const mixed = [
+  { question_type: 'ShortAnswer', display_order: 1 },
+  { question_type: 'MultipleChoice', display_order: 2 },
+  { question_type: 'TrueFalse', display_order: 3 },
+  { question_type: 'MultipleChoice', display_order: 4 },
+];
+assert.deepStrictEqual(sortQuestionsByPart(mixed).map((q) => q.display_order), [2, 4, 3, 1]);
 console.log('questionItems selfcheck passed');
