@@ -241,15 +241,27 @@ export const aiExercisesApi = {
     return response.data;
   },
   // Multipart: `payload` JSON string + optional `file`
+  // Starts a background job (a single request would hit the proxy timeout), then polls until done.
   generateForStudent: async (payload, file = null) => {
     const formData = new FormData();
     formData.append('payload', JSON.stringify(payload));
     if (file) formData.append('file', file);
-    const response = await api.post('/api/v1/ai-exercises/student', formData, {
+    const start = await api.post('/api/v1/ai-exercises/student/jobs', formData, {
       headers: { 'Content-Type': 'multipart/form-data' },
-      timeout: 180000,
     });
-    return response.data;
+    const deadline = Date.now() + 10 * 60 * 1000;
+    while (Date.now() < deadline) {
+      await new Promise((r) => setTimeout(r, 3000));
+      const { data } = await api.get(`/api/v1/ai-exercises/student/jobs/${start.data.job_id}`);
+      if (data.status === 'done') return data.result;
+      if (data.status === 'error') {
+        // Same shape as an axios error so mapAiErrorMessage keeps working
+        const err = new Error('AI generation failed');
+        err.response = { status: data.http_status, data: { detail: data.detail } };
+        throw err;
+      }
+    }
+    throw new Error('AI generation timed out');
   },
 };
 
