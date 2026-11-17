@@ -14,7 +14,7 @@ from uuid import UUID
 
 from fastapi import HTTPException, Response
 
-from app.core.background_jobs import register_handler
+from app.core.background_jobs import hold_ownership, register_handler
 from app.core.resource_limits import IMPORT_SEMAPHORE
 from app.modules.exercise.schemas import AiExerciseGenerateRequest, StudentAiGenerateRequest
 from app.modules.exercise.services.ai_exercise_service import AiExerciseService
@@ -57,6 +57,7 @@ def _import(session, user, payload: dict):
         raise HTTPException(status_code=403, detail={
             "code": "ERR-AUTH-FORBIDDEN", "message": "You do not have permission to access this resource."})
     resp = Response()
+    hold_ownership(session)  # a superseded run must not import twice
     with IMPORT_SEMAPHORE:
         questions = _import_questions_impl(
             exercise_id=UUID(payload["exercise_id"]), question_file=_upload(payload["question_file"]),
