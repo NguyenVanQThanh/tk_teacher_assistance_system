@@ -177,3 +177,10 @@ def test_part2_requires_explanation_for_every_statement():
     assert validate_question("Part2", {**base, "explanation": short})[0] is None
     full = chr(10).join(["a) Đúng. x", "b) Sai. y", "c) Đúng. z", "d) Sai. w"])
     assert validate_question("Part2", {**base, "explanation": full})[0] is not None
+
+
+def test_part2_one_line_explanation_is_split():
+    raw = {"content": "Q", "explanation": "a) Đúng. x b) Sai. y c) Đúng. z d) True. w",
+           "segments": [{"key": k, "statement": f"s{k}", "is_correct": True} for k in "abcd"]}
+    out, err = validate_question("Part2", raw)
+    assert err is None and len(out["explanation"].split("\n")) == 4

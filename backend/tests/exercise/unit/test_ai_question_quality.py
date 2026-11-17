@@ -90,7 +90,7 @@ def test_judge_rejects_and_regenerates_only_rejected(monkeypatch):
     monkeypatch.setattr(Svc, "_call_mistral_part", _two_mcq_fake(calls))
     judged = []
 
-    def judge(cls, part, items_json, context):
+    def judge(cls, part, items_json, context, subject_name=""):
         judged.append(items_json)
         if len(judged) == 1:
             return [{"i": 0, "ans": "A", "ok": True}, {"i": 1, "ans": "C", "ok": True}]
@@ -121,7 +121,7 @@ def test_judge_rejected_questions_are_never_persisted(monkeypatch):
     monkeypatch.setattr(gen.config, "AI_PART_MAX_RETRIES", 0)
     monkeypatch.setattr(Svc, "_call_mistral_part", _two_mcq_fake([]))
     monkeypatch.setattr(Svc, "_call_judge", classmethod(
-        lambda cls, part, items, ctx: [{"i": 0, "ok": False, "why": "bad"}, {"i": 1, "ok": False, "why": "bad"}]))
+        lambda cls, part, items, ctx, subj="": [{"i": 0, "ok": False, "why": "bad"}, {"i": 1, "ok": False, "why": "bad"}]))
     with pytest.raises(RuntimeError):
         Svc.generate_part("Part1", ["NhanBiet"] * 2, "", "", "r", "Hoa", "12")
 
@@ -142,7 +142,22 @@ def test_reviewing_stage_reported(monkeypatch):
     monkeypatch.setenv("MISTRAL_API_KEY", "k")
     monkeypatch.setattr(gen.config, "AI_JUDGE_ENABLED", True)
     monkeypatch.setattr(Svc, "_call_mistral_part", _two_mcq_fake([]))
-    monkeypatch.setattr(Svc, "_call_judge", classmethod(lambda cls, part, items, ctx: []))
+    monkeypatch.setattr(Svc, "_call_judge", classmethod(lambda cls, part, items, ctx, subj="": []))
     stages = []
     Svc.generate_part("Part1", ["NhanBiet"] * 2, "", "", "r", "Hoa", "12", on_stage=stages.append)
     assert stages == ["REVIEWING", "GENERATING"]
+
+
+def test_passage_reference_allowed_with_long_stem_only():
+    long_stem = "Đọc đoạn trích sau. " + "x" * 300 + " Theo đoạn trích trên, ý nào đúng?"
+    assert validate_question("Part1", mcq(long_stem))[0] is not None
+    assert validate_question("Part1", mcq("Theo đoạn trích trên, ý nào đúng?"))[0] is None
+    assert validate_question("Part1", mcq("Theo SGK " + "x" * 300))[0] is None
+    assert validate_question("Part1", mcq("Theo SGK, chất nào đúng?"))[0] is None
+
+
+def test_subject_rule_in_prompt():
+    args = ("Part1", ["NhanBiet"], "", "", "")
+    assert "in English" in gen.build_part_prompt(*args, "Tiếng Anh", "Lớp 12")
+    assert "in English" not in gen.build_part_prompt(*args, "Hóa học", "Lớp 12")
+    assert gen._subject_rule("Âm nhạc") == ""
