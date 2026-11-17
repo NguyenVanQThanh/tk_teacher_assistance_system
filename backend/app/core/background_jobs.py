@@ -9,6 +9,7 @@ Updated By: AI Agent
 import logging
 import statistics
 import threading
+import time
 from datetime import datetime, timezone
 from typing import Any, Callable, Dict, List, Optional, Tuple
 from uuid import UUID
@@ -299,7 +300,11 @@ def recover_interrupted() -> int:
         session.close()
 
 
+RECOVER_EVERY_SECONDS = 60
+
+
 def _worker_loop() -> None:
+    last_recover = 0.0
     while not _stop.is_set():
         job_id = None
         try:
@@ -311,6 +316,13 @@ def _worker_loop() -> None:
         except Exception:  # noqa: BLE001
             logger.exception("Job claim failed")
         if job_id is None:
+            # Periodic sweep: jobs orphaned by a crashed process must not count against the user cap forever.
+            if time.monotonic() - last_recover > RECOVER_EVERY_SECONDS:
+                last_recover = time.monotonic()
+                try:
+                    recover_interrupted()
+                except Exception:  # noqa: BLE001
+                    logger.exception("Periodic job recovery failed")
             _stop.wait(POLL_SECONDS)
             continue
         run_one(job_id)
