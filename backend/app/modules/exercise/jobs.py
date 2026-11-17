@@ -9,6 +9,7 @@ Updated By: AI Agent
 import base64
 import io
 import json
+from fastapi import HTTPException
 from types import SimpleNamespace
 from uuid import UUID
 
@@ -52,6 +53,10 @@ def encode_upload(f) -> dict:
 
 def _import(session, user, payload: dict):
     from app.modules.exercise.routers.exercises import _import_questions_impl
+    from app.modules.auth.services.permission_service import PermissionService
+    if "EXE_QUESTION_IMPORT" not in PermissionService.get_effective_permissions(session, user.user_id, user.role_id):
+        raise HTTPException(status_code=403, detail={
+            "code": "ERR-AUTH-FORBIDDEN", "message": "You do not have permission to access this resource."})
     resp = Response()
     with IMPORT_SEMAPHORE:
         questions = _import_questions_impl(

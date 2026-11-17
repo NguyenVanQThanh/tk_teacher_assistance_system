@@ -6,6 +6,7 @@ Created By: AI Agent
 Updated At: 2026-11-17
 Updated By: AI Agent
 """
+from datetime import datetime, timedelta, timezone
 import pytest
 from fastapi import HTTPException
 from sqlalchemy.orm import Session
@@ -58,10 +59,14 @@ def test_recover_interrupted(db_session):
     job = bj.enqueue(db_session, u.user_id, "T_REC", {})
     job.status, job.attempts = "RUNNING", 1
     db_session.commit()
+    assert bj.recover_interrupted() == 0  # fresh heartbeat: a live job of another process is left alone
+    job.updated_at = datetime.now(timezone.utc) - timedelta(seconds=bj.STALE_SECONDS + 5)
+    db_session.commit()
     assert bj.recover_interrupted() == 1
     db_session.expire_all()
     assert db_session.get(BackgroundJob, job.job_id).status == "QUEUED"
     job.status, job.attempts = "RUNNING", bj.MAX_ATTEMPTS
+    job.updated_at = datetime.now(timezone.utc) - timedelta(seconds=bj.STALE_SECONDS + 5)
     db_session.commit()
     bj.recover_interrupted()
     db_session.expire_all()

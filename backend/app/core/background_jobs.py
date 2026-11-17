@@ -28,6 +28,8 @@ _local = threading.local()
 _stop = threading.Event()
 _threads: List[threading.Thread] = []
 POLL_SECONDS = 2.0
+STALE_SECONDS = 600  # a RUNNING job untouched this long is presumed orphaned (heartbeat refreshes updated_at)
+HEARTBEAT_SECONDS = 30
 MAX_ACTIVE_PER_USER = 3  # queued + running jobs one user may hold
 MAX_ATTEMPTS = 2  # a job interrupted by a restart is re-queued once, then failed
 
@@ -173,6 +175,9 @@ def _finish(job_id: UUID, ok: bool, result: Any = None, error: Optional[dict] = 
         job.progress = 100 if ok else job.progress
         job.finished_at = datetime.now(timezone.utc)
         job.result, job.error = (result if ok else None), (None if ok else error)
+        # Drop uploaded file content: it is only needed to run the job.
+        job.payload = {k: v for k, v in (job.payload or {}).items()
+                       if k not in ("file_text", "question_file", "answer_file")}
         _, label, link, _ = _HANDLERS.get(job.kind, (None, "Tác vụ", "/", 60))
         session.commit()  # the outcome is durable before the best-effort notification
         try:
@@ -195,6 +200,8 @@ def run_one(job_id: UUID) -> None:
     """Run one claimed job with its own session; always ends in DONE or FAILED."""
     session = SessionLocal()
     _local.job_id = job_id
+    hb_stop = threading.Event()
+    threading.Thread(target=_heartbeat, args=(job_id, hb_stop), daemon=True).start()
     try:
         job = session.get(BackgroundJob, job_id)
         fn = _HANDLERS[job.kind][0]
@@ -209,17 +216,38 @@ def run_one(job_id: UUID) -> None:
         outcome = (False, None, {"http_status": 500, "detail": {
             "code": "ERR-EXE-AI_GENERATION_FAILED", "message": "Job failed."}})
     finally:
+        hb_stop.set()
         _local.job_id = None
         session.close()
     _finish(job_id, *outcome)
 
 
+def _heartbeat(job_id: UUID, stop: threading.Event) -> None:
+    """Touch updated_at while a job runs so other processes do not mistake it for an orphan."""
+    while not stop.wait(HEARTBEAT_SECONDS):
+        try:
+            session = SessionLocal()
+            try:
+                session.query(BackgroundJob).filter(BackgroundJob.job_id == job_id).update(
+                    {"updated_at": datetime.now(timezone.utc)})
+                session.commit()
+            finally:
+                session.close()
+        except Exception:  # noqa: BLE001
+            logger.debug("Heartbeat failed", exc_info=True)
+
+
 def recover_interrupted() -> int:
-    """After a restart: RUNNING jobs were cut off; re-queue them once, then mark them FAILED."""
+    """After a restart: stale RUNNING jobs were cut off; re-queue them once, then mark them FAILED.
+
+    Only jobs not touched for STALE_SECONDS are recovered, so a second backend process never steals a live job."""
+    from datetime import timedelta
+    cutoff = datetime.now(timezone.utc) - timedelta(seconds=STALE_SECONDS)
     session = SessionLocal()
     try:
         n = 0
-        for job in session.query(BackgroundJob).filter(BackgroundJob.status == "RUNNING").all():
+        for job in session.query(BackgroundJob).filter(
+                BackgroundJob.status == "RUNNING", BackgroundJob.updated_at < cutoff).all():
             if (job.attempts or 0) < MAX_ATTEMPTS:
                 job.status, job.progress, job.stage = "QUEUED", 0, None
             else:

@@ -39,7 +39,7 @@ _FALSE_WORDS = {"false", "sai", "no", "0"}
 # Phrases below are matched against accent-folded, lowercase text (see _fold).
 _BANNED_META = (
     "sgk", "sach giao khoa", "theo sach", "trong sach", "trong bai hoc", "trong tai lieu", "theo tai lieu",
-    "doan van tren", "van ban tren", "doan trich tren", "ngu lieu tren", "textbook", "context",
+    "doan van tren", "van ban tren", "doan trich tren", "ngu lieu tren", "textbook",
     "duoc neu trong", "duoc de cap trong",
 )
 _NON_NUMERIC_STEMS = (
