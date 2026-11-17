@@ -402,6 +402,30 @@ def _key_of(part: str, q: Dict[str, Any]) -> str:
     return str(q["correct_answer"])
 
 
+def _adopt_judge_key(part: str, q: Dict[str, Any], ans: str) -> bool:
+    """Overwrite the question's answer key with the reviewer's answer (in place); False when it is malformed.
+
+    The old explanation described the old key, so it is dropped rather than left contradicting the new key."""
+    ans = ans.strip().upper()
+    if part == "Part1":
+        if ans not in ("A", "B", "C", "D") or len(q["answer_options"]) < 4:
+            return False
+        for i, opt in enumerate(q["answer_options"]):
+            opt["is_correct"] = "ABCD"[i] == ans
+    elif part == "Part2":
+        if len(ans) != 4 or set(ans) - {"D", "S"} or len(q["segments"]) != 4:
+            return False
+        for i, flag in enumerate(ans):
+            q["segments"][i]["is_correct"] = q["answer_options"][i]["is_correct"] = flag == "D"
+    else:
+        fixed, err = validate_short({"correct_answer": ans})
+        if fixed is None:
+            return False
+        q["correct_answer"] = fixed["correct_answer"]
+    q["explanation"] = None
+    return True
+
+
 def _same_answer(part: str, a: Any, b: Any) -> bool:
     """Compare judge and generator answers (numeric for Part3, case-insensitive text otherwise)."""
     if part == "Part3":
@@ -590,7 +614,11 @@ class AiExerciseGeneratorService:
             if v.get("ok") is False:
                 result[i] = "reviewer: " + str(v.get("why") or "question rejected")
             elif ans and not _same_answer(part, ans, _key_of(part, questions[i])):
-                result[i] = f"answer key disputed (reviewer got {ans})"
+                # The reviewer's answer wins: adopt it as the key; reject only when it cannot be applied.
+                if _adopt_judge_key(part, questions[i], ans):
+                    logger.info("%s: key replaced by reviewer answer %s", part, ans)
+                else:
+                    result[i] = f"answer key disputed (reviewer got {ans})"
         return result
 
     @classmethod
