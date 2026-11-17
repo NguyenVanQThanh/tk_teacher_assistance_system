@@ -533,6 +533,13 @@ export default function StudentExercisesPage() {
     }
   }, []);
 
+  // The job tray announces finished jobs: reload the list so a new AI exercise appears without F5.
+  useEffect(() => {
+    const onFinished = () => { clearSessionCache(); setLocalAiExercisesTrigger((prev) => prev + 1); };
+    window.addEventListener('jobs:finished', onFinished);
+    return () => window.removeEventListener('jobs:finished', onFinished);
+  }, []);
+
   // Manual refresh handler to force fetch fresh data from backend into cache
   const handleRefreshData = () => {
     clearSessionCache();
@@ -865,47 +872,13 @@ export default function StudentExercisesPage() {
         }
       };
 
-      const result = await aiExercisesApi.generateForStudent(payload, aiFile);
+      await aiExercisesApi.startForStudent(payload, aiFile);
 
       clearTimeout(step2Timer);
       clearTimeout(step3Timer);
-
-      // Keep local backup as well so it's always available across reloads
-      try {
-        const existingLocal = JSON.parse(localStorage.getItem('tk_student_ai_exercises') || '[]');
-        const newLocalItem = {
-          id: result.exercise_id,
-          exercise_id: result.exercise_id,
-          assignment_id: result.assignment_id,
-          class_id: result.class_id,
-          className: result.class_name || '12A1',
-          type: 'quiz',
-          category: 'ai_generated',
-          categoryLabel: 'Bài tập tạo sinh AI',
-          title: result.title,
-          teacher: 'Trợ lý AI Tam Khang',
-          subject: result.subject_name,
-          questionsCount: `${result.total_questions} câu hỏi`,
-          total_questions: result.total_questions,
-          duration: `${result.duration_minutes} phút`,
-          status: 'active',
-          statusLabel: 'Đang mở',
-          isAiGenerated: true,
-          isRealBackend: true,
-          topicPrompt: aiTopicPrompt
-        };
-        const updated = [newLocalItem, ...existingLocal.filter(x => x.id !== result.exercise_id && x.title !== result.title)];
-        localStorage.setItem('tk_student_ai_exercises', JSON.stringify(updated));
-      } catch (err) {
-        console.warn('Could not save local copy of AI exercise', err);
-      }
-
-      clearSessionCache();
-      setGeneratedAiResult(result);
-      setGeneratedExerciseId(result.exercise_id);
-      setIsGenerating(false);
-      setGenerationStep(4);
-      setLocalAiExercisesTrigger(prev => prev + 1);
+      // Queued: close the modal so the student is free; the job tray shows progress and the bell notifies on completion.
+      toast.success('Đã đưa vào hàng đợi. Bạn có thể tiếp tục sử dụng hệ thống, sẽ có thông báo khi bài tập sẵn sàng.');
+      handleCloseAiModal();
     } catch (err) {
       clearTimeout(step2Timer);
       clearTimeout(step3Timer);

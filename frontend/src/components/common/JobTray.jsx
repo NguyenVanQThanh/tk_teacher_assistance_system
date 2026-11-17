@@ -31,10 +31,16 @@ export default function JobTray() {
   useEffect(() => {
     if (!user) return undefined;
     let alive = true;
+    let prevIds = new Set();
     const tick = async () => {
       try {
         const { data } = await api.get('/api/v1/jobs', { params: { active: true } });
-        if (alive) setJobs((Array.isArray(data) ? data : data.items || []).filter((j) => !awaitedJobs.has(j.job_id)));
+        const all = Array.isArray(data) ? data : data.items || [];
+        const ids = new Set(all.map((j) => j.job_id));
+        // A job that left the active list has finished: let pages refresh their data.
+        if ([...prevIds].some((id) => !ids.has(id) && !awaitedJobs.has(id))) window.dispatchEvent(new Event('jobs:finished'));
+        prevIds = ids;
+        if (alive) setJobs(all.filter((j) => !awaitedJobs.has(j.job_id)));
       } catch {
         /* best effort: the tray is informational */
       }

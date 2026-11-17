@@ -266,6 +266,16 @@ export const aiExercisesApi = {
     return response.data;
   },
   // Multipart: `payload` JSON string + optional `file`
+  // Queue the job and return at once ({ job_id, ... }); progress shows in the job tray, completion in notifications.
+  startForStudent: async (payload, file = null) => {
+    const formData = new FormData();
+    formData.append('payload', JSON.stringify(payload));
+    if (file) formData.append('file', file);
+    const start = await api.post('/api/v1/ai-exercises/student/jobs', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    });
+    return start.data;
+  },
   generateForStudent: async (payload, file = null) => {
     const formData = new FormData();
     formData.append('payload', JSON.stringify(payload));
