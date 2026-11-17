@@ -379,7 +379,8 @@ class AiExerciseGeneratorService:
             ],
             response_format={"type": "json_object"},
             temperature=temperature,
-            max_tokens=8192,
+            # A batch needs ~2k tokens; a runaway (looping) reply must fail fast instead of burning minutes.
+            max_tokens=config.AI_PART_MAX_TOKENS,
         )
         if getattr(resp.choices[0], "finish_reason", None) == "length":
             logger.warning("Mistral reply for %s was cut off (finish_reason=length)", part)
