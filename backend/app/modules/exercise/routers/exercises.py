@@ -361,13 +361,13 @@ def _import_questions_impl(
         )
 
     q_bytes = question_file.file.read()
-    # 1MB cap keeps the vision OCR provider stable (page rendering + token budget per chunk)
-    if len(q_bytes) > 1 * 1024 * 1024:
+    # 15MB cap keeps the vision OCR provider stable (page rendering + token budget per chunk)
+    if len(q_bytes) > 15 * 1024 * 1024:
         raise HTTPException(
             status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
             detail={
                 "code": "ERR-EXE-IMPORT_FILE_TOO_LARGE",
-                "message": "Question file size exceeds 1MB limit. Please compress or split the file."
+                "message": "Question file size exceeds 15MB limit. Please compress or split the file."
             }
         )
 
@@ -401,12 +401,12 @@ def _import_questions_impl(
                 }
             )
         ans_bytes = answer_file.file.read()
-        if len(ans_bytes) > 1 * 1024 * 1024:
+        if len(ans_bytes) > 15 * 1024 * 1024:
             raise HTTPException(
                 status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
                 detail={
                     "code": "ERR-EXE-IMPORT_FILE_TOO_LARGE",
-                    "message": "Answer file size exceeds 1MB limit."
+                    "message": "Answer file size exceeds 15MB limit."
                 }
             )
 
@@ -636,19 +636,19 @@ def start_import_questions_job(
 
     q_bytes_len = question_file.file.seek(0, 2)
     question_file.file.seek(0)
-    if q_bytes_len > 1 * 1024 * 1024:
+    if q_bytes_len > 15 * 1024 * 1024:
         raise HTTPException(
             status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
             detail={"code": "ERR-EXE-IMPORT_FILE_TOO_LARGE",
-                    "message": "Question file size exceeds 1MB limit. Please compress or split the file."})
+                    "message": "Question file size exceeds 15MB limit. Please compress or split the file."})
     if answer_file is not None:
         a_len = answer_file.file.seek(0, 2)
         answer_file.file.seek(0)
-        if a_len > 1 * 1024 * 1024:
+        if a_len > 15 * 1024 * 1024:
             raise HTTPException(
                 status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
                 detail={"code": "ERR-EXE-IMPORT_FILE_TOO_LARGE",
-                        "message": "Answer file size exceeds 1MB limit. Please compress or split the file."})
+                        "message": "Answer file size exceeds 15MB limit. Please compress or split the file."})
     job = enqueue(exercise_service.db, current_user.user_id, KIND_IMPORT, {
         "exercise_id": str(exercise_id), "test_code": test_code,
         "question_file": encode_upload(question_file), "answer_file": encode_upload(answer_file)})
