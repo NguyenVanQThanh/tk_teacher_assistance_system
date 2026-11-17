@@ -628,6 +628,7 @@ Updated By: AI Agent
 }
 
 .option-content-text {
+  min-width: 0;
   font-size: 16.5px;
   color: #1E293B;
   font-weight: 400;

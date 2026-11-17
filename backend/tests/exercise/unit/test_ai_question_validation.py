@@ -197,3 +197,11 @@ def test_part3_blocked_for_subjects_without_short_answer(monkeypatch):
     with pytest.raises(ValueError):
         AiExerciseGeneratorService.generate_questions(
             "Lịch sử", "Lớp 12", "t", 0, 0, 0, matrix={"short": {"NhanBiet": 1, "ThongHieu": 0, "VanDung": 0}})
+
+def test_unclosed_code_block_rejected_and_balanced_passes():
+    base = {"explanation": "e", "answer_options": [
+        {"content": o, "is_correct": i == 0} for i, o in enumerate(["a", "b", "c", "d"])]}
+    bad, err = gen.validate_question("Part1", {**base, "content": "Code:\n```python\nx = 1"})
+    assert bad is None and err == "unclosed code block"
+    ok, err = gen.validate_question("Part1", {**base, "content": "Code:\n```python\nx = 1\n```\nOutput?"})
+    assert err is None and ok is not None

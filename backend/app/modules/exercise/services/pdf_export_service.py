@@ -23,6 +23,7 @@ from matplotlib.backends.backend_agg import FigureCanvasAgg
 
 from reportlab.lib.pagesizes import A4
 from reportlab.platypus import (
+    Preformatted,
     SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, Image as RLImage, KeepTogether, HRFlowable
 )
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
@@ -34,6 +35,8 @@ from models.models import Exercise, Question, AnswerOption
 from app.modules.exercise.schemas import QuestionTypeEnum
 from app.core.storage import read_bytes_from_url
 from app.modules.exercise.services.question_order import question_sort_key
+
+_CODE_FENCE_RE = re.compile(r"```[\w+-]*[^\n]*\n([\s\S]*?)\n?```")
 
 
 # ---------------------------------------------------------------------------
@@ -278,6 +281,17 @@ class PdfExportService:
         if not raw_text:
             return ""
 
+        # Inline code spans bypass math handling and render in a monospace font.
+        # ponytail: Courier lacks Vietnamese diacritics; register a TTF mono font if code needs them.
+        if "`" in raw_text:
+            out = []
+            for i, seg in enumerate(re.split(r"`([^`\n]+)`", raw_text)):
+                if i % 2:
+                    out.append(f'<font face="Courier">{cls._escape_html(seg)}</font>')
+                elif seg:
+                    out.append(cls.format_content_to_markup(seg, temp_files_list, fontsize))
+            return "".join(out)
+
         normalized_text = cls._normalize_math_in_text(raw_text)
         parts = re.split(r"(\$\$.*?\$\$|\$.*?\$)", normalized_text)
 
@@ -484,7 +498,7 @@ class PdfExportService:
     @classmethod
     def _format_content_blocks(cls, text: str, style: ParagraphStyle, temp_files: List[str],
                                prefix: str = "") -> List[Any]:
-        """Render content split into text and markdown-table blocks.
+        """Render content split into fenced code blocks, text and markdown-table blocks.
 
         ``prefix`` (e.g. "Câu 1. ") is prepended to the first text block so the question
         header keeps flowing inline; when the content starts with a table the prefix gets
@@ -492,6 +506,24 @@ class PdfExportService:
         """
         if not isinstance(text, str):
             text = "" if text is None else str(text)
+        if "```" in text and _CODE_FENCE_RE.search(text):
+            code_style = ParagraphStyle(
+                "CodeBlock", parent=style, fontName="Courier", fontSize=9, leading=11,
+                backColor=colors.HexColor("#f6f8fa"), borderPadding=4, spaceBefore=4, spaceAfter=4)
+            elements: List[Any] = []
+            pos = 0
+            pending_prefix = prefix or ""
+            for m in _CODE_FENCE_RE.finditer(text):
+                before = text[pos:m.start()]
+                if before.strip() or pending_prefix:
+                    elements.extend(cls._format_content_blocks(before, style, temp_files, pending_prefix))
+                    pending_prefix = ""
+                elements.append(Preformatted(m.group(1), code_style))
+                pos = m.end()
+            tail = text[pos:]
+            if tail.strip() or pending_prefix:
+                elements.extend(cls._format_content_blocks(tail, style, temp_files, pending_prefix))
+            return elements
         elements: List[Any] = []
         pending = prefix or ""
         for kind, value in cls.split_table_blocks(text):

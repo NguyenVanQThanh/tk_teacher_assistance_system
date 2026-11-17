@@ -328,7 +328,7 @@ export default function ExercisePreviewModal({ exercise, isOpen, onClose }) {
                             className={`option-item ${isCorrect ? 'is-correct' : ''}`}
                           >
                             <span className="opt-label">{labelChar}.</span>
-                            <span><MathRenderer text={cleanOptText || opt.content} /></span>
+                            <span style={{ minWidth: 0 }}><MathRenderer text={cleanOptText || opt.content} /></span>
                             {isCorrect && (
                               <span className="correct-tag"><Check size={12} /> Đáp án đúng</span>
                             )}
@@ -354,7 +354,7 @@ export default function ExercisePreviewModal({ exercise, isOpen, onClose }) {
                             style={!isTrue ? { borderColor: '#FED7AA', background: '#FFFDF9' } : {}}
                           >
                             <span className="opt-label" style={{ fontWeight: 700 }}>{labelChar}</span>
-                            <span style={{ flex: 1 }}><MathRenderer text={cleanOptText || opt.content} /></span>
+                            <span style={{ flex: 1, minWidth: 0 }}><MathRenderer text={cleanOptText || opt.content} /></span>
                             {isTrue ? (
                               <span className="correct-tag" style={{ background: '#ECFDF5', color: '#059669', borderColor: '#A7F3D0' }}>
                                 <Check size={12} /> Đúng
