@@ -183,3 +183,33 @@ def test_review_batch_adopts_reviewer_answer(monkeypatch):
     q = {"content": "Q", "answer_options": [{"content": c, "is_correct": c == "a"} for c in "abcd"]}
     assert Svc.review_batch("Part1", [q], "") == [None]
     assert [o["is_correct"] for o in q["answer_options"]] == [False, True, False, False]
+
+
+def test_rekeyed_question_gets_a_new_explanation(monkeypatch):
+    monkeypatch.setattr(gen.config, "AI_JUDGE_ENABLED", True)
+    monkeypatch.setattr(Svc, "_call_judge", classmethod(lambda cls, part, items, ctx, subj="": [{"i": 0, "ans": "DSSD", "ok": True}]))
+    seen = []
+
+    def explainer(cls, part, items_json, subject_name=""):
+        seen.append(items_json)
+        text = chr(10).join(["a) Đúng. x", "b) Sai. y", "c) Sai. z", "d) Đúng. w"])
+        return [{"i": 0, "explanation": text}]
+
+    monkeypatch.setattr(Svc, "_call_explainer", classmethod(explainer))
+    q = {"content": "Q", "explanation": "old",
+         "segments": [{"key": k, "statement": k, "is_correct": True} for k in "abcd"],
+         "answer_options": [{"content": k, "is_correct": True} for k in "abcd"]}
+    assert Svc.review_batch("Part2", [q], "") == [None]
+    Svc.regenerate_explanations("Part2", [q], "Hóa học")
+    assert '"answer": "DSSD"' in seen[0]
+    assert q["explanation"].startswith("a) Đúng.") and "_rekeyed" not in q
+
+
+def test_rekeyed_explanation_fails_open(monkeypatch):
+    def boom(cls, *a, **k):
+        raise RuntimeError("down")
+
+    monkeypatch.setattr(Svc, "_call_explainer", classmethod(boom))
+    q = {"content": "Q", "explanation": None, "_rekeyed": True, "correct_answer": "5"}
+    Svc.regenerate_explanations("Part3", [q], "Toán")
+    assert q["explanation"] is None and "_rekeyed" not in q
