@@ -665,6 +665,7 @@ class AiChapterOut(BaseModel):
     chapter: str
     doc_id: str
     page_start: Optional[int] = None
+    lessons: List[str] = []
 
 
 class AiExerciseGenerateRequest(BaseModel):
