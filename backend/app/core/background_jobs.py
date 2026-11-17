@@ -28,6 +28,7 @@ _local = threading.local()
 _stop = threading.Event()
 _threads: List[threading.Thread] = []
 POLL_SECONDS = 2.0
+MAX_ACTIVE_PER_USER = 3  # queued + running jobs one user may hold
 MAX_ATTEMPTS = 2  # a job interrupted by a restart is re-queued once, then failed
 
 
@@ -64,9 +65,18 @@ def report(stage: str, progress: int) -> None:
 
 
 def enqueue(session, user_id: UUID, kind: str, payload: dict) -> BackgroundJob:
-    """Insert a QUEUED job and commit. A handler must be registered for the kind."""
+    """Insert a QUEUED job and commit. A handler must be registered for the kind.
+
+    Raises HTTPException 429 when the user already has MAX_ACTIVE_PER_USER queued or running jobs, so one
+    account cannot flood the shared FIFO queue."""
     if kind not in _HANDLERS:
         raise ValueError(f"Unknown job kind: {kind}")
+    active = session.query(BackgroundJob).filter(
+        BackgroundJob.user_id == user_id, BackgroundJob.status.in_(("QUEUED", "RUNNING"))).count()
+    if active >= MAX_ACTIVE_PER_USER:
+        raise HTTPException(status_code=429, detail={
+            "code": "ERR-EXE-AI_TOO_MANY_JOBS",
+            "message": "Too many jobs in progress. Wait for one to finish."})
     job = BackgroundJob(user_id=user_id, kind=kind, payload=payload, status="QUEUED", progress=0)
     session.add(job)
     session.commit()
@@ -116,15 +126,20 @@ def to_public(session, job: BackgroundJob) -> dict:
     return out
 
 
-def get_job(session, job_id: str, user_id: UUID) -> Optional[dict]:
-    """Public job state, or None when unknown or owned by someone else."""
+def get_job(session, job_id: str, user_id: UUID, kind: Optional[str] = None,
+            payload_match: Optional[Dict[str, Any]] = None) -> Optional[dict]:
+    """Public job state, or None when unknown, owned by someone else, of another kind or payload."""
     try:
         jid = UUID(str(job_id))
     except ValueError:
         return None
     job = session.query(BackgroundJob).filter(
         BackgroundJob.job_id == jid, BackgroundJob.user_id == user_id).first()
-    return to_public(session, job) if job else None
+    if job is None or (kind is not None and job.kind != kind):
+        return None
+    if payload_match and any((job.payload or {}).get(k) != v for k, v in payload_match.items()):
+        return None
+    return to_public(session, job)
 
 
 def list_jobs(session, user_id: UUID, active_only: bool = False, limit: int = 20) -> List[dict]:
@@ -159,11 +174,16 @@ def _finish(job_id: UUID, ok: bool, result: Any = None, error: Optional[dict] = 
         job.finished_at = datetime.now(timezone.utc)
         job.result, job.error = (result if ok else None), (None if ok else error)
         _, label, link, _ = _HANDLERS.get(job.kind, (None, "Tác vụ", "/", 60))
-        notification_service.notify(
-            session, [job.user_id], "JOB_DONE" if ok else "JOB_FAILED",
-            f"{label} đã hoàn tất" if ok else f"{label} thất bại",
-            "Nhấn để xem kết quả." if ok else "Vui lòng thử lại.", link)
-        session.commit()
+        session.commit()  # the outcome is durable before the best-effort notification
+        try:
+            notification_service.notify(
+                session, [job.user_id], "JOB_DONE" if ok else "JOB_FAILED",
+                f"{label} đã hoàn tất" if ok else f"{label} thất bại",
+                "Nhấn để xem kết quả." if ok else "Vui lòng thử lại.", link)
+            session.commit()
+        except Exception:  # noqa: BLE001 - a failed notification must never undo the job outcome
+            session.rollback()
+            logger.exception("Could not notify the owner of job %s", job_id)
     except Exception:  # noqa: BLE001
         session.rollback()
         logger.exception("Could not store the outcome of job %s", job_id)

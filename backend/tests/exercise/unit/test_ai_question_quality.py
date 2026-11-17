@@ -115,14 +115,15 @@ def test_judge_failure_fails_open(monkeypatch):
     assert len(Svc.generate_part("Part1", ["NhanBiet"] * 2, "", "", "r", "Hoa", "12")) == 2
 
 
-def test_judge_rejection_falls_back_when_retries_exhausted(monkeypatch):
+def test_judge_rejected_questions_are_never_persisted(monkeypatch):
     monkeypatch.setenv("MISTRAL_API_KEY", "k")
     monkeypatch.setattr(gen.config, "AI_JUDGE_ENABLED", True)
     monkeypatch.setattr(gen.config, "AI_PART_MAX_RETRIES", 0)
     monkeypatch.setattr(Svc, "_call_mistral_part", _two_mcq_fake([]))
     monkeypatch.setattr(Svc, "_call_judge", classmethod(
         lambda cls, part, items, ctx: [{"i": 0, "ok": False, "why": "bad"}, {"i": 1, "ok": False, "why": "bad"}]))
-    assert len(Svc.generate_part("Part1", ["NhanBiet"] * 2, "", "", "r", "Hoa", "12")) == 2
+    with pytest.raises(RuntimeError):
+        Svc.generate_part("Part1", ["NhanBiet"] * 2, "", "", "r", "Hoa", "12")
 
 
 def test_judge_disabled_not_called(monkeypatch):

@@ -115,7 +115,7 @@ AI_PART_BATCH_SIZE = _env_int("AI_PART_BATCH_SIZE", 5, minimum=1)
 # Worker threads that process queued background jobs (0 disables the worker, e.g. in tests).
 JOB_WORKERS = _env_int("JOB_WORKERS", 2, minimum=0)
 # Mistral model for question generation (tried before Gemini)
-AI_MISTRAL_MODEL = os.environ.get("AI_MISTRAL_MODEL", "mistral-medium-latest")  # large always emits reasoning chunks: ~75s per call and truncation
+AI_MISTRAL_MODEL = os.environ.get("AI_MISTRAL_MODEL", "deepseek-v4-1-flash-1017")  # via the Mistral API; mistral-large always emits reasoning chunks (slow, truncated)
 
 
 def _env_bool(name: str, default: bool) -> bool:
@@ -123,7 +123,7 @@ def _env_bool(name: str, default: bool) -> bool:
 
 # Second-pass LLM review of generated questions (solves each question blind and compares keys).
 AI_JUDGE_ENABLED = _env_bool("AI_JUDGE_ENABLED", True)
-AI_JUDGE_MODEL = os.environ.get("AI_JUDGE_MODEL", "deepseek-v4-1-flash-1017")  # served through the Mistral API (MISTRAL_API_KEY)
+AI_JUDGE_MODEL = os.environ.get("AI_JUDGE_MODEL", "mistral-medium-latest")  # a different model than the generator reviews independently
 AI_JUDGE_MAX_TOKENS = _env_int("AI_JUDGE_MAX_TOKENS", 600, minimum=200)
 
 # ---------------------------------------------------------------------------

@@ -271,7 +271,10 @@ class AttemptService:
             getattr(assignment, "owner_student_id", None) is not None
             and assignment.owner_student_id == attempt.student_id
         )
-        reveal = (not owner) or (not is_exam) or released or personal
+        # The answer key is revealed to the teacher, after release, or for the student's own AI exercise.
+        # A shared PRACTICE assignment may allow retakes, so finishing alone never reveals the key.
+        reveal = (not owner) or released or personal
+        strip_verdicts = owner and is_exam and not released and not personal
         finished = bool(getattr(attempt, "is_finished", False))
         if out.detailed_results:
             questions = out.detailed_results.get("questions") or []
@@ -284,12 +287,14 @@ class AttemptService:
                         row.update(key.get(str(row.get("question_id", "")).lower(), {}))
                         merged.append(row)
                     out.detailed_results = {**out.detailed_results, "questions": merged, "answer_key_revealed": True}
-            else:
+            elif strip_verdicts:
                 keep = ("question_id", "question_type", "student_answer_option_id", "student_answer_text")
                 out.detailed_results = {
                     "questions": [{k: r[k] for k in keep if k in r} for r in questions],
                     "answer_key_revealed": False,
                 }
+            else:
+                out.detailed_results = {**out.detailed_results, "answer_key_revealed": False}
         return out
 
     def get_attempt_paper(self, attempt_id: UUID, current_user: User) -> AssignmentTakingOut:

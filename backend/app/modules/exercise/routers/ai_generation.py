@@ -209,7 +209,7 @@ async def start_student_job(
 )
 def get_student_job(job_id: str, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
     """Job state: running | done (with result) | error (with http_status and detail)."""
-    job = get_job(db, job_id, current_user.user_id)
+    job = get_job(db, job_id, current_user.user_id, kind=KIND_STUDENT_AI)
     if job is None:
         raise _err(status.HTTP_404_NOT_FOUND, "ERR-EXE-AI_JOB_NOT_FOUND", "Job not found.")
     return job

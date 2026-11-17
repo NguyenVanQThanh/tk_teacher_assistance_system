@@ -85,14 +85,14 @@ def _qs(out):
 
 def test_practice_owner_gets_key():
     sid = uuid.uuid4()
-    out = AttemptService.redact_for_owner(_attempt(sid, "PRACTICE"), SimpleNamespace(user_id=sid))
+    out = AttemptService.redact_for_owner(_attempt(sid, "PRACTICE", personal=True), SimpleNamespace(user_id=sid))
     assert out.detailed_results["answer_key_revealed"] is True
     assert out.detailed_results["questions"][0]  # results use q1 id, so no key merge on unknown ids
 
 
 def test_key_merged_by_question_id():
     sid = uuid.uuid4()
-    att = _attempt(sid, "PRACTICE")
+    att = _attempt(sid, "PRACTICE", personal=True)
     att.detailed_results = {"questions": [
         {"question_id": str(_QIDS["mcq"]), "question_type": "MultipleChoice"},
         {"question_id": str(_QIDS["tf"]), "question_type": "TrueFalse"},
@@ -111,5 +111,15 @@ def test_exam_personal_and_teacher_reveal_unfinished_does_not():
     assert AttemptService.redact_for_owner(_attempt(sid, "EXAM", personal=True), owner).detailed_results["answer_key_revealed"]
     teacher = SimpleNamespace(user_id=uuid.uuid4())
     assert AttemptService.redact_for_owner(_attempt(sid, "EXAM"), teacher).detailed_results["answer_key_revealed"]
-    out = AttemptService.redact_for_owner(_attempt(sid, "PRACTICE", finished=False), owner)
-    assert "answer_key_revealed" not in out.detailed_results
+    out = AttemptService.redact_for_owner(_attempt(sid, "PRACTICE", personal=True, finished=False), owner)
+    assert not out.detailed_results.get("answer_key_revealed")
+    assert not any(f in out.detailed_results["questions"][0] for f in KEY_FIELDS)
+
+
+def test_shared_practice_does_not_reveal_key_but_keeps_verdicts():
+    """A class PRACTICE assignment may allow retakes: finishing alone must not leak the key."""
+    sid = uuid.uuid4()
+    out = AttemptService.redact_for_owner(_attempt(sid, "PRACTICE"), SimpleNamespace(user_id=sid))
+    assert out.detailed_results["answer_key_revealed"] is False
+    assert "is_correct" in out.detailed_results["questions"][0]
+    assert not any(f in out.detailed_results["questions"][0] for f in KEY_FIELDS)

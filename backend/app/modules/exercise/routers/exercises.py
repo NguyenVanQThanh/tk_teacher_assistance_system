@@ -6,8 +6,6 @@
 # Updated By: AI Agent
 
 import json
-from types import SimpleNamespace
-import io
 import hashlib
 import logging
 import re
@@ -154,7 +152,7 @@ def start_ai_generate_job(
 )
 def get_ai_generate_job(job_id: str, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
     """Job state: running | done (with result) | error (with http_status and detail)."""
-    job = get_job(db, job_id, current_user.user_id)
+    job = get_job(db, job_id, current_user.user_id, kind=KIND_TEACHER_AI)
     if job is None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -643,6 +641,14 @@ def start_import_questions_job(
             status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
             detail={"code": "ERR-EXE-IMPORT_FILE_TOO_LARGE",
                     "message": "Question file size exceeds 1MB limit. Please compress or split the file."})
+    if answer_file is not None:
+        a_len = answer_file.file.seek(0, 2)
+        answer_file.file.seek(0)
+        if a_len > 1 * 1024 * 1024:
+            raise HTTPException(
+                status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+                detail={"code": "ERR-EXE-IMPORT_FILE_TOO_LARGE",
+                        "message": "Answer file size exceeds 1MB limit. Please compress or split the file."})
     job = enqueue(exercise_service.db, current_user.user_id, KIND_IMPORT, {
         "exercise_id": str(exercise_id), "test_code": test_code,
         "question_file": encode_upload(question_file), "answer_file": encode_upload(answer_file)})
@@ -655,7 +661,8 @@ def start_import_questions_job(
 def get_import_questions_job(exercise_id: UUID, job_id: str, db: Session = Depends(get_db),
                              current_user: User = Depends(get_current_user)):
     """Job state: running | done (with result) | error (with http_status and detail)."""
-    job = get_job(db, job_id, current_user.user_id)
+    job = get_job(db, job_id, current_user.user_id, kind=KIND_IMPORT,
+                  payload_match={"exercise_id": str(exercise_id)})
     if job is None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,

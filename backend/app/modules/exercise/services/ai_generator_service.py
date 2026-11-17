@@ -493,10 +493,6 @@ class AiExerciseGeneratorService:
                     errors.append(reason)
             if len(valid) == before:
                 failures += 1
-        if len(valid) < len(slots) and rejected_pool:
-            logger.warning("Using %d judge-rejected %s questions to fill the requested count",
-                           min(len(rejected_pool), len(slots) - len(valid)), part)
-            valid += rejected_pool[:len(slots) - len(valid)]
         if len(valid) < len(slots):
             raise RuntimeError(f"AI returned fewer valid {part} questions than requested.")
         valid = valid[:len(slots)]
