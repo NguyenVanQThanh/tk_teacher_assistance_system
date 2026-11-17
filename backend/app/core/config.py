@@ -109,6 +109,8 @@ AI_PART_WORKERS = _env_int("AI_PART_WORKERS", 3)
 AI_PART_MAX_RETRIES = _env_int("AI_PART_MAX_RETRIES", 2, minimum=0)
 # Questions requested per model call; smaller batches avoid replies cut off at max_tokens.
 AI_PART_BATCH_SIZE = _env_int("AI_PART_BATCH_SIZE", 5, minimum=1)
+# Worker threads that process queued background jobs (0 disables the worker, e.g. in tests).
+JOB_WORKERS = _env_int("JOB_WORKERS", 2, minimum=0)
 # Mistral model for question generation (tried before Gemini)
 AI_MISTRAL_MODEL = os.environ.get("AI_MISTRAL_MODEL", "mistral-large-latest")
 

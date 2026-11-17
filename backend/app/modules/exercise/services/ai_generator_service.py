@@ -13,6 +13,7 @@ from concurrent.futures import ThreadPoolExecutor
 from typing import Any, Dict, List, Optional, Tuple
 
 from app.core import config
+from app.core import background_jobs
 from app.modules.exercise.services.gemini_vision_parser_service import GeminiVisionParserService
 
 logger = logging.getLogger("smartlms.exercise.ai_generator")
@@ -286,9 +287,16 @@ class AiExerciseGeneratorService:
         if not plans:
             raise RuntimeError("No questions requested.")
 
+        job_id = background_jobs.current_job_id()  # captured here: pool threads do not inherit it
+        done = []
+        background_jobs.report_for(job_id, "GENERATING", 30)
+
         def run(part: str) -> List[Dict[str, Any]]:
-            return cls.generate_part(part, plans[part], context, student_file, topic_prompt,
-                                     subject_name, grade_name)
+            out = cls.generate_part(part, plans[part], context, student_file, topic_prompt,
+                                    subject_name, grade_name)
+            done.append(part)
+            background_jobs.report_for(job_id, "GENERATING", 30 + 60 * len(done) // len(plans))
+            return out
 
         try:
             with ThreadPoolExecutor(max_workers=max(1, config.AI_PART_WORKERS)) as pool:
@@ -318,7 +326,7 @@ class AiExerciseGeneratorService:
             try:
                 raw_items = cls._call_llm_part(
                     part=part, prompt=prompt,
-                    temperature=FIRST_TEMPERATURE if failures == 0 else RETRY_TEMPERATURE)
+                    temperature=RETRY_TEMPERATURE if failures or errors else FIRST_TEMPERATURE)
             except json.JSONDecodeError as exc:
                 logger.warning("Mistral returned invalid JSON for %s: %s", part, exc)
                 errors = ["the previous reply was not valid JSON; return a complete, valid JSON object"]

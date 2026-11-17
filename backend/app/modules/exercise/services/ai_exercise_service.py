@@ -22,6 +22,7 @@ from app.modules.exercise.schemas import (
 )
 from app.modules.exercise.services.ai_generator_service import AiExerciseGeneratorService
 from app.modules.exercise.services.rag_context_service import STUDENT_FILE_CHARS, RagContextService
+from app.core import background_jobs
 from app.modules.exercise.services.rag_retrieval_service import RagRetrievalService, parse_grade
 from models.models import (
     AnswerOption, Class, ClassAssignment, Exercise, Question, StudentClass, Subject, TeacherSubject, User,
@@ -121,6 +122,7 @@ class AiExerciseService:
         # Guest teachers have no classes: the exercise lands in the bank without an assignment.
         class_obj = None if user.is_guest else self._resolve_teacher_class(user, subject, payload)
         grade_name = payload.grade_name or "Lớp 12"
+        background_jobs.report("RETRIEVING_CONTEXT", 5)
         context, sources = RagContextService.build_context_with_sources(
             self.db,
             topic_prompt=payload.topic_prompt,
@@ -143,6 +145,7 @@ class AiExerciseService:
             "matrix": matrix, "sources": sources,
             "document_ids": [str(d) for d in (payload.document_ids or [])],
         }
+        background_jobs.report("SAVING", 95)
         return self._persist(user, subject, class_obj, questions, metadata, payload.duration_minutes,
                              payload.topic_prompt, grade_name, owner_student_id=None)
 
@@ -171,6 +174,7 @@ class AiExerciseService:
             raise _err(status.HTTP_422_UNPROCESSABLE_ENTITY, "ERR-EXE-AI_INVALID_CHAPTER",
                        "One or more chapters are not available for this subject.")
         grade_name = f"Lớp {grade}" if grade else (class_obj.class_name if class_obj is not None else "")
+        background_jobs.report("RETRIEVING_CONTEXT", 5)
         context, sources = RagContextService.build_student_context(
             self.db, student_id=user.user_id, subject_id=subject.subject_id, subject_name=subject.subject_name,
             grade=grade, chapters=payload.chapters, topic_prompt=payload.topic_prompt)
@@ -189,6 +193,7 @@ class AiExerciseService:
             "part1_count": counts[0], "part2_count": counts[1], "part3_count": counts[2],
             "sources": sources, "document_ids": [],
         }
+        background_jobs.report("SAVING", 95)
         return self._persist(user, subject, class_obj, questions, metadata, payload.duration_minutes,
                              topic, grade_name, owner_student_id=user.user_id)
 

@@ -17,7 +17,8 @@ from fastapi import APIRouter, Depends, Query, UploadFile, File, Form, HTTPExcep
 from pydantic import ValidationError
 from sqlalchemy.orm import Session
 
-from app.core.background_jobs import get_job, start_job
+from app.core.background_jobs import enqueue, get_job, to_public
+from app.modules.exercise.jobs import KIND_IMPORT, KIND_TEACHER_AI, encode_upload
 from app.core.database import get_db
 from app.modules.academic.scoping import get_user_role_name
 from app.modules.auth import access_policy
@@ -143,16 +144,16 @@ def start_ai_generate_job(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail={"code": "ERR-DOC-NOT_FOUND", "message": "Document not found."}
             )
-    return start_job(current_user.user_id, lambda session, user: ExerciseService(session)
-                     .generate_ai_exercise(user, payload))
+    job = enqueue(service.db, current_user.user_id, KIND_TEACHER_AI, json.loads(payload.model_dump_json()))
+    return to_public(service.db, job)
 
 @router.get(
     "/ai-generate/jobs/{job_id}",
     dependencies=[Depends(require_any_perm("EXE_ATTEMPT_SUBMIT", "EXE_EXERCISE_VIEW", "EXE_EXERCISE_MANAGE"))]
 )
-def get_ai_generate_job(job_id: str, current_user: User = Depends(get_current_user)):
+def get_ai_generate_job(job_id: str, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
     """Job state: running | done (with result) | error (with http_status and detail)."""
-    job = get_job(job_id, current_user.user_id)
+    job = get_job(db, job_id, current_user.user_id)
     if job is None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -632,33 +633,26 @@ def start_import_questions_job(
     """
     exercise_service.get_exercise_for_write(current_user, exercise_id)  # fail fast: 404 / 403
 
-    def snapshot(f: Optional[UploadFile]):
-        # Uploads are closed once the response is sent: copy them now.
-        if f is None:
-            return None
-        return SimpleNamespace(filename=f.filename, file=io.BytesIO(f.file.read()))
-
-    q_file, a_file = snapshot(question_file), snapshot(answer_file)
-
-    def work(session, user):
-        resp = Response()
-        with IMPORT_SEMAPHORE:
-            questions = _import_questions_impl(
-                exercise_id=exercise_id, question_file=q_file, answer_file=a_file, test_code=test_code,
-                exercise_service=ExerciseService(session), question_service=QuestionService(session),
-                current_user=user, response=resp)
-        skipped = json.loads(resp.headers.get("X-Import-Skipped", "[]"))
-        return {"questions": questions, "skipped_count": len(skipped), "skipped": skipped}
-
-    return start_job(current_user.user_id, work)
+    q_bytes_len = question_file.file.seek(0, 2)
+    question_file.file.seek(0)
+    if q_bytes_len > 1 * 1024 * 1024:
+        raise HTTPException(
+            status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+            detail={"code": "ERR-EXE-IMPORT_FILE_TOO_LARGE",
+                    "message": "Question file size exceeds 1MB limit. Please compress or split the file."})
+    job = enqueue(exercise_service.db, current_user.user_id, KIND_IMPORT, {
+        "exercise_id": str(exercise_id), "test_code": test_code,
+        "question_file": encode_upload(question_file), "answer_file": encode_upload(answer_file)})
+    return to_public(exercise_service.db, job)
 
 @router.get(
     "/{exercise_id}/questions/import/jobs/{job_id}",
     dependencies=[Depends(require_perm("EXE_QUESTION_IMPORT"))]
 )
-def get_import_questions_job(exercise_id: UUID, job_id: str, current_user: User = Depends(get_current_user)):
+def get_import_questions_job(exercise_id: UUID, job_id: str, db: Session = Depends(get_db),
+                             current_user: User = Depends(get_current_user)):
     """Job state: running | done (with result) | error (with http_status and detail)."""
-    job = get_job(job_id, current_user.user_id)
+    job = get_job(db, job_id, current_user.user_id)
     if job is None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,

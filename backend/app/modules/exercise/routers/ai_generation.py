@@ -16,10 +16,11 @@ from pydantic import ValidationError
 from sqlalchemy.orm import Session
 from starlette.concurrency import run_in_threadpool
 
-from app.core.background_jobs import get_job, start_job
+from app.core.background_jobs import enqueue, get_job, to_public
 from app.core.database import get_db
 from app.modules.academic.scoping import get_user_role_name
 from app.modules.auth.dependencies import get_current_user, require_perm
+from app.modules.exercise.jobs import KIND_STUDENT_AI
 from app.modules.exercise.schemas import AiChapterOut, AiExerciseGenerateOut, StudentAiGenerateRequest
 from app.modules.exercise.services.ai_exercise_service import AiExerciseService
 from app.modules.exercise.services.rag_context_service import STUDENT_FILE_CHARS
@@ -197,17 +198,18 @@ async def start_student_job(
 ):
     """Validate like POST /student, then generate in the background; poll GET /student/jobs/{job_id}."""
     payload, file_text, file_name = await _parse_student_request(request, db, current_user)
-    return start_job(current_user.user_id, lambda session, user: AiExerciseService(session)
-                     .generate_for_student(user, payload, file_text, file_name))
+    job = enqueue(db, current_user.user_id, KIND_STUDENT_AI, {
+        "request": json.loads(payload.model_dump_json()), "file_text": file_text, "file_name": file_name})
+    return to_public(db, job)
 
 
 @router.get(
     "/student/jobs/{job_id}",
     dependencies=[Depends(require_perm("EXE_ATTEMPT_SUBMIT"))],
 )
-def get_student_job(job_id: str, current_user: User = Depends(get_current_user)):
+def get_student_job(job_id: str, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
     """Job state: running | done (with result) | error (with http_status and detail)."""
-    job = get_job(job_id, current_user.user_id)
+    job = get_job(db, job_id, current_user.user_id)
     if job is None:
         raise _err(status.HTTP_404_NOT_FOUND, "ERR-EXE-AI_JOB_NOT_FOUND", "Job not found.")
     return job

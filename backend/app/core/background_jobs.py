@@ -1,67 +1,255 @@
 """
 File Name: background_jobs.py
-Description: In-memory background jobs for slow AI endpoints (avoids proxy timeouts such as Cloudflare 524).
+Description: Postgres-backed job queue (table background_jobs) with in-process workers, progress, ETA and notifications.
 Created At: 2026-11-17
 Created By: AI Agent
 Updated At: 2026-11-17
 Updated By: AI Agent
 """
 import logging
+import statistics
 import threading
-import time
-from typing import Any, Callable, Optional
-from uuid import uuid4
+from datetime import datetime, timezone
+from typing import Any, Callable, Dict, List, Optional, Tuple
+from uuid import UUID
 
 from fastapi import HTTPException
 from fastapi.encoders import jsonable_encoder
 
+from app.core import config
 from app.core.database import SessionLocal
-from models.models import User
+from models.models import BackgroundJob, User
 
 logger = logging.getLogger("smartlms.background_jobs")
 
-# ponytail: in-memory jobs, valid for a single backend process (uvicorn without --workers);
-# move to a DB table or Redis when the backend scales to several processes.
-_JOBS: dict = {}
-_JOBS_LOCK = threading.Lock()
-_TTL_SECONDS = 3600
+# kind -> (handler(session, user, payload) -> result, notification label, frontend link, default seconds)
+_HANDLERS: Dict[str, Tuple[Callable[[Any, User, dict], Any], str, str, int]] = {}
+_local = threading.local()
+_stop = threading.Event()
+_threads: List[threading.Thread] = []
+POLL_SECONDS = 2.0
+MAX_ATTEMPTS = 2  # a job interrupted by a restart is re-queued once, then failed
 
 
-def _run(job_id: str, user_id, fn: Callable[[Any, User], Any]) -> None:
-    """Run fn(session, user) in a worker thread with its own DB session and store the outcome."""
+def register_handler(kind: str, fn: Callable[[Any, User, dict], Any], label: str, link: str,
+                     default_seconds: int = 60) -> None:
+    """Register the function that processes jobs of this kind."""
+    _HANDLERS[kind] = (fn, label, link, default_seconds)
+
+
+def current_job_id() -> Optional[UUID]:
+    """Id of the job running in this thread (None outside a job); capture it before spawning threads."""
+    return getattr(_local, "job_id", None)
+
+
+def report_for(job_id: Optional[UUID], stage: str, progress: int) -> None:
+    """Publish progress of a job from any thread; a no-op without a job id. Never raises."""
+    if job_id is None:
+        return
+    try:
+        session = SessionLocal()
+        try:
+            session.query(BackgroundJob).filter(BackgroundJob.job_id == job_id).update(
+                {"stage": stage, "progress": max(0, min(99, int(progress)))})
+            session.commit()
+        finally:
+            session.close()
+    except Exception:  # noqa: BLE001 - progress is best effort
+        logger.debug("Could not report job progress", exc_info=True)
+
+
+def report(stage: str, progress: int) -> None:
+    """Publish progress of the job running in this thread."""
+    report_for(current_job_id(), stage, progress)
+
+
+def enqueue(session, user_id: UUID, kind: str, payload: dict) -> BackgroundJob:
+    """Insert a QUEUED job and commit. A handler must be registered for the kind."""
+    if kind not in _HANDLERS:
+        raise ValueError(f"Unknown job kind: {kind}")
+    job = BackgroundJob(user_id=user_id, kind=kind, payload=payload, status="QUEUED", progress=0)
+    session.add(job)
+    session.commit()
+    session.refresh(job)
+    return job
+
+
+def _estimate_seconds(session, kind: str) -> int:
+    """Median duration of the last 10 finished jobs of this kind, else the handler default."""
+    rows = (session.query(BackgroundJob.started_at, BackgroundJob.finished_at)
+            .filter(BackgroundJob.kind == kind, BackgroundJob.status == "DONE",
+                    BackgroundJob.started_at.isnot(None), BackgroundJob.finished_at.isnot(None))
+            .order_by(BackgroundJob.finished_at.desc()).limit(10).all())
+    durations = [(_aware(f) - _aware(s)).total_seconds() for s, f in rows if _aware(f) >= _aware(s)]
+    if durations:
+        return max(5, int(statistics.median(durations)))
+    return _HANDLERS[kind][3] if kind in _HANDLERS else 60
+
+
+def _aware(dt: Optional[datetime]) -> Optional[datetime]:
+    return dt if dt is None or dt.tzinfo else dt.replace(tzinfo=timezone.utc)
+
+
+def to_public(session, job: BackgroundJob) -> dict:
+    """Client view of a job: queued|running|done|error with progress, stage and ETA seconds."""
+    status = {"QUEUED": "queued", "RUNNING": "running", "DONE": "done", "FAILED": "error"}[job.status]
+    est = _estimate_seconds(session, job.kind)
+    out: Dict[str, Any] = {
+        "job_id": str(job.job_id), "kind": job.kind, "status": status,
+        "progress": 100 if job.status == "DONE" else job.progress, "stage": job.stage,
+        "created_at": job.created_at.isoformat() if job.created_at else None,
+        "estimated_seconds": est,
+    }
+    if job.status == "RUNNING":
+        started = _aware(job.started_at) or datetime.now(timezone.utc)
+        out["eta_seconds"] = max(0, est - int((datetime.now(timezone.utc) - started).total_seconds()))
+    elif job.status == "QUEUED":
+        ahead = session.query(BackgroundJob).filter(
+            BackgroundJob.status.in_(("QUEUED", "RUNNING")), BackgroundJob.created_at < job.created_at).count()
+        out["queue_position"] = ahead + 1
+        out["eta_seconds"] = est * (ahead // max(1, config.JOB_WORKERS) + 1)
+    if job.status == "DONE":
+        out["result"] = job.result
+    elif job.status == "FAILED":
+        out["http_status"] = (job.error or {}).get("http_status", 500)
+        out["detail"] = (job.error or {}).get("detail")
+    return out
+
+
+def get_job(session, job_id: str, user_id: UUID) -> Optional[dict]:
+    """Public job state, or None when unknown or owned by someone else."""
+    try:
+        jid = UUID(str(job_id))
+    except ValueError:
+        return None
+    job = session.query(BackgroundJob).filter(
+        BackgroundJob.job_id == jid, BackgroundJob.user_id == user_id).first()
+    return to_public(session, job) if job else None
+
+
+def list_jobs(session, user_id: UUID, active_only: bool = False, limit: int = 20) -> List[dict]:
+    """Newest jobs of one user."""
+    q = session.query(BackgroundJob).filter(BackgroundJob.user_id == user_id)
+    if active_only:
+        q = q.filter(BackgroundJob.status.in_(("QUEUED", "RUNNING")))
+    return [to_public(session, j) for j in q.order_by(BackgroundJob.created_at.desc()).limit(limit).all()]
+
+
+def _claim(session) -> Optional[UUID]:
+    """Atomically take the oldest QUEUED job (FOR UPDATE SKIP LOCKED on Postgres)."""
+    job = (session.query(BackgroundJob).filter(BackgroundJob.status == "QUEUED")
+           .order_by(BackgroundJob.created_at).with_for_update(skip_locked=True).first())
+    if job is None:
+        session.rollback()
+        return None
+    job.status, job.progress, job.stage = "RUNNING", 0, "STARTING"
+    job.started_at, job.attempts = datetime.now(timezone.utc), (job.attempts or 0) + 1
+    session.commit()
+    return job.job_id
+
+
+def _finish(job_id: UUID, ok: bool, result: Any = None, error: Optional[dict] = None) -> None:
+    """Store the outcome and notify the owner in one transaction."""
+    from app.modules.notification import service as notification_service
     session = SessionLocal()
     try:
-        user = session.get(User, user_id)
-        result = fn(session, user)
-        data = jsonable_encoder(result)
-        outcome = {"status": "done", "result": data}
-    except HTTPException as exc:
-        outcome = {"status": "error", "http_status": exc.status_code, "detail": exc.detail}
-    except Exception:  # noqa: BLE001 - reported as a generic failure, logged here
-        logger.exception("Background job %s failed", job_id)
-        outcome = {"status": "error", "http_status": 500,
-                   "detail": {"code": "ERR-EXE-AI_GENERATION_FAILED", "message": "AI generation failed."}}
+        job = session.get(BackgroundJob, job_id)
+        job.status = "DONE" if ok else "FAILED"
+        job.progress = 100 if ok else job.progress
+        job.finished_at = datetime.now(timezone.utc)
+        job.result, job.error = (result if ok else None), (None if ok else error)
+        _, label, link, _ = _HANDLERS.get(job.kind, (None, "Tác vụ", "/", 60))
+        notification_service.notify(
+            session, [job.user_id], "JOB_DONE" if ok else "JOB_FAILED",
+            f"{label} đã hoàn tất" if ok else f"{label} thất bại",
+            "Nhấn để xem kết quả." if ok else "Vui lòng thử lại.", link)
+        session.commit()
+    except Exception:  # noqa: BLE001
+        session.rollback()
+        logger.exception("Could not store the outcome of job %s", job_id)
     finally:
         session.close()
-    with _JOBS_LOCK:
-        _JOBS[job_id].update(outcome)
 
 
-def start_job(user_id, fn: Callable[[Any, User], Any]) -> dict:
-    """Start fn in the background and return {job_id, status}."""
-    now = time.time()
-    job_id = uuid4().hex
-    with _JOBS_LOCK:
-        for k in [k for k, v in _JOBS.items() if now - v["created"] > _TTL_SECONDS]:
-            del _JOBS[k]
-        _JOBS[job_id] = {"status": "running", "user_id": str(user_id), "created": now}
-    threading.Thread(target=_run, args=(job_id, user_id, fn), daemon=True).start()
-    return {"job_id": job_id, "status": "running"}
+def run_one(job_id: UUID) -> None:
+    """Run one claimed job with its own session; always ends in DONE or FAILED."""
+    session = SessionLocal()
+    _local.job_id = job_id
+    try:
+        job = session.get(BackgroundJob, job_id)
+        fn = _HANDLERS[job.kind][0]
+        user = session.get(User, job.user_id)
+        outcome = (True, jsonable_encoder(fn(session, user, job.payload)), None)
+    except HTTPException as exc:
+        session.rollback()
+        outcome = (False, None, {"http_status": exc.status_code, "detail": exc.detail})
+    except Exception:  # noqa: BLE001 - reported to the client as a generic failure
+        session.rollback()
+        logger.exception("Job %s failed", job_id)
+        outcome = (False, None, {"http_status": 500, "detail": {
+            "code": "ERR-EXE-AI_GENERATION_FAILED", "message": "Job failed."}})
+    finally:
+        _local.job_id = None
+        session.close()
+    _finish(job_id, *outcome)
 
 
-def get_job(job_id: str, user_id) -> Optional[dict]:
-    """Public job state, or None when unknown or owned by someone else."""
-    job = _JOBS.get(job_id)
-    if job is None or job["user_id"] != str(user_id):
-        return None
-    return {k: v for k, v in job.items() if k not in ("user_id", "created")}
+def recover_interrupted() -> int:
+    """After a restart: RUNNING jobs were cut off; re-queue them once, then mark them FAILED."""
+    session = SessionLocal()
+    try:
+        n = 0
+        for job in session.query(BackgroundJob).filter(BackgroundJob.status == "RUNNING").all():
+            if (job.attempts or 0) < MAX_ATTEMPTS:
+                job.status, job.progress, job.stage = "QUEUED", 0, None
+            else:
+                job.status, job.finished_at = "FAILED", datetime.now(timezone.utc)
+                job.error = {"http_status": 500, "detail": {
+                    "code": "ERR-EXE-AI_GENERATION_FAILED", "message": "Job interrupted by a restart."}}
+            n += 1
+        session.commit()
+        return n
+    finally:
+        session.close()
+
+
+def _worker_loop() -> None:
+    while not _stop.is_set():
+        job_id = None
+        try:
+            session = SessionLocal()
+            try:
+                job_id = _claim(session)
+            finally:
+                session.close()
+        except Exception:  # noqa: BLE001
+            logger.exception("Job claim failed")
+        if job_id is None:
+            _stop.wait(POLL_SECONDS)
+            continue
+        run_one(job_id)
+
+
+def start_workers() -> int:
+    """Start JOB_WORKERS daemon threads (0 disables). Returns the number started."""
+    if config.JOB_WORKERS < 1 or _threads:
+        return 0
+    _stop.clear()
+    try:
+        recover_interrupted()
+    except Exception:  # noqa: BLE001
+        logger.exception("Could not recover interrupted jobs")
+    for i in range(config.JOB_WORKERS):
+        t = threading.Thread(target=_worker_loop, name=f"job-worker-{i}", daemon=True)
+        t.start()
+        _threads.append(t)
+    logger.info("Started %d job worker(s)", len(_threads))
+    return len(_threads)
+
+
+def stop_workers() -> None:
+    """Ask workers to stop after their current job."""
+    _stop.set()
+    for t in _threads:
+        t.join(timeout=2)
+    _threads.clear()

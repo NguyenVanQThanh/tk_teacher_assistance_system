@@ -487,3 +487,32 @@ class Notification(Base):
         CheckConstraint("status IN ('ACTIVE', 'DELETED')", name='chk_notification_status'),
         Index('ix_notifications_user_status_created', 'user_id', 'status', 'created_at'),
     )
+
+
+class BackgroundJob(Base):
+    """Queued unit of slow work (AI generation, question import) run by the in-process job worker.
+
+    Rows are never deleted: finished jobs stay as history (Strict Soft Delete policy).
+    """
+    __tablename__ = 'background_jobs'
+
+    job_id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    user_id = Column(UUID(as_uuid=True), ForeignKey('users.user_id'), nullable=False)
+    kind = Column(String(50), nullable=False)
+    status = Column(String(20), nullable=False, default='QUEUED')  # QUEUED | RUNNING | DONE | FAILED
+    progress = Column(Integer, nullable=False, default=0)  # 0-100
+    stage = Column(String(50), nullable=True)  # machine code, translated by the frontend
+    attempts = Column(Integer, nullable=False, default=0)
+    payload = Column(JSON().with_variant(JSONB(), 'postgresql'), nullable=False)
+    result = Column(JSON().with_variant(JSONB(), 'postgresql'), nullable=True)
+    error = Column(JSON().with_variant(JSONB(), 'postgresql'), nullable=True)  # {http_status, detail}
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    started_at = Column(DateTime(timezone=True), nullable=True)
+    finished_at = Column(DateTime(timezone=True), nullable=True)
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False)
+
+    __table_args__ = (
+        CheckConstraint("status IN ('QUEUED', 'RUNNING', 'DONE', 'FAILED')", name='chk_background_job_status'),
+        Index('ix_background_jobs_status_created', 'status', 'created_at'),
+        Index('ix_background_jobs_user_created', 'user_id', 'created_at'),
+    )
