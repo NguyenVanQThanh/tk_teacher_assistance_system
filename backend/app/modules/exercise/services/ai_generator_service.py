@@ -306,23 +306,30 @@ class AiExerciseGeneratorService:
         valid: List[Dict[str, Any]] = []
         errors: List[str] = []
         seen_content = set()
-        for attempt in range(1 + max(0, config.AI_PART_MAX_RETRIES)):
-            remaining = slots[len(valid):]
-            if not remaining:
-                break
+        # Ask for small batches: a long single reply gets cut off at max_tokens (invalid JSON).
+        # Only calls that add no valid question count as failures, so batching never eats the retries.
+        failures, calls = 0, 0
+        max_calls = 1 + max(0, config.AI_PART_MAX_RETRIES) + len(slots)
+        while len(valid) < len(slots) and failures <= max(0, config.AI_PART_MAX_RETRIES) and calls < max_calls:
+            remaining = slots[len(valid):][:max(1, config.AI_PART_BATCH_SIZE)]
+            before = len(valid)
             prompt = build_part_prompt(part, remaining, context, student_file, student_request,
                                        subject_name, grade_name, errors)
             try:
                 raw_items = cls._call_llm_part(
                     part=part, prompt=prompt,
-                    temperature=FIRST_TEMPERATURE if attempt == 0 else RETRY_TEMPERATURE)
+                    temperature=FIRST_TEMPERATURE if failures == 0 else RETRY_TEMPERATURE)
             except json.JSONDecodeError as exc:
-                # Truncated or malformed JSON from the model is retried like any invalid output.
-                logger.warning("Mistral returned invalid JSON for %s (attempt %d): %s", part, attempt + 1, exc)
+                logger.warning("Mistral returned invalid JSON for %s: %s", part, exc)
                 errors = ["the previous reply was not valid JSON; return a complete, valid JSON object"]
+                failures += 1
+                calls += 1
                 continue
+            calls += 1
             errors = []
             for raw in raw_items or []:
+                if len(valid) - before >= len(remaining):
+                    break
                 normalized, err = validate_question(part, raw)
                 if normalized is None:
                     errors.append(err or "invalid question")
@@ -333,6 +340,8 @@ class AiExerciseGeneratorService:
                     continue
                 seen_content.add(key)
                 valid.append(normalized)
+            if len(valid) == before:
+                failures += 1
         if len(valid) < len(slots):
             raise RuntimeError(f"AI returned fewer valid {part} questions than requested.")
         valid = valid[:len(slots)]
