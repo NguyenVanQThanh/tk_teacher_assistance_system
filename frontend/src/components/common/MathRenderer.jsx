@@ -10,6 +10,7 @@ import katex from 'katex';
 import 'katex/dist/katex.min.css';
 import MarkdownTable from './MarkdownTable';
 import { splitTableBlocks } from './tableMarkdown';
+import { splitCodeBlocks, splitInlineCode } from '../../utils/codeMarkdown';
 import { preprocessMathText } from '../../utils/mathPreprocess';
 
 /**
@@ -55,6 +56,11 @@ function renderKatex(mathStr, displayMode = false) {
 }
 
 
+/** Fenced code block; code is a React text child (never raw HTML). */
+export function CodeBlock({ code, lang }) {
+  return <pre className="code-block" data-lang={lang}><code>{code}</code></pre>;
+}
+
 /**
  * MathRenderer component for rendering LaTeX formulas cleanly across Vietnamese text.
  * Harmonizes font family with academic serif style ('Times New Roman', 'KaTeX_Main', Times, serif).
@@ -62,6 +68,18 @@ function renderKatex(mathStr, displayMode = false) {
 export default function MathRenderer({ text, className = '' }) {
   const content = useMemo(() => {
     if (!text || typeof text !== 'string') return text || '';
+
+    // Code fences and inline code render verbatim (no math/table processing)
+    if (text.includes('```')) {
+      return splitCodeBlocks(text).map((b, i) => (b.type === 'code'
+        ? <CodeBlock key={i} code={b.value} lang={b.lang} />
+        : <MathRenderer key={i} text={b.value} />));
+    }
+    if (text.includes('`')) {
+      return splitInlineCode(text).map((b, i) => (b.type === 'code'
+        ? <code key={i} className="code-inline">{b.value}</code>
+        : <MathRenderer key={i} text={b.value} />));
+    }
 
     // Markdown tables inside the text render as real tables (cells call back into MathRenderer)
     if (text.includes('|') && text.includes('---')) {

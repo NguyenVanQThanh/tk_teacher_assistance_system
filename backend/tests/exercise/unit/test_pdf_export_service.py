@@ -81,3 +81,18 @@ def test_generate_exercise_pdf_success():
     assert len(pdf_bytes) > 0
     assert pdf_bytes.startswith(b"%PDF-")
 
+
+
+def test_code_fence_renders_preformatted():
+    from reportlab.platypus import Preformatted
+    from reportlab.lib.styles import ParagraphStyle
+    style = ParagraphStyle("t")
+    els = PdfExportService._format_content_blocks("Run:\n```python\nif a < b:\n    print(1)\n```\nDone", style, [], prefix="Cau 1. ")
+    pre = [e for e in els if isinstance(e, Preformatted)]
+    assert len(pre) == 1
+    assert "    print(1)" in pre[0].lines
+
+
+def test_inline_code_uses_courier_and_escapes():
+    markup = PdfExportService.format_content_to_markup("Check `a<b` now", [])
+    assert 'face="Courier"' in markup and "a&lt;b" in markup
