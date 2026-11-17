@@ -319,38 +319,13 @@ export default function CreateExerciseModal({ isOpen, onClose, onCreateSuccess }
         short: lv(questionCounts.shortAnswer),
       };
 
-      const res = await exercisesApi.generateAiExercise(payload);
+      if (title.trim()) payload.title = title.trim();
 
-      // Persist the custom name entered by the teacher
-      if (title.trim() && res.exercise_id) {
-        try {
-          await exercisesApi.updateExercise(res.exercise_id, { title: title.trim() });
-          res.title = title.trim();
-        } catch {
-          // Title update is best-effort; the exercise was still created
-        }
-      }
+      await exercisesApi.startAiExercise(payload);
 
-      const createdExercise = {
-        id: res.exercise_id,
-        title: res.title,
-        type: type,
-        grade: grade,
-        subject: subject,
-        subjectName: selectedSubjectName,
-        questionCount: `${res.total_questions || 0} câu hỏi`,
-        duration: type === 'quiz' ? '15 phút' : '45 phút',
-        date: new Date().toLocaleDateString('vi-VN'),
-        authorName: 'Giáo viên',
-        authorInitial: 'GV',
-        hasShare: true,
-      };
-
-      showToast(`Đã tạo thành công bài tập "${res.title}" (${res.total_questions} câu hỏi).`, 'success', 'Tạo bài tập AI thành công');
-      if (onCreateSuccess) onCreateSuccess(createdExercise);
-      // Stay open on a result step so the teacher can review the sources used
-      setAiResult({ title: res.title, total: res.total_questions || 0, sources: Array.isArray(res.sources) ? res.sources : [] });
-      setCurrentStep('ai_result');
+      // Queued: close the modal; the job tray shows progress and the bell notifies when the exercise is ready.
+      showToast('Đã đưa vào hàng đợi. Thầy/Cô có thể tiếp tục làm việc, hệ thống sẽ thông báo khi đề sẵn sàng.', 'success', 'Đang tạo đề AI');
+      onClose();
     } catch (err) {
       const detail = err.response?.data?.detail;
       const isGenFailed = detail && typeof detail === 'object' && detail.code === 'ERR-EXE-AI_GENERATION_FAILED';

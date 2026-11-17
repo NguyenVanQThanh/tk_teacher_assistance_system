@@ -169,7 +169,7 @@ class AiExerciseService:
         }
         background_jobs.report("SAVING", 95)
         return self._persist(user, subject, class_obj, questions, metadata, payload.duration_minutes,
-                             payload.topic_prompt, grade_name, owner_student_id=None)
+                             payload.topic_prompt, grade_name, owner_student_id=None, title=payload.title)
 
     def generate_for_student(self, user: User, payload: StudentAiGenerateRequest,
                              file_text: Optional[str] = None,
@@ -276,7 +276,7 @@ class AiExerciseService:
 
     def _persist(self, user: User, subject: Subject, class_obj: Optional[Class], questions: List[Dict[str, Any]],
                  metadata: Dict[str, Any], duration_minutes: int, topic: str, grade_name: str,
-                 owner_student_id: Optional[uuid.UUID]) -> AiExerciseGenerateOut:
+                 owner_student_id: Optional[uuid.UUID], title: Optional[str] = None) -> AiExerciseGenerateOut:
         """Store Exercise, Questions, AnswerOptions (MCQ and True/False) and the assignment in one commit."""
         if not all(_has_answer_key(q) for q in questions):
             raise _err(status.HTTP_502_BAD_GATEWAY, "ERR-EXE-AI_ANSWER_KEY_MISSING",
@@ -284,7 +284,7 @@ class AiExerciseService:
         clean = (topic or "").strip()
         short = clean[:50] + "..." if len(clean) > 50 else clean
         exercise = Exercise(
-            title=f"{subject.subject_name} {grade_name} - {short}"[:255],
+            title=((title or "").strip() or f"{subject.subject_name} {grade_name} - {short}")[:255],
             subject_id=subject.subject_id, created_by=user.user_id, total_questions=len(questions),
             ai_metadata=metadata, status="ACTIVE",
         )

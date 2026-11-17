@@ -250,6 +250,11 @@ export const exercisesApi = {
     const response = await api.post(`/api/v1/exercises/${exerciseId}/questions`, data);
     return response.data;
   },
+  // Queue the teacher AI job and return at once; progress shows in the job tray, completion in notifications.
+  startAiExercise: async (data) => {
+    const start = await api.post('/api/v1/exercises/ai-generate/jobs', data);
+    return start.data;
+  },
   generateAiExercise: async (data) => {
     const start = await api.post('/api/v1/exercises/ai-generate/jobs', data);
     return pollJob(`/api/v1/exercises/ai-generate/jobs/${start.data.job_id}`);

@@ -682,6 +682,7 @@ class AiExerciseGenerateRequest(BaseModel):
     duration_minutes: int = 45
     class_id: Optional[UUID] = None
     document_ids: List[UUID] = []
+    title: Optional[str] = None  # custom exercise title; defaults to a generated one
     matrix: Optional[AiMatrix] = None
 
 
