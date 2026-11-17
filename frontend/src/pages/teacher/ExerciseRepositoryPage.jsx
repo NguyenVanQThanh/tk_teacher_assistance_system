@@ -230,6 +230,14 @@ export default function ExerciseRepositoryPage() {
     }
   };
 
+  // The job tray announces finished jobs: reload the list so a new AI exercise appears without F5.
+  useEffect(() => {
+    const onFinished = () => { setCursorHistory([null]); loadExercises(null, 'next', 1); };
+    window.addEventListener('jobs:finished', onFinished);
+    return () => window.removeEventListener('jobs:finished', onFinished);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   const handleCreateSuccess = () => {
     setCursorHistory([null]);
     loadExercises(null, 'next', 1);

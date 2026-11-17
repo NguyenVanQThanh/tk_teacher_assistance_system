@@ -3,11 +3,12 @@
 #              plus the student-safe "taking" paper builder (sanitized questions, no answer key).
 # Created At: 2026-07-31
 # Created By: Tam Khang
-# Updated At: 2026-11-13
+# Updated At: 2026-11-17
 # Updated By: AI Agent
 
 import hashlib
 import random
+from itertools import groupby
 from datetime import datetime, timedelta, timezone
 from typing import List, Optional, Dict, Any
 from uuid import UUID
@@ -25,6 +26,7 @@ from app.modules.exercise.schemas import (
 )
 from app.modules.exercise.repository import AssignmentRepository, ExerciseRepository, AttemptRepository
 from app.modules.academic.scoping import get_user_role_name, check_class_access, get_accessible_class_ids
+from app.modules.exercise.services.question_order import question_sort_key, part_rank
 
 # ai_metadata keys that may be shown to students (display only; no generation context).
 _STUDENT_SAFE_META_KEYS = {"type", "grade", "grade_name", "level", "duration", "duration_minutes",
@@ -79,6 +81,9 @@ def _shuffle_student_questions(
 ) -> List[StudentQuestionOut]:
     """Shuffle the student-visible question/option order WITHOUT touching the ORM or the DB.
 
+    Questions are shuffled only WITHIN their part; parts stay in fixed order
+    (MultipleChoice, TrueFalse, ShortAnswer, Other) and display_order is continuous 1..N.
+
     Only the Pydantic display copies are reordered and their `display_order` is rewritten as a
     1-based display alias; the persisted `questions.display_order` /
     `answer_options.display_order` values stay untouched. Every question/option appears exactly
@@ -94,9 +99,13 @@ def _shuffle_student_questions(
     """
     rng = random.Random(_seed_to_int(seed))
 
-    # Sort first so the shuffle input is deterministic even when DB rows tie on display_order.
-    ordered = sorted(questions, key=lambda q: (q.display_order, str(q.question_id)))
-    rng.shuffle(ordered)
+    # Sort first so the shuffle input is deterministic, then shuffle inside each part only so
+    # MultipleChoice / TrueFalse / ShortAnswer stay grouped in that order.
+    ordered: List[StudentQuestionOut] = []
+    for _, group in groupby(sorted(questions, key=question_sort_key), key=part_rank):
+        part = list(group)
+        rng.shuffle(part)
+        ordered.extend(part)
 
     shuffled: List[StudentQuestionOut] = []
     for index, question in enumerate(ordered, start=1):

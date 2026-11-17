@@ -5,6 +5,7 @@
 // Updated At: 2026-11-15
 // Updated By: AI Agent
 
+import { subjectAllowsPart3, PART3_NOT_SUPPORTED_MESSAGE } from '../../utils/subjectParts';
 import React, { useState, useRef, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { 
@@ -285,6 +286,12 @@ export default function CreateExerciseModal({ isOpen, onClose, onCreateSuccess }
     }
 
     const totalQuestions = calculateTotalQuestions();
+    const shortTotal = Object.values(questionCounts.shortAnswer).reduce((a, b) => a + b, 0);
+    if (shortTotal > 0 && !subjectAllowsPart3(selectedSubjectName)) {
+      setErrorMsg(PART3_NOT_SUPPORTED_MESSAGE);
+      showToast(PART3_NOT_SUPPORTED_MESSAGE, 'error', 'Không thể tạo bài tập');
+      return;
+    }
 
     if (totalQuestions === 0 && !aiPrompt.trim()) {
       const msg = 'Vui lòng thiết lập số lượng câu hỏi hoặc nhập mô tả yêu cầu.';
@@ -319,38 +326,13 @@ export default function CreateExerciseModal({ isOpen, onClose, onCreateSuccess }
         short: lv(questionCounts.shortAnswer),
       };
 
-      const res = await exercisesApi.generateAiExercise(payload);
+      if (title.trim()) payload.title = title.trim();
 
-      // Persist the custom name entered by the teacher
-      if (title.trim() && res.exercise_id) {
-        try {
-          await exercisesApi.updateExercise(res.exercise_id, { title: title.trim() });
-          res.title = title.trim();
-        } catch {
-          // Title update is best-effort; the exercise was still created
-        }
-      }
+      await exercisesApi.startAiExercise(payload);
 
-      const createdExercise = {
-        id: res.exercise_id,
-        title: res.title,
-        type: type,
-        grade: grade,
-        subject: subject,
-        subjectName: selectedSubjectName,
-        questionCount: `${res.total_questions || 0} câu hỏi`,
-        duration: type === 'quiz' ? '15 phút' : '45 phút',
-        date: new Date().toLocaleDateString('vi-VN'),
-        authorName: 'Giáo viên',
-        authorInitial: 'GV',
-        hasShare: true,
-      };
-
-      showToast(`Đã tạo thành công bài tập "${res.title}" (${res.total_questions} câu hỏi).`, 'success', 'Tạo bài tập AI thành công');
-      if (onCreateSuccess) onCreateSuccess(createdExercise);
-      // Stay open on a result step so the teacher can review the sources used
-      setAiResult({ title: res.title, total: res.total_questions || 0, sources: Array.isArray(res.sources) ? res.sources : [] });
-      setCurrentStep('ai_result');
+      // Queued: close the modal; the job tray shows progress and the bell notifies when the exercise is ready.
+      showToast('Đã đưa vào hàng đợi. Thầy/Cô có thể tiếp tục làm việc, hệ thống sẽ thông báo khi đề sẵn sàng.', 'success', 'Đang tạo đề AI');
+      onClose();
     } catch (err) {
       const detail = err.response?.data?.detail;
       const isGenFailed = detail && typeof detail === 'object' && detail.code === 'ERR-EXE-AI_GENERATION_FAILED';
@@ -378,14 +360,14 @@ export default function CreateExerciseModal({ isOpen, onClose, onCreateSuccess }
       return;
     }
 
-    // Keep files <= 1MB so the vision OCR provider stays stable and fast
-    const MAX_IMPORT_BYTES = 1 * 1024 * 1024;
+    // Keep files <= 15MB (the backend enforces the same cap)
+    const MAX_IMPORT_BYTES = 15 * 1024 * 1024;
     if (uploadedFile.size > MAX_IMPORT_BYTES) {
-      setErrorMsg('File đề bài vượt quá 1MB. Vui lòng nén hoặc tách nhỏ file trước khi tải lên.');
+      setErrorMsg('File đề bài vượt quá 15MB. Vui lòng nén hoặc tách nhỏ file trước khi tải lên.');
       return;
     }
     if (answerFile && answerFile.size > MAX_IMPORT_BYTES) {
-      setErrorMsg('File đáp án vượt quá 1MB. Vui lòng nén hoặc tách nhỏ file trước khi tải lên.');
+      setErrorMsg('File đáp án vượt quá 15MB. Vui lòng nén hoặc tách nhỏ file trước khi tải lên.');
       return;
     }
 
@@ -1098,7 +1080,7 @@ export default function CreateExerciseModal({ isOpen, onClose, onCreateSuccess }
                     ) : (
                       <>
                         <span className="dropzone-title">1. File Đề bài (Bắt buộc) *</span>
-                        <span className="dropzone-sub">Hỗ trợ .DOCX, .PDF (tối đa 1MB)</span>
+                        <span className="dropzone-sub">Hỗ trợ .DOCX, .PDF (tối đa 15MB)</span>
                       </>
                     )}
                   </label>
@@ -1139,7 +1121,7 @@ export default function CreateExerciseModal({ isOpen, onClose, onCreateSuccess }
                     ) : (
                       <>
                         <span className="dropzone-title">2. File Đáp án riêng (Tùy chọn)</span>
-                        <span className="dropzone-sub">Hỗ trợ .DOCX, .PDF (tối đa 1MB) nếu có file đáp án tách rời</span>
+                        <span className="dropzone-sub">Hỗ trợ .DOCX, .PDF (tối đa 15MB) nếu có file đáp án tách rời</span>
                       </>
                     )}
                   </label>

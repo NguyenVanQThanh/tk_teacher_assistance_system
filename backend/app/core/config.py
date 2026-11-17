@@ -2,6 +2,8 @@
 # Description: Application-level configuration loaded from environment variables (.env).
 # Created At: 2026-11-08
 # Created By: Tam Khang
+# Updated At: 2026-11-17
+# Updated By: AI Agent
 
 import os
 from pathlib import Path
@@ -106,16 +108,27 @@ LOAD_TEST_DEFAULT_USERS = _env_int("LOAD_TEST_DEFAULT_USERS", 30)
 # retry rounds for missing questions.
 AI_GENERATE_CONCURRENCY = _env_int("AI_GENERATE_CONCURRENCY", 4)
 AI_PART_WORKERS = _env_int("AI_PART_WORKERS", 3)
-AI_PART_MAX_RETRIES = _env_int("AI_PART_MAX_RETRIES", 2, minimum=0)
+AI_PART_MAX_RETRIES = _env_int("AI_PART_MAX_RETRIES", 5, minimum=0)
+AI_PART_MAX_TOKENS = _env_int("AI_PART_MAX_TOKENS", 3500, minimum=500)
+# Questions requested per model call; smaller batches avoid replies cut off at max_tokens.
+AI_PART_BATCH_SIZE = _env_int("AI_PART_BATCH_SIZE", 5, minimum=1)
+# Worker threads that process queued background jobs (0 disables the worker, e.g. in tests).
+JOB_WORKERS = _env_int("JOB_WORKERS", 2, minimum=0)
 # Mistral model for question generation (tried before Gemini)
-AI_MISTRAL_MODEL = os.environ.get("AI_MISTRAL_MODEL", "mistral-large-latest")
+AI_MISTRAL_MODEL = os.environ.get("AI_MISTRAL_MODEL", "deepseek-v4-1-flash-1017")  # via the Mistral API; mistral-large always emits reasoning chunks (slow, truncated)
+
+
+def _env_bool(name: str, default: bool) -> bool:
+    return os.environ.get(name, "true" if default else "false").strip().lower() in ("1", "true", "yes")
+
+# Second-pass LLM review of generated questions (solves each question blind and compares keys).
+AI_JUDGE_ENABLED = _env_bool("AI_JUDGE_ENABLED", True)
+AI_JUDGE_MODEL = os.environ.get("AI_JUDGE_MODEL", "deepseek-v4-1-flash-1017")  # same model as the generator by default; override to use a different judge
+AI_JUDGE_MAX_TOKENS = _env_int("AI_JUDGE_MAX_TOKENS", 600, minimum=200)
 
 # ---------------------------------------------------------------------------
 # Guest access (POST /api/v1/auth/guest) and academic year.
 # ---------------------------------------------------------------------------
-def _env_bool(name: str, default: bool) -> bool:
-    return os.environ.get(name, "true" if default else "false").strip().lower() in ("1", "true", "yes")
-
 GUEST_ACCESS_ENABLED = _env_bool("GUEST_ACCESS_ENABLED", True)
 # Maximum guest accounts created per client IP per rolling hour.
 GUEST_CREATE_PER_IP_HOUR = _env_int("GUEST_CREATE_PER_IP_HOUR", 5)

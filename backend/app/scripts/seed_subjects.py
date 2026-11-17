@@ -25,6 +25,10 @@ CORE_SUBJECTS = [
     ("Lịch sử", "Môn Lịch sử Việt Nam và thế giới"),
     ("Tiếng Anh", "Môn Tiếng Anh học thuật và giao tiếp"),
     ("Ngữ văn", "Môn Ngữ văn và đọc hiểu tác phẩm"),
+    ("Địa lí", "Môn Địa lí tự nhiên và kinh tế - xã hội"),
+    ("Tin học", "Môn Tin học và khoa học máy tính"),
+    ("Công nghệ", "Môn Công nghệ phổ thông"),
+    ("Giáo dục kinh tế và pháp luật", "Môn Giáo dục kinh tế và pháp luật"),
 ]
 
 

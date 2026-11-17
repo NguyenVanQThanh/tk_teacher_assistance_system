@@ -2,10 +2,11 @@
 // Description: Interactive modal for previewing exercise content, real questions, options, and assigning to classes.
 // Created At: 2026-08-30
 // Created By: Tam Khang
-// Updated At: 2026-11-15
+// Updated At: 2026-11-17
 // Updated By: AI Agent
 
 import React, { useState, useEffect, useRef } from 'react';
+import { sortQuestionsByPart } from '../../utils/questionItems';
 import { 
   X, 
   Send, 
@@ -20,6 +21,7 @@ import {
 } from 'lucide-react';
 import { exercisesApi, classesApi, assignmentsApi } from '../../services/api';
 import MathRenderer from '../common/MathRenderer';
+import QuestionContentView from '../common/QuestionContentView';
 import { getQuestionItems } from '../../utils/questionItems';
 import QuestionMedia from './QuestionMedia';
 import './ExercisePreviewModal.css';
@@ -208,10 +210,9 @@ export default function ExercisePreviewModal({ exercise, isOpen, onClose }) {
     }
   };
 
-  const questions = (exerciseDetail?.questions || [])
-    .filter((q) => q.status !== 'DELETED')
-    .slice()
-    .sort((a, b) => (a.display_order || 0) - (b.display_order || 0));
+  const questions = sortQuestionsByPart(
+    (exerciseDetail?.questions || []).filter((q) => q.status !== 'DELETED')
+  );
   const questionCountText = `${questions.length || exercise.total_questions || 0} câu hỏi`;
   const durationText = exerciseDetail?.ai_metadata?.duration || exercise.duration;
 
@@ -275,10 +276,10 @@ export default function ExercisePreviewModal({ exercise, isOpen, onClose }) {
               return (
                 <div key={q.question_id || idx} className="question-item-card">
                   <div className="question-header">
-                    <span className="q-number">Câu {q.display_order || idx + 1}:</span>
+                    <span className="q-number">Câu {idx + 1}:</span>
                     <div style={{ flex: 1 }}>
                       <div className="q-text">
-                        <MathRenderer text={q.content || q.content_latex} />
+                        <QuestionContentView text={q.content || q.content_latex} />
                       </div>
                       <QuestionMedia question={q} />
  
@@ -327,7 +328,7 @@ export default function ExercisePreviewModal({ exercise, isOpen, onClose }) {
                             className={`option-item ${isCorrect ? 'is-correct' : ''}`}
                           >
                             <span className="opt-label">{labelChar}.</span>
-                            <span><MathRenderer text={cleanOptText || opt.content} /></span>
+                            <span style={{ minWidth: 0 }}><MathRenderer text={cleanOptText || opt.content} /></span>
                             {isCorrect && (
                               <span className="correct-tag"><Check size={12} /> Đáp án đúng</span>
                             )}
@@ -353,7 +354,7 @@ export default function ExercisePreviewModal({ exercise, isOpen, onClose }) {
                             style={!isTrue ? { borderColor: '#FED7AA', background: '#FFFDF9' } : {}}
                           >
                             <span className="opt-label" style={{ fontWeight: 700 }}>{labelChar}</span>
-                            <span style={{ flex: 1 }}><MathRenderer text={cleanOptText || opt.content} /></span>
+                            <span style={{ flex: 1, minWidth: 0 }}><MathRenderer text={cleanOptText || opt.content} /></span>
                             {isTrue ? (
                               <span className="correct-tag" style={{ background: '#ECFDF5', color: '#059669', borderColor: '#A7F3D0' }}>
                                 <Check size={12} /> Đúng
