@@ -4,7 +4,7 @@
 #              and the sync/version APIs (GET /api/v1/sync/version, GET /api/v1/sync/stream, X-Data-Version).
 # Created At: 2026-11-12
 # Created By: AI Agent
-# Updated At: 2026-11-13
+# Updated At: 2026-11-17
 # Updated By: AI Agent
 
 import json
@@ -885,6 +885,69 @@ class TestDisplayShuffle:
         assert seeds[att1] != seeds[att2]
 
         assert _display_signature(first) != _display_signature(second)
+
+    def _add_mixed_questions(self, client, setup):
+        """Add MCQ / TrueFalse / ShortAnswer questions with interleaved display_order values."""
+        def post(payload):
+            r = client.post(
+                f"/api/v1/exercises/{setup['exercise_id']}/questions",
+                json=payload, headers=setup["teacher_headers"],
+            )
+            assert r.status_code == status.HTTP_201_CREATED, r.text
+
+        for i in range(3):
+            post({
+                "content": f"Mixed MCQ {i}", "question_type": "MultipleChoice",
+                "display_order": 200 + i * 10,
+                "answer_options": [
+                    {"content": "A", "is_correct": False, "display_order": 1},
+                    {"content": "B", "is_correct": True, "display_order": 2},
+                ],
+            })
+            post({
+                "content": f"Mixed TF {i}", "question_type": "TrueFalse",
+                "display_order": 205 + i * 10,
+                "answer_options": [
+                    {"content": f"{c}) statement", "is_correct": c in "ac", "display_order": n}
+                    for n, c in enumerate("abcd", 1)
+                ],
+            })
+            post({
+                "content": f"Mixed SA {i}", "question_type": "ShortAnswer",
+                "display_order": 207 + i * 10, "correct_answer": "42",
+            })
+
+    @staticmethod
+    def _assert_grouped(body):
+        rank = {"MultipleChoice": 1, "TrueFalse": 2, "ShortAnswer": 3}
+        ranks = [rank.get(q["question_type"], 4) for q in body["questions"]]
+        assert ranks == sorted(ranks)
+        assert [q["display_order"] for q in body["questions"]] == list(range(1, len(ranks) + 1))
+        ids = [q["question_id"] for q in body["questions"]]
+        assert len(ids) == len(set(ids))
+
+    def test_shuffle_keeps_parts_grouped(self, client: TestClient, db_session, exam_setup: dict):
+        setup = exam_setup
+        sh = setup["student_headers"]
+        self._add_mixed_questions(client, setup)
+        assignment_id = _create_shuffle_assignment(client, setup)
+        _start_attempt(client, assignment_id, sh)
+        body = _get_taking(client, assignment_id, sh)
+        self._assert_grouped(body)
+        q_orders, _o, _b = _db_paper_order(db_session, setup["exercise_id"])
+        assert {q["question_id"] for q in body["questions"]} == set(q_orders)
+
+    def test_review_paper_keeps_parts_grouped(self, client: TestClient, exam_setup: dict):
+        setup = exam_setup
+        sh = setup["student_headers"]
+        self._add_mixed_questions(client, setup)
+        assignment_id = _create_shuffle_assignment(client, setup)
+        att = _start_attempt(client, assignment_id, sh)
+        sub = client.put(f"/api/v1/attempts/{att}/submit", json={"answers": []}, headers=sh)
+        assert sub.status_code == status.HTTP_200_OK, sub.text
+        paper = client.get(f"/api/v1/attempts/{att}/paper", headers=sh)
+        assert paper.status_code == status.HTTP_200_OK, paper.text
+        self._assert_grouped(paper.json())
 
     def test_shuffle_review_keeps_attempt_order(self, client: TestClient, exam_setup: dict):
         setup = exam_setup

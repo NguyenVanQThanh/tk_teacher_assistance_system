@@ -2,14 +2,14 @@
 # Description: Unit tests for F-EXE-04 Auto Grading service (GradingService).
 # Created At: 2026-08-08
 # Created By: Tam Khang
-# Updated At: 2026-08-08
-# Updated By: Tam Khang
+# Updated At: 2026-11-17
+# Updated By: AI Agent
 
 import uuid
 from unittest.mock import MagicMock
 import pytest
 
-from app.modules.exercise.services.grading_service import GradingService
+from app.modules.exercise.services.grading_service import GradingService, build_answer_key
 from app.modules.exercise.schemas import AnswerInput
 
 
@@ -18,6 +18,8 @@ def create_mock_question(q_id, q_type, options=None, status="ACTIVE"):
     q.question_id = q_id
     q.question_type = q_type
     q.status = status
+    q.display_order = 0
+    q.created_at = None
     q.answer_options = options or []
     return q
 
@@ -226,3 +228,32 @@ class TestGradingServiceUnit:
         ]
         score, _ = service.grade_attempt(uuid.uuid4(), answers)
         assert score == 3.0 + 4.0 * 0.5 + 3.0
+
+
+def _kq(qid, qtype, opts=(), status="ACTIVE", ca=None):
+    return type("Q", (), dict(question_id=qid, question_type=qtype, status=status, explanation="ex",
+                              correct_answer=ca, answer_options=list(opts)))()
+
+
+def _ko(content, ok, oid=None):
+    return type("O", (), dict(option_id=oid or uuid.uuid4(), content=content, is_correct=ok))()
+
+
+def test_build_answer_key_all_types():
+    ids = [uuid.uuid4() for _ in range(5)]
+    oid = uuid.uuid4()
+    ex = type("E", (), dict(questions=[
+        _kq(ids[0], "MultipleChoice", [_ko("A", False), _ko("B", True, oid)]),
+        # options out of order: label follows the 'a) ' prefix, not the position
+        _kq(ids[1], "TrueFalse", [_ko("b) two", False), _ko("a) one", True)]),
+        _kq(ids[2], "ShortAnswer", ca="2,5"),
+        _kq(ids[3], "Other"),
+        _kq(ids[4], "ShortAnswer", status="DELETED", ca="9"),
+    ]))()
+    key = build_answer_key(ex)
+    assert key[str(ids[0]).lower()]["correct_option_id"] == str(oid)
+    assert key[str(ids[1]).lower()]["correct_values"] == {"b": False, "a": True}
+    assert key[str(ids[1]).lower()]["statements"] == {"b": "two", "a": "one"}
+    assert key[str(ids[2]).lower()]["correct_answer"] == "2,5"
+    assert key[str(ids[3]).lower()] == {"explanation": "ex"}
+    assert str(ids[4]).lower() not in key

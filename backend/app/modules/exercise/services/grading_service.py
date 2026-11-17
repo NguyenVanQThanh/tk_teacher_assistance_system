@@ -2,7 +2,7 @@
 # Description: Internal auto-grading engine for exercise attempts (F-EXE-04) with per-part score weights, True/False partial credit, numeric short answers and exercise-wide regrading.
 # Created At: 2026-08-05
 # Created By: Tam Khang
-# Updated At: 2026-11-13
+# Updated At: 2026-11-17
 # Updated By: AI Agent
 
 from types import SimpleNamespace
@@ -12,6 +12,7 @@ from sqlalchemy.orm import Session
 
 from app.modules.exercise.schemas import AnswerInput
 from app.modules.exercise.repository import ExerciseRepository
+from app.modules.exercise.services.question_order import question_sort_key
 
 # Score budget per part (national exam layout), normalised over the parts present in the exercise.
 PART_WEIGHTS = {"MultipleChoice": 3.0, "TrueFalse": 4.0, "ShortAnswer": 3.0}
@@ -43,6 +44,49 @@ def _numeric_equal(a: str, b: str) -> bool:
         return abs(fa - fb) <= 1e-6 * max(1.0, abs(fb))
     except ValueError:
         return na.lower() == nb.lower()
+
+
+def _tf_label(opt, idx: int) -> str:
+    """Return the a-d label of a True/False statement: its 'a) ' content prefix, else its position."""
+    label = chr(ord('a') + idx)
+    for key in ['a', 'b', 'c', 'd']:
+        if opt.content.strip().lower().startswith(key):
+            return key
+    return label
+
+
+def build_answer_key(exercise) -> Dict[str, Dict[str, Any]]:
+    """Build {question_id_lower: key fields} from the CURRENT answer key. Never persisted."""
+    result: Dict[str, Dict[str, Any]] = {}
+    for q in (getattr(exercise, "questions", None) or []):
+        if getattr(q, "status", None) == "DELETED":
+            continue
+        qid = str(q.question_id).lower()
+        explanation = getattr(q, "explanation", None)
+        opts = list(getattr(q, "answer_options", None) or [])
+        if q.question_type == "MultipleChoice":
+            correct = next((o for o in opts if o.is_correct), None)
+            result[qid] = {
+                "correct_option_id": str(correct.option_id) if correct else None,
+                "correct_option_text": correct.content if correct else None,
+                "explanation": explanation,
+            }
+        elif q.question_type == "TrueFalse":
+            values: Dict[str, bool] = {}
+            statements: Dict[str, str] = {}
+            for idx, opt in enumerate(opts):
+                label = _tf_label(opt, idx)
+                values[label] = bool(opt.is_correct)
+                text = opt.content.strip()
+                if text.lower().startswith(label) and text[1:2] in (")", "."):
+                    text = text[2:].strip()
+                statements[label] = text
+            result[qid] = {"correct_values": values, "statements": statements, "explanation": explanation}
+        elif q.question_type == "ShortAnswer":
+            result[qid] = {"correct_answer": getattr(q, "correct_answer", None), "explanation": explanation}
+        else:
+            result[qid] = {"explanation": explanation}
+    return result
 
 
 class GradingService:
@@ -78,13 +122,9 @@ class GradingService:
         """Score answers (objects with answer_option_id / answer_text) against the current answer key."""
         manual_overrides = manual_overrides or {}
 
-        def get_display_order(q):
-            val = getattr(q, 'display_order', 0)
-            return val if isinstance(val, (int, float)) else 0
-
         active_questions = sorted(
             [q for q in exercise.questions if getattr(q, 'status', None) != 'DELETED'],
-            key=get_display_order
+            key=question_sort_key
         )
         max_points = compute_max_points(active_questions)
         auto_count = sum(1 for q in active_questions if q.question_type in ('MultipleChoice', 'TrueFalse'))
@@ -136,11 +176,7 @@ class GradingService:
                 sub_results = {}
                 if q.answer_options:
                     for idx, opt in enumerate(q.answer_options):
-                        opt_label = chr(ord('a') + idx)
-                        for key in ['a', 'b', 'c', 'd']:
-                            if opt.content.strip().lower().startswith(key):
-                                opt_label = key
-                                break
+                        opt_label = _tf_label(opt, idx)
                         user_val = sub_answers.get(opt_label)
                         is_sub_correct = (user_val == opt.is_correct) if user_val is not None else False
                         sub_results[opt_label] = is_sub_correct

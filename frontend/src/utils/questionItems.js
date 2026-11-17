@@ -4,7 +4,7 @@
 // `answer_options` empty, so consumers must fall back to segments.
 // Created At: 2026-11-08
 // Created By: Tam Khang
-// Updated At: 2026-11-12
+// Updated At: 2026-11-17
 // Updated By: AI Agent
 
 /**
@@ -29,4 +29,12 @@ export function getQuestionItems(q) {
     is_correct: Boolean(s.is_correct),
     display_order: i + 1,
   }));
+}
+
+const PART_RANK = { MULTIPLECHOICE: 1, TRUEFALSE: 2, SHORTANSWER: 3 };
+
+/** Sort questions by part (MCQ, TrueFalse, ShortAnswer, Other), then by stored display_order. */
+export function sortQuestionsByPart(qs) {
+  const rank = (q) => PART_RANK[String(q.question_type || '').replace(/[^a-zA-Z]/g, '').toUpperCase()] || 4;
+  return [...(qs || [])].sort((a, b) => rank(a) - rank(b) || (a.display_order || 0) - (b.display_order || 0));
 }

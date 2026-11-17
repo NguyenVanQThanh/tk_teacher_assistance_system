@@ -126,7 +126,7 @@ def test_generate_questions_parallel_parts(monkeypatch):
         if part == "Part1":
             return [{"content": "M", **mcq(list("abcd"), {0})}]
         if part == "Part2":
-            return [{"content": "T", "segments": tf_segments([True] * 4)}]
+            return [{"content": "T", "explanation": "a) Đúng. x\nb) Sai. y\nc) Đúng. z\nd) Sai. w", "segments": tf_segments([True] * 4)}]
         return [{"content": "S", "correct_answer": "1"}]
 
     monkeypatch.setattr(Svc, "_call_mistral_part", classmethod(fake))
@@ -166,3 +166,42 @@ def test_jaccard_duplicate_dropped():
 def test_round_robin_interleaves_chapters():
     a, b = [_c("a1"), _c("a2")], [_c("b1")]
     assert [c.content for c in RagContextService.round_robin([a, b])] == ["a1", "b1", "a2"]
+
+
+
+def test_part2_requires_explanation_for_every_statement():
+    from app.modules.exercise.services.ai_generator_service import validate_question
+    base = {"content": "T", "segments": tf_segments([True, False, True, False])}
+    assert validate_question("Part2", base)[0] is None
+    short = "a) Đúng. x" + chr(10) + "b) Sai. y"
+    assert validate_question("Part2", {**base, "explanation": short})[0] is None
+    full = chr(10).join(["a) Đúng. x", "b) Sai. y", "c) Đúng. z", "d) Sai. w"])
+    assert validate_question("Part2", {**base, "explanation": full})[0] is not None
+
+
+def test_part2_one_line_explanation_is_split():
+    raw = {"content": "Q", "explanation": "a) Đúng. x b) Sai. y c) Đúng. z d) True. w",
+           "segments": [{"key": k, "statement": f"s{k}", "is_correct": True} for k in "abcd"]}
+    out, err = validate_question("Part2", raw)
+    assert err is None and len(out["explanation"].split("\n")) == 4
+
+
+def test_part3_blocked_for_subjects_without_short_answer(monkeypatch):
+    import pytest
+    from app.modules.exercise.services.ai_generator_service import AiExerciseGeneratorService, subject_allows_part3
+    monkeypatch.setenv("MISTRAL_API_KEY", "k")
+    assert not subject_allows_part3("Tiếng Anh") and not subject_allows_part3("Lịch sử")
+    assert subject_allows_part3("Địa lí") and subject_allows_part3("Hóa học")
+    with pytest.raises(ValueError):
+        AiExerciseGeneratorService.generate_questions("Tiếng Anh", "Lớp 12", "t", 1, 0, 2)
+    with pytest.raises(ValueError):
+        AiExerciseGeneratorService.generate_questions(
+            "Lịch sử", "Lớp 12", "t", 0, 0, 0, matrix={"short": {"NhanBiet": 1, "ThongHieu": 0, "VanDung": 0}})
+
+def test_unclosed_code_block_rejected_and_balanced_passes():
+    base = {"explanation": "e", "answer_options": [
+        {"content": o, "is_correct": i == 0} for i, o in enumerate(["a", "b", "c", "d"])]}
+    bad, err = gen.validate_question("Part1", {**base, "content": "Code:\n```python\nx = 1"})
+    assert bad is None and err == "unclosed code block"
+    ok, err = gen.validate_question("Part1", {**base, "content": "Code:\n```python\nx = 1\n```\nOutput?"})
+    assert err is None and ok is not None

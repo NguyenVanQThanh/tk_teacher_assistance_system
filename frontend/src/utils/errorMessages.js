@@ -3,7 +3,7 @@ File Name: errorMessages.js
 Description: Central mapping from backend error codes / HTTP failures to Vietnamese user-facing messages.
 Created At: 2026-11-15
 Created By: AI Agent
-Updated At: 2026-11-15
+Updated At: 2026-11-17
 Updated By: AI Agent
 */
 
@@ -87,14 +87,17 @@ export const ERROR_CODE_MESSAGES = {
   'ERR-DOC-PERMISSION_DENIED': 'Bạn không có quyền với tài liệu này.',
   // Exercises
   'ERR-EXE-AI_BAD_REQUEST': 'Yêu cầu tạo bài tập bằng AI không hợp lệ.',
+  'ERR-EXE-AI_ANSWER_KEY_MISSING': 'AI tạo câu hỏi thiếu đáp án. Vui lòng thử tạo lại.',
   'ERR-EXE-AI_BUSY': 'Hệ thống AI đang bận. Vui lòng thử lại sau ít phút.',
   'ERR-EXE-AI_CHAPTER_REQUIRED': 'Vui lòng chọn ít nhất một chương.',
   'ERR-EXE-AI_EMPTY_MATRIX': 'Vui lòng chọn số lượng câu hỏi lớn hơn 0.',
   'ERR-EXE-AI_FILE_NO_TEXT': 'Không đọc được nội dung văn bản trong tệp. Hãy dùng tệp có chữ (không phải ảnh quét).',
-  'ERR-EXE-AI_FILE_TOO_LARGE': 'Tệp tải lên phải nhỏ hơn 1 MB.',
+  'ERR-EXE-AI_FILE_TOO_LARGE': 'Tệp tải lên phải nhỏ hơn 15 MB.',
   'ERR-EXE-AI_FILE_TYPE': 'Định dạng tệp không được hỗ trợ (chỉ PDF, DOCX, TXT).',
   'ERR-EXE-AI_GENERATION_FAILED': 'AI chưa tạo được bài tập lúc này. Vui lòng thử lại.',
   'ERR-EXE-AI_JOB_NOT_FOUND': 'Không tìm thấy tiến trình tạo bài tập. Vui lòng thử lại.',
+  'ERR-EXE-AI_TOO_MANY_JOBS': 'Bạn đang có quá nhiều tác vụ đang chạy. Vui lòng đợi một tác vụ hoàn tất.',
+  'ERR-EXE-AI_PART_NOT_SUPPORTED': 'Môn học này không có phần Trả lời ngắn. Vui lòng đặt số câu phần III bằng 0.',
   'ERR-EXE-AI_INVALID_CHAPTER': 'Chương đã chọn không hợp lệ. Vui lòng chọn lại.',
   'ERR-EXE-AI_INVALID_PAYLOAD': 'Dữ liệu tạo bài tập bằng AI không hợp lệ.',
   'ERR-EXE-AI_LENGTH_REQUIRED': 'Không xác định được kích thước tệp tải lên.',

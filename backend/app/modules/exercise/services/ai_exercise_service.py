@@ -2,7 +2,7 @@
 # Description: Orchestrates AI exercise generation (teacher and student flows): context retrieval, LLM generation and persistence.
 # Created At: 2026-11-13
 # Created By: AI Agent
-# Updated At: 2026-11-15
+# Updated At: 2026-11-17
 # Updated By: AI Agent
 
 import logging
@@ -22,6 +22,7 @@ from app.modules.exercise.schemas import (
 )
 from app.modules.exercise.services.ai_generator_service import AiExerciseGeneratorService
 from app.modules.exercise.services.rag_context_service import STUDENT_FILE_CHARS, RagContextService
+from app.core import background_jobs
 from app.modules.exercise.services.rag_retrieval_service import RagRetrievalService, parse_grade
 from models.models import (
     AnswerOption, Class, ClassAssignment, Exercise, Question, StudentClass, Subject, TeacherSubject, User,
@@ -31,6 +32,28 @@ logger = logging.getLogger("smartlms.exercise.ai_exercise")
 
 MAX_TOTAL_QUESTIONS = 40
 DEFAULT_DUE_DAYS = 14
+
+
+def _has_answer_key(q: Dict[str, Any]) -> bool:
+    """True when the generated question carries a usable correct answer for its type."""
+    opts = q.get("answer_options") or []
+    if q.get("question_type") == "MultipleChoice":
+        return sum(1 for o in opts if o.get("is_correct")) == 1
+    if q.get("question_type") == "TrueFalse":
+        return len(opts) == 4
+    if q.get("question_type") == "ShortAnswer":
+        return bool(str(q.get("correct_answer") or "").strip())
+    return True
+
+
+def _mcq_correct_letter(q: Dict[str, Any]) -> Optional[str]:
+    """Return the stored correct letter, else derive it from the option flagged is_correct."""
+    if q.get("correct_answer"):
+        return q["correct_answer"]
+    for i, o in enumerate(q.get("answer_options") or []):
+        if o.get("is_correct") and i < 4:
+            return "ABCD"[i]
+    return None
 
 
 def _err(code: int, error: str, message: str) -> HTTPException:
@@ -121,6 +144,7 @@ class AiExerciseService:
         # Guest teachers have no classes: the exercise lands in the bank without an assignment.
         class_obj = None if user.is_guest else self._resolve_teacher_class(user, subject, payload)
         grade_name = payload.grade_name or "Lớp 12"
+        background_jobs.report("RETRIEVING_CONTEXT", 5)
         context, sources = RagContextService.build_context_with_sources(
             self.db,
             topic_prompt=payload.topic_prompt,
@@ -143,8 +167,9 @@ class AiExerciseService:
             "matrix": matrix, "sources": sources,
             "document_ids": [str(d) for d in (payload.document_ids or [])],
         }
+        background_jobs.report("SAVING", 95)
         return self._persist(user, subject, class_obj, questions, metadata, payload.duration_minutes,
-                             payload.topic_prompt, grade_name, owner_student_id=None)
+                             payload.topic_prompt, grade_name, owner_student_id=None, title=payload.title)
 
     def generate_for_student(self, user: User, payload: StudentAiGenerateRequest,
                              file_text: Optional[str] = None,
@@ -171,6 +196,7 @@ class AiExerciseService:
             raise _err(status.HTTP_422_UNPROCESSABLE_ENTITY, "ERR-EXE-AI_INVALID_CHAPTER",
                        "One or more chapters are not available for this subject.")
         grade_name = f"Lớp {grade}" if grade else (class_obj.class_name if class_obj is not None else "")
+        background_jobs.report("RETRIEVING_CONTEXT", 5)
         context, sources = RagContextService.build_student_context(
             self.db, student_id=user.user_id, subject_id=subject.subject_id, subject_name=subject.subject_name,
             grade=grade, chapters=payload.chapters, topic_prompt=payload.topic_prompt)
@@ -189,6 +215,7 @@ class AiExerciseService:
             "part1_count": counts[0], "part2_count": counts[1], "part3_count": counts[2],
             "sources": sources, "document_ids": [],
         }
+        background_jobs.report("SAVING", 95)
         return self._persist(user, subject, class_obj, questions, metadata, payload.duration_minutes,
                              topic, grade_name, owner_student_id=user.user_id)
 
@@ -242,19 +269,26 @@ class AiExerciseService:
                 subject_name=subject_name, grade_name=grade_name, topic_prompt=topic_prompt,
                 part1_count=counts[0], part2_count=counts[1], part3_count=counts[2],
                 context=context, matrix=matrix, student_file=student_file)
+        except ValueError as e:
+            raise _err(status.HTTP_422_UNPROCESSABLE_ENTITY, "ERR-EXE-AI_PART_NOT_SUPPORTED", str(e))
         except RuntimeError as e:
+            logger.warning("AI generation failed: %s", e)
             raise _err(status.HTTP_502_BAD_GATEWAY, "ERR-EXE-AI_GENERATION_FAILED", str(e))
         finally:
             AI_GENERATE_SEMAPHORE.release()
 
     def _persist(self, user: User, subject: Subject, class_obj: Optional[Class], questions: List[Dict[str, Any]],
                  metadata: Dict[str, Any], duration_minutes: int, topic: str, grade_name: str,
-                 owner_student_id: Optional[uuid.UUID]) -> AiExerciseGenerateOut:
+                 owner_student_id: Optional[uuid.UUID], title: Optional[str] = None) -> AiExerciseGenerateOut:
         """Store Exercise, Questions, AnswerOptions (MCQ and True/False) and the assignment in one commit."""
+        if not all(_has_answer_key(q) for q in questions):
+            raise _err(status.HTTP_502_BAD_GATEWAY, "ERR-EXE-AI_ANSWER_KEY_MISSING",
+                       "AI output is missing a correct answer for at least one question.")
+        background_jobs.hold_ownership(self.db)  # no duplicate Exercise from a superseded job run
         clean = (topic or "").strip()
         short = clean[:50] + "..." if len(clean) > 50 else clean
         exercise = Exercise(
-            title=f"{subject.subject_name} {grade_name} - {short}"[:255],
+            title=((title or "").strip() or f"{subject.subject_name} {grade_name} - {short}")[:255],
             subject_id=subject.subject_id, created_by=user.user_id, total_questions=len(questions),
             ai_metadata=metadata, status="ACTIVE",
         )
@@ -264,7 +298,8 @@ class AiExerciseService:
             question = Question(
                 exercise_id=exercise.exercise_id, content=q["content"], content_markdown=q["content"],
                 question_type=q["question_type"], difficulty=q.get("difficulty"),
-                correct_answer=q.get("correct_answer"), explanation=q.get("explanation"),
+                correct_answer=_mcq_correct_letter(q) if q["question_type"] == "MultipleChoice" else q.get("correct_answer"),
+                explanation=q.get("explanation"),
                 segments=q.get("segments"), display_order=order, is_ai_generated=True, status="ACTIVE",
             )
             self.db.add(question)

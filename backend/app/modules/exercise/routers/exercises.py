@@ -2,7 +2,7 @@
 # Description: API Router for Exercise endpoints (F-EXE-01).
 # Created At: 2026-07-31
 # Created By: Tam Khang
-# Updated At: 2026-11-13
+# Updated At: 2026-11-17
 # Updated By: AI Agent
 
 import json
@@ -15,6 +15,8 @@ from fastapi import APIRouter, Depends, Query, UploadFile, File, Form, HTTPExcep
 from pydantic import ValidationError
 from sqlalchemy.orm import Session
 
+from app.core.background_jobs import enqueue, get_job, to_public
+from app.modules.exercise.jobs import KIND_IMPORT, KIND_TEACHER_AI, encode_upload
 from app.core.database import get_db
 from app.modules.academic.scoping import get_user_role_name
 from app.modules.auth import access_policy
@@ -31,6 +33,7 @@ from app.modules.exercise.services.question_service import QuestionService
 from app.modules.exercise.services.import_parser_service import ImportParserService
 from app.modules.exercise.services.answer_solver_service import AnswerSolverService
 from app.modules.exercise.services.pdf_export_service import PdfExportService
+from app.modules.exercise.services.question_order import question_sort_key
 from app.core.resource_limits import (
     IMPORT_SEMAPHORE,
     PDF_EXPORT_ACQUIRE_TIMEOUT_SECONDS,
@@ -116,6 +119,47 @@ def generate_ai_exercise(
     return service.generate_ai_exercise(current_user, payload)
 
 
+@router.post(
+    "/ai-generate/jobs",
+    status_code=status.HTTP_202_ACCEPTED,
+    dependencies=[Depends(require_any_perm("EXE_ATTEMPT_SUBMIT", "EXE_EXERCISE_VIEW", "EXE_EXERCISE_MANAGE"))]
+)
+def start_ai_generate_job(
+    payload: AiExerciseGenerateRequest,
+    service: ExerciseService = Depends(get_exercise_service),
+    current_user: User = Depends(get_current_user)
+):
+    """Same checks as POST /ai-generate, but runs in the background; poll GET /ai-generate/jobs/{job_id}."""
+    role_name = get_user_role_name(service.db, current_user)
+    if not access_policy.is_teacher(role_name) and role_name != "Admin":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail={"code": "ERR-EXE-AI_TEACHER_ONLY", "message": "Only teachers can generate exercises here."}
+        )
+    if payload.document_ids:
+        visible = access_policy.visible_document_ids(service.db, current_user, payload.document_ids)
+        if any(d not in visible for d in payload.document_ids):
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail={"code": "ERR-DOC-NOT_FOUND", "message": "Document not found."}
+            )
+    job = enqueue(service.db, current_user.user_id, KIND_TEACHER_AI, json.loads(payload.model_dump_json()))
+    return to_public(service.db, job)
+
+@router.get(
+    "/ai-generate/jobs/{job_id}",
+    dependencies=[Depends(require_any_perm("EXE_ATTEMPT_SUBMIT", "EXE_EXERCISE_VIEW", "EXE_EXERCISE_MANAGE"))]
+)
+def get_ai_generate_job(job_id: str, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    """Job state: running | done (with result) | error (with http_status and detail)."""
+    job = get_job(db, job_id, current_user.user_id, kind=KIND_TEACHER_AI)
+    if job is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail={"code": "ERR-EXE-AI_JOB_NOT_FOUND", "message": "Job not found."}
+        )
+    return job
+
 @router.get(
     "",
     response_model=CursorPaginatedExerciseOut,
@@ -160,7 +204,9 @@ def get_exercise_detail(
     exercise = service.get_exercise_detail(current_user, exercise_id)
     # Hide soft-deleted questions (e.g. ones replaced by a re-import) so filters
     # and detail views never show stale duplicates.
-    exercise.questions = [q for q in (exercise.questions or []) if q.status != "DELETED"]
+    exercise.questions = sorted(
+        (q for q in (exercise.questions or []) if q.status != "DELETED"), key=question_sort_key
+    )
     return exercise
 
 
@@ -315,13 +361,13 @@ def _import_questions_impl(
         )
 
     q_bytes = question_file.file.read()
-    # 1MB cap keeps the vision OCR provider stable (page rendering + token budget per chunk)
-    if len(q_bytes) > 1 * 1024 * 1024:
+    # 15MB cap keeps the vision OCR provider stable (page rendering + token budget per chunk)
+    if len(q_bytes) > 15 * 1024 * 1024:
         raise HTTPException(
             status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
             detail={
                 "code": "ERR-EXE-IMPORT_FILE_TOO_LARGE",
-                "message": "Question file size exceeds 1MB limit. Please compress or split the file."
+                "message": "Question file size exceeds 15MB limit. Please compress or split the file."
             }
         )
 
@@ -355,12 +401,12 @@ def _import_questions_impl(
                 }
             )
         ans_bytes = answer_file.file.read()
-        if len(ans_bytes) > 1 * 1024 * 1024:
+        if len(ans_bytes) > 15 * 1024 * 1024:
             raise HTTPException(
                 status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
                 detail={
                     "code": "ERR-EXE-IMPORT_FILE_TOO_LARGE",
-                    "message": "Answer file size exceeds 1MB limit."
+                    "message": "Answer file size exceeds 15MB limit."
                 }
             )
 
@@ -568,6 +614,61 @@ def _import_questions_impl(
 
     return created_questions
 
+
+@router.post(
+    "/{exercise_id}/questions/import/jobs",
+    status_code=status.HTTP_202_ACCEPTED,
+    dependencies=[Depends(require_perm("EXE_QUESTION_IMPORT"))]
+)
+def start_import_questions_job(
+    exercise_id: UUID,
+    question_file: UploadFile = File(..., description="Docx or PDF question file"),
+    answer_file: Optional[UploadFile] = File(None, description="Optional separate answer key file"),
+    test_code: Optional[str] = Form(None, description="Optional target test code (e.g. 0121)"),
+    exercise_service: ExerciseService = Depends(get_exercise_service),
+    current_user: User = Depends(get_current_user),
+):
+    """
+    Background variant of the import (OCR + AI solving can exceed the proxy timeout).
+    Poll GET /questions/import/jobs/{job_id}; result is {questions, skipped_count, skipped}.
+    """
+    exercise_service.get_exercise_for_write(current_user, exercise_id)  # fail fast: 404 / 403
+
+    q_bytes_len = question_file.file.seek(0, 2)
+    question_file.file.seek(0)
+    if q_bytes_len > 15 * 1024 * 1024:
+        raise HTTPException(
+            status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+            detail={"code": "ERR-EXE-IMPORT_FILE_TOO_LARGE",
+                    "message": "Question file size exceeds 15MB limit. Please compress or split the file."})
+    if answer_file is not None:
+        a_len = answer_file.file.seek(0, 2)
+        answer_file.file.seek(0)
+        if a_len > 15 * 1024 * 1024:
+            raise HTTPException(
+                status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+                detail={"code": "ERR-EXE-IMPORT_FILE_TOO_LARGE",
+                        "message": "Answer file size exceeds 15MB limit. Please compress or split the file."})
+    job = enqueue(exercise_service.db, current_user.user_id, KIND_IMPORT, {
+        "exercise_id": str(exercise_id), "test_code": test_code,
+        "question_file": encode_upload(question_file), "answer_file": encode_upload(answer_file)})
+    return to_public(exercise_service.db, job)
+
+@router.get(
+    "/{exercise_id}/questions/import/jobs/{job_id}",
+    dependencies=[Depends(require_perm("EXE_QUESTION_IMPORT"))]
+)
+def get_import_questions_job(exercise_id: UUID, job_id: str, db: Session = Depends(get_db),
+                             current_user: User = Depends(get_current_user)):
+    """Job state: running | done (with result) | error (with http_status and detail)."""
+    job = get_job(db, job_id, current_user.user_id, kind=KIND_IMPORT,
+                  payload_match={"exercise_id": str(exercise_id)})
+    if job is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail={"code": "ERR-EXE-AI_JOB_NOT_FOUND", "message": "Job not found."}
+        )
+    return job
 
 @router.get(
     "/{exercise_id}/export/pdf",

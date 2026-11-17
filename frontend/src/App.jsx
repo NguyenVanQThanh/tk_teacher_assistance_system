@@ -9,6 +9,7 @@ import React from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import ProtectedRoute, { guestHome } from './components/common/ProtectedRoute';
+import JobTray from './components/common/JobTray';
 import TeacherLayout from './components/layout/TeacherLayout';
 import StudentLayout from './components/layout/StudentLayout';
 import LoginPage from './pages/LoginPage';
@@ -253,6 +254,7 @@ export default function App() {
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
         </React.Suspense>
+        <JobTray />
       </BrowserRouter>
     </AuthProvider>
     </ErrorBoundary>

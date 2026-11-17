@@ -2,7 +2,7 @@
 // Description: Interactive student examination interface supporting 3 question types: Multiple Choice (4 options), True/False (4 sub-items), and Short Answer (with on-screen numpad helper).
 // Created At: 2026-09-07
 // Created By: Tam Khang
-// Updated At: 2026-11-15
+// Updated At: 2026-11-17
 // Updated By: AI Agent
 
 import React, { useState, useEffect, useMemo, useRef } from 'react';
@@ -81,13 +81,16 @@ export default function StudentExerciseTakingPage() {
   // UUID check: distinguishes real backend targets from local AI/mock exercises
   const isUuid = (id) => typeof id === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id);
 
-  // Sort backend questions by display_order and their options by display_order
+  // Part rank so MCQ / TrueFalse / ShortAnswer / Other stay grouped in that order
+  const qTypeRank = (t) => ({ MULTIPLE_CHOICE: 1, TRUE_FALSE: 2, SHORT_ANSWER: 3, OTHER: 4 }[normalizeQType(t)] || 4);
+
+  // Sort backend questions by part, display_order and their options by display_order
   const sortBackendQuestions = (qs) => [...(qs || [])]
     .map(q => ({
       ...q,
       answer_options: [...(q.answer_options || [])].sort((a, b) => (a.display_order || 0) - (b.display_order || 0))
     }))
-    .sort((a, b) => (a.display_order || 0) - (b.display_order || 0));
+    .sort((a, b) => (qTypeRank(a.question_type) - qTypeRank(b.question_type)) || ((a.display_order || 0) - (b.display_order || 0)));
 
   // Exercise / Exam Metadata from localStorage (for AI generated practice fallback)
   const savedAiExercise = useMemo(() => {
@@ -603,7 +606,7 @@ export default function StudentExerciseTakingPage() {
   useEffect(() => {
     if (!isReadOnlyReview && !isExamSubmitted && answers && Object.keys(answers).length > 0) {
       try {
-        sessionStorage.setItem(`tk_exam_draft_${currentExamId}`, JSON.stringify(answers));
+        sessionStorage.setItem(`tk_exam_draft_v2_${currentExamId}`, JSON.stringify(answers));
       } catch (e) {}
     }
   }, [answers, currentExamId, isReadOnlyReview, isExamSubmitted]);
@@ -612,7 +615,7 @@ export default function StudentExerciseTakingPage() {
   useEffect(() => {
     if (!isReadOnlyReview && Object.keys(answers).length === 0) {
       try {
-        const savedDraft = sessionStorage.getItem(`tk_exam_draft_${currentExamId}`);
+        const savedDraft = sessionStorage.getItem(`tk_exam_draft_v2_${currentExamId}`);
         if (savedDraft) {
           const parsed = JSON.parse(savedDraft);
           if (parsed && typeof parsed === 'object' && Object.keys(parsed).length > 0) {
@@ -931,7 +934,7 @@ export default function StudentExerciseTakingPage() {
         const currentToken = localStorage.getItem('access_token');
         if (!currentToken) {
           try {
-            sessionStorage.setItem(`tk_exam_draft_${currentExamId}`, JSON.stringify(answers));
+            sessionStorage.setItem(`tk_exam_draft_v2_${currentExamId}`, JSON.stringify(answers));
           } catch (e) {}
           toast.error('Phiên đăng nhập của bạn đã hết hạn. Các câu trả lời đã được lưu tạm, vui lòng đăng nhập lại để nộp bài.');
           setTimeout(() => { window.location.href = '/login'; }, 2500);
@@ -970,7 +973,7 @@ export default function StudentExerciseTakingPage() {
 
         // Clear draft and exercises session cache on successful submit
         try {
-          sessionStorage.removeItem(`tk_exam_draft_${currentExamId}`);
+          sessionStorage.removeItem(`tk_exam_draft_v2_${currentExamId}`);
           let currentUserId = 'default';
           try {
             const rawUser = localStorage.getItem('user_info');
@@ -1007,7 +1010,7 @@ export default function StudentExerciseTakingPage() {
         console.error('Submit attempt failed:', err);
         if (err.response?.status === 401 || !localStorage.getItem('access_token')) {
           try {
-            sessionStorage.setItem(`tk_exam_draft_${currentExamId}`, JSON.stringify(answers));
+            sessionStorage.setItem(`tk_exam_draft_v2_${currentExamId}`, JSON.stringify(answers));
           } catch (e) {}
           toast.error('Phiên làm việc đã hết hạn. Các câu trả lời của bạn đã được lưu tạm, vui lòng đăng nhập lại để nộp bài.');
           setTimeout(() => { window.location.href = '/login'; }, 2500);
@@ -1127,7 +1130,8 @@ export default function StudentExerciseTakingPage() {
           image_url: bQ.image_url,
           image_metadata: bQ.image_metadata,
           segments: bQ.segments,
-          qRes
+          qRes,
+          answerKeyRevealed: Boolean(attemptDetailedResults?.answer_key_revealed)
         };
       } else if (qType === 'true_false') {
         const letters = ['a', 'b', 'c', 'd'];
@@ -1142,7 +1146,9 @@ export default function StudentExerciseTakingPage() {
                 key: letter,
                 text,
                 optionId: opt.option_id,
-                isCorrect: Boolean(opt.is_correct)
+                isCorrect: qRes?.correct_values
+                  ? qRes.correct_values[letter]
+                  : (opt.is_correct ?? undefined)
               };
             })
           : [
@@ -1164,7 +1170,8 @@ export default function StudentExerciseTakingPage() {
           image_url: bQ.image_url,
           image_metadata: bQ.image_metadata,
           segments: bQ.segments,
-          qRes
+          qRes,
+          answerKeyRevealed: Boolean(attemptDetailedResults?.answer_key_revealed)
         };
       } else if (qType === 'other') {
         return {
@@ -1180,7 +1187,8 @@ export default function StudentExerciseTakingPage() {
           image_url: bQ.image_url,
           image_metadata: bQ.image_metadata,
           segments: bQ.segments,
-          qRes
+          qRes,
+          answerKeyRevealed: Boolean(attemptDetailedResults?.answer_key_revealed)
         };
       } else {
         return {
@@ -1195,7 +1203,8 @@ export default function StudentExerciseTakingPage() {
           image_url: bQ.image_url,
           image_metadata: bQ.image_metadata,
           segments: bQ.segments,
-          qRes
+          qRes,
+          answerKeyRevealed: Boolean(attemptDetailedResults?.answer_key_revealed)
         };
       }
     }
@@ -2140,6 +2149,25 @@ export default function StudentExerciseTakingPage() {
                     );
                   })}
                 </div>
+                {isReadOnlyReview && questionData.answerKeyRevealed && (() => {
+                  const mine = questionData.options.find(o => o.key === answers[currentQuestionIdx]);
+                  const right = questionData.options.find(o => o.isCorrect === true);
+                  const fmt = (o) => `${o.key}. ${(o.text || '').replace(/^[A-Da-d][\.\)]\s*/, '').trim()}`;
+                  return (
+                    <div className="short-answer-review-comparison">
+                      <div className={`comparison-box student-ans-box ${mine && right && mine.key === right.key ? 'sa-correct' : 'sa-wrong'}`}>
+                        <span className="comparison-label">Lựa chọn của bạn:</span>
+                        <span className="comparison-value">{mine ? <QuestionContentView text={fmt(mine)} /> : '(Chưa trả lời)'}</span>
+                      </div>
+                      {right && (
+                        <div className="comparison-box correct-ans-box">
+                          <span className="comparison-label">Đáp án đúng:</span>
+                          <span className="comparison-value"><QuestionContentView text={fmt(right)} /></span>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })()}
               </div>
             )}
 
@@ -2178,7 +2206,7 @@ export default function StudentExerciseTakingPage() {
                           <span className="tf-sub-text">
                             <QuestionContentView text={(item.text || '').replace(/^[a-dA-D][\.\)]\s*/, '').replace(/[\r\n\s\.]*[√✓\u221a]\s*$/, '').replace(/[\r\n\s\.]*\(\s*\)\s*$/, '').trim()} />
                           </span>
-                          {isReadOnlyReview && correctVal !== undefined && (
+                          {isReadOnlyReview && questionData.answerKeyRevealed && correctVal !== undefined && (
                             <span className={`tf-key-verdict-pill ${correctVal ? 'pill-true' : 'pill-false'}`}>
                               Đáp án chuẩn: {correctVal ? 'Đúng' : 'Sai'}
                             </span>
@@ -2238,6 +2266,32 @@ export default function StudentExerciseTakingPage() {
                     );
                   })}
                 </div>
+                {isReadOnlyReview && questionData.answerKeyRevealed && (() => {
+                  const ans = answers[currentQuestionIdx] && typeof answers[currentQuestionIdx] === 'object' ? answers[currentQuestionIdx] : {};
+                  const label = (v) => (v === true ? 'Đúng' : v === false ? 'Sai' : '—');
+                  const subs = questionData.qRes?.sub_results || {};
+                  const okCount = questionData.items.filter(it => subs[it.key] === true).length;
+                  return (
+                    <div className="tf-review-table-wrap">
+                      <table className="tf-review-table">
+                        <thead>
+                          <tr><th>Mệnh đề</th><th>Bạn chọn</th><th>Đáp án</th><th>Kết quả</th></tr>
+                        </thead>
+                        <tbody>
+                          {questionData.items.map((it) => (
+                            <tr key={it.key}>
+                              <td>{it.key})</td>
+                              <td>{label(ans[it.key])}</td>
+                              <td>{label(it.isCorrect)}</td>
+                              <td>{subs[it.key] === true ? '✓' : subs[it.key] === false ? '✗' : '—'}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                      <div className="tf-review-footer">Số ý đúng: {okCount}/{questionData.items.length}</div>
+                    </div>
+                  );
+                })()}
               </div>
             )}
 
@@ -2397,22 +2451,21 @@ export default function StudentExerciseTakingPage() {
                   </div>
                 </div>
 
-                {isReadOnlyReview && (
+                {isReadOnlyReview && questionData.answerKeyRevealed && (
                   <div className="short-answer-review-comparison">
                     <div className={`comparison-box student-ans-box ${
-                      questionData.correctAnswer && answers[currentQuestionIdx]
-                        ? String(answers[currentQuestionIdx]).trim().replace(',', '.') === String(questionData.correctAnswer).trim().replace(',', '.')
-                          ? 'sa-correct'
-                          : 'sa-wrong'
-                        : 'sa-wrong'
+                      questionData.isCorrect === true ? 'sa-correct' : (questionData.isCorrect === false || !answers[currentQuestionIdx]) ? 'sa-wrong' : ''
                     }`}>
                       <span className="comparison-label">Câu trả lời của bạn:</span>
-                      <span className="comparison-value">{answers[currentQuestionIdx] || '(Chưa trả lời)'}</span>
+                      <span className="comparison-value">{answers[currentQuestionIdx] ? <MathRenderer text={String(answers[currentQuestionIdx])} /> : '(Chưa trả lời)'}</span>
+                      {questionData.isCorrect === null && answers[currentQuestionIdx] && (
+                        <span className="sa-pending-pill">Chờ giáo viên chấm</span>
+                      )}
                     </div>
                     {questionData.correctAnswer && (
                       <div className="comparison-box correct-ans-box">
-                        <span className="comparison-label">Đáp án chuẩn của đề:</span>
-                        <span className="comparison-value">{questionData.correctAnswer}</span>
+                        <span className="comparison-label">Đáp án đúng:</span>
+                        <span className="comparison-value"><MathRenderer text={String(questionData.correctAnswer).replace('.', ',')} /></span>
                       </div>
                     )}
                   </div>
@@ -2420,12 +2473,18 @@ export default function StudentExerciseTakingPage() {
               </div>
             )}
 
+            {isReadOnlyReview && !questionData.answerKeyRevealed && questionData.type !== 'other' && (
+              <div className="review-key-withheld-note">
+                Đáp án và lời giải sẽ hiển thị khi giáo viên công bố đáp án.
+              </div>
+            )}
+
             {/* Explanation & Solution Guide in Review Mode */}
-            {isReadOnlyReview && (questionData.explanation || questionData.solutionGuide) && (
+            {isReadOnlyReview && questionData.answerKeyRevealed && (questionData.explanation || questionData.solutionGuide) && (
               <div className="review-solution-guide-card">
                 <div className="solution-guide-header">
                   <Lightbulb size={18} className="guide-bulb-icon" />
-                  <span className="guide-title">Lời giải chi tiết & Phương pháp giải</span>
+                  <span className="guide-title">Lời giải chi tiết</span>
                 </div>
                 <div className="solution-guide-body">
                   <QuestionContentView text={questionData.explanation || questionData.solutionGuide} />

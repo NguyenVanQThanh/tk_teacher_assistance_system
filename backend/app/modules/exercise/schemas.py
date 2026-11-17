@@ -2,7 +2,7 @@
 # Description: Pydantic schemas for Exercise, Question, AnswerOption, and Assignment CRUD & validation.
 # Created At: 2026-07-31
 # Created By: Tam Khang
-# Updated At: 2026-11-12
+# Updated At: 2026-11-17
 # Updated By: AI Agent
 # Note: Student-safe schemas (StudentQuestionOut and friends) intentionally omit correct_answer /
 # explanation / is_correct so students can never read the answer key from API responses.
@@ -427,6 +427,9 @@ class AttemptSubmitRequest(BaseModel):
 
 
 class AttemptOut(BaseModel):
+    """Attempt result. For finished attempts whose key is released, detailed_results["questions"][i]
+    also carries correct_option_id, correct_option_text (MCQ), correct_values, statements (TF),
+    correct_answer (short answer) and explanation; detailed_results["answer_key_revealed"] flags it."""
     attempt_id: UUID
     student_id: UUID
     assignment_id: UUID
@@ -679,6 +682,7 @@ class AiExerciseGenerateRequest(BaseModel):
     duration_minutes: int = 45
     class_id: Optional[UUID] = None
     document_ids: List[UUID] = []
+    title: Optional[str] = None  # custom exercise title; defaults to a generated one
     matrix: Optional[AiMatrix] = None
 
 

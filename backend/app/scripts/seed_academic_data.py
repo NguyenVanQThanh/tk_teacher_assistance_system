@@ -79,7 +79,11 @@ def seed_academic_sample_data():
             {"name": "Sinh học", "desc": "Môn Sinh học tế bào, di truyền và tiến hóa"},
             {"name": "Lịch sử", "desc": "Môn Lịch sử Việt Nam và thế giới"},
             {"name": "Tiếng Anh", "desc": "Môn Tiếng Anh học thuật và giao tiếp"},
-            {"name": "Ngữ văn", "desc": "Môn Ngữ văn và đọc hiểu tác phẩm"}
+            {"name": "Ngữ văn", "desc": "Môn Ngữ văn và đọc hiểu tác phẩm"},
+            {"name": "Địa lí", "desc": "Môn Địa lí tự nhiên và kinh tế - xã hội"},
+            {"name": "Tin học", "desc": "Môn Tin học và khoa học máy tính"},
+            {"name": "Công nghệ", "desc": "Môn Công nghệ phổ thông"},
+            {"name": "Giáo dục kinh tế và pháp luật", "desc": "Môn Giáo dục kinh tế và pháp luật"}
         ]
         subjects_dict = {}
         for s_info in subjects_data:
@@ -270,6 +274,18 @@ def seed_academic_sample_data():
             ("0999000009", "10A3", "Lịch sử"),
             ("0999000009", "11B2", "Lịch sử"),
             ("0999000009", "12A1", "Lịch sử"),
+            ("0999000002", "12A1", "Địa lí"),
+            ("0999000002", "11B2", "Địa lí"),
+            ("0999000002", "10A3", "Địa lí"),
+            ("0999000002", "12A1", "Tin học"),
+            ("0999000002", "11B2", "Tin học"),
+            ("0999000002", "10A3", "Tin học"),
+            ("0999000002", "12A1", "Công nghệ"),
+            ("0999000002", "11B2", "Công nghệ"),
+            ("0999000002", "10A3", "Công nghệ"),
+            ("0999000002", "12A1", "Giáo dục kinh tế và pháp luật"),
+            ("0999000002", "11B2", "Giáo dục kinh tế và pháp luật"),
+            ("0999000002", "10A3", "Giáo dục kinh tế và pháp luật"),
         ]
         for t_phone, c_name, s_name in assignments_plan:
             teacher = teachers_dict[t_phone]

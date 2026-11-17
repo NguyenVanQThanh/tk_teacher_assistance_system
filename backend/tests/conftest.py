@@ -2,8 +2,8 @@
 # Description: Testing configuration, database setup using SQLite in-memory, and fixtures.
 # Created At: 2026-07-17
 # Created By: Tam Khang
-# Updated At: 2026-09-30
-# Updated By: Tam Khang
+# Updated At: 2026-11-17
+# Updated By: AI Agent
 
 
 import os
@@ -23,6 +23,7 @@ os.environ["DB_NAME"] = "dummy"
 # Monitoring persistence would open real DB sessions from the background flush loop; the tests
 # use an in-memory SQLite override, so keep the collector purely in-memory.
 os.environ["MONITORING_PERSIST_ENABLED"] = "0"
+os.environ["JOB_WORKERS"] = "0"
 
 # Monkeypatch bcrypt.hashpw to avoid passlib bug check ValueError on Python 3.13 / bcrypt >= 4.0
 import bcrypt
@@ -392,3 +393,5 @@ def client(db_session: Session, monkeypatch) -> Generator[TestClient, None, None
 def _isolate_llm_keys(monkeypatch):
     """Keep tests off real LLM APIs: generation tests mock the Gemini path, so Mistral must be disabled."""
     monkeypatch.delenv("MISTRAL_API_KEY", raising=False)
+    from app.core import config
+    monkeypatch.setattr(config, "AI_JUDGE_ENABLED", False)

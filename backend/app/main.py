@@ -92,6 +92,9 @@ from app.modules.exercise.routers.assignments import router as assignments_route
 from app.modules.exercise.routers.attempts import router as attempts_router
 from app.modules.exercise.routers.sync import router as sync_router
 from app.modules.exercise.routers.ai_generation import router as ai_generation_router
+from app.modules.exercise.routers.jobs import router as jobs_router
+from app.core import background_jobs
+import app.modules.exercise.jobs  # noqa: F401  registers the job handlers
 from app.modules.document.routers.documents import router as documents_router
 from app.modules.admin.routers.users import router as admin_users_router
 from app.modules.admin.routers.dashboard import router as admin_dashboard_router
@@ -228,9 +231,11 @@ async def lifespan(app: FastAPI):
     else:
         logger.info("API monitoring persistence disabled (MONITORING_PERSIST_ENABLED=0)")
 
+    background_jobs.start_workers()
     try:
         yield
     finally:
+        background_jobs.stop_workers()
         if flush_task is not None:
             flush_task.cancel()
             with suppress(asyncio.CancelledError):
@@ -318,6 +323,7 @@ app.include_router(enrollments_router)
 app.include_router(teacher_assignments_router)
 app.include_router(exercises_router)
 app.include_router(ai_generation_router)
+app.include_router(jobs_router)
 app.include_router(questions_router)
 app.include_router(assignments_router)
 app.include_router(attempts_router)

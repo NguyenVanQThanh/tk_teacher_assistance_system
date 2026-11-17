@@ -11,6 +11,8 @@ import React, { useMemo } from 'react';
 import MathRenderer, { MathInline } from './MathRenderer';
 import MarkdownTable from './MarkdownTable';
 import { splitTableBlocks } from './tableMarkdown';
+import { CodeBlock } from './MathRenderer';
+import { splitCodeBlocks } from '../../utils/codeMarkdown';
 import './QuestionContentView.css';
 
 const isDisplayFormula = (t) => t.startsWith('$$') && t.endsWith('$$') && t.length > 4;
@@ -67,10 +69,13 @@ export function renderQuestionTextBlocks(rawText) {
  */
 export function renderQuestionContent(text) {
   if (!text || typeof text !== 'string' || !text.trim()) return null;
-  const parts = splitTableBlocks(text);
-  return parts.map((part, pIdx) => (part.type === 'table'
-    ? <MarkdownTable key={`t${pIdx}`} markdown={part.value} />
-    : <React.Fragment key={`x${pIdx}`}>{renderQuestionTextBlocks(part.value)}</React.Fragment>));
+  return splitCodeBlocks(text).map((cb, cIdx) => (cb.type === 'code'
+    ? <CodeBlock key={`c${cIdx}`} code={cb.value} lang={cb.lang} />
+    : <React.Fragment key={`b${cIdx}`}>
+      {splitTableBlocks(cb.value).map((part, pIdx) => (part.type === 'table'
+        ? <MarkdownTable key={`t${pIdx}`} markdown={part.value} />
+        : <React.Fragment key={`x${pIdx}`}>{renderQuestionTextBlocks(part.value)}</React.Fragment>))}
+    </React.Fragment>));
 }
 
 /**

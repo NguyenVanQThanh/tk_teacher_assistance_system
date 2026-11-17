@@ -72,7 +72,7 @@ def _fake_questions(monkeypatch):
             return [{"content": f"M{i}", "answer_options": [
                 {"content": c, "is_correct": c == "a"} for c in "abcd"]} for i in range(n)]
         if part == "Part2":
-            return [{"content": f"T{i}", "segments": [
+            return [{"content": f"T{i}", "explanation": "a) Đúng. x\nb) Sai. y\nc) Đúng. z\nd) Sai. w", "segments": [
                 {"key": k, "statement": f"s{k}", "is_correct": k in "ac"} for k in "abcd"]} for i in range(n)]
         return [{"content": f"S{i}", "correct_answer": "7"} for i in range(n)]
     monkeypatch.setattr(AiExerciseGeneratorService, "_call_mistral_part", classmethod(fake))
@@ -115,9 +115,9 @@ def test_teacher_cannot_use_student_endpoint(client, world):
 
 
 def test_413_when_file_too_large(client, world):
-    r = _post(client, world, files={"file": ("n.txt", b"a" * 1_048_576, "text/plain")})
+    r = _post(client, world, files={"file": ("n.txt", b"a" * 15 * 1024 * 1024, "text/plain")})
     assert r.status_code == 413 and r.json()["detail"]["code"] == "ERR-EXE-AI_FILE_TOO_LARGE"
-    r = _post(client, world, files={"file": ("n.txt", b"a" * (1_048_576 + 70_000), "text/plain")})
+    r = _post(client, world, files={"file": ("n.txt", b"a" * (15 * 1024 * 1024 + 70_000), "text/plain")})
     assert r.status_code == 413
 
 
@@ -189,3 +189,34 @@ def test_job_endpoints_validate_and_scope(client, world):
     r = client.post(URL + "/jobs", data={"payload": json.dumps(bad)}, headers=h)
     assert r.status_code == 422
     assert client.get(URL + "/jobs/doesnotexist", headers=h).status_code == 404
+
+
+def test_invalid_json_is_retried(monkeypatch):
+    """A malformed model reply must be retried instead of failing the whole generation."""
+    calls = {"n": 0}
+
+    def flaky(cls, api_key, part, prompt, temperature):
+        calls["n"] += 1
+        if calls["n"] == 1:
+            json.loads('{"questions": [{"content": "unterminated')
+        return [{"content": "S0", "correct_answer": "7"}]
+
+    monkeypatch.setattr(AiExerciseGeneratorService, "_call_mistral_part", classmethod(flaky))
+    monkeypatch.setenv("MISTRAL_API_KEY", "k")
+    out = AiExerciseGeneratorService.generate_part("Part3", ["NhanBiet"], "ctx", "", "req", "Hóa", "Lớp 12")
+    assert len(out) == 1 and calls["n"] == 2
+
+
+def test_part_is_generated_in_small_batches(monkeypatch):
+    """Long parts are split so one reply is never large enough to be cut off at max_tokens."""
+    sizes = []
+
+    def fake(cls, api_key, part, prompt, temperature):
+        n = prompt.count("- Question ")
+        sizes.append(n)
+        return [{"content": f"S{len(sizes)}-{i}", "correct_answer": "7"} for i in range(n)]
+
+    monkeypatch.setattr(AiExerciseGeneratorService, "_call_mistral_part", classmethod(fake))
+    monkeypatch.setenv("MISTRAL_API_KEY", "k")
+    out = AiExerciseGeneratorService.generate_part("Part3", ["NhanBiet"] * 12, "ctx", "", "req", "Hóa", "Lớp 12")
+    assert len(out) == 12 and max(sizes) <= 5 and len(sizes) == 3

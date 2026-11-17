@@ -29,9 +29,10 @@ import {
   HelpCircle
 } from 'lucide-react';
 import { exercisesApi, questionsApi, documentsApi } from '../../services/api';
-import MathRenderer, { resolveMediaUrl } from '../common/MathRenderer';
+import MathRenderer, { resolveMediaUrl, CodeBlock } from '../common/MathRenderer';
 import MarkdownTable from '../common/MarkdownTable';
 import { splitTableBlocks } from '../common/tableMarkdown';
+import { splitCodeBlocks } from '../../utils/codeMarkdown';
 import MathTextEditor from '../common/MathTextEditor';
 import MathShortcutsHelp from '../common/MathShortcutsHelp';
 import { symbolCategoriesBySubject } from '../common/mathSymbols';
@@ -373,6 +374,12 @@ Tam giác vuông SAB tại A: tan(∠SBA) = SA / AB = a√3 / a = √3 => ∠SBA
 
   const renderLiveContent = (rawText) => {
     if (!rawText) return <p className="preview-empty-text">(Chưa có nội dung câu hỏi)</p>;
+    const codeParts = splitCodeBlocks(rawText);
+    if (codeParts.some((c) => c.type === 'code')) {
+      return codeParts.map((c, i) => (c.type === 'code'
+        ? <CodeBlock key={`c${i}`} code={c.value} lang={c.lang} />
+        : <React.Fragment key={`b${i}`}>{renderLiveContent(c.value)}</React.Fragment>));
+    }
     // Markdown tables render as real tables; remaining text keeps the per-line rendering
     const parts = splitTableBlocks(rawText);
     if (parts.some((p) => p.type === 'table')) {
