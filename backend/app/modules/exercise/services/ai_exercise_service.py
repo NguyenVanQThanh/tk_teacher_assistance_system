@@ -269,6 +269,8 @@ class AiExerciseService:
                 subject_name=subject_name, grade_name=grade_name, topic_prompt=topic_prompt,
                 part1_count=counts[0], part2_count=counts[1], part3_count=counts[2],
                 context=context, matrix=matrix, student_file=student_file)
+        except ValueError as e:
+            raise _err(status.HTTP_422_UNPROCESSABLE_ENTITY, "ERR-EXE-AI_PART_NOT_SUPPORTED", str(e))
         except RuntimeError as e:
             logger.warning("AI generation failed: %s", e)
             raise _err(status.HTTP_502_BAD_GATEWAY, "ERR-EXE-AI_GENERATION_FAILED", str(e))

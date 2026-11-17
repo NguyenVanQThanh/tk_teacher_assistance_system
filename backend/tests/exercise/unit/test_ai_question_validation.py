@@ -184,3 +184,16 @@ def test_part2_one_line_explanation_is_split():
            "segments": [{"key": k, "statement": f"s{k}", "is_correct": True} for k in "abcd"]}
     out, err = validate_question("Part2", raw)
     assert err is None and len(out["explanation"].split("\n")) == 4
+
+
+def test_part3_blocked_for_subjects_without_short_answer(monkeypatch):
+    import pytest
+    from app.modules.exercise.services.ai_generator_service import AiExerciseGeneratorService, subject_allows_part3
+    monkeypatch.setenv("MISTRAL_API_KEY", "k")
+    assert not subject_allows_part3("Tiếng Anh") and not subject_allows_part3("Lịch sử")
+    assert subject_allows_part3("Địa lí") and subject_allows_part3("Hóa học")
+    with pytest.raises(ValueError):
+        AiExerciseGeneratorService.generate_questions("Tiếng Anh", "Lớp 12", "t", 1, 0, 2)
+    with pytest.raises(ValueError):
+        AiExerciseGeneratorService.generate_questions(
+            "Lịch sử", "Lớp 12", "t", 0, 0, 0, matrix={"short": {"NhanBiet": 1, "ThongHieu": 0, "VanDung": 0}})

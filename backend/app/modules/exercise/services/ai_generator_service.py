@@ -73,6 +73,16 @@ _SUBJECT_RULES = (
 )
 
 
+# Subjects whose official exam has no Part III (short numeric answer); matched on folded subject names.
+_NO_PART3_SUBJECTS = ("tieng anh", "english", "ngu van", "lich su", "kinh te", "phap luat", "tin hoc", "cong nghe")
+
+
+def subject_allows_part3(subject_name: str) -> bool:
+    """False for subjects that cannot sensibly have numeric short-answer questions."""
+    name = _fold(subject_name)
+    return not any(k in name for k in _NO_PART3_SUBJECTS)
+
+
 def _subject_rule(subject_name: str) -> str:
     """Return extra per-subject instructions for the prompt, or '' for an unknown subject."""
     name = _fold(subject_name)
@@ -454,6 +464,10 @@ class AiExerciseGeneratorService:
         if not mistral_key:
             raise RuntimeError("AI generation is not configured (missing Mistral API key).")
         counts = {"Part1": part1_count, "Part2": part2_count, "Part3": part3_count}
+        if not subject_allows_part3(subject_name):
+            has_short = part3_count > 0 or bool(matrix and sum((matrix.get("short") or {}).values()) > 0)
+            if has_short:
+                raise ValueError(f"Part III (short answer) is not supported for {subject_name}.")
         plans: Dict[str, List[str]] = {}
         for part, spec in PART_SPECS.items():
             slots = slots_from_matrix(matrix[spec["matrix_key"]]) if matrix and spec["matrix_key"] in matrix \
