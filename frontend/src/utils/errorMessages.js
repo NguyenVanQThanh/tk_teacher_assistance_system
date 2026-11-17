@@ -94,6 +94,7 @@ export const ERROR_CODE_MESSAGES = {
   'ERR-EXE-AI_FILE_TOO_LARGE': 'Tệp tải lên phải nhỏ hơn 1 MB.',
   'ERR-EXE-AI_FILE_TYPE': 'Định dạng tệp không được hỗ trợ (chỉ PDF, DOCX, TXT).',
   'ERR-EXE-AI_GENERATION_FAILED': 'AI chưa tạo được bài tập lúc này. Vui lòng thử lại.',
+  'ERR-EXE-AI_JOB_NOT_FOUND': 'Không tìm thấy tiến trình tạo bài tập. Vui lòng thử lại.',
   'ERR-EXE-AI_INVALID_CHAPTER': 'Chương đã chọn không hợp lệ. Vui lòng chọn lại.',
   'ERR-EXE-AI_INVALID_PAYLOAD': 'Dữ liệu tạo bài tập bằng AI không hợp lệ.',
   'ERR-EXE-AI_LENGTH_REQUIRED': 'Không xác định được kích thước tệp tải lên.',
