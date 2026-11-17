@@ -108,7 +108,7 @@ jobs:
           context: ./frontend
           file: ./deploy/docker/Dockerfile.frontend.prod
           build-args: |
-            VITE_API_BASE_URL=/api
+            VITE_API_BASE_URL=
           push: true
           tags: |
             ${{ env.REGISTRY }}/${{ steps.meta.outputs.owner }}/smartlms-frontend:${{ github.sha }}

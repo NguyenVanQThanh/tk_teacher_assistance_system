@@ -94,7 +94,7 @@ services:
       # Dockerfile prod nằm trong deploy/, tham chiếu tương đối từ context ./frontend
       dockerfile: ../deploy/docker/Dockerfile.frontend.prod
       args:
-        VITE_API_BASE_URL: ${VITE_API_BASE_URL:-/api}
+        VITE_API_BASE_URL: ${VITE_API_BASE_URL-}
     container_name: smartlms_frontend
     restart: unless-stopped
     mem_limit: 896m
