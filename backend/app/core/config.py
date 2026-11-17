@@ -123,7 +123,7 @@ def _env_bool(name: str, default: bool) -> bool:
 
 # Second-pass LLM review of generated questions (solves each question blind and compares keys).
 AI_JUDGE_ENABLED = _env_bool("AI_JUDGE_ENABLED", True)
-AI_JUDGE_MODEL = os.environ.get("AI_JUDGE_MODEL", "mistral-medium-latest")  # a different model than the generator reviews independently
+AI_JUDGE_MODEL = os.environ.get("AI_JUDGE_MODEL", "deepseek-v4-1-flash-1017")  # same model as the generator by default; override to use a different judge
 AI_JUDGE_MAX_TOKENS = _env_int("AI_JUDGE_MAX_TOKENS", 600, minimum=200)
 
 # ---------------------------------------------------------------------------
