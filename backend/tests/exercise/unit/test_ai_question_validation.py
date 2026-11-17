@@ -126,7 +126,7 @@ def test_generate_questions_parallel_parts(monkeypatch):
         if part == "Part1":
             return [{"content": "M", **mcq(list("abcd"), {0})}]
         if part == "Part2":
-            return [{"content": "T", "segments": tf_segments([True] * 4)}]
+            return [{"content": "T", "explanation": "a) Đúng. x\nb) Sai. y\nc) Đúng. z\nd) Sai. w", "segments": tf_segments([True] * 4)}]
         return [{"content": "S", "correct_answer": "1"}]
 
     monkeypatch.setattr(Svc, "_call_mistral_part", classmethod(fake))
@@ -166,3 +166,14 @@ def test_jaccard_duplicate_dropped():
 def test_round_robin_interleaves_chapters():
     a, b = [_c("a1"), _c("a2")], [_c("b1")]
     assert [c.content for c in RagContextService.round_robin([a, b])] == ["a1", "b1", "a2"]
+
+
+
+def test_part2_requires_explanation_for_every_statement():
+    from app.modules.exercise.services.ai_generator_service import validate_question
+    base = {"content": "T", "segments": tf_segments([True, False, True, False])}
+    assert validate_question("Part2", base)[0] is None
+    short = "a) Đúng. x" + chr(10) + "b) Sai. y"
+    assert validate_question("Part2", {**base, "explanation": short})[0] is None
+    full = chr(10).join(["a) Đúng. x", "b) Sai. y", "c) Đúng. z", "d) Sai. w"])
+    assert validate_question("Part2", {**base, "explanation": full})[0] is not None

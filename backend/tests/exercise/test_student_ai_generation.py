@@ -72,7 +72,7 @@ def _fake_questions(monkeypatch):
             return [{"content": f"M{i}", "answer_options": [
                 {"content": c, "is_correct": c == "a"} for c in "abcd"]} for i in range(n)]
         if part == "Part2":
-            return [{"content": f"T{i}", "segments": [
+            return [{"content": f"T{i}", "explanation": "a) Đúng. x\nb) Sai. y\nc) Đúng. z\nd) Sai. w", "segments": [
                 {"key": k, "statement": f"s{k}", "is_correct": k in "ac"} for k in "abcd"]} for i in range(n)]
         return [{"content": f"S{i}", "correct_answer": "7"} for i in range(n)]
     monkeypatch.setattr(AiExerciseGeneratorService, "_call_mistral_part", classmethod(fake))

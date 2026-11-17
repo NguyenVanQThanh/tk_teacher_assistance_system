@@ -225,6 +225,10 @@ def validate_question(part: str, raw: Any) -> Tuple[Optional[Dict[str, Any]], Op
     if err:
         return None, err
     explanation = raw.get("explanation")
+    if part == "Part2":
+        text = _fold(str(explanation or ""))
+        if not all(re.search(rf"(^|\s){k}\)", text) for k in "abcd"):
+            return None, "Part2 explanation must explain each statement a), b), c), d) on its own line"
     normalized.update({
         "part": part,
         "question_type": PART_SPECS[part]["question_type"],
@@ -275,7 +279,7 @@ _SYSTEM_INSTRUCTION = (
     "3. Give every quantity, unit and constant needed (atomic masses, g = 9,8 m/s2, etc.).\n"
     "4. Be checked by solving it yourself before writing the key; the key must match your solution.\n"
     "5. Not repeat or trivially rephrase another question in the batch.\n"
-    "Keep `explanation` to at most 2 short sentences."
+    "Keep `explanation` to at most 2 short sentences for PART I and PART III (PART II has its own rule)."
 )
 
 _PART_RULES = {
@@ -293,6 +297,10 @@ _PART_RULES = {
         "then exactly 4 statements a, b, c, d in `segments` (key, statement, boolean is_correct). Each statement "
         "is independently and unambiguously true or false given the stem; mix true and false; statements go from "
         "recall (a) to application (d). No statement may depend on another's answer.\n"
+        "`explanation` for PART II is REQUIRED and must explain all four statements, true AND false ones, one "
+        "line each in this exact format, lines separated by newlines: 'a) Đúng. <1-2 sentences: the reasoning or "
+        "calculation>' or 'a) Sai. <1-2 sentences: why it is wrong and what the correct fact is>', then b), c), "
+        "d). Never skip a statement and never write only a general remark.\n"
         "BAD statement: 'Polymer có nhiều ứng dụng.' (vague).\n"
         "GOOD statement: 'Tơ nylon-6,6 thuộc loại tơ polyamide.' (true)."
     ),
