@@ -8,15 +8,17 @@
 import io
 import json
 import logging
+import threading
+import time
 from typing import List, Optional
-from uuid import UUID
+from uuid import UUID, uuid4
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from pydantic import ValidationError
 from sqlalchemy.orm import Session
 from starlette.concurrency import run_in_threadpool
 
-from app.core.database import get_db
+from app.core.database import SessionLocal, get_db
 from app.modules.academic.scoping import get_user_role_name
 from app.modules.auth.dependencies import get_current_user, require_perm
 from app.modules.exercise.schemas import AiChapterOut, AiExerciseGenerateOut, StudentAiGenerateRequest
@@ -107,21 +109,8 @@ def list_chapters(
     return AiExerciseService(db).student_chapters(current_user, subject_id, grade)
 
 
-@router.post(
-    "/student",
-    response_model=AiExerciseGenerateOut,
-    status_code=status.HTTP_201_CREATED,
-    dependencies=[Depends(require_perm("EXE_ATTEMPT_SUBMIT"))],
-)
-async def generate_for_student(
-    request: Request,
-    db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
-):
-    """
-    Generate a personal AI exercise. Multipart fields: `payload` (JSON string) and optional `file`
-    (.pdf/.docx/.txt, under 1 MiB). The request size is checked before the body is parsed.
-    """
+async def _parse_student_request(request: Request, db: Session, current_user: User):
+    """Validate the multipart request and return (payload, file_text, file_name)."""
     _require_student(db, current_user)
     length = request.headers.get("content-length")
     if length is None:
@@ -174,6 +163,85 @@ async def generate_for_student(
         if not file_text:
             raise _err(status.HTTP_422_UNPROCESSABLE_ENTITY, "ERR-EXE-AI_FILE_NO_TEXT",
                        "No readable text was found in the uploaded file.")
+    return payload, file_text, file_name
 
+
+@router.post(
+    "/student",
+    response_model=AiExerciseGenerateOut,
+    status_code=status.HTTP_201_CREATED,
+    dependencies=[Depends(require_perm("EXE_ATTEMPT_SUBMIT"))],
+)
+async def generate_for_student(
+    request: Request,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """
+    Generate a personal AI exercise. Multipart fields: `payload` (JSON string) and optional `file`
+    (.pdf/.docx/.txt, under 1 MiB). The request size is checked before the body is parsed.
+    """
+    payload, file_text, file_name = await _parse_student_request(request, db, current_user)
     return await run_in_threadpool(
         AiExerciseService(db).generate_for_student, current_user, payload, file_text, file_name)
+
+
+# ponytail: in-memory jobs, valid for a single backend process (uvicorn without --workers);
+# move to a DB table or Redis when the backend scales to several processes.
+_JOBS: dict = {}
+_JOB_TTL_SECONDS = 3600
+_JOBS_LOCK = threading.Lock()
+
+
+def _run_job(job_id: str, user_id, payload, file_text, file_name) -> None:
+    """Run generation in a worker thread with its own DB session and store the outcome."""
+    session = SessionLocal()
+    try:
+        user = session.get(User, user_id)
+        result = AiExerciseService(session).generate_for_student(user, payload, file_text, file_name)
+        outcome = {"status": "done", "result": json.loads(result.model_dump_json())}
+    except HTTPException as exc:
+        outcome = {"status": "error", "http_status": exc.status_code, "detail": exc.detail}
+    except Exception:  # noqa: BLE001 - reported to the client as a generic failure, logged here
+        logger.exception("AI generation job %s failed", job_id)
+        outcome = {"status": "error", "http_status": 500,
+                   "detail": {"code": "ERR-EXE-AI_GENERATION_FAILED", "message": "AI generation failed."}}
+    finally:
+        session.close()
+    with _JOBS_LOCK:
+        _JOBS[job_id].update(outcome)
+
+
+@router.post(
+    "/student/jobs",
+    status_code=status.HTTP_202_ACCEPTED,
+    dependencies=[Depends(require_perm("EXE_ATTEMPT_SUBMIT"))],
+)
+async def start_student_job(
+    request: Request,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Validate like POST /student, then generate in the background; poll GET /student/jobs/{job_id}."""
+    payload, file_text, file_name = await _parse_student_request(request, db, current_user)
+    now = time.time()
+    job_id = uuid4().hex
+    with _JOBS_LOCK:
+        for k in [k for k, v in _JOBS.items() if now - v["created"] > _JOB_TTL_SECONDS]:
+            del _JOBS[k]
+        _JOBS[job_id] = {"status": "running", "user_id": str(current_user.user_id), "created": now}
+    threading.Thread(target=_run_job, args=(job_id, current_user.user_id, payload, file_text, file_name),
+                     daemon=True).start()
+    return {"job_id": job_id, "status": "running"}
+
+
+@router.get(
+    "/student/jobs/{job_id}",
+    dependencies=[Depends(require_perm("EXE_ATTEMPT_SUBMIT"))],
+)
+def get_student_job(job_id: str, current_user: User = Depends(get_current_user)):
+    """Job state: running | done (with result) | error (with http_status and detail)."""
+    job = _JOBS.get(job_id)
+    if job is None or job["user_id"] != str(current_user.user_id):
+        raise _err(status.HTTP_404_NOT_FOUND, "ERR-EXE-AI_JOB_NOT_FOUND", "Job not found.")
+    return {k: v for k, v in job.items() if k not in ("user_id", "created")}
