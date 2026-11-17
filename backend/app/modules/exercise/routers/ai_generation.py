@@ -29,7 +29,7 @@ from models.models import User
 logger = logging.getLogger("smartlms.exercise.ai_generation")
 router = APIRouter(prefix="/api/v1/ai-exercises", tags=["ai-exercises"])
 
-MAX_FILE_BYTES = 1_048_576  # uploads of 1 MiB or more are rejected
+MAX_FILE_BYTES = 15 * 1024 * 1024  # uploads of 15 MiB or more are rejected
 MULTIPART_OVERHEAD_BYTES = 64 * 1024
 ALLOWED_EXTENSIONS = (".pdf", ".docx", ".txt")
 
@@ -40,7 +40,7 @@ def _err(code: int, error: str, message: str) -> HTTPException:
 
 def _too_large() -> HTTPException:
     return _err(status.HTTP_413_REQUEST_ENTITY_TOO_LARGE, "ERR-EXE-AI_FILE_TOO_LARGE",
-                "The uploaded file must be smaller than 1 MiB.")
+                "The uploaded file must be smaller than 15 MiB.")
 
 
 def _bad_type() -> HTTPException:
@@ -179,7 +179,7 @@ async def generate_for_student(
 ):
     """
     Generate a personal AI exercise. Multipart fields: `payload` (JSON string) and optional `file`
-    (.pdf/.docx/.txt, under 1 MiB). The request size is checked before the body is parsed.
+    (.pdf/.docx/.txt, under 15 MiB). The request size is checked before the body is parsed.
     """
     payload, file_text, file_name = await _parse_student_request(request, db, current_user)
     return await run_in_threadpool(

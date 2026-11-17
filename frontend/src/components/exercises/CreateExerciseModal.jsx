@@ -360,14 +360,14 @@ export default function CreateExerciseModal({ isOpen, onClose, onCreateSuccess }
       return;
     }
 
-    // Keep files <= 1MB so the vision OCR provider stays stable and fast
-    const MAX_IMPORT_BYTES = 1 * 1024 * 1024;
+    // Keep files <= 15MB (the backend enforces the same cap)
+    const MAX_IMPORT_BYTES = 15 * 1024 * 1024;
     if (uploadedFile.size > MAX_IMPORT_BYTES) {
-      setErrorMsg('File đề bài vượt quá 1MB. Vui lòng nén hoặc tách nhỏ file trước khi tải lên.');
+      setErrorMsg('File đề bài vượt quá 15MB. Vui lòng nén hoặc tách nhỏ file trước khi tải lên.');
       return;
     }
     if (answerFile && answerFile.size > MAX_IMPORT_BYTES) {
-      setErrorMsg('File đáp án vượt quá 1MB. Vui lòng nén hoặc tách nhỏ file trước khi tải lên.');
+      setErrorMsg('File đáp án vượt quá 15MB. Vui lòng nén hoặc tách nhỏ file trước khi tải lên.');
       return;
     }
 
@@ -1080,7 +1080,7 @@ export default function CreateExerciseModal({ isOpen, onClose, onCreateSuccess }
                     ) : (
                       <>
                         <span className="dropzone-title">1. File Đề bài (Bắt buộc) *</span>
-                        <span className="dropzone-sub">Hỗ trợ .DOCX, .PDF (tối đa 1MB)</span>
+                        <span className="dropzone-sub">Hỗ trợ .DOCX, .PDF (tối đa 15MB)</span>
                       </>
                     )}
                   </label>
@@ -1121,7 +1121,7 @@ export default function CreateExerciseModal({ isOpen, onClose, onCreateSuccess }
                     ) : (
                       <>
                         <span className="dropzone-title">2. File Đáp án riêng (Tùy chọn)</span>
-                        <span className="dropzone-sub">Hỗ trợ .DOCX, .PDF (tối đa 1MB) nếu có file đáp án tách rời</span>
+                        <span className="dropzone-sub">Hỗ trợ .DOCX, .PDF (tối đa 15MB) nếu có file đáp án tách rời</span>
                       </>
                     )}
                   </label>

@@ -70,7 +70,7 @@ export const formatDeadline = (dueAtStr) => {
 };
 
 // Student AI generation limits (mirror backend contract)
-const AI_MAX_FILE_BYTES = 1024 * 1024; // files must be strictly smaller than 1 MiB
+const AI_MAX_FILE_BYTES = 15 * 1024 * 1024; // files must be strictly smaller than 15 MiB
 const AI_ALLOWED_EXTENSIONS = ['pdf', 'docx', 'txt'];
 const MAX_AI_CHAPTERS = 10;
 
@@ -78,7 +78,7 @@ const AI_ERROR_MESSAGES = {
   'ERR-EXE-AI_CHAPTER_REQUIRED': 'Vui lòng chọn ít nhất một chương.',
   'ERR-EXE-AI_INVALID_CHAPTER': 'Chương đã chọn không hợp lệ. Vui lòng chọn lại.',
   'ERR-EXE-AI_EMPTY_MATRIX': 'Vui lòng chọn số lượng câu hỏi lớn hơn 0.',
-  'ERR-EXE-AI_FILE_TOO_LARGE': 'Tệp tải lên phải nhỏ hơn 1 MB.',
+  'ERR-EXE-AI_FILE_TOO_LARGE': 'Tệp tải lên phải nhỏ hơn 15 MB.',
   'ERR-EXE-AI_FILE_NO_TEXT': 'Không đọc được nội dung văn bản trong tệp. Hãy dùng tệp có chữ (không phải ảnh quét).',
   'ERR-EXE-AI_BUSY': 'Hệ thống AI đang bận. Vui lòng thử lại sau ít phút.',
   'ERR-EXE-AI_GENERATION_FAILED': 'AI chưa tạo được bài tập lúc này. Vui lòng bấm "Khởi tạo bài tập với AI" để thử lại.',
@@ -771,7 +771,7 @@ export default function StudentExercisesPage() {
     }
     if (f.size >= AI_MAX_FILE_BYTES) {
       setAiFile(null);
-      setAiFileError('Tệp phải nhỏ hơn 1 MB.');
+      setAiFileError('Tệp phải nhỏ hơn 15 MB.');
       e.target.value = '';
       return;
     }
@@ -1542,7 +1542,7 @@ export default function StudentExercisesPage() {
                     accept=".pdf,.docx,.txt"
                     onChange={handleAiFileChange}
                   />
-                  <p style={{ fontSize: 12, color: '#6b7280', margin: '6px 0 0' }}>PDF, DOCX hoặc TXT, nhỏ hơn 1 MB.</p>
+                  <p style={{ fontSize: 12, color: '#6b7280', margin: '6px 0 0' }}>PDF, DOCX hoặc TXT, nhỏ hơn 15 MB.</p>
                   {aiFileError && (
                     <p data-testid="ai-file-error" style={{ fontSize: 12, color: '#dc2626', margin: '4px 0 0' }}>{aiFileError}</p>
                   )}
