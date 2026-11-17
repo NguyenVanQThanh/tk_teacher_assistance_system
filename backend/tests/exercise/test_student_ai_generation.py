@@ -180,3 +180,12 @@ def test_generation_failure_502(client, world, monkeypatch):
     monkeypatch.setattr("app.modules.exercise.services.ai_generator_service.GeminiVisionParserService.get_api_key",
                         lambda: None)
     assert _post(client, world).status_code == 502
+
+
+def test_job_endpoints_validate_and_scope(client, world):
+    """Jobs reuse the request validation; unknown job ids are 404."""
+    h = world["headers"]
+    bad = _payload(world, chapters=[])
+    r = client.post(URL + "/jobs", data={"payload": json.dumps(bad)}, headers=h)
+    assert r.status_code == 422
+    assert client.get(URL + "/jobs/doesnotexist", headers=h).status_code == 404
