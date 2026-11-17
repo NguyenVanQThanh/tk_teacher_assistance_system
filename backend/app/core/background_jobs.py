@@ -14,6 +14,7 @@ from typing import Any, Callable, Dict, List, Optional, Tuple
 from uuid import UUID
 
 from fastapi import HTTPException
+from sqlalchemy import text
 from fastapi.encoders import jsonable_encoder
 
 from app.core import config
@@ -73,6 +74,9 @@ def enqueue(session, user_id: UUID, kind: str, payload: dict) -> BackgroundJob:
     account cannot flood the shared FIFO queue."""
     if kind not in _HANDLERS:
         raise ValueError(f"Unknown job kind: {kind}")
+    if session.get_bind().dialect.name == "postgresql":
+        # Serialize concurrent enqueues of one user so the cap check and the insert are atomic.
+        session.execute(text("SELECT pg_advisory_xact_lock(hashtext(:k))"), {"k": f"job-enqueue:{user_id}"})
     active = session.query(BackgroundJob).filter(
         BackgroundJob.user_id == user_id, BackgroundJob.status.in_(("QUEUED", "RUNNING"))).count()
     if active >= MAX_ACTIVE_PER_USER:
@@ -165,12 +169,16 @@ def _claim(session) -> Optional[UUID]:
     return job.job_id
 
 
-def _finish(job_id: UUID, ok: bool, result: Any = None, error: Optional[dict] = None) -> None:
+def _finish(job_id: UUID, ok: bool, result: Any = None, error: Optional[dict] = None,
+            attempt: Optional[int] = None) -> None:
     """Store the outcome and notify the owner in one transaction."""
     from app.modules.notification import service as notification_service
     session = SessionLocal()
     try:
         job = session.get(BackgroundJob, job_id)
+        if job.status != "RUNNING" or (attempt is not None and job.attempts != attempt):
+            logger.warning("Job %s was re-queued or re-claimed; discarding the stale outcome", job_id)
+            return
         job.status = "DONE" if ok else "FAILED"
         job.progress = 100 if ok else job.progress
         job.finished_at = datetime.now(timezone.utc)
@@ -200,10 +208,12 @@ def run_one(job_id: UUID) -> None:
     """Run one claimed job with its own session; always ends in DONE or FAILED."""
     session = SessionLocal()
     _local.job_id = job_id
+    attempt = None
     hb_stop = threading.Event()
     threading.Thread(target=_heartbeat, args=(job_id, hb_stop), daemon=True).start()
     try:
         job = session.get(BackgroundJob, job_id)
+        attempt = job.attempts
         fn = _HANDLERS[job.kind][0]
         user = session.get(User, job.user_id)
         outcome = (True, jsonable_encoder(fn(session, user, job.payload)), None)
@@ -219,7 +229,7 @@ def run_one(job_id: UUID) -> None:
         hb_stop.set()
         _local.job_id = None
         session.close()
-    _finish(job_id, *outcome)
+    _finish(job_id, *outcome, attempt=attempt)
 
 
 def _heartbeat(job_id: UUID, stop: threading.Event) -> None:

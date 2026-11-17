@@ -71,3 +71,14 @@ def test_recover_interrupted(db_session):
     bj.recover_interrupted()
     db_session.expire_all()
     assert db_session.get(BackgroundJob, job.job_id).status == "FAILED"
+
+
+def test_finish_ignores_job_requeued_by_recovery(db_session):
+    bj.register_handler("T_STALE", lambda s, u, p: 1, "Test", "/t")
+    u = _user(db_session)
+    job = bj.enqueue(db_session, u.user_id, "T_STALE", {})
+    job.status, job.attempts = "QUEUED", 1  # recovered while the old worker still runs
+    db_session.commit()
+    bj._finish(job.job_id, True, {"x": 1}, attempt=1)
+    db_session.expire_all()
+    assert db_session.get(BackgroundJob, job.job_id).status == "QUEUED"
