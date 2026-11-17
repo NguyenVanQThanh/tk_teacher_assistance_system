@@ -92,7 +92,7 @@ export const ERROR_CODE_MESSAGES = {
   'ERR-EXE-AI_CHAPTER_REQUIRED': 'Vui lòng chọn ít nhất một chương.',
   'ERR-EXE-AI_EMPTY_MATRIX': 'Vui lòng chọn số lượng câu hỏi lớn hơn 0.',
   'ERR-EXE-AI_FILE_NO_TEXT': 'Không đọc được nội dung văn bản trong tệp. Hãy dùng tệp có chữ (không phải ảnh quét).',
-  'ERR-EXE-AI_FILE_TOO_LARGE': 'Tệp tải lên phải nhỏ hơn 1 MB.',
+  'ERR-EXE-AI_FILE_TOO_LARGE': 'Tệp tải lên phải nhỏ hơn 15 MB.',
   'ERR-EXE-AI_FILE_TYPE': 'Định dạng tệp không được hỗ trợ (chỉ PDF, DOCX, TXT).',
   'ERR-EXE-AI_GENERATION_FAILED': 'AI chưa tạo được bài tập lúc này. Vui lòng thử lại.',
   'ERR-EXE-AI_JOB_NOT_FOUND': 'Không tìm thấy tiến trình tạo bài tập. Vui lòng thử lại.',

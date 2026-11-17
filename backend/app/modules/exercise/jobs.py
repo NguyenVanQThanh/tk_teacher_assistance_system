@@ -44,7 +44,7 @@ def _upload(d):
 
 
 def encode_upload(f) -> dict:
-    """Serialize an UploadFile for the job payload (files are capped at 1 MB by the router)."""
+    """Serialize an UploadFile for the job payload (files are capped at 15 MB by the router)."""
     if f is None:
         return None
     return {"filename": f.filename, "data": base64.b64encode(f.file.read()).decode("ascii")}

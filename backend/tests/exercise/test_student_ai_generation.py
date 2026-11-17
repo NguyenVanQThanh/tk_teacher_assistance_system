@@ -115,9 +115,9 @@ def test_teacher_cannot_use_student_endpoint(client, world):
 
 
 def test_413_when_file_too_large(client, world):
-    r = _post(client, world, files={"file": ("n.txt", b"a" * 1_048_576, "text/plain")})
+    r = _post(client, world, files={"file": ("n.txt", b"a" * 15 * 1024 * 1024, "text/plain")})
     assert r.status_code == 413 and r.json()["detail"]["code"] == "ERR-EXE-AI_FILE_TOO_LARGE"
-    r = _post(client, world, files={"file": ("n.txt", b"a" * (1_048_576 + 70_000), "text/plain")})
+    r = _post(client, world, files={"file": ("n.txt", b"a" * (15 * 1024 * 1024 + 70_000), "text/plain")})
     assert r.status_code == 413
 
 
