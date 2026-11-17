@@ -106,10 +106,14 @@ def _aware(dt: Optional[datetime]) -> Optional[datetime]:
     return dt if dt is None or dt.tzinfo else dt.replace(tzinfo=timezone.utc)
 
 
-def to_public(session, job: BackgroundJob) -> dict:
+def to_public(session, job: BackgroundJob, estimates: Optional[Dict[str, int]] = None) -> dict:
     """Client view of a job: queued|running|done|error with progress, stage and ETA seconds."""
     status = {"QUEUED": "queued", "RUNNING": "running", "DONE": "done", "FAILED": "error"}[job.status]
-    est = _estimate_seconds(session, job.kind)
+    if estimates is None:
+        estimates = {}
+    if job.kind not in estimates:
+        estimates[job.kind] = _estimate_seconds(session, job.kind)
+    est = estimates[job.kind]
     out: Dict[str, Any] = {
         "job_id": str(job.job_id), "kind": job.kind, "status": status,
         "progress": 100 if job.status == "DONE" else job.progress, "stage": job.stage,
@@ -153,7 +157,8 @@ def list_jobs(session, user_id: UUID, active_only: bool = False, limit: int = 20
     q = session.query(BackgroundJob).filter(BackgroundJob.user_id == user_id)
     if active_only:
         q = q.filter(BackgroundJob.status.in_(("QUEUED", "RUNNING")))
-    return [to_public(session, j) for j in q.order_by(BackgroundJob.created_at.desc()).limit(limit).all()]
+    estimates: Dict[str, int] = {}  # one estimate query per kind, not per job
+    return [to_public(session, j, estimates) for j in q.order_by(BackgroundJob.created_at.desc()).limit(limit).all()]
 
 
 def _claim(session) -> Optional[UUID]:
@@ -184,8 +189,7 @@ def _finish(job_id: UUID, ok: bool, result: Any = None, error: Optional[dict] = 
         job.finished_at = datetime.now(timezone.utc)
         job.result, job.error = (result if ok else None), (None if ok else error)
         # Drop uploaded file content: it is only needed to run the job.
-        job.payload = {k: v for k, v in (job.payload or {}).items()
-                       if k not in ("file_text", "question_file", "answer_file")}
+        job.payload = _scrub(job.payload)
         _, label, link, _ = _HANDLERS.get(job.kind, (None, "Tác vụ", "/", 60))
         session.commit()  # the outcome is durable before the best-effort notification
         try:
@@ -232,6 +236,14 @@ def run_one(job_id: UUID) -> None:
     _finish(job_id, *outcome, attempt=attempt)
 
 
+_FILE_KEYS = ("file_text", "question_file", "answer_file")
+
+
+def _scrub(payload: Optional[dict]) -> dict:
+    """Payload without uploaded file content (only needed while the job can still run)."""
+    return {k: v for k, v in (payload or {}).items() if k not in _FILE_KEYS}
+
+
 def _heartbeat(job_id: UUID, stop: threading.Event) -> None:
     """Touch updated_at while a job runs so other processes do not mistake it for an orphan."""
     while not stop.wait(HEARTBEAT_SECONDS):
@@ -262,6 +274,7 @@ def recover_interrupted() -> int:
                 job.status, job.progress, job.stage = "QUEUED", 0, None
             else:
                 job.status, job.finished_at = "FAILED", datetime.now(timezone.utc)
+                job.payload = _scrub(job.payload)
                 job.error = {"http_status": 500, "detail": {
                     "code": "ERR-EXE-AI_GENERATION_FAILED", "message": "Job interrupted by a restart."}}
             n += 1
