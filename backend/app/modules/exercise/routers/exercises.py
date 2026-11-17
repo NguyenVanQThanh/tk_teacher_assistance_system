@@ -6,6 +6,8 @@
 # Updated By: AI Agent
 
 import json
+from types import SimpleNamespace
+import io
 import hashlib
 import logging
 import re
@@ -15,6 +17,7 @@ from fastapi import APIRouter, Depends, Query, UploadFile, File, Form, HTTPExcep
 from pydantic import ValidationError
 from sqlalchemy.orm import Session
 
+from app.core.background_jobs import get_job, start_job
 from app.core.database import get_db
 from app.modules.academic.scoping import get_user_role_name
 from app.modules.auth import access_policy
@@ -115,6 +118,47 @@ def generate_ai_exercise(
             )
     return service.generate_ai_exercise(current_user, payload)
 
+
+@router.post(
+    "/ai-generate/jobs",
+    status_code=status.HTTP_202_ACCEPTED,
+    dependencies=[Depends(require_any_perm("EXE_ATTEMPT_SUBMIT", "EXE_EXERCISE_VIEW", "EXE_EXERCISE_MANAGE"))]
+)
+def start_ai_generate_job(
+    payload: AiExerciseGenerateRequest,
+    service: ExerciseService = Depends(get_exercise_service),
+    current_user: User = Depends(get_current_user)
+):
+    """Same checks as POST /ai-generate, but runs in the background; poll GET /ai-generate/jobs/{job_id}."""
+    role_name = get_user_role_name(service.db, current_user)
+    if not access_policy.is_teacher(role_name) and role_name != "Admin":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail={"code": "ERR-EXE-AI_TEACHER_ONLY", "message": "Only teachers can generate exercises here."}
+        )
+    if payload.document_ids:
+        visible = access_policy.visible_document_ids(service.db, current_user, payload.document_ids)
+        if any(d not in visible for d in payload.document_ids):
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail={"code": "ERR-DOC-NOT_FOUND", "message": "Document not found."}
+            )
+    return start_job(current_user.user_id, lambda session, user: ExerciseService(session)
+                     .generate_ai_exercise(user, payload))
+
+@router.get(
+    "/ai-generate/jobs/{job_id}",
+    dependencies=[Depends(require_any_perm("EXE_ATTEMPT_SUBMIT", "EXE_EXERCISE_VIEW", "EXE_EXERCISE_MANAGE"))]
+)
+def get_ai_generate_job(job_id: str, current_user: User = Depends(get_current_user)):
+    """Job state: running | done (with result) | error (with http_status and detail)."""
+    job = get_job(job_id, current_user.user_id)
+    if job is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail={"code": "ERR-EXE-AI_JOB_NOT_FOUND", "message": "Job not found."}
+        )
+    return job
 
 @router.get(
     "",
@@ -568,6 +612,59 @@ def _import_questions_impl(
 
     return created_questions
 
+
+@router.post(
+    "/{exercise_id}/questions/import/jobs",
+    status_code=status.HTTP_202_ACCEPTED,
+    dependencies=[Depends(require_perm("EXE_QUESTION_IMPORT"))]
+)
+def start_import_questions_job(
+    exercise_id: UUID,
+    question_file: UploadFile = File(..., description="Docx or PDF question file"),
+    answer_file: Optional[UploadFile] = File(None, description="Optional separate answer key file"),
+    test_code: Optional[str] = Form(None, description="Optional target test code (e.g. 0121)"),
+    exercise_service: ExerciseService = Depends(get_exercise_service),
+    current_user: User = Depends(get_current_user),
+):
+    """
+    Background variant of the import (OCR + AI solving can exceed the proxy timeout).
+    Poll GET /questions/import/jobs/{job_id}; result is {questions, skipped_count, skipped}.
+    """
+    exercise_service.get_exercise_for_write(current_user, exercise_id)  # fail fast: 404 / 403
+
+    def snapshot(f: Optional[UploadFile]):
+        # Uploads are closed once the response is sent: copy them now.
+        if f is None:
+            return None
+        return SimpleNamespace(filename=f.filename, file=io.BytesIO(f.file.read()))
+
+    q_file, a_file = snapshot(question_file), snapshot(answer_file)
+
+    def work(session, user):
+        resp = Response()
+        with IMPORT_SEMAPHORE:
+            questions = _import_questions_impl(
+                exercise_id=exercise_id, question_file=q_file, answer_file=a_file, test_code=test_code,
+                exercise_service=ExerciseService(session), question_service=QuestionService(session),
+                current_user=user, response=resp)
+        skipped = json.loads(resp.headers.get("X-Import-Skipped", "[]"))
+        return {"questions": questions, "skipped_count": len(skipped), "skipped": skipped}
+
+    return start_job(current_user.user_id, work)
+
+@router.get(
+    "/{exercise_id}/questions/import/jobs/{job_id}",
+    dependencies=[Depends(require_perm("EXE_QUESTION_IMPORT"))]
+)
+def get_import_questions_job(exercise_id: UUID, job_id: str, current_user: User = Depends(get_current_user)):
+    """Job state: running | done (with result) | error (with http_status and detail)."""
+    job = get_job(job_id, current_user.user_id)
+    if job is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail={"code": "ERR-EXE-AI_JOB_NOT_FOUND", "message": "Job not found."}
+        )
+    return job
 
 @router.get(
     "/{exercise_id}/export/pdf",

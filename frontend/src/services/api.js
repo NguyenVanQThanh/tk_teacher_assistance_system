@@ -177,6 +177,23 @@ export const subjectsApi = {
   },
 };
 
+// Slow AI endpoints run as background jobs (a single request would hit the proxy timeout, HTTP 524):
+// start returns a job id, then poll until the job is done. Errors keep the axios shape.
+const pollJob = async (jobUrl, maxMs = 10 * 60 * 1000) => {
+  const deadline = Date.now() + maxMs;
+  while (Date.now() < deadline) {
+    await new Promise((r) => setTimeout(r, 3000));
+    const { data } = await api.get(jobUrl);
+    if (data.status === 'done') return data.result;
+    if (data.status === 'error') {
+      const err = new Error('Background job failed');
+      err.response = { status: data.http_status, data: { detail: data.detail } };
+      throw err;
+    }
+  }
+  throw new Error('Background job timed out');
+};
+
 export const exercisesApi = {
   getExercises: async (params = {}) => {
     const response = await api.get('/api/v1/exercises', { params });
@@ -208,17 +225,12 @@ export const exercisesApi = {
     return response.data;
   },
   importQuestions: async (exerciseId, formData) => {
-    const response = await api.post(`/api/v1/exercises/${exerciseId}/questions/import`, formData, {
-      headers: {
-        'Content-Type': 'multipart/form-data',
-      },
-    });
-    const data = response.data;
-    // Backend reports questions skipped during import via headers; attach them to
-    // the returned array so callers can warn the user without breaking `.length`.
-    if (Array.isArray(data)) {
-      data.skippedCount = parseInt(response.headers?.['x-import-skipped-count'] || '0', 10) || 0;
-    }
+    const base = `/api/v1/exercises/${exerciseId}/questions/import/jobs`;
+    const start = await api.post(base, formData, { headers: { 'Content-Type': 'multipart/form-data' } });
+    const result = await pollJob(`${base}/${start.data.job_id}`);
+    const data = Array.isArray(result.questions) ? result.questions : [];
+    // Questions skipped during import are attached so callers can warn without breaking `.length`.
+    data.skippedCount = result.skipped_count || 0;
     return data;
   },
   addQuestion: async (exerciseId, data) => {
@@ -226,8 +238,8 @@ export const exercisesApi = {
     return response.data;
   },
   generateAiExercise: async (data) => {
-    const response = await api.post('/api/v1/exercises/ai-generate', data);
-    return response.data;
+    const start = await api.post('/api/v1/exercises/ai-generate/jobs', data);
+    return pollJob(`/api/v1/exercises/ai-generate/jobs/${start.data.job_id}`);
   },
 };
 
@@ -241,7 +253,6 @@ export const aiExercisesApi = {
     return response.data;
   },
   // Multipart: `payload` JSON string + optional `file`
-  // Starts a background job (a single request would hit the proxy timeout), then polls until done.
   generateForStudent: async (payload, file = null) => {
     const formData = new FormData();
     formData.append('payload', JSON.stringify(payload));
@@ -249,19 +260,7 @@ export const aiExercisesApi = {
     const start = await api.post('/api/v1/ai-exercises/student/jobs', formData, {
       headers: { 'Content-Type': 'multipart/form-data' },
     });
-    const deadline = Date.now() + 10 * 60 * 1000;
-    while (Date.now() < deadline) {
-      await new Promise((r) => setTimeout(r, 3000));
-      const { data } = await api.get(`/api/v1/ai-exercises/student/jobs/${start.data.job_id}`);
-      if (data.status === 'done') return data.result;
-      if (data.status === 'error') {
-        // Same shape as an axios error so mapAiErrorMessage keeps working
-        const err = new Error('AI generation failed');
-        err.response = { status: data.http_status, data: { detail: data.detail } };
-        throw err;
-      }
-    }
-    throw new Error('AI generation timed out');
+    return pollJob(`/api/v1/ai-exercises/student/jobs/${start.data.job_id}`);
   },
 };
 
