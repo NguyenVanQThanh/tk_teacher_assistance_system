@@ -3,8 +3,8 @@ File Name: StudentExerciseTakingPage.css
 Description: Examination taking stylesheet supporting 3 question types: Multiple Choice, True/False, and Short Answer with virtual keypad.
 Created At: 2026-09-07
 Created By: Tam Khang
-Updated At: 2026-10-04
-Updated By: Tam Khang
+Updated At: 2026-11-17
+Updated By: AI Agent
 */
 
 .exercise-taking-container {
@@ -2327,3 +2327,48 @@ Updated By: Tam Khang
   box-shadow: 0 8px 18px rgba(101, 73, 166, 0.45);
 }
 
+
+@media (max-width: 640px) {
+  .short-answer-review-comparison { grid-template-columns: 1fr; }
+}
+
+.sa-pending-pill {
+  align-self: flex-start;
+  font-size: 12px;
+  font-weight: 600;
+  color: #64748B;
+  background: #F1F5F9;
+  border-radius: 999px;
+  padding: 2px 10px;
+}
+
+.review-key-withheld-note {
+  margin-top: 14px;
+  padding: 12px 16px;
+  border-radius: 10px;
+  background: #EFF6FF;
+  border: 1.5px solid #BFDBFE;
+  color: #1E40AF;
+  font-size: 14px;
+}
+
+.tf-review-table-wrap { margin-top: 14px; }
+
+.tf-review-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 14px;
+}
+
+.tf-review-table th,
+.tf-review-table td {
+  border: 1px solid #E2E8F0;
+  padding: 6px 10px;
+  text-align: center;
+}
+
+.tf-review-footer {
+  margin-top: 8px;
+  font-weight: 700;
+  color: #065F46;
+}

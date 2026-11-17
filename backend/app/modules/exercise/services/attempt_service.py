@@ -3,7 +3,7 @@
 #              plus the student-safe sanitized "paper" of an owned attempt.
 # Created At: 2026-08-05
 # Created By: Tam Khang
-# Updated At: 2026-11-13
+# Updated At: 2026-11-17
 # Updated By: AI Agent
 
 import secrets
@@ -20,7 +20,7 @@ from app.modules.exercise.schemas import (
 )
 from app.modules.exercise.repository import AttemptRepository, AssignmentRepository
 from app.modules.exercise.services.assignment_service import AssignmentService, open_attempt_deadline
-from app.modules.exercise.services.grading_service import GradingService
+from app.modules.exercise.services.grading_service import GradingService, build_answer_key
 from app.modules.academic.scoping import get_user_role_name, check_class_access, get_accessible_class_ids
 
 
@@ -265,14 +265,31 @@ class AttemptService:
             out.detailed_results = {
                 k: v for k, v in out.detailed_results.items() if k != "shuffle_seed"
             }
-        if attempt.student_id == current_user.user_id and is_exam and not released and out.detailed_results:
-            keep = ("question_id", "question_type", "student_answer_option_id", "student_answer_text")
-            out.detailed_results = {
-                "questions": [
-                    {k: r[k] for k in keep if k in r}
-                    for r in (out.detailed_results.get("questions") or [])
-                ]
-            }
+        assignment = getattr(attempt, "assignment", None)
+        owner = attempt.student_id == current_user.user_id
+        personal = (
+            getattr(assignment, "owner_student_id", None) is not None
+            and assignment.owner_student_id == attempt.student_id
+        )
+        reveal = (not owner) or (not is_exam) or released or personal
+        finished = bool(getattr(attempt, "is_finished", False))
+        if out.detailed_results:
+            questions = out.detailed_results.get("questions") or []
+            if reveal:
+                if finished:
+                    key = build_answer_key(ex) if ex is not None else {}
+                    merged = []
+                    for r in questions:
+                        row = dict(r)
+                        row.update(key.get(str(row.get("question_id", "")).lower(), {}))
+                        merged.append(row)
+                    out.detailed_results = {**out.detailed_results, "questions": merged, "answer_key_revealed": True}
+            else:
+                keep = ("question_id", "question_type", "student_answer_option_id", "student_answer_text")
+                out.detailed_results = {
+                    "questions": [{k: r[k] for k in keep if k in r} for r in questions],
+                    "answer_key_revealed": False,
+                }
         return out
 
     def get_attempt_paper(self, attempt_id: UUID, current_user: User) -> AssignmentTakingOut:

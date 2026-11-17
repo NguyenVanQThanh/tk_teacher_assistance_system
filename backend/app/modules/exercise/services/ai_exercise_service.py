@@ -2,7 +2,7 @@
 # Description: Orchestrates AI exercise generation (teacher and student flows): context retrieval, LLM generation and persistence.
 # Created At: 2026-11-13
 # Created By: AI Agent
-# Updated At: 2026-11-15
+# Updated At: 2026-11-17
 # Updated By: AI Agent
 
 import logging
@@ -32,6 +32,28 @@ logger = logging.getLogger("smartlms.exercise.ai_exercise")
 
 MAX_TOTAL_QUESTIONS = 40
 DEFAULT_DUE_DAYS = 14
+
+
+def _has_answer_key(q: Dict[str, Any]) -> bool:
+    """True when the generated question carries a usable correct answer for its type."""
+    opts = q.get("answer_options") or []
+    if q.get("question_type") == "MultipleChoice":
+        return sum(1 for o in opts if o.get("is_correct")) == 1
+    if q.get("question_type") == "TrueFalse":
+        return len(opts) == 4
+    if q.get("question_type") == "ShortAnswer":
+        return bool(str(q.get("correct_answer") or "").strip())
+    return True
+
+
+def _mcq_correct_letter(q: Dict[str, Any]) -> Optional[str]:
+    """Return the stored correct letter, else derive it from the option flagged is_correct."""
+    if q.get("correct_answer"):
+        return q["correct_answer"]
+    for i, o in enumerate(q.get("answer_options") or []):
+        if o.get("is_correct") and i < 4:
+            return "ABCD"[i]
+    return None
 
 
 def _err(code: int, error: str, message: str) -> HTTPException:
@@ -256,6 +278,9 @@ class AiExerciseService:
                  metadata: Dict[str, Any], duration_minutes: int, topic: str, grade_name: str,
                  owner_student_id: Optional[uuid.UUID]) -> AiExerciseGenerateOut:
         """Store Exercise, Questions, AnswerOptions (MCQ and True/False) and the assignment in one commit."""
+        if not all(_has_answer_key(q) for q in questions):
+            raise _err(status.HTTP_502_BAD_GATEWAY, "ERR-EXE-AI_ANSWER_KEY_MISSING",
+                       "AI output is missing a correct answer for at least one question.")
         clean = (topic or "").strip()
         short = clean[:50] + "..." if len(clean) > 50 else clean
         exercise = Exercise(
@@ -269,7 +294,8 @@ class AiExerciseService:
             question = Question(
                 exercise_id=exercise.exercise_id, content=q["content"], content_markdown=q["content"],
                 question_type=q["question_type"], difficulty=q.get("difficulty"),
-                correct_answer=q.get("correct_answer"), explanation=q.get("explanation"),
+                correct_answer=_mcq_correct_letter(q) if q["question_type"] == "MultipleChoice" else q.get("correct_answer"),
+                explanation=q.get("explanation"),
                 segments=q.get("segments"), display_order=order, is_ai_generated=True, status="ACTIVE",
             )
             self.db.add(question)

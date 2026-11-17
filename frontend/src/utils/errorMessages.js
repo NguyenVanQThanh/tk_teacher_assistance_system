@@ -3,7 +3,7 @@ File Name: errorMessages.js
 Description: Central mapping from backend error codes / HTTP failures to Vietnamese user-facing messages.
 Created At: 2026-11-15
 Created By: AI Agent
-Updated At: 2026-11-15
+Updated At: 2026-11-17
 Updated By: AI Agent
 */
 
@@ -87,6 +87,7 @@ export const ERROR_CODE_MESSAGES = {
   'ERR-DOC-PERMISSION_DENIED': 'Bạn không có quyền với tài liệu này.',
   // Exercises
   'ERR-EXE-AI_BAD_REQUEST': 'Yêu cầu tạo bài tập bằng AI không hợp lệ.',
+  'ERR-EXE-AI_ANSWER_KEY_MISSING': 'AI tạo câu hỏi thiếu đáp án. Vui lòng thử tạo lại.',
   'ERR-EXE-AI_BUSY': 'Hệ thống AI đang bận. Vui lòng thử lại sau ít phút.',
   'ERR-EXE-AI_CHAPTER_REQUIRED': 'Vui lòng chọn ít nhất một chương.',
   'ERR-EXE-AI_EMPTY_MATRIX': 'Vui lòng chọn số lượng câu hỏi lớn hơn 0.',

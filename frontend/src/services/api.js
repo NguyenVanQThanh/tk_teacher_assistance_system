@@ -179,8 +179,21 @@ export const subjectsApi = {
 
 // Slow AI endpoints run as background jobs (a single request would hit the proxy timeout, HTTP 524):
 // start returns a job id, then poll until the job is done. Errors keep the axios shape.
+// Ids of jobs a screen is waiting on itself; the job tray hides them to avoid a duplicate display.
+export const awaitedJobs = new Set();
+
 const pollJob = async (jobUrl, maxMs = 10 * 60 * 1000) => {
   const deadline = Date.now() + maxMs;
+  const jobId = jobUrl.split('/').pop();
+  awaitedJobs.add(jobId);
+  try {
+    return await pollLoop(jobUrl, deadline);
+  } finally {
+    awaitedJobs.delete(jobId);
+  }
+};
+
+const pollLoop = async (jobUrl, deadline) => {
   while (Date.now() < deadline) {
     await new Promise((r) => setTimeout(r, 3000));
     const { data } = await api.get(jobUrl);
