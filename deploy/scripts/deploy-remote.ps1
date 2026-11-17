@@ -194,7 +194,17 @@ if ($Tunnel) {
 
 if (-not $SkipUpload -and -not $SkipData) {
     if (Test-RemoteFile "$RemotePath/sgk_data/vectors.dump") {
-        Write-Host "    sgk_data da co tren server - bo qua (dung -SkipData de tat han)." -ForegroundColor DarkGray
+        # Data already on the server: only refresh the small files when the data VERSION changed.
+        $localVer = Join-Path (Join-Path $RepoRoot $DataDir) "VERSION"
+        $remoteVer = (& ssh @SshOpts $Target "cat '$RemotePath/sgk_data/VERSION' 2>/dev/null || true") -join ""
+        if ((Test-Path $localVer) -and ((Get-Content $localVer -Raw).Trim() -ne $remoteVer.Trim())) {
+            Write-Host "    SGK data version moi - upload vectors.dump + VERSION (khong upload images.tar)." -ForegroundColor Yellow
+            Copy-ToRemote (Join-Path (Join-Path $RepoRoot $DataDir) "vectors.dump") "$RemotePath/sgk_data/"
+            Copy-ToRemote $localVer "$RemotePath/sgk_data/"
+        }
+        else {
+            Write-Host "    sgk_data da co tren server - bo qua (dung -SkipData de tat han)." -ForegroundColor DarkGray
+        }
     }
     else {
         $localData = Join-Path $RepoRoot $DataDir

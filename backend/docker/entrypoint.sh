@@ -12,5 +12,4 @@ sh "$DIR/migrate.sh"
 sh "$DIR/bootstrap_admin.sh"
 python /app/app/scripts/seed_subjects.py
 sh "$DIR/load_sgk.sh"
-python /app/app/scripts/apply_sgk_labels.py
 exec "$@"
