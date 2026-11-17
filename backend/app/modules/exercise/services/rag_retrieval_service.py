@@ -348,16 +348,37 @@ class RagRetrievalService:
 
     @staticmethod
     def list_chapters(db: Session, doc_ids: Sequence[str]) -> List[Dict[str, Any]]:
-        """Return [{chapter, doc_id, page_start}] for the given SGK docs, ordered by doc then first page."""
+        """Return [{chapter, doc_id, page_start, lessons}] for the given SGK docs, ordered by doc then first page."""
         if not doc_ids:
             return []
         rows = db.execute(
             text("SELECT doc_id, chuong, min(page) AS page_start FROM chunks "
-                 "WHERE doc_id = ANY(:ids) AND chuong IS NOT NULL GROUP BY doc_id, chuong "
-                 "ORDER BY doc_id, 3"),
+                 "WHERE doc_id = ANY(:ids) AND chuong IS NOT NULL GROUP BY doc_id, chuong"),
             {"ids": list(doc_ids)},
         ).fetchall()
-        return [{"chapter": r[1], "doc_id": r[0], "page_start": r[2]} for r in rows]
+
+        # Volumes of one subject must read in curriculum order. doc_id is a random hash and the titles
+        # sort wrongly ("tap hai" < "tap mot"), so order books by the lowest chapter/lesson number
+        # they contain (tap mot starts at Bai 1, tap hai at Bai 6), then chapters by page.
+        def _num(label: str) -> int:
+            m = re.search(r"\d+", label or "")
+            return int(m.group()) if m else 10 ** 6
+
+        first_num: Dict[str, int] = {}
+        for doc_id, chuong, _page in rows:
+            first_num[doc_id] = min(first_num.get(doc_id, 10 ** 6), _num(chuong))
+        rows = sorted(rows, key=lambda r: (first_num[r[0]], r[0], r[2]))
+        lesson_rows = db.execute(
+            text("SELECT doc_id, chuong, bai FROM chunks "
+                 "WHERE doc_id = ANY(:ids) AND chuong IS NOT NULL AND bai IS NOT NULL "
+                 "GROUP BY doc_id, chuong, bai ORDER BY min(page)"),
+            {"ids": list(doc_ids)},
+        ).fetchall()
+        lessons: Dict[Tuple[str, str], List[str]] = {}
+        for doc_id, chuong, bai in lesson_rows:
+            lessons.setdefault((doc_id, chuong), []).append(bai)
+        return [{"chapter": r[1], "doc_id": r[0], "page_start": r[2], "lessons": lessons.get((r[0], r[1]), [])}
+                for r in rows]
 
     @classmethod
     def search_sgk(cls, db: Session, query: str, subject_name: Optional[str], grade: Any,
