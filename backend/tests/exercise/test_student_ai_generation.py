@@ -205,3 +205,18 @@ def test_invalid_json_is_retried(monkeypatch):
     monkeypatch.setenv("MISTRAL_API_KEY", "k")
     out = AiExerciseGeneratorService.generate_part("Part3", ["NhanBiet"], "ctx", "", "req", "Hóa", "Lớp 12")
     assert len(out) == 1 and calls["n"] == 2
+
+
+def test_part_is_generated_in_small_batches(monkeypatch):
+    """Long parts are split so one reply is never large enough to be cut off at max_tokens."""
+    sizes = []
+
+    def fake(cls, api_key, part, prompt, temperature):
+        n = prompt.count("- Question ")
+        sizes.append(n)
+        return [{"content": f"S{len(sizes)}-{i}", "correct_answer": "7"} for i in range(n)]
+
+    monkeypatch.setattr(AiExerciseGeneratorService, "_call_mistral_part", classmethod(fake))
+    monkeypatch.setenv("MISTRAL_API_KEY", "k")
+    out = AiExerciseGeneratorService.generate_part("Part3", ["NhanBiet"] * 12, "ctx", "", "req", "Hóa", "Lớp 12")
+    assert len(out) == 12 and max(sizes) <= 5 and len(sizes) == 3
