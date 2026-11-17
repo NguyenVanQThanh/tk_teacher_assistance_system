@@ -733,8 +733,9 @@ export default function StudentExercisesPage() {
     setAiSelectedChapters([]);
     setAiChaptersError('');
     if (!aiSubjectId) return undefined;
+    if (isGuest && !aiGrade) return undefined; // guests must pick a grade first
     setAiChaptersLoading(true);
-    aiExercisesApi.getChapters(aiSubjectId)
+    aiExercisesApi.getChapters(aiSubjectId, isGuest ? aiGrade : undefined)
       .then(res => { if (!cancelled) setAiChapters(Array.isArray(res) ? res : []); })
       .catch(err => {
         if (cancelled) return;
@@ -742,7 +743,7 @@ export default function StudentExercisesPage() {
       })
       .finally(() => { if (!cancelled) setAiChaptersLoading(false); });
     return () => { cancelled = true; };
-  }, [aiSubjectId]);
+  }, [aiSubjectId, aiGrade, isGuest]);
 
   const toggleAiChapter = (name) => {
     setAiSelectedChapters(prev => prev.includes(name)
@@ -1523,8 +1524,8 @@ export default function StudentExercisesPage() {
                     <BookOpen size={16} />
                     <span>Chương cần ôn tập (chọn ít nhất 1, tối đa {MAX_AI_CHAPTERS})</span>
                   </div>
-                  {!aiSubjectId ? (
-                    <p style={{ fontSize: 12, color: '#6b7280', margin: 0 }}>Hãy chọn môn học để xem danh sách chương.</p>
+                  {!aiSubjectId || (isGuest && !aiGrade) ? (
+                    <p style={{ fontSize: 12, color: '#6b7280', margin: 0 }}>{isGuest && !aiGrade ? 'Hãy chọn khối lớp và môn học để xem danh sách chương.' : 'Hãy chọn môn học để xem danh sách chương.'}</p>
                   ) : aiChaptersLoading ? (
                     <p style={{ fontSize: 12, color: '#6b7280', margin: 0 }}>Đang tải danh sách chương...</p>
                   ) : aiChaptersError ? (
@@ -1540,7 +1541,12 @@ export default function StudentExercisesPage() {
                             checked={aiSelectedChapters.includes(c.chapter)}
                             onChange={() => toggleAiChapter(c.chapter)}
                           />
-                          <span>{c.chapter}</span>
+                          <span>
+                            {c.chapter}
+                            {Array.isArray(c.lessons) && c.lessons.length > 0 && (
+                              <span style={{ display: 'block', fontSize: 11, color: '#6b7280' }}>{c.lessons.join(' · ')}</span>
+                            )}
+                          </span>
                         </label>
                       ))}
                     </div>

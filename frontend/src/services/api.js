@@ -233,8 +233,11 @@ export const exercisesApi = {
 
 export const aiExercisesApi = {
   // Chapters available for a subject (grade resolved server-side from the student's class)
-  getChapters: async (subjectId) => {
-    const response = await api.get('/api/v1/ai-exercises/chapters', { params: { subject_id: subjectId } });
+  // `grade` (10-12) is required for guests only: they have no class to derive it from
+  getChapters: async (subjectId, grade) => {
+    const response = await api.get('/api/v1/ai-exercises/chapters', {
+      params: { subject_id: subjectId, ...(grade ? { grade: Number(grade) } : {}) },
+    });
     return response.data;
   },
   // Multipart: `payload` JSON string + optional `file`
