@@ -348,7 +348,7 @@ class RagRetrievalService:
 
     @staticmethod
     def list_chapters(db: Session, doc_ids: Sequence[str]) -> List[Dict[str, Any]]:
-        """Return [{chapter, doc_id, page_start}] for the given SGK docs, ordered by doc then first page."""
+        """Return [{chapter, doc_id, page_start, lessons}] for the given SGK docs, ordered by doc then first page."""
         if not doc_ids:
             return []
         rows = db.execute(
@@ -357,7 +357,17 @@ class RagRetrievalService:
                  "ORDER BY doc_id, 3"),
             {"ids": list(doc_ids)},
         ).fetchall()
-        return [{"chapter": r[1], "doc_id": r[0], "page_start": r[2]} for r in rows]
+        lesson_rows = db.execute(
+            text("SELECT doc_id, chuong, bai FROM chunks "
+                 "WHERE doc_id = ANY(:ids) AND chuong IS NOT NULL AND bai IS NOT NULL "
+                 "GROUP BY doc_id, chuong, bai ORDER BY min(page)"),
+            {"ids": list(doc_ids)},
+        ).fetchall()
+        lessons: Dict[Tuple[str, str], List[str]] = {}
+        for doc_id, chuong, bai in lesson_rows:
+            lessons.setdefault((doc_id, chuong), []).append(bai)
+        return [{"chapter": r[1], "doc_id": r[0], "page_start": r[2], "lessons": lessons.get((r[0], r[1]), [])}
+                for r in rows]
 
     @classmethod
     def search_sgk(cls, db: Session, query: str, subject_name: Optional[str], grade: Any,

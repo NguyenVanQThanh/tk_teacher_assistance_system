@@ -1541,7 +1541,12 @@ export default function StudentExercisesPage() {
                             checked={aiSelectedChapters.includes(c.chapter)}
                             onChange={() => toggleAiChapter(c.chapter)}
                           />
-                          <span>{c.chapter}</span>
+                          <span>
+                            {c.chapter}
+                            {Array.isArray(c.lessons) && c.lessons.length > 0 && (
+                              <span style={{ display: 'block', fontSize: 11, color: '#6b7280' }}>{c.lessons.join(' · ')}</span>
+                            )}
+                          </span>
                         </label>
                       ))}
                     </div>
