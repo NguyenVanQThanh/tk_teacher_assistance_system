@@ -439,7 +439,6 @@ class AiExerciseGeneratorService:
                       on_stage: Optional[Callable[[str], None]] = None) -> List[Dict[str, Any]]:
         """Generate one part; invalid or judge-rejected items are dropped and only the missing count is re-requested."""
         valid: List[Dict[str, Any]] = []
-        rejected_pool: List[Dict[str, Any]] = []
         errors: List[str] = []
         seen_content = set()
         # Ask for small batches: a long single reply gets cut off at max_tokens (invalid JSON).
@@ -488,12 +487,15 @@ class AiExerciseGeneratorService:
                     if reason is None:
                         continue
                     valid.remove(q)
-                    rejected_pool.append(q)
                     seen_content.discard(key)
                     errors.append(reason)
+            if errors:
+                logger.info("%s: %d/%d valid, rejected: %s", part, len(valid), len(slots), "; ".join(errors[:6]))
             if len(valid) == before:
                 failures += 1
         if len(valid) < len(slots):
+            logger.warning("%s exhausted retries with %d/%d valid; last rejections: %s",
+                           part, len(valid), len(slots), "; ".join(errors[:6]))
             raise RuntimeError(f"AI returned fewer valid {part} questions than requested.")
         valid = valid[:len(slots)]
         for question, difficulty in zip(valid, slots):
