@@ -270,6 +270,7 @@ class AiExerciseService:
                 part1_count=counts[0], part2_count=counts[1], part3_count=counts[2],
                 context=context, matrix=matrix, student_file=student_file)
         except RuntimeError as e:
+            logger.warning("AI generation failed: %s", e)
             raise _err(status.HTTP_502_BAD_GATEWAY, "ERR-EXE-AI_GENERATION_FAILED", str(e))
         finally:
             AI_GENERATE_SEMAPHORE.release()

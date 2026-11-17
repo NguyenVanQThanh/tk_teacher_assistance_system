@@ -239,6 +239,7 @@ def run_one(job_id: UUID) -> None:
         outcome = (True, jsonable_encoder(fn(session, user, job.payload)), None)
     except HTTPException as exc:
         session.rollback()
+        logger.warning("Job %s failed with HTTP %s: %s", job_id, exc.status_code, exc.detail)
         outcome = (False, None, {"http_status": exc.status_code, "detail": exc.detail})
     except Exception:  # noqa: BLE001 - reported to the client as a generic failure
         session.rollback()
