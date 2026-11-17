@@ -123,7 +123,7 @@ def _env_bool(name: str, default: bool) -> bool:
 
 # Second-pass LLM review of generated questions (solves each question blind and compares keys).
 AI_JUDGE_ENABLED = _env_bool("AI_JUDGE_ENABLED", True)
-AI_JUDGE_MODEL = os.environ.get("AI_JUDGE_MODEL", AI_MISTRAL_MODEL)
+AI_JUDGE_MODEL = os.environ.get("AI_JUDGE_MODEL", "deepseek-v4-1-flash-1017")  # served through the Mistral API (MISTRAL_API_KEY)
 AI_JUDGE_MAX_TOKENS = _env_int("AI_JUDGE_MAX_TOKENS", 600, minimum=200)
 
 # ---------------------------------------------------------------------------
