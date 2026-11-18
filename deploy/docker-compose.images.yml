@@ -144,6 +144,8 @@ services:
     command: tunnel --no-autoupdate run
     environment:
       TUNNEL_TOKEN: ${CLOUDFLARE_TUNNEL_TOKEN:-}
+      # HTTP/2 instead of QUIC: some ISPs throttle UDP, which stalls large uploads.
+      TUNNEL_TRANSPORT_PROTOCOL: ${TUNNEL_TRANSPORT_PROTOCOL:-http2}
     depends_on:
       - nginx
 
