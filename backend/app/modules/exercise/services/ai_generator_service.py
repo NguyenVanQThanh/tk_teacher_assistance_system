@@ -246,6 +246,19 @@ def validate_short(raw: Dict[str, Any]) -> Tuple[Optional[Dict[str, Any]], Optio
 _VALIDATORS = {"Part1": validate_mcq, "Part2": validate_tf, "Part3": validate_short}
 
 
+_OPTION_LINE_RE = re.compile(r"^\s*[A-D][.)]\s+\S")
+
+def _strip_repeated_options(content: str) -> str:
+    """Drop 'A. ..' to 'D. ..' lines the model repeated inside a Part1 stem.
+
+    answer_options is the source of truth, so repeats are redundant, never fatal. Needs two
+    or more option lines to act, so a stray 'A. ' list item or cloze '(1)' stem is untouched."""
+    lines = content.split(chr(10))
+    if sum(1 for ln in lines if _OPTION_LINE_RE.match(ln)) < 2:
+        return content
+    kept = [ln for ln in lines if not _OPTION_LINE_RE.match(ln)]
+    return chr(10).join(kept).strip()
+
 def _content_issue(part: str, content: str, normalized: Dict[str, Any]) -> Optional[str]:
     """Deterministic quality checks on question text; returns a reason or None."""
     texts = [content] + [o["content"] for o in normalized.get("answer_options", [])]
@@ -257,8 +270,6 @@ def _content_issue(part: str, content: str, normalized: Dict[str, Any]) -> Optio
         banned = banned + _BANNED_NO_PASSAGE
     if any(m in _fold(t) for t in texts for m in banned):
         return "question must not refer to the textbook/SGK or the source"
-    if part == "Part1" and len(set(re.findall(r"(?m)^\s*([A-D])[.)]\s+\S", content))) >= 2:
-        return "options must be only in answer_options, not repeated in content"
     folded = _fold(content)
     if part == "Part3" and any(f" {stem} " in f" {folded} " for stem in _NON_NUMERIC_STEMS):
         return "short-answer question must ask for one numeric value, not a list or explanation"
@@ -281,6 +292,10 @@ def validate_question(part: str, raw: Any) -> Tuple[Optional[Dict[str, Any]], Op
     normalized, err = _VALIDATORS[part](raw)
     if normalized is None:
         return None, err
+    if part == "Part1":
+        content = _strip_repeated_options(content)
+        if not content:
+            return None, "empty content"
     err = _content_issue(part, content, normalized)
     if err:
         return None, err
@@ -396,6 +411,15 @@ _JUDGE_INSTRUCTION = (
     "ok judges question QUALITY only; a statement being false is normal and NOT a reason for ok=false (put it in ans). "
     "ans: Part1 one letter A-D; Part2 four letters D/S for a-d, e.g. \"DSSD\"; Part3 the number."
 )
+
+
+def _with_reviewer_note(explanation: Optional[str], reason: str, subject_name: str) -> str:
+    """Append the reviewer's remark to the explanation so a teacher sees the doubt next to the question."""
+    english = _subject_rule(subject_name).startswith("Subject rules: ALL text")
+    label = "Reviewer note" if english else "Lưu ý của AI kiểm duyệt"
+    note = f"{label}: {reason.removeprefix('reviewer: ').strip()}"
+    return explanation.strip() + chr(10) + note if explanation and explanation.strip() else note
+
 
 
 def _judge_view(part: str, q: Dict[str, Any]) -> Dict[str, Any]:
@@ -590,13 +614,13 @@ class AiExerciseGeneratorService:
                 reasons = cls.review_batch(part, [q for q, _ in batch], context, subject_name)
                 if on_stage:
                     on_stage("GENERATING")
-                for (q, key), reason in zip(batch, reasons):
-                    if reason is None:
-                        continue
-                    valid.remove(q)
-                    seen_content.discard(key)
-                    errors.append(reason)
-                cls.regenerate_explanations(part, [q for q, _ in batch if q in valid], subject_name)
+                # The reviewer is a model and can be wrong: never drop a question over its verdict.
+                # Keep it and attach the reviewer's remark to the question's own explanation.
+                cls.regenerate_explanations(part, [q for q, _ in batch], subject_name)
+                for (q, _key), reason in zip(batch, reasons):
+                    if reason is not None:
+                        q["explanation"] = _with_reviewer_note(q.get("explanation"), reason, subject_name)
+                        logger.info("%s: reviewer remark kept as note: %s", part, reason)
             if errors:
                 logger.info("%s: %d/%d valid, rejected: %s", part, len(valid), len(slots), "; ".join(errors[:6]))
             if len(valid) == before:

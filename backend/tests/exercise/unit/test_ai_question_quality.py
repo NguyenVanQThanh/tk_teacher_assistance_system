@@ -82,25 +82,19 @@ def _two_mcq_fake(calls):
     return classmethod(fake)
 
 
-def test_judge_rejects_and_regenerates_only_rejected(monkeypatch):
+def test_judge_remark_kept_as_note_never_drops_question(monkeypatch):
     monkeypatch.setenv("MISTRAL_API_KEY", "k")
     monkeypatch.setattr(gen.config, "AI_JUDGE_ENABLED", True)
-    monkeypatch.setattr(gen.config, "AI_PART_MAX_RETRIES", 2)
+    monkeypatch.setattr(gen.config, "AI_PART_MAX_RETRIES", 0)
     calls = []
     monkeypatch.setattr(Svc, "_call_mistral_part", _two_mcq_fake(calls))
-    judged = []
-
-    def judge(cls, part, items_json, context, subject_name=""):
-        judged.append(items_json)
-        if len(judged) == 1:
-            return [{"i": 0, "ans": "A", "ok": True}, {"i": 1, "ans": "C", "ok": False, "why": "ambiguous"}]
-        return [{"i": 0, "ans": "A", "ok": True}]
-
-    monkeypatch.setattr(Svc, "_call_judge", classmethod(judge))
+    monkeypatch.setattr(Svc, "_call_judge", classmethod(
+        lambda cls, part, items, ctx, subj="": [{"i": 0, "ans": "A", "ok": True},
+                                                 {"i": 1, "ans": "C", "ok": False, "why": "ambiguous"}]))
     out = Svc.generate_part("Part1", ["NhanBiet"] * 2, "", "", "r", "Hoa", "12")
-    assert [q["content"] for q in out] == ["Q1", "Q3"]
-    assert "exactly 1 NEW" in calls[1] and "reviewer: ambiguous" in calls[1]
-    assert "is_correct" not in judged[0]
+    assert [q["content"] for q in out] == ["Q1", "Q2"] and len(calls) == 1
+    assert "ambiguous" in out[1]["explanation"] and "Lưu ý" in out[1]["explanation"]
+    assert "ambiguous" not in (out[0].get("explanation") or "")
 
 
 def test_judge_failure_fails_open(monkeypatch):
@@ -114,16 +108,6 @@ def test_judge_failure_fails_open(monkeypatch):
     monkeypatch.setattr(Svc, "_call_judge", classmethod(boom))
     assert len(Svc.generate_part("Part1", ["NhanBiet"] * 2, "", "", "r", "Hoa", "12")) == 2
 
-
-def test_judge_rejected_questions_are_never_persisted(monkeypatch):
-    monkeypatch.setenv("MISTRAL_API_KEY", "k")
-    monkeypatch.setattr(gen.config, "AI_JUDGE_ENABLED", True)
-    monkeypatch.setattr(gen.config, "AI_PART_MAX_RETRIES", 0)
-    monkeypatch.setattr(Svc, "_call_mistral_part", _two_mcq_fake([]))
-    monkeypatch.setattr(Svc, "_call_judge", classmethod(
-        lambda cls, part, items, ctx, subj="": [{"i": 0, "ok": False, "why": "bad"}, {"i": 1, "ok": False, "why": "bad"}]))
-    with pytest.raises(RuntimeError):
-        Svc.generate_part("Part1", ["NhanBiet"] * 2, "", "", "r", "Hoa", "12")
 
 
 def test_judge_disabled_not_called(monkeypatch):
