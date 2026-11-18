@@ -19,6 +19,7 @@ import {
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import NotificationBell from '../common/NotificationBell';
+import GuestUsageBadge from '../common/GuestUsageBadge';
 import TeacherProfileModal from '../teacher/TeacherProfileModal';
 import './StudentHeader.css';
 
@@ -72,6 +73,7 @@ export default function StudentHeader({ onToggleSidebar }) {
 
         <div className="header-right">
           {/* Notifications Popover */}
+          <GuestUsageBadge />
           <NotificationBell />
 
           <button className="icon-btn" aria-label="Help" title="Trợ giúp & Hướng dẫn">
