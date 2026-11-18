@@ -455,6 +455,9 @@ def _import_questions_impl(
         else:
             groups.append((label, [parsed_q]))
 
+    # Lock the job row only now: holding it through OCR/solving blocks heartbeat updates.
+    from app.core.background_jobs import hold_ownership
+    hold_ownership(exercise_service.db)
     base_exercise = exercise_service.get_exercise_for_write(current_user, exercise_id)
     if base_exercise is None:
         raise HTTPException(
