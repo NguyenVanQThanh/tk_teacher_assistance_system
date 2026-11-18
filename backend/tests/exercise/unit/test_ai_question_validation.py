@@ -205,3 +205,11 @@ def test_unclosed_code_block_rejected_and_balanced_passes():
     assert bad is None and err == "unclosed code block"
     ok, err = gen.validate_question("Part1", {**base, "content": "Code:\n```python\nx = 1\n```\nOutput?"})
     assert err is None and ok is not None
+
+
+def test_options_repeated_in_stem_rejected():
+    q = mcq(["a", "b", "c", "d"], {0})
+    q["content"] = "Pick the odd one.\nA. please\nB. break"
+    assert validate_question("Part1", q)[0] is None
+    q["content"] = "Read:\n(1) ___ is here\n(2) ___ is there"
+    assert validate_question("Part1", q)[0] is not None

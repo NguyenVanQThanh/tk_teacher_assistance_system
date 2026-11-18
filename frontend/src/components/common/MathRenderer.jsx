@@ -81,6 +81,16 @@ export default function MathRenderer({ text, className = '' }) {
         : <MathRenderer key={i} text={b.value} />));
     }
 
+    // <u>..</u> underline markup (pronunciation items); other HTML stays literal text
+    if (text.includes('<u>')) {
+      const parts = splitUnderline(text);
+      if (parts.some((b) => b.type === 'u')) {
+        return parts.map((b, i) => (b.type === 'u'
+          ? <u key={i}>{b.value}</u>
+          : <MathRenderer key={i} text={b.value} />));
+      }
+    }
+
     // Markdown tables inside the text render as real tables (cells call back into MathRenderer)
     if (text.includes('|') && text.includes('---')) {
       const blocks = splitTableBlocks(text);
