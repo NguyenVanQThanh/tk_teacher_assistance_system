@@ -150,9 +150,6 @@ def _mistral_key() -> Optional[str]:
     return os.environ.get("MISTRAL_API_KEY") or os.environ.get("MISTRAL_KEY")
 
 
-def _gemini_key() -> Optional[str]:
-    return os.environ.get("GEMINI_API_KEY") or os.environ.get("GOOGLE_API_KEY") or os.environ.get("GEMINI_KEY")
-
 
 # Query -> embedding cache (bounded LRU). Manual instead of functools.lru_cache so one batched API call
 # can fill several entries at once.
@@ -202,27 +199,7 @@ _UNSET: Any = object()
 
 # Lazy-initialized LLM clients (module-level singletons)
 _llm_lock = threading.Lock()
-_gemini_client: Optional[Any] = None
 _mistral_client: Optional[Any] = None
-
-
-def _get_gemini_client() -> Optional[Any]:
-    """Lazy initialization of Gemini client (reused across calls)."""
-    global _gemini_client
-    if _gemini_client is None:
-        key = _gemini_key()
-        if key:
-            with _llm_lock:
-                if _gemini_client is None:  # Double-check after acquiring lock
-                    try:
-                        from google import genai
-                        _gemini_client = genai.Client(api_key=key)
-                    except Exception as e:
-                        logger.warning("Failed to create Gemini client: %s", e)
-                        return None
-        else:
-            return None
-    return _gemini_client
 
 
 def _get_mistral_client() -> Optional[Any]:
@@ -245,19 +222,7 @@ def _get_mistral_client() -> Optional[Any]:
 
 
 def _llm_text(prompt: str) -> Optional[str]:
-    """One short LLM completion (Gemini first, then Mistral); None when no key is configured."""
-    # Try Gemini first
-    gemini_client = _get_gemini_client()
-    if gemini_client:
-        try:
-            resp = gemini_client.models.generate_content(
-                model=config.RAG_QUERY_EXPANSION_GEMINI_MODEL, contents=prompt)
-            return resp.text
-        except Exception as e:
-            logger.debug("Gemini query expansion failed: %s", e)
-            # Don't fail, try Mistral
-            pass
-    
+    """One short LLM completion (Mistral); None when no key is configured."""
     # Try Mistral
     mistral_client = _get_mistral_client()
     if mistral_client:

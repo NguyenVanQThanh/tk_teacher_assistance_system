@@ -213,3 +213,25 @@ def test_rekeyed_explanation_fails_open(monkeypatch):
     q = {"content": "Q", "explanation": None, "_rekeyed": True, "correct_answer": "5"}
     Svc.regenerate_explanations("Part3", [q], "Toán")
     assert q["explanation"] is None and "_rekeyed" not in q
+
+
+def _part2_q():
+    return {"content": "Q", "explanation": "old",
+            "segments": [{"key": k, "statement": k, "is_correct": True} for k in "abcd"],
+            "answer_options": [{"content": k, "is_correct": True} for k in "abcd"]}
+
+
+def test_part2_verdict_style_rejection_adopts_judge_key(monkeypatch):
+    monkeypatch.setattr(gen.config, "AI_JUDGE_ENABLED", True)
+    monkeypatch.setattr(Svc, "_call_judge", classmethod(lambda cls, part, items, ctx, subj="": [
+        {"i": 0, "ans": "DSSD", "ok": False, "why": "b sai: x; c sai"}]))
+    q = _part2_q()
+    assert Svc.review_batch("Part2", [q], "") == [None]
+    assert [s["is_correct"] for s in q["segments"]] == [True, False, False, True]
+
+
+def test_part2_real_quality_rejection_still_rejects(monkeypatch):
+    monkeypatch.setattr(gen.config, "AI_JUDGE_ENABLED", True)
+    monkeypatch.setattr(Svc, "_call_judge", classmethod(lambda cls, part, items, ctx, subj="": [
+        {"i": 0, "ans": "DSSD", "ok": False, "why": "ambiguous stem"}]))
+    assert Svc.review_batch("Part2", [_part2_q()], "")[0].startswith("reviewer:")

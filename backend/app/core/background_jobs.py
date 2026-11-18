@@ -291,7 +291,7 @@ def recover_interrupted() -> int:
     try:
         n = 0
         for job in session.query(BackgroundJob).filter(
-                BackgroundJob.status == "RUNNING", BackgroundJob.updated_at < cutoff).all():
+                BackgroundJob.status == "RUNNING", BackgroundJob.updated_at < cutoff).with_for_update(skip_locked=True).all():
             if (job.attempts or 0) < MAX_ATTEMPTS:
                 job.status, job.progress, job.stage = "QUEUED", 0, None
             else:

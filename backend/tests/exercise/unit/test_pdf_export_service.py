@@ -96,3 +96,8 @@ def test_code_fence_renders_preformatted():
 def test_inline_code_uses_courier_and_escapes():
     markup = PdfExportService.format_content_to_markup("Check `a<b` now", [])
     assert 'face="Courier"' in markup and "a&lt;b" in markup
+
+
+def test_underline_markup_kept_other_html_escaped():
+    markup = PdfExportService.format_content_to_markup("gr<u>ea</u>t <b>x</b>", [])
+    assert "gr<u>ea</u>t" in markup and "&lt;b&gt;" in markup and "<b>" not in markup

@@ -72,15 +72,12 @@ def _calendar_year() -> str:
 
 def _default_settings_payload() -> Dict[str, Dict[str, Any]]:
     default_model = (
-        getattr(app_config, "RAG_QUERY_EXPANSION_GEMINI_MODEL", None)
+        getattr(app_config, "AI_MISTRAL_MODEL", None)
         or getattr(app_config, "ANSWER_SOLVER_MODEL", None)
-        or getattr(app_config, "AI_MISTRAL_MODEL", None)
-        or "gemini-2.5-flash"
+        or "deepseek-v4-1-flash-1017"
     )
     has_key = bool(
-        os.getenv("GEMINI_API_KEY")
-        or os.getenv("MISTRAL_API_KEY")
-        or os.getenv("OPENAI_API_KEY")
+        os.getenv("MISTRAL_API_KEY")
     )
     return {
         "general": {
@@ -96,7 +93,7 @@ def _default_settings_payload() -> Dict[str, Dict[str, Any]]:
             "gradeLockDeadline": "2026-01-25",
         },
         "ai": {
-            "provider": "google_gemini",
+            "provider": "mistral",
             "defaultModel": default_model,
             "apiKey": "••••••••••••" if has_key else "",
             "dailyTokenLimitPerTeacher": 250000,
@@ -264,16 +261,14 @@ def ping_ai_configuration(
     cfg = _load_settings(db)
     body = payload or {}
 
-    provider = str(body.get("provider") or cfg["ai"].get("provider") or "google_gemini")
-    model = str(body.get("model") or cfg["ai"].get("defaultModel") or "gemini-2.5-flash")
+    provider = str(body.get("provider") or cfg["ai"].get("provider") or "mistral")
+    model = str(body.get("model") or cfg["ai"].get("defaultModel") or "deepseek-v4-1-flash-1017")
 
     # Verify DB session health and non-secret application settings availability
     db.query(func.count(Role.role_id)).scalar()
     has_configured_key = bool(
         cfg["ai"].get("apiKey")
-        or os.getenv("GEMINI_API_KEY")
         or os.getenv("MISTRAL_API_KEY")
-        or os.getenv("OPENAI_API_KEY")
     )
 
     elapsed_ms = max(1, int(round((time.perf_counter() - start) * 1000)))
