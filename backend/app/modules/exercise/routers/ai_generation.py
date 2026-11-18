@@ -198,6 +198,7 @@ async def start_student_job(
 ):
     """Validate like POST /student, then generate in the background; poll GET /student/jobs/{job_id}."""
     payload, file_text, file_name = await _parse_student_request(request, db, current_user)
+    AiExerciseService(db)._enforce_guest_ai_limit(current_user)  # fail fast instead of a failed job
     job = enqueue(db, current_user.user_id, KIND_STUDENT_AI, {
         "request": json.loads(payload.model_dump_json()), "file_text": file_text, "file_name": file_name})
     return to_public(db, job)

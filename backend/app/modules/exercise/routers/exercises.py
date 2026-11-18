@@ -15,12 +15,13 @@ from fastapi import APIRouter, Depends, Query, UploadFile, File, Form, HTTPExcep
 from pydantic import ValidationError
 from sqlalchemy.orm import Session
 
+from app.core import config as app_config
 from app.core.background_jobs import enqueue, get_job, to_public
 from app.modules.exercise.jobs import KIND_IMPORT, KIND_TEACHER_AI, encode_upload
 from app.core.database import get_db
 from app.modules.academic.scoping import get_user_role_name
 from app.modules.auth import access_policy
-from models.models import User, Exercise
+from models.models import BackgroundJob, User, Exercise
 from app.modules.auth.dependencies import require_perm, get_current_user
 from app.modules.exercise.schemas import (
     AnswerReleaseRequest, ExerciseCreate, ExerciseUpdate, ExerciseOut,
@@ -29,6 +30,7 @@ from app.modules.exercise.schemas import (
     AiExerciseGenerateRequest, AiExerciseGenerateOut
 )
 from app.modules.exercise.services.exercise_service import ExerciseService
+from app.modules.exercise.services.ai_exercise_service import AiExerciseService
 from app.modules.exercise.services.question_service import QuestionService
 from app.modules.exercise.services.import_parser_service import ImportParserService
 from app.modules.exercise.services.answer_solver_service import AnswerSolverService
@@ -43,6 +45,41 @@ from app.core.resource_limits import (
 
 logger = logging.getLogger("smartlms.exercise.router")
 router = APIRouter(prefix="/api/v1/exercises", tags=["exercise-bank"])
+
+
+def _pdf_page_count(filename: str, data: bytes) -> int:
+    """Page count of a PDF upload (0 for non-PDF or unreadable files; the parser reports those itself)."""
+    if not (filename or "").lower().endswith(".pdf"):
+        return 0
+    try:
+        import fitz  # PyMuPDF
+        with fitz.open(stream=data, filetype="pdf") as doc:
+            return doc.page_count
+    except Exception:  # noqa: BLE001 - corrupt file is reported by the parser
+        return 0
+
+
+def _enforce_import_page_cap(filename: str, data: bytes) -> None:
+    """Reject PDFs above IMPORT_MAX_PDF_PAGES before any OCR cost is spent."""
+    if _pdf_page_count(filename, data) > app_config.IMPORT_MAX_PDF_PAGES:
+        raise HTTPException(
+            status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+            detail={"code": "ERR-EXE-IMPORT_TOO_MANY_PAGES",
+                    "message": f"PDF has too many pages (max {app_config.IMPORT_MAX_PDF_PAGES}). Please split the file."})
+
+
+def _enforce_guest_import_limit(db: Session, user: User) -> None:
+    """Cap OCR import jobs per guest; every queued job counts so retries cannot bypass the cap."""
+    if not user.is_guest:
+        return
+    used = db.query(BackgroundJob).filter(
+        BackgroundJob.user_id == user.user_id, BackgroundJob.kind == KIND_IMPORT).count()
+    if used >= app_config.GUEST_IMPORT_LIMIT:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail={"code": "ERR-EXE-GUEST_IMPORT_LIMIT",
+                    "message": "Guest accounts have reached the question import limit."})
+
 
 
 def get_exercise_service(db: Session = Depends(get_db)) -> ExerciseService:
@@ -143,6 +180,7 @@ def start_ai_generate_job(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail={"code": "ERR-DOC-NOT_FOUND", "message": "Document not found."}
             )
+    AiExerciseService(service.db)._enforce_guest_ai_limit(current_user)  # fail fast instead of a failed job
     job = enqueue(service.db, current_user.user_id, KIND_TEACHER_AI, json.loads(payload.model_dump_json()))
     return to_public(service.db, job)
 
@@ -322,6 +360,7 @@ def import_questions(
     loop (the old ``async def`` handler did, which is why one import could stall
     every other user). IMPORT_SEMAPHORE bounds how many imports run at once.
     """
+    _enforce_guest_import_limit(exercise_service.db, current_user)
     with IMPORT_SEMAPHORE:
         return _import_questions_impl(
             exercise_id=exercise_id,
@@ -370,6 +409,8 @@ def _import_questions_impl(
                 "message": "Question file size exceeds 15MB limit. Please compress or split the file."
             }
         )
+
+    _enforce_import_page_cap(q_filename, q_bytes)
 
     # Reject a question file already imported into another exercise (SHA-256 of the raw bytes)
     q_hash = hashlib.sha256(q_bytes).hexdigest()
@@ -455,6 +496,9 @@ def _import_questions_impl(
         else:
             groups.append((label, [parsed_q]))
 
+    # Lock the job row only now: holding it through OCR/solving blocks heartbeat updates.
+    from app.core.background_jobs import hold_ownership
+    hold_ownership(exercise_service.db)
     base_exercise = exercise_service.get_exercise_for_write(current_user, exercise_id)
     if base_exercise is None:
         raise HTTPException(
@@ -649,6 +693,12 @@ def start_import_questions_job(
                 status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
                 detail={"code": "ERR-EXE-IMPORT_FILE_TOO_LARGE",
                         "message": "Answer file size exceeds 15MB limit. Please compress or split the file."})
+    _enforce_guest_import_limit(exercise_service.db, current_user)
+    _enforce_import_page_cap(question_file.filename, question_file.file.read())
+    question_file.file.seek(0)
+    if answer_file is not None:
+        _enforce_import_page_cap(answer_file.filename, answer_file.file.read())
+        answer_file.file.seek(0)
     job = enqueue(exercise_service.db, current_user.user_id, KIND_IMPORT, {
         "exercise_id": str(exercise_id), "test_code": test_code,
         "question_file": encode_upload(question_file), "answer_file": encode_upload(answer_file)})

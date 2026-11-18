@@ -177,8 +177,7 @@ def test_busy_returns_503(client, world, monkeypatch):
 
 
 def test_generation_failure_502(client, world, monkeypatch):
-    monkeypatch.setattr("app.modules.exercise.services.ai_generator_service.GeminiVisionParserService.get_api_key",
-                        lambda: None)
+    monkeypatch.delenv("MISTRAL_API_KEY", raising=False)
     assert _post(client, world).status_code == 502
 
 

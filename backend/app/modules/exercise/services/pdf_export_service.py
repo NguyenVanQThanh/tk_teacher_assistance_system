@@ -292,6 +292,16 @@ class PdfExportService:
                     out.append(cls.format_content_to_markup(seg, temp_files_list, fontsize))
             return "".join(out)
 
+        # <u>..</u> underline spans (pronunciation items); other HTML stays escaped.
+        if "<u>" in raw_text:
+            out = []
+            for i, seg in enumerate(re.split(r"<u>([^<>\n]{1,60})</u>", raw_text)):
+                if i % 2:
+                    out.append(f"<u>{cls._escape_html(seg)}</u>")
+                elif seg:
+                    out.append(cls.format_content_to_markup(seg, temp_files_list, fontsize))
+            return "".join(out)
+
         normalized_text = cls._normalize_math_in_text(raw_text)
         parts = re.split(r"(\$\$.*?\$\$|\$.*?\$)", normalized_text)
 
