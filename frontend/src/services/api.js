@@ -35,6 +35,11 @@ api.interceptors.response.use(
       localStorage.removeItem('access_token');
       localStorage.removeItem('user_info');
     }
+    // Guest quota exhausted: let the guest usage badge show a banner (any caller, any screen).
+    const code = error.response?.data?.detail?.code;
+    if (typeof code === 'string' && code.startsWith('ERR-') && code.endsWith('_LIMIT') && code.includes('GUEST')) {
+      window.dispatchEvent(new CustomEvent('guest:limit', { detail: code }));
+    }
     return Promise.reject(error);
   }
 );
@@ -199,6 +204,10 @@ const pollLoop = async (jobUrl, deadline) => {
     const { data } = await api.get(jobUrl);
     if (data.status === 'done') return data.result;
     if (data.status === 'error') {
+      const jobCode = data.detail?.code;
+      if (typeof jobCode === 'string' && jobCode.includes('GUEST') && jobCode.endsWith('_LIMIT')) {
+        window.dispatchEvent(new CustomEvent('guest:limit', { detail: jobCode }));
+      }
       const err = new Error('Background job failed');
       err.response = { status: data.http_status, data: { detail: data.detail } };
       throw err;

@@ -30,6 +30,7 @@ from app.modules.exercise.schemas import (
     AiExerciseGenerateRequest, AiExerciseGenerateOut
 )
 from app.modules.exercise.services.exercise_service import ExerciseService
+from app.modules.exercise.services.ai_exercise_service import AiExerciseService
 from app.modules.exercise.services.question_service import QuestionService
 from app.modules.exercise.services.import_parser_service import ImportParserService
 from app.modules.exercise.services.answer_solver_service import AnswerSolverService
@@ -179,6 +180,7 @@ def start_ai_generate_job(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail={"code": "ERR-DOC-NOT_FOUND", "message": "Document not found."}
             )
+    AiExerciseService(service.db)._enforce_guest_ai_limit(current_user)  # fail fast instead of a failed job
     job = enqueue(service.db, current_user.user_id, KIND_TEACHER_AI, json.loads(payload.model_dump_json()))
     return to_public(service.db, job)
 

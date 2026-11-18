@@ -296,3 +296,11 @@ def test_purge_stale_guests_soft_deletes_only_old_guests(client, db_session):
     assert purge_stale_guests(db_session, 30) >= 1
     assert db_session.query(User).filter(User.user_id == old).one().status == "DELETED"
     assert db_session.query(User).filter(User.user_id == new).one().status == "ACTIVE"
+
+
+def test_me_exposes_guest_usage_only_for_guests(client):
+    g = _guest(client, "Teacher")
+    me = client.get("/api/v1/auth/me", headers=_h(g)).json()
+    assert me["guest_usage"] == {
+        "documents": {"used": 0, "limit": 3}, "ai": {"used": 0, "limit": 3}, "imports": {"used": 0, "limit": 3}}
+    assert client.get("/api/v1/auth/me", headers=_admin(client)).json()["guest_usage"] is None

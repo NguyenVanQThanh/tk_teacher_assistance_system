@@ -207,12 +207,17 @@ def _finish(job_id: UUID, ok: bool, result: Any = None, error: Optional[dict] = 
         # Drop uploaded file content: it is only needed to run the job.
         job.payload = _scrub(job.payload)
         _, label, link, _ = _HANDLERS.get(job.kind, (None, "Tác vụ", "/", 60))
+        detail = (error or {}).get("detail") if isinstance(error, dict) else None
+        code = detail.get("code", "") if isinstance(detail, dict) else ""
+        limit_hit = (not ok) and "GUEST" in code and code.endswith("_LIMIT")
         session.commit()  # the outcome is durable before the best-effort notification
         try:
             notification_service.notify(
                 session, [job.user_id], "JOB_DONE" if ok else "JOB_FAILED",
-                f"{label} đã hoàn tất" if ok else f"{label} thất bại",
-                "Nhấn để xem kết quả." if ok else "Vui lòng thử lại.", link)
+                f"{label} đã hoàn tất" if ok else (f"{label}: đã hết lượt dùng" if limit_hit else f"{label} thất bại"),
+                "Nhấn để xem kết quả." if ok else (
+                    "Tài khoản khách đã hết lượt cho chức năng này. Vui lòng đăng ký tài khoản để tiếp tục."
+                    if limit_hit else "Vui lòng thử lại."), link)
             session.commit()
         except Exception:  # noqa: BLE001 - a failed notification must never undo the job outcome
             session.rollback()

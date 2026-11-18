@@ -7,7 +7,7 @@
 
 
 from uuid import UUID
-from typing import Optional, List
+from typing import Dict, Optional, List
 from typing import Literal
 from pydantic import BaseModel, Field, ConfigDict, field_validator
 
@@ -77,6 +77,8 @@ class UserProfileOut(BaseModel):
     teaching_subjects: Optional[List[str]] = Field(None, description="Assigned teaching subjects for teachers")
     permissions: List[str] = Field(default_factory=list, description="Effective permission codes")
     is_guest: bool = Field(False, description="True for guest accounts")
+    guest_usage: Optional[Dict[str, Dict[str, int]]] = Field(
+        None, description="Guest quota usage: {documents|ai|imports: {used, limit}}; null for regular users")
     current_academic_year: Optional[str] = Field(None, description="Current academic year, e.g. 2025-2026")
 
 class UserProfileUpdateRequest(BaseModel):

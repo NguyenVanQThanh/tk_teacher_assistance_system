@@ -18,7 +18,7 @@ from app.core import config as app_config
 from app.core.database import get_db
 from app.core.security import get_password_hash
 from app.core.rate_limit import check_rate_limit, record_login_failure, reset_login_failures
-from models.models import User, Role, StudentClass, Class, TeacherSubject, Subject
+from models.models import User, Role, StudentClass, Class, TeacherSubject, Subject, Document, Exercise, BackgroundJob
 from app.modules.auth.schemas import (
     GuestRequest, LoginRequest, LoginResponse, UserProfileOut, ChangePasswordRequest, RegisterRequest, UserProfileUpdateRequest
 )
@@ -186,8 +186,24 @@ def get_me(current_user: User = Depends(get_current_user), db: Session = Depends
         teaching_subjects=teaching_subjects,
         permissions=perms,
         is_guest=bool(current_user.is_guest),
+        guest_usage=_guest_usage(db, current_user),
         current_academic_year=get_current_academic_year(db),
     )
+
+def _guest_usage(db: Session, user: User):
+    """Quota usage shown to guests; counted exactly like the limit checks (soft-deleted rows still count)."""
+    if not user.is_guest:
+        return None
+    uid = user.user_id
+    return {
+        "documents": {"used": db.query(Document).filter(Document.uploaded_by == uid).count(),
+                      "limit": app_config.GUEST_DOC_LIMIT},
+        "ai": {"used": db.query(Exercise).filter(Exercise.created_by == uid).count(),
+               "limit": app_config.GUEST_AI_LIMIT},
+        "imports": {"used": db.query(BackgroundJob).filter(
+            BackgroundJob.user_id == uid, BackgroundJob.kind == "QUESTION_IMPORT").count(),
+                    "limit": app_config.GUEST_IMPORT_LIMIT},
+    }
 
 @router.put("/profile", response_model=UserProfileOut, dependencies=[Depends(require_perm("AUTH_ME_VIEW"))])
 def update_profile(
