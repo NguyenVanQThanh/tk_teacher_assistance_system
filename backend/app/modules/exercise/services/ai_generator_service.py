@@ -71,7 +71,9 @@ _SUBJECT_RULES = (
      "'a-c-b-d-e'), reading comprehension (passage of 200-300 words, paragraphs separated by blank lines; main "
      "idea, vocabulary in context, reference words, NOT TRUE), word choice, phonetics/stress. Part2: a short "
      "passage plus 4 True/False statements. Part3 (if requested): ask the number of correct sentences or a "
-     "correct ordering count, never free text. Put each paragraph, numbered blank and statement on its own line."),
+     "correct ordering count, never free text. Put each paragraph, numbered blank and statement on its own line. "
+     "For pronunciation items mark the underlined letters with <u>..</u> in each option (e.g. gr<u>ea</u>t); "
+     "stress items use plain words; blanks are '_____'."),
     (("ngu van",), "Subject rules: write reading-comprehension items on an embedded excerpt (with author); the "
                    "passage stays inside the stem; put each verse line on its own line; Part3 (if requested) asks a count."),
 )
@@ -256,6 +258,8 @@ def _content_issue(part: str, content: str, normalized: Dict[str, Any]) -> Optio
         banned = banned + _BANNED_NO_PASSAGE
     if any(m in _fold(t) for t in texts for m in banned):
         return "question must not refer to the textbook/SGK or the source"
+    if part == "Part1" and len(set(re.findall(r"(?m)^\s*([A-D])[.)]\s+\S", content))) >= 2:
+        return "options must be only in answer_options, not repeated in content"
     folded = _fold(content)
     if part == "Part3" and any(f" {stem} " in f" {folded} " for stem in _NON_NUMERIC_STEMS):
         return "short-answer question must ask for one numeric value, not a list or explanation"
@@ -349,7 +353,8 @@ _PART_RULES = {
         "PART I - multiple choice. Each question: a clear stem and exactly 4 distinct options (no 'A.'/'B.' "
         "prefixes), with exactly one option with is_correct=true. Distractors must be plausible (common "
         "misconceptions or calculation slips), similar in length and grammar to the key, and clearly wrong. "
-        "Never use 'Tất cả các đáp án trên', 'Cả A và B' or 'Không có đáp án đúng'.\n"
+        "Never use 'Tất cả các đáp án trên', 'Cả A và B' or 'Không có đáp án đúng'. "
+        "Never repeat the options inside `content`.\n"
         "BAD: 'Theo SGK, polymer là gì?' (meta reference, debatable definition recall).\n"
         "GOOD: 'Polymer nào sau đây được điều chế bằng phản ứng trùng ngưng?' options: Nylon-6,6 (true); "
         "Polyethylene; Poly(vinyl chloride); Polystyrene."

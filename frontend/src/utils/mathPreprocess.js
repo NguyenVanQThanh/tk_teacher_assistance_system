@@ -33,7 +33,9 @@ export function preprocessMathText(text) {
   // 2. If entire string is a math formula or choice with NO Vietnamese words
   // ponytail: prose (two plain words in a row once \commands are removed) is never wrapped
   const looksLikeProse = /[A-Za-z]{2,}\s+[A-Za-z]{2,}/.test(str.replace(/\\[a-zA-Z]+/g, ''));
-  if (!VIETNAMESE_WORDS.test(str) && !looksLikeProse) {
+  // ponytail: rearrangement answers like "C - A - B" are letters, not math; widen if other letter-dash formats appear
+  const isRearrangement = /^[a-e](\s*-\s*[a-e])+$/i.test(str.trim());
+  if (!VIETNAMESE_WORDS.test(str) && !looksLikeProse && !isRearrangement) {
     const trimmed = str.replace(/^[A-D]\.\s*/, '').trim();
     if (trimmed.length > 0 && (/[=\\+\-*/^_{}()\[\]<>]/.test(trimmed) || /^-?\d+(\.\d+)?$/.test(trimmed))) {
       const prefix = str.match(/^[A-D]\.\s*/)?.[0] || '';
