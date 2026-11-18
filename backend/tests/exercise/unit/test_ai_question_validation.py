@@ -207,9 +207,12 @@ def test_unclosed_code_block_rejected_and_balanced_passes():
     assert err is None and ok is not None
 
 
-def test_options_repeated_in_stem_rejected():
+def test_options_repeated_in_stem_stripped():
     q = mcq(["a", "b", "c", "d"], {0})
     q["content"] = "Pick the odd one.\nA. please\nB. break"
+    ok, err = validate_question("Part1", q)
+    assert err is None and ok["content"] == "Pick the odd one."
+    q["content"] = "A. please\nB. break"
     assert validate_question("Part1", q)[0] is None
     q["content"] = "Read:\n(1) ___ is here\n(2) ___ is there"
     assert validate_question("Part1", q)[0] is not None

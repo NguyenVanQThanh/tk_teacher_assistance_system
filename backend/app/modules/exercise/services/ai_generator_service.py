@@ -246,6 +246,20 @@ def validate_short(raw: Dict[str, Any]) -> Tuple[Optional[Dict[str, Any]], Optio
 _VALIDATORS = {"Part1": validate_mcq, "Part2": validate_tf, "Part3": validate_short}
 
 
+_OPTION_LINE_RE = re.compile(r"^\s*[A-D][.)]\s+\S")
+
+def _strip_repeated_options(content: str) -> str:
+    """Cut a trailing block of 'A. ..' / 'B. ..' lines (options the model repeated inside the stem).
+
+    Only a block at the very end is removed, so passages and mid-stem lists stay intact."""
+    lines = content.rstrip().split(chr(10))
+    cut = len(lines)
+    while cut > 0 and (_OPTION_LINE_RE.match(lines[cut - 1]) or not lines[cut - 1].strip()):
+        cut -= 1
+    if len(lines) - cut < 2 or sum(1 for ln in lines[cut:] if _OPTION_LINE_RE.match(ln)) < 2 or cut == 0:
+        return content
+    return chr(10).join(lines[:cut]).rstrip()
+
 def _content_issue(part: str, content: str, normalized: Dict[str, Any]) -> Optional[str]:
     """Deterministic quality checks on question text; returns a reason or None."""
     texts = [content] + [o["content"] for o in normalized.get("answer_options", [])]
@@ -281,6 +295,8 @@ def validate_question(part: str, raw: Any) -> Tuple[Optional[Dict[str, Any]], Op
     normalized, err = _VALIDATORS[part](raw)
     if normalized is None:
         return None, err
+    if part == "Part1":
+        content = _strip_repeated_options(content)
     err = _content_issue(part, content, normalized)
     if err:
         return None, err
