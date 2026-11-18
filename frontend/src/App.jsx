@@ -10,6 +10,7 @@ import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import ProtectedRoute, { guestHome } from './components/common/ProtectedRoute';
 import JobTray from './components/common/JobTray';
+import GuestUsageBadge from './components/common/GuestUsageBadge';
 import TeacherLayout from './components/layout/TeacherLayout';
 import StudentLayout from './components/layout/StudentLayout';
 import LoginPage from './pages/LoginPage';
@@ -255,6 +256,7 @@ export default function App() {
         </Routes>
         </React.Suspense>
         <JobTray />
+        <GuestUsageBadge />
       </BrowserRouter>
     </AuthProvider>
     </ErrorBoundary>
