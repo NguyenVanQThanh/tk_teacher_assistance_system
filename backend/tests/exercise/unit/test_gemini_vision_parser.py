@@ -131,6 +131,7 @@ class TestGeminiVisionParserService:
     @patch("app.modules.exercise.services.gemini_vision_parser_service.GeminiVisionParserService.parse_pdf_document")
     def test_import_parser_service_gemini_integration(self, mock_parse_pdf, monkeypatch):
         monkeypatch.setenv("GEMINI_API_KEY", "test_key")
+        monkeypatch.setenv("SCAN_AI_PROVIDER", "gemini")  # Gemini is opt-in; Mistral is the default
 
         mock_parse_pdf.return_value = GeminiVisionParserService._process_gemini_json_response(json.dumps({
             "questions": [

@@ -1450,8 +1450,7 @@ class ImportParserService:
     def get_ai_vision_providers() -> List[Tuple[str, Any]]:
         """
         Ordered list of available AI vision OCR providers for scanned exams.
-        Primary provider is chosen via SCAN_AI_PROVIDER (default: 'mistral');
-        the other configured provider is kept as automatic fallback.
+        Primary provider is chosen via SCAN_AI_PROVIDER (default: 'mistral', no Gemini fallback).
         """
         if not os.environ.get("PYTEST_CURRENT_TEST"):
             if not any(k in os.environ for k in ("SCAN_AI_PROVIDER", "MISTRAL_API_KEY", "GEMINI_API_KEY")):
@@ -1466,7 +1465,9 @@ class ImportParserService:
             "mistral": ("Mistral", MistralVisionParserService),
             "gemini": ("Google Gemini", GeminiVisionParserService),
         }
-        fallback = "gemini" if primary == "mistral" else "mistral"
+        # Mistral only by default (Gemini vision fails on the v1 API); set SCAN_AI_PROVIDER=gemini to opt in,
+        # which keeps Mistral as the fallback.
+        fallback = "mistral" if primary == "gemini" else None
 
         ordered: List[Tuple[str, Any]] = []
         for key in (primary, fallback):
