@@ -10,7 +10,7 @@ import katex from 'katex';
 import 'katex/dist/katex.min.css';
 import MarkdownTable from './MarkdownTable';
 import { splitTableBlocks } from './tableMarkdown';
-import { splitCodeBlocks, splitInlineCode } from '../../utils/codeMarkdown';
+import { splitCodeBlocks, splitInlineCode, splitUnderline } from '../../utils/codeMarkdown';
 import { preprocessMathText } from '../../utils/mathPreprocess';
 
 /**
@@ -79,6 +79,16 @@ export default function MathRenderer({ text, className = '' }) {
       return splitInlineCode(text).map((b, i) => (b.type === 'code'
         ? <code key={i} className="code-inline">{b.value}</code>
         : <MathRenderer key={i} text={b.value} />));
+    }
+
+    // <u>..</u> underline markup (pronunciation items); other HTML stays literal text
+    if (text.includes('<u>')) {
+      const parts = splitUnderline(text);
+      if (parts.some((b) => b.type === 'u')) {
+        return parts.map((b, i) => (b.type === 'u'
+          ? <u key={i}>{b.value}</u>
+          : <MathRenderer key={i} text={b.value} />));
+      }
     }
 
     // Markdown tables inside the text render as real tables (cells call back into MathRenderer)

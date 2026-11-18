@@ -312,7 +312,7 @@ Lưu ý:
 
 # 2. Tạo file env production (KHÔNG commit file này)
 cp deploy/.env.prod.example deploy/.env.prod
-nano deploy/.env.prod        # điền mật khẩu DB, SECRET_KEY, MISTRAL_API_KEY, GEMINI_API_KEY...
+nano deploy/.env.prod        # điền mật khẩu DB, SECRET_KEY, MISTRAL_API_KEY...
 
 # 3. Build & chạy (từ repo root)
 bash deploy/scripts/deploy.sh                 # không có proxy, mở thẳng các port nội bộ

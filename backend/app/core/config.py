@@ -68,7 +68,6 @@ DOCUMENT_RENDER_DPI = int(os.environ.get("DOCUMENT_RENDER_DPI", "200"))
 
 # RAG query expansion (sub-queries for retrieval). API keys are read from the process environment at call time.
 RAG_QUERY_EXPANSION_ENABLED = os.environ.get("RAG_QUERY_EXPANSION_ENABLED", "true").strip().lower() in ("1", "true", "yes")
-RAG_QUERY_EXPANSION_GEMINI_MODEL = os.environ.get("RAG_QUERY_EXPANSION_GEMINI_MODEL", "gemini-2.5-flash")
 RAG_QUERY_EXPANSION_MISTRAL_MODEL = os.environ.get("RAG_QUERY_EXPANSION_MISTRAL_MODEL", "mistral-small-latest")
 
 
@@ -114,7 +113,7 @@ AI_PART_MAX_TOKENS = _env_int("AI_PART_MAX_TOKENS", 3500, minimum=500)
 AI_PART_BATCH_SIZE = _env_int("AI_PART_BATCH_SIZE", 5, minimum=1)
 # Worker threads that process queued background jobs (0 disables the worker, e.g. in tests).
 JOB_WORKERS = _env_int("JOB_WORKERS", 2, minimum=0)
-# Mistral model for question generation (tried before Gemini)
+# Mistral model for question generation
 AI_MISTRAL_MODEL = os.environ.get("AI_MISTRAL_MODEL", "deepseek-v4-1-flash-1017")  # via the Mistral API; mistral-large always emits reasoning chunks (slow, truncated)
 
 
@@ -138,6 +137,10 @@ GUEST_CREATE_GLOBAL_HOUR = _env_int("GUEST_CREATE_GLOBAL_HOUR", 200)
 GUEST_DOC_LIMIT = _env_int("GUEST_DOC_LIMIT", 3, minimum=0)
 # Maximum AI generations (exercises created) per guest account; soft-deleted ones still count.
 GUEST_AI_LIMIT = _env_int("GUEST_AI_LIMIT", 3, minimum=0)
+# Maximum question-import (OCR) jobs per guest account; every queued job counts, even failed ones.
+GUEST_IMPORT_LIMIT = _env_int("GUEST_IMPORT_LIMIT", 3, minimum=0)
+# Maximum PDF pages OCR-ed per import (all roles); bounds vision-provider cost.
+IMPORT_MAX_PDF_PAGES = _env_int("IMPORT_MAX_PDF_PAGES", 30, minimum=1)
 # Fallback academic year ("YYYY-YYYY") used when no admin setting exists; empty -> derived from calendar.
 CURRENT_ACADEMIC_YEAR = os.environ.get("CURRENT_ACADEMIC_YEAR", "").strip()
 # Honor CF-Connecting-IP / X-Forwarded-For only behind a trusted reverse proxy.

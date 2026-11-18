@@ -209,6 +209,13 @@ jobs:
           GUEST_CREATE_GLOBAL_HOUR: ${{ vars.GUEST_CREATE_GLOBAL_HOUR }}
           GUEST_AI_LIMIT: ${{ vars.GUEST_AI_LIMIT }}
           GUEST_DOC_LIMIT: ${{ vars.GUEST_DOC_LIMIT }}
+          GUEST_IMPORT_LIMIT: ${{ vars.GUEST_IMPORT_LIMIT }}
+          IMPORT_MAX_PDF_PAGES: ${{ vars.IMPORT_MAX_PDF_PAGES }}
+          JOB_WORKERS: ${{ vars.JOB_WORKERS }}
+          AI_MISTRAL_MODEL: ${{ vars.AI_MISTRAL_MODEL }}
+          AI_JUDGE_MODEL: ${{ vars.AI_JUDGE_MODEL }}
+          AI_PART_MAX_RETRIES: ${{ vars.AI_PART_MAX_RETRIES }}
+          IMPORT_CONCURRENCY: ${{ vars.IMPORT_CONCURRENCY }}
         run: |
           set -euo pipefail
           umask 077
@@ -224,7 +231,9 @@ jobs:
                       STORAGE_BACKEND R2_ACCOUNT_ID R2_ACCESS_KEY_ID R2_SECRET_ACCESS_KEY \
                       R2_BUCKET R2_PUBLIC_BASE_URL NGINX_BIND NGINX_PORT \
                       TRUST_PROXY_HEADERS TRUSTED_PROXY_HOPS GUEST_ACCESS_ENABLED \
-                      GUEST_CREATE_PER_IP_HOUR GUEST_CREATE_GLOBAL_HOUR GUEST_AI_LIMIT GUEST_DOC_LIMIT; do
+                      GUEST_CREATE_PER_IP_HOUR GUEST_CREATE_GLOBAL_HOUR GUEST_AI_LIMIT GUEST_DOC_LIMIT \
+                      GUEST_IMPORT_LIMIT IMPORT_MAX_PDF_PAGES JOB_WORKERS AI_MISTRAL_MODEL \
+                      AI_JUDGE_MODEL AI_PART_MAX_RETRIES IMPORT_CONCURRENCY; do
             val="${!name:-}"
             if [ -n "$val" ]; then
               printf '%s=%s\n' "$name" "$val" >> /tmp/deploy.env

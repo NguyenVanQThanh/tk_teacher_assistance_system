@@ -40,6 +40,7 @@ QUY TẮC BỔ SUNG (BẮT BUỘC):
 - CHÉP NGUYÊN VĂN từng chữ của đề: không diễn đạt lại, không tóm tắt, không thay từ đồng nghĩa, không dịch, không sửa ngữ pháp/chính tả; giữ đủ mọi câu, mọi số liệu, mọi đơn vị ở đề bài và từng phương án.
 - Không bịa nội dung: chỉ chép đúng chữ có trên trang. Không tự tạo câu hỏi hay phương án không có trong ảnh.
 - Chép ĐẦY ĐỦ mọi câu, kể cả câu có bảng/hình/đồ thị; không bỏ sót câu nào ngay sau một hình. Số câu chạy liên tục 1..N trong mỗi phần.
+- BỎ QUA mọi nội dung KHÔNG phải câu hỏi của đề: lời giải/đáp án/hướng dẫn chấm đứng riêng, lý thuyết, bài đọc dài không gắn câu hỏi, quảng cáo, header/footer, số trang, tên trường, hướng dẫn làm bài, ghi chú, mục lục, ví dụ minh họa. Chỉ xuất một object khi có số thứ tự câu hỏi ("Câu N", "N." hoặc tương đương) cùng đề bài/phương án rõ ràng. Không suy diễn, không biến đoạn văn bất kỳ thành câu hỏi. Nếu trang không có câu hỏi nào, trả về "questions": [].
 - Câu bị ngắt giữa hai trang: chép đầy đủ phần có trên các trang được gửi; câu chưa kết thúc ở cuối trang cuối thì bỏ qua (sẽ nằm ở lượt sau)."""
 # Pixtral officially recommends ~1568px per side, but exam scans need the extra
 # resolution for accurate figure bboxes; 3136 keeps full render detail (scale 3.0

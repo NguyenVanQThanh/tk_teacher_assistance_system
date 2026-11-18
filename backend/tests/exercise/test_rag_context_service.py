@@ -28,9 +28,7 @@ def test_format_orders_sgk_first_and_dedupes():
 
 
 def test_generator_raises_without_key(monkeypatch):
-    monkeypatch.setattr(
-        "app.modules.exercise.services.ai_generator_service.GeminiVisionParserService.get_api_key", lambda: None
-    )
+    monkeypatch.delenv("MISTRAL_API_KEY", raising=False)
     with pytest.raises(RuntimeError):
         AiExerciseGeneratorService.generate_questions("Hoa", "Lop 12", "este", 1, 1, 1)
 
