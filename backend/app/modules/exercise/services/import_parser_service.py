@@ -1450,31 +1450,18 @@ class ImportParserService:
     def get_ai_vision_providers() -> List[Tuple[str, Any]]:
         """
         Ordered list of available AI vision OCR providers for scanned exams.
-        Primary provider is chosen via SCAN_AI_PROVIDER (default: 'mistral', no Gemini fallback).
+        Mistral is the only OCR provider.
         """
         if not os.environ.get("PYTEST_CURRENT_TEST"):
-            if not any(k in os.environ for k in ("SCAN_AI_PROVIDER", "MISTRAL_API_KEY", "GEMINI_API_KEY")):
+            if not any(k in os.environ for k in ("MISTRAL_API_KEY",)):
                 from dotenv import load_dotenv, find_dotenv
                 load_dotenv(find_dotenv())
 
-        from app.modules.exercise.services.gemini_vision_parser_service import GeminiVisionParserService
         from app.modules.exercise.services.mistral_vision_parser_service import MistralVisionParserService
 
-        primary = (os.environ.get("SCAN_AI_PROVIDER", "mistral") or "mistral").strip().lower()
-        registry = {
-            "mistral": ("Mistral", MistralVisionParserService),
-            "gemini": ("Google Gemini", GeminiVisionParserService),
-        }
-        # Mistral only by default (Gemini vision fails on the v1 API); set SCAN_AI_PROVIDER=gemini to opt in,
-        # which keeps Mistral as the fallback.
-        fallback = "mistral" if primary == "gemini" else None
-
         ordered: List[Tuple[str, Any]] = []
-        for key in (primary, fallback):
-            if key in registry and all(k != key for k, _ in ordered):
-                name, service = registry[key]
-                if service.is_available():
-                    ordered.append((name, service))
+        if MistralVisionParserService.is_available():
+            ordered.append(("Mistral", MistralVisionParserService))
         return ordered
 
     @classmethod

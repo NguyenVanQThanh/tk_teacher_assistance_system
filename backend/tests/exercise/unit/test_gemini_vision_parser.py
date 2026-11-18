@@ -128,32 +128,6 @@ class TestGeminiVisionParserService:
         assert len(result.errors) > 0
         assert len(result.questions) == 0
 
-    @patch("app.modules.exercise.services.gemini_vision_parser_service.GeminiVisionParserService.parse_pdf_document")
-    def test_import_parser_service_gemini_integration(self, mock_parse_pdf, monkeypatch):
-        monkeypatch.setenv("GEMINI_API_KEY", "test_key")
-        monkeypatch.setenv("SCAN_AI_PROVIDER", "gemini")  # Gemini is opt-in; Mistral is the default
-
-        mock_parse_pdf.return_value = GeminiVisionParserService._process_gemini_json_response(json.dumps({
-            "questions": [
-                {
-                    "question_number": 1,
-                    "part": "Part1",
-                    "question_type": "MultipleChoice",
-                    "content": "Test Question from Gemini",
-                    "answer_options": [
-                        {"content": "$A$", "is_correct": True, "display_order": 0}
-                    ]
-                }
-            ]
-        }))
-
-        pdf_dummy_bytes = b"%PDF-1.4 dummy content"
-        res = ImportParserService.parse_document(pdf_dummy_bytes, "exam.pdf")
-
-        assert mock_parse_pdf.called
-        assert len(res.questions) == 1
-        assert res.questions[0].content == "Test Question from Gemini"
-
     def test_process_gemini_null_options(self):
         null_options_json = json.dumps({
             "questions": [

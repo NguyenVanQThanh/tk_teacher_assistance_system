@@ -1,5 +1,5 @@
 # File Name: ai_generator_service.py
-# Description: Generates AI exercise questions per part (MCQ / True-False / Short answer) with Gemini structured output, strict validation and repair.
+# Description: Generates AI exercise questions per part (MCQ / True-False / Short answer) with Mistral JSON mode, strict validation and repair.
 # Created At: 2026-10-03
 # Created By: Tam Khang
 # Updated At: 2026-11-17
@@ -15,7 +15,6 @@ from typing import Any, Callable, Dict, List, Optional, Tuple
 
 from app.core import config
 from app.core import background_jobs
-from app.modules.exercise.services.gemini_vision_parser_service import GeminiVisionParserService
 
 logger = logging.getLogger("smartlms.exercise.ai_generator")
 
@@ -494,7 +493,7 @@ class AiExerciseGeneratorService:
         student_file: str = "",
     ) -> List[Dict[str, Any]]:
         """
-        Generate Part1 (MultipleChoice), Part2 (TrueFalse) and Part3 (ShortAnswer) questions with Gemini,
+        Generate Part1 (MultipleChoice), Part2 (TrueFalse) and Part3 (ShortAnswer) questions with Mistral,
         grounded on the retrieved context. One LLM call per non-empty part, run in parallel.
 
         matrix is {mcq|tf|short: {NhanBiet, ThongHieu, VanDung}}; without it the counts are spread over the
@@ -758,28 +757,5 @@ class AiExerciseGeneratorService:
         if isinstance(content, list):  # content may come back as a list of text chunks
             content = "".join(getattr(c, "text", None) or (c.get("text", "") if isinstance(c, dict) else "") for c in content)
         data = json.loads(content or "{}")
-        questions = data.get("questions", []) if isinstance(data, dict) else []
-        return questions if isinstance(questions, list) else []
-
-    @classmethod
-    def _call_gemini_part(cls, api_key: str, part: str, prompt: str, temperature: float) -> List[Dict[str, Any]]:
-        """Call Gemini once for one part with JSON structured output; returns the raw question dicts."""
-        from google import genai
-        from google.genai import types
-
-        # system_instruction and response_schema require the v1beta API version
-        client = genai.Client(api_key=api_key, http_options=types.HttpOptions(api_version="v1beta"))
-        response = client.models.generate_content(
-            model=GeminiVisionParserService.get_model_name(),
-            contents=[prompt],
-            config=types.GenerateContentConfig(
-                system_instruction=_SYSTEM_INSTRUCTION,
-                response_mime_type="application/json",
-                response_schema=_response_schema(part),
-                temperature=temperature,
-                max_output_tokens=8192,
-            ),
-        )
-        data = json.loads(response.text or "{}")
         questions = data.get("questions", []) if isinstance(data, dict) else []
         return questions if isinstance(questions, list) else []

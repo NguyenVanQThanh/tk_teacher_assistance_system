@@ -64,10 +64,8 @@ def _mask_key(value: str) -> str:
 
 # Log scan OCR provider config at startup (masked) so Docker/env issues are visible in logs
 logger.warning(
-    "Scan OCR config: SCAN_AI_PROVIDER=%s | MISTRAL_API_KEY=%s | GEMINI_API_KEY=%s | ENABLE_MARKER_PDF=%s",
-    os.environ.get("SCAN_AI_PROVIDER", "mistral"),
+    "Scan OCR config: provider=mistral | MISTRAL_API_KEY=%s | ENABLE_MARKER_PDF=%s",
     _mask_key(os.environ.get("MISTRAL_API_KEY") or os.environ.get("MISTRAL_KEY")),
-    _mask_key(os.environ.get("GEMINI_API_KEY") or os.environ.get("GOOGLE_API_KEY") or os.environ.get("GEMINI_KEY")),
     os.environ.get("ENABLE_MARKER_PDF", "1"),
 )
 

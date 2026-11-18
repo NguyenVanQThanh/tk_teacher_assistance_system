@@ -1,5 +1,5 @@
 # File Name: test_vision_provider_order.py
-# Description: OCR provider selection: Mistral only by default, Gemini is opt-in with Mistral fallback.
+# Description: OCR provider selection: Mistral is the only OCR provider.
 # Created At: 2026-11-18
 # Created By: AI Agent
 # Updated At: 2026-11-18
@@ -25,8 +25,8 @@ def test_default_is_mistral_only(monkeypatch):
     assert _names(monkeypatch, "mistral") == ["Mistral"]
 
 
-def test_gemini_is_opt_in_with_mistral_fallback(monkeypatch):
-    assert _names(monkeypatch, "gemini") == ["Google Gemini", "Mistral"]
+def test_gemini_setting_is_ignored(monkeypatch):
+    assert _names(monkeypatch, "gemini") == ["Mistral"]
 
 
 def test_ocr_prompt_skips_non_question_content():
