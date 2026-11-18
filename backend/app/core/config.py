@@ -138,6 +138,10 @@ GUEST_CREATE_GLOBAL_HOUR = _env_int("GUEST_CREATE_GLOBAL_HOUR", 200)
 GUEST_DOC_LIMIT = _env_int("GUEST_DOC_LIMIT", 3, minimum=0)
 # Maximum AI generations (exercises created) per guest account; soft-deleted ones still count.
 GUEST_AI_LIMIT = _env_int("GUEST_AI_LIMIT", 3, minimum=0)
+# Maximum question-import (OCR) jobs per guest account; every queued job counts, even failed ones.
+GUEST_IMPORT_LIMIT = _env_int("GUEST_IMPORT_LIMIT", 3, minimum=0)
+# Maximum PDF pages OCR-ed per import (all roles); bounds vision-provider cost.
+IMPORT_MAX_PDF_PAGES = _env_int("IMPORT_MAX_PDF_PAGES", 30, minimum=1)
 # Fallback academic year ("YYYY-YYYY") used when no admin setting exists; empty -> derived from calendar.
 CURRENT_ACADEMIC_YEAR = os.environ.get("CURRENT_ACADEMIC_YEAR", "").strip()
 # Honor CF-Connecting-IP / X-Forwarded-For only behind a trusted reverse proxy.
