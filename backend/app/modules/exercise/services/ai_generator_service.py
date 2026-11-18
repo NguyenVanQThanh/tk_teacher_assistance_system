@@ -413,6 +413,15 @@ _JUDGE_INSTRUCTION = (
 )
 
 
+def _with_reviewer_note(explanation: Optional[str], reason: str, subject_name: str) -> str:
+    """Append the reviewer's remark to the explanation so a teacher sees the doubt next to the question."""
+    english = _subject_rule(subject_name).startswith("Subject rules: ALL text")
+    label = "Reviewer note" if english else "Lưu ý của AI kiểm duyệt"
+    note = f"{label}: {reason.removeprefix('reviewer: ').strip()}"
+    return explanation.strip() + chr(10) + note if explanation and explanation.strip() else note
+
+
+
 def _judge_view(part: str, q: Dict[str, Any]) -> Dict[str, Any]:
     """Compact question view for the judge, without any answer key."""
     if part == "Part1":
@@ -605,13 +614,13 @@ class AiExerciseGeneratorService:
                 reasons = cls.review_batch(part, [q for q, _ in batch], context, subject_name)
                 if on_stage:
                     on_stage("GENERATING")
-                for (q, key), reason in zip(batch, reasons):
-                    if reason is None:
-                        continue
-                    valid.remove(q)
-                    seen_content.discard(key)
-                    errors.append(reason)
-                cls.regenerate_explanations(part, [q for q, _ in batch if q in valid], subject_name)
+                # The reviewer is a model and can be wrong: never drop a question over its verdict.
+                # Keep it and attach the reviewer's remark to the question's own explanation.
+                cls.regenerate_explanations(part, [q for q, _ in batch], subject_name)
+                for (q, _key), reason in zip(batch, reasons):
+                    if reason is not None:
+                        q["explanation"] = _with_reviewer_note(q.get("explanation"), reason, subject_name)
+                        logger.info("%s: reviewer remark kept as note: %s", part, reason)
             if errors:
                 logger.info("%s: %d/%d valid, rejected: %s", part, len(valid), len(slots), "; ".join(errors[:6]))
             if len(valid) == before:
