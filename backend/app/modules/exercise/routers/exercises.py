@@ -13,6 +13,7 @@ from uuid import UUID
 from typing import List, Optional, Tuple
 from fastapi import APIRouter, Depends, Query, UploadFile, File, Form, HTTPException, Response, status
 from pydantic import ValidationError
+from sqlalchemy import text
 from sqlalchemy.orm import Session
 
 from app.core import config as app_config
@@ -47,21 +48,26 @@ logger = logging.getLogger("smartlms.exercise.router")
 router = APIRouter(prefix="/api/v1/exercises", tags=["exercise-bank"])
 
 
-def _pdf_page_count(filename: str, data: bytes) -> int:
-    """Page count of a PDF upload (0 for non-PDF or unreadable files; the parser reports those itself)."""
+def _pdf_page_count(filename: str, data: bytes) -> Optional[int]:
+    """Page count of a PDF upload; 0 for non-PDF files, None when a PDF cannot be opened."""
     if not (filename or "").lower().endswith(".pdf"):
         return 0
     try:
         import fitz  # PyMuPDF
         with fitz.open(stream=data, filetype="pdf") as doc:
             return doc.page_count
-    except Exception:  # noqa: BLE001 - corrupt file is reported by the parser
-        return 0
+    except Exception:  # noqa: BLE001 - reported below as an unreadable file
+        return None
 
 
 def _enforce_import_page_cap(filename: str, data: bytes) -> None:
-    """Reject PDFs above IMPORT_MAX_PDF_PAGES before any OCR cost is spent."""
-    if _pdf_page_count(filename, data) > app_config.IMPORT_MAX_PDF_PAGES:
+    """Reject unreadable PDFs and PDFs above IMPORT_MAX_PDF_PAGES before any OCR cost is spent."""
+    pages = _pdf_page_count(filename, data)
+    if pages is None:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail={"code": "ERR-EXE-IMPORT_FILE_UNREADABLE", "message": "The PDF file cannot be read."})
+    if pages > app_config.IMPORT_MAX_PDF_PAGES:
         raise HTTPException(
             status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
             detail={"code": "ERR-EXE-IMPORT_TOO_MANY_PAGES",
@@ -72,6 +78,9 @@ def _enforce_guest_import_limit(db: Session, user: User) -> None:
     """Cap OCR import jobs per guest; every queued job counts so retries cannot bypass the cap."""
     if not user.is_guest:
         return
+    if db.get_bind().dialect.name == "postgresql":
+        # Held until enqueue() commits, so parallel requests from one guest cannot all pass the count.
+        db.execute(text("SELECT pg_advisory_xact_lock(hashtext(:k))"), {"k": "guest_quota:" + str(user.user_id)})
     used = db.query(BackgroundJob).filter(
         BackgroundJob.user_id == user.user_id, BackgroundJob.kind == KIND_IMPORT).count()
     if used >= app_config.GUEST_IMPORT_LIMIT:

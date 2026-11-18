@@ -10,7 +10,7 @@ import katex from 'katex';
 import 'katex/dist/katex.min.css';
 import MarkdownTable from './MarkdownTable';
 import { splitTableBlocks } from './tableMarkdown';
-import { splitCodeBlocks, splitInlineCode } from '../../utils/codeMarkdown';
+import { splitCodeBlocks, splitInlineCode, splitUnderline } from '../../utils/codeMarkdown';
 import { preprocessMathText } from '../../utils/mathPreprocess';
 
 /**
