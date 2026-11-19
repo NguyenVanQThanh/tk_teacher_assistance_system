@@ -412,12 +412,14 @@ def _import_questions_impl(
 
     _enforce_import_page_cap(q_filename, q_bytes)
 
-    # Reject a question file already imported into another exercise (SHA-256 of the raw bytes)
+    # Reject a question file this user already imported into another of their exercises (SHA-256 of the raw bytes).
+    # Scoped per owner: different accounts may import the same file.
     q_hash = hashlib.sha256(q_bytes).hexdigest()
     # ponytail: Python-side scan of ai_metadata; add an indexed column when exercises exceed ~10k rows
     for other_id, other_meta in (
         exercise_service.db.query(Exercise.exercise_id, Exercise.ai_metadata)
-        .filter(Exercise.status != "DELETED", Exercise.exercise_id != exercise_id)
+        .filter(Exercise.status != "DELETED", Exercise.exercise_id != exercise_id,
+                Exercise.created_by == current_user.user_id)
         .all()
     ):
         if isinstance(other_meta, dict) and other_meta.get("source_file_hash") == q_hash:
