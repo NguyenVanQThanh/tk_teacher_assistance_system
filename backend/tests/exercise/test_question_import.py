@@ -117,3 +117,37 @@ class TestQuestionImportEndpoint:
         ex_detail = client.get(f"/api/v1/exercises/{exercise_id}", headers=admin_headers)
         assert ex_detail.status_code == status.HTTP_200_OK
         assert ex_detail.json()["total_questions"] == 3
+
+
+class TestImportDuplicateScope:
+    """The same file is blocked for one owner but allowed for different owners."""
+
+    def _exercise(self, client, headers, subject_id, title):
+        resp = client.post("/api/v1/exercises", json={"title": title, "subject_id": subject_id}, headers=headers)
+        return resp.json()["exercise_id"]
+
+    def _import(self, client, headers, exercise_id, data):
+        mime = "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+        return client.post(f"/api/v1/exercises/{exercise_id}/questions/import",
+                           files={"question_file": ("same.docx", data, mime)}, headers=headers)
+
+    def test_same_owner_blocked_other_owner_allowed(self, client: TestClient, db_session):
+        from models.models import Exercise, User
+        headers = {"Authorization": f"Bearer {get_admin_token(client)}"}
+        sub = client.post("/api/v1/subjects", json={"subject_name": f"Dup {uuid.uuid4().hex[:6]}"}, headers=headers)
+        subject_id = sub.json()["subject_id"]
+        data = create_sample_docx_with_answers()
+
+        first = self._exercise(client, headers, subject_id, "Dup first")
+        assert self._import(client, headers, first, data).status_code == status.HTTP_201_CREATED
+
+        second = self._exercise(client, headers, subject_id, "Dup second")
+        dup = self._import(client, headers, second, data)
+        assert dup.status_code == status.HTTP_409_CONFLICT
+        assert dup.json()["detail"]["code"] == "ERR-EXE-IMPORT_DUPLICATE_FILE"
+
+        # Hand the first exercise to a different owner: the same file is no longer a duplicate for this user.
+        other = db_session.query(User).filter(User.phone != "0987654321").first()
+        db_session.query(Exercise).filter(Exercise.exercise_id == uuid.UUID(first)).update({"created_by": other.user_id})
+        db_session.commit()
+        assert self._import(client, headers, second, data).status_code == status.HTTP_201_CREATED
