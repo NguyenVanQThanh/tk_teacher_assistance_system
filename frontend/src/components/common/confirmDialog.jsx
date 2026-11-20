@@ -24,11 +24,11 @@ const S = {
   row: { display: 'flex', justifyContent: 'flex-end', gap: 10 },
   cancel: {
     padding: '9px 18px', borderRadius: 10, border: '1px solid #DCD6E8', background: '#FFFFFF',
-    color: '#4D308D', fontWeight: 600, fontSize: 14, cursor: 'pointer',
+    color: '#4D308D', fontFamily: 'inherit', fontWeight: 600, fontSize: 14, cursor: 'pointer',
   },
   ok: {
     padding: '9px 18px', borderRadius: 10, border: 'none', background: '#4D308D',
-    color: '#FFFFFF', fontWeight: 600, fontSize: 14, cursor: 'pointer',
+    color: '#FFFFFF', fontFamily: 'inherit', fontWeight: 600, fontSize: 14, cursor: 'pointer',
   },
 };
 
