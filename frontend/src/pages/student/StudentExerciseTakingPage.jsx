@@ -50,6 +50,7 @@ import QuestionMedia from '../../components/exercises/QuestionMedia';
 import AiSourcesList from '../../components/exercises/AiSourcesList';
 import './StudentExerciseTakingPage.css';
 import toast from '../../components/common/toast';
+import FontSizeControl, { useExerciseFontScale } from '../../components/common/FontSizeControl';
 
 // Aborted requests (component unmount / React StrictMode double-mount) are expected
 // control flow — they must never be surfaced to the student as an error.
@@ -585,6 +586,7 @@ export default function StudentExerciseTakingPage() {
 
   // Submission & Exam Lock States
   const [isSubmitModalOpen, setIsSubmitModalOpen] = useState(false);
+  const fontScale = useExerciseFontScale();
   const [isReadOnlyReview, setIsReadOnlyReview] = useState(Boolean(!isBackendTarget && savedSubmission));
   const [isExamSubmitted, setIsExamSubmitted] = useState(Boolean(!isBackendTarget && savedSubmission));
   const [submissionResult, setSubmissionResult] = useState(!isBackendTarget ? savedSubmission : null);
@@ -1750,6 +1752,7 @@ export default function StudentExerciseTakingPage() {
             <Clock size={16} className="timer-icon" />
             <span>{isExamSubmitted ? `Đã làm: ${formatTimer(timeLeft)}` : formatTimer(timeLeft)}</span>
           </div>
+          <FontSizeControl step={fontScale.step} onInc={fontScale.inc} onDec={fontScale.dec} onReset={fontScale.reset} />
           <button 
             type="button" 
             className="exam-icon-btn btn-fullscreen-toggle" 
@@ -1995,7 +1998,7 @@ export default function StudentExerciseTakingPage() {
         </aside>
 
         {/* Center Question Viewport */}
-        <main className="exam-question-viewport">
+        <main className="exam-question-viewport" style={{ '--exam-font-scale': fontScale.scale }}>
           {/* AI reference sources: shown only after submission to avoid leaking answers */}
           {isExamSubmitted && backendExercise?.ai_metadata?.is_ai_generated && (
             <AiSourcesList sources={backendExercise.ai_metadata.sources} />
