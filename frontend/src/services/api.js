@@ -249,7 +249,8 @@ export const exercisesApi = {
   importQuestions: async (exerciseId, formData) => {
     const base = `/api/v1/exercises/${exerciseId}/questions/import/jobs`;
     const start = await api.post(base, formData, { headers: { 'Content-Type': 'multipart/form-data' } });
-    const result = await pollJob(`${base}/${start.data.job_id}`);
+    // Import (OCR + AI solving) can run 15+ minutes on big PDFs: wait up to 40 minutes
+    const result = await pollJob(`${base}/${start.data.job_id}`, 40 * 60 * 1000);
     const data = Array.isArray(result.questions) ? result.questions : [];
     // Questions skipped during import are attached so callers can warn without breaking `.length`.
     data.skippedCount = result.skipped_count || 0;
