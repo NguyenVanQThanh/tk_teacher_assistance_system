@@ -446,10 +446,10 @@ class ImportParserService:
             section_errors: List[ParseError] = []
             # LLM pre-pass: read the exam outline first, then scan with that structure
             structure = cls._analyze_section_structure(file_bytes, section, label, page_images)
-            for chunk in chunks:
+            def _scan_chunk(chunk):
                 images = cls._section_images(section, chunk, page_images)
                 if not images:
-                    continue
+                    return None
                 chunk_pages = cls._slice_pages(section, chunk, page_images)
                 hint = structure.to_hint(chunk_pages) if structure and structure.parts else None
 
@@ -482,9 +482,17 @@ class ImportParserService:
                     if local_result.questions or chunk_result is None:
                         chunk_result = local_result
 
-                if chunk_result is not None:
-                    section_questions.extend(chunk_result.questions)
-                    section_errors.extend(chunk_result.errors)
+                return chunk_result
+
+            # ponytail: chunks are independent (overlap dedup runs after); map() keeps page order.
+            # Concurrency capped by IMPORT_CHUNK_CONCURRENCY (default 3) to respect provider rate limits.
+            from concurrent.futures import ThreadPoolExecutor
+            workers = max(1, min(len(chunks), cls.get_chunk_concurrency()))
+            with ThreadPoolExecutor(max_workers=workers) as pool:
+                for chunk_result in pool.map(_scan_chunk, chunks):
+                    if chunk_result is not None:
+                        section_questions.extend(chunk_result.questions)
+                        section_errors.extend(chunk_result.errors)
 
             section_questions = seq.normalize_questions(section_questions)
             try:
@@ -1436,6 +1444,14 @@ class ImportParserService:
             original_name=original_name,
             content_type="image/png",
         )
+
+    @staticmethod
+    def get_chunk_concurrency() -> int:
+        """Parallel vision requests per exam section (IMPORT_CHUNK_CONCURRENCY, default 3)."""
+        try:
+            return max(1, int(os.environ.get("IMPORT_CHUNK_CONCURRENCY", "3")))
+        except ValueError:
+            return 3
 
     @staticmethod
     def get_max_pages_per_call() -> int:
