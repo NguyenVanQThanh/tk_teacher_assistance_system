@@ -76,7 +76,7 @@ def test_embed_batches(monkeypatch):
     assert sizes == [2, 1]
 
 
-def _db(row=("/uploads/documents/f.pdf", "pdf")):
+def _db(row=("/uploads/documents/f.pdf", "pdf", "u1", "Bai 1")):
     db = MagicMock()
     db.execute.return_value.first.return_value = row
     return db
@@ -112,3 +112,28 @@ def test_ingest_failure_sets_failed(monkeypatch, tmp_path):
 def test_unsupported_type():
     with pytest.raises(ValueError):
         DocumentIngestService.build_chunks("doc", b"", "d")
+
+
+def _capture(monkeypatch):
+    from app.modules.notification import service as ns
+    calls = []
+    monkeypatch.setattr(ns, "notify", lambda db, uids, t, title, body=None, link=None: calls.append((list(uids), t, title, body)))
+    return calls
+
+def test_success_notifies_uploader_once(monkeypatch, tmp_path):
+    calls = _capture(monkeypatch)
+    monkeypatch.setattr(svc, "get_storage", lambda: LocalStorage(tmp_path))
+    (tmp_path / "documents").mkdir()
+    (tmp_path / "documents" / "f.pdf").write_bytes(b"x")
+    monkeypatch.setattr(DocumentIngestService, "build_chunks",
+                        staticmethod(lambda *a, **k: [{"page": 1, "modality": "text", "content": "hi", "meta": {}}]))
+    monkeypatch.setattr(svc, "embed_texts", lambda t: [[0.1, 0.2] for _ in t])
+    DocumentIngestService._run(_db(), "d1")
+    assert len(calls) == 1 and calls[0][0] == ["u1"] and calls[0][1] == "JOB_DONE" and "Bai 1" in calls[0][2]
+
+def test_failure_notifies_uploader_once(monkeypatch, tmp_path):
+    calls = _capture(monkeypatch)
+    monkeypatch.setattr(svc, "get_storage", lambda: LocalStorage(tmp_path))
+    DocumentIngestService._run(_db(), "d1")
+    assert len(calls) == 1 and calls[0][0] == ["u1"] and calls[0][1] == "JOB_FAILED"
+    assert "Stored file missing" in calls[0][3]
