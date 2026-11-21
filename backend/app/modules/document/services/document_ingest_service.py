@@ -360,6 +360,22 @@ class DocumentIngestService:
         db.commit()
 
     @staticmethod
+    def _notify_owner(db, user_id, title, ok: bool, reason: str = "") -> None:
+        """Notify only the uploader once the document reaches DONE/FAILED; never affects the ingest outcome."""
+        from app.modules.notification import service as notification_service
+        try:
+            if ok:
+                notification_service.notify(db, [user_id], "JOB_DONE", f"Tài liệu \"{title}\" đã sẵn sàng để sử dụng",
+                                            "Nhấn để xem trong Kho tài liệu.", "/teacher/documents")
+            else:
+                notification_service.notify(db, [user_id], "JOB_FAILED", f"Xử lý tài liệu \"{title}\" thất bại",
+                                            (reason or "Lỗi không xác định.")[:200], "/teacher/documents")
+            db.commit()
+        except Exception:  # noqa: BLE001 - best effort
+            db.rollback()
+            logger.exception("Could not notify the uploader of document %s", title)
+
+    @staticmethod
     def mark_pending(db, document_id) -> None:
         """Set ingest_status = PENDING (used at upload and re-trigger)."""
         DocumentIngestService._set_status(db, document_id, "PENDING")
@@ -422,7 +438,7 @@ class DocumentIngestService:
     @staticmethod
     def _run(db, document_id) -> None:
         row = db.execute(
-            text("SELECT file_url, file_type FROM documents WHERE document_id = :id"), {"id": str(document_id)}
+            text("SELECT file_url, file_type, uploaded_by, title FROM documents WHERE document_id = :id"), {"id": str(document_id)}
         ).first()
         if row is None:
             logger.error("Ingest skipped, document not found: %s", document_id)
@@ -477,8 +493,10 @@ class DocumentIngestService:
                 db.execute(_CHUNK_INSERT_SQL, params[start:start + CHUNK_INSERT_BATCH_SIZE])
             db.commit()
             DocumentIngestService._set_status(db, document_id, "DONE")
+            DocumentIngestService._notify_owner(db, row[2], row[3], True)
             logger.info("Ingest done: document=%s chunks=%d", document_id, len(chunks))
         except Exception as exc:
             db.rollback()
             logger.error("Ingest failed: document=%s error=%s", document_id, exc, exc_info=True)
             DocumentIngestService._set_status(db, document_id, "FAILED", str(exc)[:2000])
+            DocumentIngestService._notify_owner(db, row[2], row[3], False, str(exc))
