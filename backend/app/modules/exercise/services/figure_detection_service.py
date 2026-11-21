@@ -31,6 +31,8 @@ DETECT_PROMPT = (
     "You are a layout detector for school exam pages. Find EVERY graph, chart, diagram, geometric drawing, "
     "circuit, photo or table-like illustration on the page image. Return ONLY JSON: "
     '{"figures": [{"bbox": [x0, y0, x1, y1], "caption": "short description", "kind": "graph|diagram|photo|circuit|other"}]}. '
+    "A variation table (bảng biến thiên) or sign table with arrows is ONE figure: one bbox covering the whole "
+    "grid, arrows and every row label; never split it. "
     "bbox is on a 0-1000 scale relative to the page, origin top-left. The bbox MUST include axis labels, axis "
     "titles, units, legends, captions and sub-labels such as (1), (2). It must NOT include question text or "
     'answer options. No figures: {"figures": []}.'

@@ -1196,8 +1196,9 @@ class ImportParserService:
                             continue
                         matched_ids.add(id(q))
                         asg = assigned[ri]
-                        figures = [b for b in asg.stem if b.kind != "table"]
-                        tables = [b for b in asg.stem if b.kind == "table"]
+                        stem = cls._fuse_by_vlm(asg.stem, vlm)
+                        figures = [b for b in stem if b.kind != "table"]
+                        tables = [b for b in stem if b.kind == "table"]
                         primary = None if q.image_url else pick_primary(figures, q.image_page, q.image_bbox)
                         for b in ([primary] if primary else []) + [f for f in figures if f is not primary]:
                             try:
@@ -1320,6 +1321,29 @@ class ImportParserService:
                         }]
                 except Exception as e:
                     logger.warning(f"attach_question_images: table crop failed for question {q.question_number}: {e}")
+
+    @staticmethod
+    def _fuse_by_vlm(blocks, vlm):
+        """Fuse layout blocks of one question that sit (>= 50% of their area) inside the same VLM figure box.
+
+        A variation table is detected as a table block plus a separate arrows drawing; the VLM sees it as
+        one figure, so both pieces must become one crop. The fused block keeps kind "drawing" (stored as an image).
+        """
+        import dataclasses
+        from app.modules.exercise.services.pdf_layout_service import _area, _inter, _union
+        out, used = [], set()
+        for page in {b.page for b in blocks}:
+            for vf in vlm.get(page, []):
+                inside = [b for b in blocks if b.page == page and id(b) not in used and _area(b.bbox) > 0
+                          and _inter(b.bbox, vf["bbox"]) / _area(b.bbox) >= 0.5]
+                if len(inside) < 2:
+                    continue
+                box = inside[0].bbox
+                for b in inside[1:]:
+                    box = _union(box, b.bbox)
+                used.update(id(b) for b in inside)
+                out.append(dataclasses.replace(inside[0], bbox=tuple(box), kind="drawing", area=_area(box)))
+        return [b for b in blocks if id(b) not in used] + out
 
     @staticmethod
     def _scan_ocr_context(file_bytes: bytes, page_images, pending):
