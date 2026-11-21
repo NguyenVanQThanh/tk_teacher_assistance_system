@@ -1980,3 +1980,10 @@ Updated By: Tam Khang
   background-color: #FEF2F2 !important;
 }
 
+
+/* Responsive grid collapse */
+@media (max-width: 768px) {
+  .user-detail-info-grid,
+  /* 2-Column Form Fields Grid */
+.add-user-form-grid { grid-template-columns: minmax(0, 1fr) !important; }
+}

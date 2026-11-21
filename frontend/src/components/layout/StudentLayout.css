@@ -39,3 +39,26 @@ Updated By: Tam Khang
   overflow-y: auto;
   background-color: #F8FAFC;
 }
+
+.student-sidebar-backdrop { display: none; }
+
+/* Responsive: sidebar becomes an off-canvas drawer */
+@media (max-width: 992px) {
+  .student-global-body { position: relative; }
+  .student-global-body > .student-sidebar {
+    position: absolute;
+    top: 0;
+    left: 0;
+    bottom: 0;
+    z-index: 50;
+    width: min(280px, 85vw);
+    box-shadow: 4px 0 24px rgba(15, 23, 42, 0.18);
+  }
+  .student-sidebar-backdrop {
+    display: block;
+    position: absolute;
+    inset: 0;
+    z-index: 49;
+    background: rgba(15, 23, 42, 0.4);
+  }
+}
