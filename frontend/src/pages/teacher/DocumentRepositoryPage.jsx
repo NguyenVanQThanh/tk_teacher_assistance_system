@@ -23,6 +23,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { documentsApi } from '../../services/api';
 import DocumentFilterBar from '../../components/documents/DocumentFilterBar';
 import { useAuth } from '../../context/AuthContext';
+import { guestDeleteWarning } from '../../utils/guestDeleteWarning';
 import DocumentCard from '../../components/documents/DocumentCard';
 import DocumentDetailView from '../../components/documents/DocumentDetailView';
 import UploadDocumentModal from '../../components/documents/UploadDocumentModal';
@@ -71,7 +72,7 @@ const mapBackendDoc = (doc) => ({
 });
 
 export default function DocumentRepositoryPage() {
-  const { user } = useAuth();
+  const { user, isGuest } = useAuth();
   const currentUserId = user?.user_id || user?.id;
   const isAdmin = user?.role === 'Admin';
   const [selectedGrade, setSelectedGrade] = useState('all');
@@ -389,6 +390,7 @@ export default function DocumentRepositoryPage() {
               <h3 className="confirm-title-text">Xác nhận xóa tài liệu</h3>
               <p className="confirm-message-text">
                 Bạn có chắc chắn muốn xóa tài liệu <strong>"{deleteConfirmDoc.title}"</strong> không? Hành động này sẽ chuyển trạng thái tài liệu sang đã xóa (xóa mềm).
+                {guestDeleteWarning(isGuest) && (<><br /><strong>{guestDeleteWarning(isGuest)}</strong></>)}
               </p>
             </div>
             <div className="confirm-actions-row">

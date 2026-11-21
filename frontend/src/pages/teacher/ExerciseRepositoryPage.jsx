@@ -21,6 +21,7 @@ import {
 import { Link, useNavigate } from 'react-router-dom';
 import ExerciseFilterBar from '../../components/exercises/ExerciseFilterBar';
 import { useAuth } from '../../context/AuthContext';
+import { guestDeleteWarning } from '../../utils/guestDeleteWarning';
 import ExerciseCard from '../../components/exercises/ExerciseCard';
 import CreateExerciseModal from '../../components/exercises/CreateExerciseModal';
 import ExercisePreviewModal from '../../components/exercises/ExercisePreviewModal';
@@ -33,7 +34,7 @@ import { getErrorMessage } from '../../utils/errorMessages';
 const PAGE_SIZE = 6;
 
 export default function ExerciseRepositoryPage() {
-  const { user } = useAuth();
+  const { user, isGuest } = useAuth();
   const currentUserId = user?.user_id || user?.id;
   const isAdmin = user?.role === 'Admin';
   const [showSidebar, setShowSidebar] = useState(true);
@@ -457,6 +458,7 @@ export default function ExerciseRepositoryPage() {
               <h3 className="confirm-title-text">Xác nhận xóa bài tập</h3>
               <p className="confirm-message-text">
                 Bạn có chắc chắn muốn xóa bài tập <strong>"{deleteConfirmTarget.title}"</strong> không? Hành động này sẽ chuyển trạng thái bài tập sang đã xóa (xóa mềm).
+                {guestDeleteWarning(isGuest) && (<><br /><strong>{guestDeleteWarning(isGuest)}</strong></>)}
               </p>
             </div>
             <div className="confirm-actions-row">

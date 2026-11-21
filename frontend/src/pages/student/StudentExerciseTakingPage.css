@@ -2368,3 +2368,13 @@ Updated By: AI Agent
   font-weight: 700;
   color: #065F46;
 }
+
+/* Font-size control (exercise content only; app chrome unchanged) */
+.font-size-control { display: flex; align-items: center; gap: 2px; }
+.font-size-control .exam-icon-btn { width: auto; min-width: 34px; padding: 0 6px; font-size: 13px; font-weight: 700; font-family: inherit; }
+.font-size-control .exam-icon-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+/* zoom scales px text and KaTeX (em-based) together; var set on the viewport */
+.exam-question-viewport { zoom: var(--exam-font-scale, 1); }
+
+/* Native buttons do not inherit font by default; popups use buttons without font-family */
+.exam-modal-backdrop button { font-family: inherit; }

@@ -2,10 +2,10 @@
 // Description: Full-page direct exercise creation layout connected to backend APIs (Multiple Choice, True/False, Short Answer).
 // Created At: 2026-08-30
 // Created By: Tam Khang
-// Updated At: 2026-11-15
+// Updated At: 2026-11-20
 // Updated By: AI Agent
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { 
   ChevronRight, 
   Plus, 
@@ -14,11 +14,19 @@ import {
   ArrowLeft,
   CheckCircle2,
   AlertCircle,
-  Loader2
+  Loader2,
+  Image as ImageIcon,
+  Sigma,
+  Table2,
+  HelpCircle
 } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
-import { exercisesApi, subjectsApi } from '../../services/api';
+import { exercisesApi, subjectsApi, questionsApi } from '../../services/api';
+import MathTextEditor from '../../components/common/MathTextEditor';
+import MathSymbolToolbar from '../../components/common/MathSymbolToolbar';
+import MathShortcutsHelp from '../../components/common/MathShortcutsHelp';
+import '../../components/documents/EditExerciseModal.css';
 import './CreateExerciseManualPage.css';
 import toast from '../../components/common/toast';
 import { getErrorMessage } from '../../utils/errorMessages';
@@ -31,10 +39,9 @@ export default function CreateExerciseManualPage() {
   const [title, setTitle] = useState('');
   const [exerciseType, setExerciseType] = useState('exam'); // 'exam' (Bài kiểm tra), 'practice' (Luyện tập tại nhà)
   const [grade, setGrade] = useState('12');
-  const { isGuest } = useAuth();
+  const { isGuest, user } = useAuth();
   const [subject, setSubject] = useState('');
   const [duration, setDuration] = useState('15');
-  const [level, setLevel] = useState('basic');
   const [startTime, setStartTime] = useState('');
   const [dueTime, setDueTime] = useState('');
 
@@ -80,6 +87,101 @@ export default function CreateExerciseManualPage() {
 
   const [isSaving, setIsSaving] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
+
+  // Shared editor tooling: the toolbar inserts into the last focused field.
+  const editorRefs = useRef({});
+  const activeEditorRef = useRef(null);
+  const regEditor = (key) => (r) => { editorRefs.current[key] = r; };
+  const setActive = (key) => { activeEditorRef.current = editorRefs.current[key]; };
+  const imageInputRef = useRef(null);
+  const helpBtnRef = useRef(null);
+  const [isHelpOpen, setIsHelpOpen] = useState(false);
+  const [tableDims, setTableDims] = useState({ open: false, rows: 3, cols: 3 });
+  const [editorFontSize, setEditorFontSize] = useState(14);
+  const [isUploadingImage, setIsUploadingImage] = useState(false);
+  const getActiveEditor = () => activeEditorRef.current || Object.values(editorRefs.current).find(Boolean);
+  const insertMath = (tpl, opts = {}) => getActiveEditor()?.insertMath(tpl, opts);
+  const insertTable = () => {
+    getActiveEditor()?.insertTable(tableDims.rows, tableDims.cols);
+    setTableDims((d) => ({ ...d, open: false }));
+  };
+  const handleImagePick = async (e) => {
+    const file = e.target.files && e.target.files[0];
+    e.target.value = '';
+    if (!file) return;
+    if (!/^image\//.test(file.type || '')) {
+      setErrorMsg('Chỉ chấp nhận tệp hình ảnh (png, jpg, jpeg, gif, bmp, webp, svg).');
+      return;
+    }
+    setIsUploadingImage(true);
+    try {
+      const formData = new FormData();
+      formData.append('file', file);
+      const meta = await questionsApi.uploadImage(formData);
+      const alt = (meta.original_name || 'hinh-anh').replace(/[[\]]/g, '');
+      getActiveEditor()?.insertImage(alt, meta.url);
+    } catch (err) {
+      setErrorMsg(getErrorMessage(err, 'Không thể tải ảnh lên.'));
+    } finally {
+      setIsUploadingImage(false);
+    }
+  };
+
+  // Draft: exercises have no server-side DRAFT state, so drafts live in localStorage per user.
+  const draftKey = `manual_exercise_draft:${user?.id ?? user?.user_id ?? 'anon'}`;
+  const [pendingDraft, setPendingDraft] = useState(null);
+  const [draftReady, setDraftReady] = useState(false);
+  const [draftSavedAt, setDraftSavedAt] = useState(null);
+  const writeDraft = () => {
+    try {
+      const snap = {
+        title, exerciseType, grade, subject, duration, startTime, dueTime,
+        mcqQuestions, tfQuestions, saQuestions, savedAt: Date.now(),
+      };
+      localStorage.setItem(draftKey, JSON.stringify(snap));
+      setDraftSavedAt(snap.savedAt);
+      return true;
+    } catch {
+      return false;
+    }
+  };
+  const clearDraft = () => {
+    try { localStorage.removeItem(draftKey); } catch { /* storage unavailable */ }
+  };
+  const applyDraft = (d) => {
+    setTitle(d.title || ''); setExerciseType(d.exerciseType || 'exam'); setGrade(d.grade || '12');
+    setSubject(d.subject || ''); setDuration(d.duration || '15');
+    setStartTime(d.startTime || ''); setDueTime(d.dueTime || '');
+    if (d.mcqQuestions?.length) setMcqQuestions(d.mcqQuestions);
+    if (d.tfQuestions?.length) setTfQuestions(d.tfQuestions);
+    if (d.saQuestions?.length) setSaQuestions(d.saQuestions);
+    setPendingDraft(null);
+    setDraftReady(true);
+  };
+  const handleSaveDraft = () => {
+    if (writeDraft()) toast.success('Đã lưu nháp.');
+    else toast.error('Không thể lưu nháp trên trình duyệt này.');
+  };
+
+  // Offer restore on open; autosave stays off until the teacher decides.
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem(draftKey);
+      if (raw) {
+        setPendingDraft(JSON.parse(raw));
+        return;
+      }
+    } catch { /* corrupt or unavailable draft is ignored */ }
+    setDraftReady(true);
+  }, [draftKey]);
+
+  // Debounced autosave of the in-progress form.
+  useEffect(() => {
+    if (!draftReady) return undefined;
+    const t = setTimeout(writeDraft, 1500);
+    return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [draftReady, title, exerciseType, grade, subject, duration, startTime, dueTime, mcqQuestions, tfQuestions, saQuestions]);
 
   useEffect(() => {
     let isMounted = true;
@@ -253,7 +355,6 @@ export default function CreateExerciseManualPage() {
           grade: grade || '12',
           duration: duration ? `${duration} phút` : '15 phút',
           type: exerciseType,
-          level: level,
           start_time: startTime,
           due_time: dueTime,
         },
@@ -310,6 +411,8 @@ export default function CreateExerciseManualPage() {
         });
       }
 
+      setDraftReady(false);
+      clearDraft();
       toast.success(`Đã tạo thành công bài tập "${title}" với ${totalValidQuestions} câu hỏi!`);
       navigate('/teacher/exercises');
     } catch (err) {
@@ -345,6 +448,16 @@ export default function CreateExerciseManualPage() {
             </div>
           )}
 
+          {pendingDraft && (
+            <div style={{ marginBottom: 16, padding: '12px 16px', background: '#F5F3FF', border: '1px solid #C4B5FD', borderRadius: 8, display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+              <span>
+                Có bản nháp chưa hoàn tất{pendingDraft.savedAt ? ` (lưu lúc ${new Date(pendingDraft.savedAt).toLocaleString('vi-VN')})` : ''}. Bạn có muốn khôi phục không?
+              </span>
+              <button type="button" className="btn-add-question" onClick={() => applyDraft(pendingDraft)}>Khôi phục</button>
+              <button type="button" className="btn-footer-cancel" onClick={() => { clearDraft(); setPendingDraft(null); setDraftReady(true); }}>Bỏ nháp</button>
+            </div>
+          )}
+
           {/* CARD 1: THÔNG TIN CƠ BẢN */}
           <div className="form-card-section">
             <h2 className="section-card-title">Thông tin cơ bản</h2>
@@ -376,7 +489,7 @@ export default function CreateExerciseManualPage() {
               </div>
             </div>
 
-            {/* Row 2: Khối, Thời gian, Phân loại cấp độ */}
+            {/* Row 2: Khối, Môn học, Thời gian */}
             <div className="form-grid-3">
               <div className="form-field-item">
                 <label className="field-label">Khối *</label>
@@ -418,19 +531,6 @@ export default function CreateExerciseManualPage() {
                   onChange={(e) => setDuration(e.target.value)}
                 />
               </div>
-
-              <div className="form-field-item">
-                <label className="field-label">Phân loại cấp độ</label>
-                <select
-                  className="custom-select-input"
-                  value={level}
-                  onChange={(e) => setLevel(e.target.value)}
-                >
-                  <option value="basic">Cơ bản (Nhận biết / Thông hiểu)</option>
-                  <option value="medium">Trung bình (Vận dụng)</option>
-                  <option value="advanced">Nâng cao (Vận dụng cao)</option>
-                </select>
-              </div>
             </div>
 
             {/* Row 3: Giờ mở bài & Hạn nộp bài */}
@@ -461,8 +561,52 @@ export default function CreateExerciseManualPage() {
           <div className="form-card-section">
             <h2 className="section-card-title">Câu hỏi và Đáp án</h2>
 
+            {/* Shared formula toolbar: inserts into the last focused field */}
+            <MathSymbolToolbar onInsert={(tpl) => insertMath(tpl)} />
+            <div className="toolbar-bottom-actions" style={{ position: 'relative' }}>
+              <button type="button" className="btn-toolbar-tool" onMouseDown={(e) => e.preventDefault()}
+                onClick={() => imageInputRef.current && imageInputRef.current.click()} disabled={isUploadingImage}
+                title="Tải ảnh từ máy lên rồi chèn vào ô đang soạn thảo">
+                {isUploadingImage ? <Loader2 size={14} className="animate-spin" /> : <ImageIcon size={14} />}
+                <span>{isUploadingImage ? 'Đang tải ảnh...' : 'Chèn hình ảnh'}</span>
+              </button>
+              <input ref={imageInputRef} type="file" accept="image/*" style={{ display: 'none' }} onChange={handleImagePick} />
+              {[['PT bậc 2', '#?x^2+#?x+#?=0'], ['PT bậc 3', '#?x^3+#?x^2+#?x+#?=0'], ['PT bậc 4', '#?x^4+#?x^3+#?x^2+#?x+#?=0']].map(([label, tpl]) => (
+                <button key={label} type="button" className="btn-toolbar-tool" onMouseDown={(e) => e.preventDefault()}
+                  onClick={() => insertMath(tpl, { display: true })} title={`Chèn ${label.toLowerCase()}`}>
+                  <Sigma size={14} /><span>{label}</span>
+                </button>
+              ))}
+              <div style={{ position: 'relative', display: 'inline-block' }}>
+                <button type="button" className="btn-toolbar-tool" onMouseDown={(e) => e.preventDefault()}
+                  onClick={() => setTableDims((d) => ({ ...d, open: !d.open }))} title="Chèn bảng vào ô đang soạn thảo">
+                  <Table2 size={14} /><span>Chèn bảng</span>
+                </button>
+                {tableDims.open && (
+                  <div style={{ position: 'absolute', top: '110%', left: 0, zIndex: 50, background: '#fff', border: '1px solid #E2E8F0', borderRadius: 8, padding: 10, boxShadow: '0 8px 24px rgba(15,23,42,.15)', display: 'flex', gap: 8, alignItems: 'center', whiteSpace: 'nowrap', fontSize: 13 }}>
+                    <label>Dòng <input type="number" min={1} max={20} value={tableDims.rows} onChange={(e) => setTableDims((d) => ({ ...d, rows: Number(e.target.value) || 1 }))} style={{ width: 48 }} /></label>
+                    <label>Cột <input type="number" min={1} max={10} value={tableDims.cols} onChange={(e) => setTableDims((d) => ({ ...d, cols: Number(e.target.value) || 1 }))} style={{ width: 48 }} /></label>
+                    <button type="button" className="btn-toolbar-tool" onMouseDown={(e) => e.preventDefault()} onClick={insertTable}>Chèn</button>
+                  </div>
+                )}
+              </div>
+              <button type="button" ref={helpBtnRef} className="btn-toolbar-tool" onMouseDown={(e) => e.preventDefault()}
+                onClick={() => setIsHelpOpen((v) => !v)} title="Hướng dẫn phím tắt soạn công thức">
+                <HelpCircle size={14} /><span>Hướng dẫn</span>
+              </button>
+              <label className="btn-toolbar-tool" title="Cỡ chữ vùng soạn thảo">
+                <span>Cỡ chữ</span>
+                <select value={editorFontSize} onChange={(e) => setEditorFontSize(Number(e.target.value))}
+                  style={{ border: 'none', background: 'transparent', font: 'inherit' }}>
+                  {[14, 16, 18, 20, 24, 28].map((sz) => (<option key={sz} value={sz}>{sz}px</option>))}
+                </select>
+              </label>
+              <MathShortcutsHelp open={isHelpOpen} onClose={() => setIsHelpOpen(false)} anchorRef={helpBtnRef} />
+              <span className="katex-support-hint">Nhấn Alt+= hoặc $ để chèn công thức</span>
+            </div>
+
             {/* SECTION 1: TRẮC NGHIỆM */}
-            <div className="question-category-section">
+            <div className="question-category-section" style={{ '--math-editor-fs': `${editorFontSize}px` }}>
               <div className="category-header-row">
                 <span className="category-title">Phần 1: Trắc nghiệm</span>
                 <button 
@@ -494,15 +638,14 @@ export default function CreateExerciseManualPage() {
                     )}
                   </div>
 
-                  <textarea
-                    rows={3}
+                  <MathTextEditor
+                    ref={regEditor(`mcq:${q.id}:content`)}
                     className="q-content-textarea"
                     placeholder="Nhập nội dung câu hỏi..."
                     value={q.content}
-                    onChange={(e) => {
-                      const val = e.target.value;
-                      setMcqQuestions(prev => prev.map(item => item.id === q.id ? { ...item, content: val } : item));
-                    }}
+                    onChange={(val) => setMcqQuestions(prev => prev.map(item => item.id === q.id ? { ...item, content: val } : item))}
+                    onFocus={() => setActive(`mcq:${q.id}:content`)}
+                    ariaLabel="Question content"
                   />
 
                   {/* Options 2x2 grid */}
@@ -517,12 +660,15 @@ export default function CreateExerciseManualPage() {
                           onChange={() => handleSetMcqCorrectOption(q.id, opt.key)}
                           title="Chọn làm đáp án đúng"
                         />
-                        <input
-                          type="text"
+                        <MathTextEditor
+                          singleLine
+                          ref={regEditor(`mcq:${q.id}:opt:${opt.key}`)}
                           className="opt-text-input"
                           placeholder={`Lựa chọn ${opt.key}...`}
                           value={opt.text}
-                          onChange={(e) => handleUpdateMcqOption(q.id, opt.key, e.target.value)}
+                          onChange={(val) => handleUpdateMcqOption(q.id, opt.key, val)}
+                          onFocus={() => setActive(`mcq:${q.id}:opt:${opt.key}`)}
+                          ariaLabel={`Answer option ${opt.key}`}
                         />
                       </div>
                     ))}
@@ -566,7 +712,7 @@ export default function CreateExerciseManualPage() {
             </div>
 
             {/* SECTION 2: ĐÚNG / SAI */}
-            <div className="question-category-section">
+            <div className="question-category-section" style={{ '--math-editor-fs': `${editorFontSize}px` }}>
               <div className="category-header-row">
                 <span className="category-title">Phần 2: Đúng / Sai</span>
                 <button 
@@ -598,15 +744,14 @@ export default function CreateExerciseManualPage() {
                     )}
                   </div>
 
-                  <textarea
-                    rows={3}
+                  <MathTextEditor
+                    ref={regEditor(`tf:${q.id}:content`)}
                     className="q-content-textarea"
                     placeholder="Nhập nhận định / câu hỏi..."
                     value={q.content}
-                    onChange={(e) => {
-                      const val = e.target.value;
-                      setTfQuestions(prev => prev.map(item => item.id === q.id ? { ...item, content: val } : item));
-                    }}
+                    onChange={(val) => setTfQuestions(prev => prev.map(item => item.id === q.id ? { ...item, content: val } : item))}
+                    onFocus={() => setActive(`tf:${q.id}:content`)}
+                    ariaLabel="Statement content"
                   />
 
                   {/* True / False choices */}
@@ -670,7 +815,7 @@ export default function CreateExerciseManualPage() {
             </div>
 
             {/* SECTION 3: TRẢ LỜI NGẮN */}
-            <div className="question-category-section">
+            <div className="question-category-section" style={{ '--math-editor-fs': `${editorFontSize}px` }}>
               <div className="category-header-row">
                 <span className="category-title">Phần 3: Trả lời ngắn</span>
                 <button 
@@ -702,29 +847,28 @@ export default function CreateExerciseManualPage() {
                     )}
                   </div>
 
-                  <textarea
-                    rows={3}
+                  <MathTextEditor
+                    ref={regEditor(`sa:${q.id}:content`)}
                     className="q-content-textarea"
                     placeholder="Nhập nội dung câu hỏi..."
                     value={q.content}
-                    onChange={(e) => {
-                      const val = e.target.value;
-                      setSaQuestions(prev => prev.map(item => item.id === q.id ? { ...item, content: val } : item));
-                    }}
+                    onChange={(val) => setSaQuestions(prev => prev.map(item => item.id === q.id ? { ...item, content: val } : item))}
+                    onFocus={() => setActive(`sa:${q.id}:content`)}
+                    ariaLabel="Question content"
                   />
 
                   {/* Expected answer input */}
                   <div className="sa-answer-box">
                     <label className="sa-label">Đáp án dự kiến</label>
-                    <input
-                      type="text"
+                    <MathTextEditor
+                      singleLine
+                      ref={regEditor(`sa:${q.id}:answer`)}
                       className="custom-text-input"
                       placeholder="Nhập câu trả lời ngắn..."
                       value={q.expectedAnswer}
-                      onChange={(e) => {
-                        const val = e.target.value;
-                        setSaQuestions(prev => prev.map(item => item.id === q.id ? { ...item, expectedAnswer: val } : item));
-                      }}
+                      onChange={(val) => setSaQuestions(prev => prev.map(item => item.id === q.id ? { ...item, expectedAnswer: val } : item))}
+                      onFocus={() => setActive(`sa:${q.id}:answer`)}
+                      ariaLabel="Expected answer"
                     />
                   </div>
 
@@ -774,6 +918,12 @@ export default function CreateExerciseManualPage() {
               onClick={() => navigate('/teacher/exercises')}
             >
               Hủy
+            </button>
+            <span className="katex-support-hint" style={{ marginRight: 'auto' }}>
+              {draftSavedAt ? `Đã tự động lưu nháp lúc ${new Date(draftSavedAt).toLocaleTimeString('vi-VN')}` : 'Chưa lưu nháp'}
+            </span>
+            <button type="button" className="btn-footer-cancel" onClick={handleSaveDraft} disabled={isSaving}>
+              Lưu nháp
             </button>
             <button 
               type="button" 
