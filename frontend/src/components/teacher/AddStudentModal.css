@@ -259,3 +259,8 @@ Updated By: Tam Khang
   background-color: #4C1D95;
   border-color: #4C1D95;
 }
+
+/* Responsive grid collapse */
+@media (max-width: 768px) {
+  .add-student-form-row { grid-template-columns: minmax(0, 1fr) !important; }
+}

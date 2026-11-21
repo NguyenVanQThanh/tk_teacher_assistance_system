@@ -123,3 +123,10 @@ Updated By: Tam Khang
     gap: 16px;
   }
 }
+
+/* Responsive grid collapse */
+@media (max-width: 768px) {
+  /* Two Column Layout */
+.subject-dashboard-content-layout,
+  .subject-dashboard-bottom-row { grid-template-columns: minmax(0, 1fr) !important; }
+}

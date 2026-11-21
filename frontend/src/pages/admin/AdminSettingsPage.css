@@ -663,3 +663,18 @@ Updated By: Tam Khang
     grid-template-columns: 1fr;
   }
 }
+
+/* Responsive grid collapse */
+@media (max-width: 768px) {
+  /* Weight Cards Row */
+.settings-weights-row { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; }
+}
+@media (max-width: 480px) {
+  /* Weight Cards Row */
+.settings-weights-row { grid-template-columns: minmax(0, 1fr) !important; }
+}
+
+@media (max-width: 768px) {
+  /* Form Controls Grid */
+.settings-form-grid { grid-template-columns: minmax(0, 1fr) !important; }
+}

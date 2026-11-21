@@ -1186,3 +1186,19 @@ Updated By: Tam Khang
 .ai-source-badge.teacher { background: #EDE9FE; color: #6D28D9; }
 .ai-source-page { color: #64748B; }
 .ai-source-thumb { height: 48px; border: 1px solid #E2E8F0; border-radius: 6px; display: block; }
+
+/* Responsive grid collapse */
+@media (max-width: 768px) {
+  /* 3 Cards Grid */
+.method-cards-grid,
+  /* 3-Card Question Matrix */
+.ai-matrix-grid,
+  .ai-matrix-inputs-row { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; }
+}
+@media (max-width: 480px) {
+  /* 3 Cards Grid */
+.method-cards-grid,
+  /* 3-Card Question Matrix */
+.ai-matrix-grid,
+  .ai-matrix-inputs-row { grid-template-columns: minmax(0, 1fr) !important; }
+}
