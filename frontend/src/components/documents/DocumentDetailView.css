@@ -318,7 +318,8 @@
   font-weight: 500;
 }
 
+
 /* Responsive grid collapse */
 @media (max-width: 768px) {
-  .doc-meta-info-grid { grid-template-columns: minmax(0, 1fr) !important; }
+  .doc-meta-info-grid { grid-template-columns: minmax(0, 1fr); }
 }

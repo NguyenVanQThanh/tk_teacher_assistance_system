@@ -472,16 +472,16 @@ Updated By: Tam Khang
   }
 }
 
+
 /* Responsive grid collapse */
 @media (max-width: 768px) {
-  .form-grid-3 { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; }
+  .form-grid-3 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
 @media (max-width: 480px) {
-  .form-grid-3 { grid-template-columns: minmax(0, 1fr) !important; }
+  .form-grid-3 { grid-template-columns: minmax(0, 1fr); }
 }
 
 @media (max-width: 768px) {
   .form-grid-2,
-  /* MCQ Options 2x2 Grid */
-.mcq-options-grid { grid-template-columns: minmax(0, 1fr) !important; }
+  .mcq-options-grid { grid-template-columns: minmax(0, 1fr); }
 }

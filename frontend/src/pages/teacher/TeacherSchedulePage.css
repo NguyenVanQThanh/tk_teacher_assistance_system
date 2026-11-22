@@ -918,16 +918,16 @@
   }
 }
 
+
 /* Responsive grid collapse */
 @media (max-width: 768px) {
-  .form-row-3col { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; }
+  .form-row-3col { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
 @media (max-width: 480px) {
-  .form-row-3col { grid-template-columns: minmax(0, 1fr) !important; }
+  .form-row-3col { grid-template-columns: minmax(0, 1fr); }
 }
 
 @media (max-width: 768px) {
-  /* Schedule Grid Layout */
-.schedule-grid-layout,
-  .form-row-2col { grid-template-columns: minmax(0, 1fr) !important; }
+  .schedule-grid-layout,
+  .form-row-2col { grid-template-columns: minmax(0, 1fr); }
 }

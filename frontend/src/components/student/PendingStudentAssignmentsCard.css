@@ -259,8 +259,8 @@ Updated By: Tam Khang
   transform: translate(2px, -2px);
 }
 
+
 /* Responsive grid collapse */
 @media (max-width: 768px) {
-  /* Categorization Stats Grid: Trên lớp vs Tạo sinh AI */
-.pending-category-stats-grid { grid-template-columns: minmax(0, 1fr) !important; }
+  .pending-category-stats-grid { grid-template-columns: minmax(0, 1fr); }
 }

@@ -78,7 +78,6 @@ img, video, canvas, svg { max-width: 100%; }
 }
 
 @media (max-width: 768px) {
-  table { display: block; max-width: 100%; overflow-x: auto; -webkit-overflow-scrolling: touch; }
   .main-header, .student-header { padding: 0 12px !important; }
   .brand-text { font-size: 18px !important; }
   .header-right { gap: 6px !important; }

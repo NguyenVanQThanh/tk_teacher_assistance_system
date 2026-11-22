@@ -128,8 +128,8 @@ Updated By: Tam Khang
   }
 }
 
+
 /* Responsive grid collapse */
 @media (max-width: 768px) {
-  /* Two-pane side-by-side layout inside card */
-.quality-content-layout { grid-template-columns: minmax(0, 1fr) !important; }
+  .quality-content-layout { grid-template-columns: minmax(0, 1fr); }
 }

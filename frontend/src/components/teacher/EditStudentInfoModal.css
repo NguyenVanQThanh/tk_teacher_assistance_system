@@ -195,7 +195,8 @@ Updated By: Tam Khang
   border-color: #059669;
 }
 
+
 /* Responsive grid collapse */
 @media (max-width: 768px) {
-  .form-row-2 { grid-template-columns: minmax(0, 1fr) !important; }
+  .form-row-2 { grid-template-columns: minmax(0, 1fr); }
 }

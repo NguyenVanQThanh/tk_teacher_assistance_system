@@ -1981,9 +1981,9 @@ Updated By: Tam Khang
 }
 
 
+
 /* Responsive grid collapse */
 @media (max-width: 768px) {
   .user-detail-info-grid,
-  /* 2-Column Form Fields Grid */
-.add-user-form-grid { grid-template-columns: minmax(0, 1fr) !important; }
+  .add-user-form-grid { grid-template-columns: minmax(0, 1fr); }
 }

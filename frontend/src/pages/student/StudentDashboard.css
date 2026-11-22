@@ -128,10 +128,11 @@ Updated By: Tam Khang
   }
 }
 
+
 /* Responsive grid collapse */
 @media (max-width: 768px) {
-  .student-dashboard-grid-layout { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; }
+  .student-dashboard-grid-layout { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
 @media (max-width: 480px) {
-  .student-dashboard-grid-layout { grid-template-columns: minmax(0, 1fr) !important; }
+  .student-dashboard-grid-layout { grid-template-columns: minmax(0, 1fr); }
 }

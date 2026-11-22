@@ -15,10 +15,17 @@ export default function StudentLayout() {
   const [showSidebar, setShowSidebar] = useState(() => window.innerWidth > 992);
   const { pathname } = useLocation();
 
-  // Auto-close the drawer on mobile after navigation
+  // Mobile drawer: close on navigation and sync with viewport changes
   useEffect(() => {
     if (window.innerWidth <= 992) setShowSidebar(false);
   }, [pathname]);
+
+  useEffect(() => {
+    const mq = window.matchMedia('(max-width: 992px)');
+    const onChange = (e) => setShowSidebar(!e.matches);
+    mq.addEventListener('change', onChange);
+    return () => mq.removeEventListener('change', onChange);
+  }, []);
 
   return (
     <div className="student-global-layout">
@@ -28,7 +35,7 @@ export default function StudentLayout() {
       <div className="student-global-body">
         {/* 2. Global Persistent Sidebar */}
         {showSidebar && <div className="student-sidebar-backdrop" onClick={() => setShowSidebar(false)} />}
-        {showSidebar && <StudentSidebar />}
+        {showSidebar && <div className="student-sidebar-wrap" onClick={(e) => { if (window.innerWidth <= 992 && e.target.closest("button, a")) setShowSidebar(false); }}><StudentSidebar /></div>}
 
         {/* 3. Dynamic Module Body */}
         <main className="student-global-content">

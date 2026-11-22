@@ -1074,10 +1074,10 @@
   transform: translateY(-1px);
 }
 
+
 /* Responsive grid collapse */
 @media (max-width: 768px) {
-  /* Modal Body */
-.grading-modal-body,
+  .grading-modal-body,
   .options-review-grid,
-  .options-truefalse-grid { grid-template-columns: minmax(0, 1fr) !important; }
+  .options-truefalse-grid { grid-template-columns: minmax(0, 1fr); }
 }

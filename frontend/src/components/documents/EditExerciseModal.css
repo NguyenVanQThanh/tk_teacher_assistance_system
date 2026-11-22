@@ -1620,16 +1620,10 @@
   min-height: 24px;
 }
 
+
 /* Responsive grid collapse */
 @media (max-width: 768px) {
-  /* ============================================================ */
-/* 4. MAIN SPLIT BODY: QUESTIONS (LEFT) & EDITOR (RIGHT) */
-/* ============================================================ */
-.edit-modal-split-body,
+  .edit-modal-split-body,
   .preview-options-grid,
-  .options-grid-row,
-  /* ============================================================ */
-/* RESPONSIVE & LAYOUT INTEGRITY */
-/* ============================================================ */
-@media (max-width: 1200px) { grid-template-columns: minmax(0, 1fr) !important; }
+  .options-grid-row { grid-template-columns: minmax(0, 1fr); }
 }

@@ -451,10 +451,10 @@ Updated By: Tam Khang
   }
 }
 
+
 /* Responsive grid collapse */
 @media (max-width: 768px) {
   .info-grid-row,
-  /* Section 3 Summary Evaluation */
-.a4-section-summary-evaluation,
-  .signatures-grid { grid-template-columns: minmax(0, 1fr) !important; }
+  .a4-section-summary-evaluation,
+  .signatures-grid { grid-template-columns: minmax(0, 1fr); }
 }

@@ -755,16 +755,13 @@
   }
 }
 
+
 /* Responsive grid collapse */
 @media (max-width: 768px) {
-  /* 3 Metric Cards Grid */
-.grading-metrics-grid,
-  /* Filter Toolbar - 4 Columns on 1 Row */
-.grading-filter-toolbar { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; }
+  .grading-metrics-grid,
+  .grading-filter-toolbar { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
 @media (max-width: 480px) {
-  /* 3 Metric Cards Grid */
-.grading-metrics-grid,
-  /* Filter Toolbar - 4 Columns on 1 Row */
-.grading-filter-toolbar { grid-template-columns: minmax(0, 1fr) !important; }
+  .grading-metrics-grid,
+  .grading-filter-toolbar { grid-template-columns: minmax(0, 1fr); }
 }

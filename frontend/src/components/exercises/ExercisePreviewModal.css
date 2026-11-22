@@ -370,7 +370,8 @@ Updated By: Tam Khang
 }
 
 
+
 /* Responsive grid collapse */
 @media (max-width: 768px) {
-  .options-grid { grid-template-columns: minmax(0, 1fr) !important; }
+  .options-grid { grid-template-columns: minmax(0, 1fr); }
 }

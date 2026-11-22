@@ -613,8 +613,8 @@ Updated By: Tam Khang
   color: #FFFFFF;
 }
 
+
 /* Responsive grid collapse */
 @media (max-width: 768px) {
-  /* Two Radar Cards Row */
-.subject-radar-two-cards-row { grid-template-columns: minmax(0, 1fr) !important; }
+  .subject-radar-two-cards-row { grid-template-columns: minmax(0, 1fr); }
 }

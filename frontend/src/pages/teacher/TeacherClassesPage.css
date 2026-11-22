@@ -351,17 +351,11 @@ Updated By: Tam Khang
   }
 }
 
+
 /* Responsive grid collapse */
 @media (max-width: 768px) {
-  /* Cards Grid */
-.classes-cards-grid { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; }
+  .classes-cards-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
 @media (max-width: 480px) {
-  /* Cards Grid */
-.classes-cards-grid { grid-template-columns: minmax(0, 1fr) !important; }
-}
-
-@media (max-width: 768px) {
-  /* Responsive */
-@media (max-width: 1200px) { grid-template-columns: minmax(0, 1fr) !important; }
+  .classes-cards-grid { grid-template-columns: minmax(0, 1fr); }
 }

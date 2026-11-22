@@ -511,10 +511,11 @@ Updated By: Tam Khang
   background-color: #3B2170;
 }
 
+
 /* Responsive grid collapse */
 @media (max-width: 768px) {
-  .qa-numbers-grid { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; }
+  .qa-numbers-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
 @media (max-width: 480px) {
-  .qa-numbers-grid { grid-template-columns: minmax(0, 1fr) !important; }
+  .qa-numbers-grid { grid-template-columns: minmax(0, 1fr); }
 }

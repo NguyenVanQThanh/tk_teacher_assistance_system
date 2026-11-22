@@ -263,8 +263,8 @@ Updated By: Tam Khang
   }
 }
 
+
 /* Responsive grid collapse */
 @media (max-width: 768px) {
-  /* Two-Column Grid Content Layout */
-.dashboard-content-layout { grid-template-columns: minmax(0, 1fr) !important; }
+  .dashboard-content-layout { grid-template-columns: minmax(0, 1fr); }
 }

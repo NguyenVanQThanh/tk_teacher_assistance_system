@@ -846,10 +846,8 @@ Updated By: Tam Khang
   }
 }
 
+
 /* Responsive grid collapse */
 @media (max-width: 768px) {
-  /* 2. Top Stat Cards */
-.roles-stats-grid,
-  /* Responsive */
-@media (max-width: 1200px) { grid-template-columns: minmax(0, 1fr) !important; }
+  .roles-stats-grid { grid-template-columns: minmax(0, 1fr); }
 }

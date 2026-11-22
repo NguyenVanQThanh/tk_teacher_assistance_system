@@ -809,8 +809,8 @@ Updated By: Tam Khang
   }
 }
 
+
 /* Responsive grid collapse */
 @media (max-width: 768px) {
-  /* Dual Radar Charts Row (Hình 1) */
-.radar-charts-grid { grid-template-columns: minmax(0, 1fr) !important; }
+  .radar-charts-grid { grid-template-columns: minmax(0, 1fr); }
 }

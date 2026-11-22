@@ -41,19 +41,23 @@ Updated By: Tam Khang
 }
 
 .student-sidebar-backdrop { display: none; }
+.student-sidebar-wrap { display: contents; }
 
 /* Responsive: sidebar becomes an off-canvas drawer */
 @media (max-width: 992px) {
   .student-global-body { position: relative; }
-  .student-global-body > .student-sidebar {
+  .student-global-body > .student-sidebar-wrap {
+    display: block;
     position: absolute;
     top: 0;
     left: 0;
     bottom: 0;
     z-index: 50;
     width: min(280px, 85vw);
+    background: #FFFFFF;
     box-shadow: 4px 0 24px rgba(15, 23, 42, 0.18);
   }
+  .student-sidebar-wrap > .student-sidebar { width: 100%; }
   .student-sidebar-backdrop {
     display: block;
     position: absolute;
