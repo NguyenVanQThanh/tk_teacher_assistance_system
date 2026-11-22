@@ -46,14 +46,14 @@ const isUuid = (val) =>
   typeof val === 'string' &&
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(val);
 
-const QUESTION_TYPES = [
+export const QUESTION_TYPES = [
   { value: 'MultipleChoice', label: 'Trắc nghiệm 4 lựa chọn' },
   { value: 'TrueFalse', label: 'Đúng/Sai' },
   { value: 'ShortAnswer', label: 'Trả lời ngắn' },
   { value: 'Other', label: 'Khác' }
 ];
 
-const normalizeQType = (raw) => {
+export const normalizeQType = (raw) => {
   const t = String(raw || '').toLowerCase();
   if (t.includes('true_false') || t.includes('truefalse')) return 'TrueFalse';
   if (t.includes('short_answer') || t.includes('shortanswer')) return 'ShortAnswer';
@@ -64,15 +64,15 @@ const normalizeQType = (raw) => {
 // Remove a leading "a) " / "A." style label so statements can be re-labelled per type.
 const stripLabel = (t) => String(t || '').replace(/^\s*[A-Da-d][.):]\s*/, '');
 
-const OPTION_LETTERS = ['A', 'B', 'C', 'D'];
-const fourSlots = (texts, correctIdx) =>
+export const OPTION_LETTERS = ['A', 'B', 'C', 'D'];
+export const fourSlots = (texts, correctIdx) =>
   OPTION_LETTERS.map((k, i) => ({ key: k, text: texts[i] || '', isCorrect: i === correctIdx }));
 
 /**
  * Convert the answer setup between question types, reusing texts where possible.
  * Returns { options, correctOption, lost } where lost = data the user would not see anymore.
  */
-const convertAnswerSetup = (from, to, options, correctOption) => {
+export const convertAnswerSetup = (from, to, options, correctOption) => {
   const texts = from === 'ShortAnswer'
     ? []
     : options.map((o) => (from === 'TrueFalse' ? stripLabel(o.text) : o.text || ''));
@@ -104,7 +104,7 @@ const convertAnswerSetup = (from, to, options, correctOption) => {
   return { options: subs, correctOption: 'A', lost };
 };
 
-const buildQuestionPayload = (q, displayOrder) => {
+export const buildQuestionPayload = (q, displayOrder) => {
   let difficulty = 'NhanBiet';
   const levelStr = String(q.level || q.levelRange || '').toLowerCase();
   if (levelStr.includes('thông hiểu') || levelStr.includes('comprehension')) {

@@ -471,3 +471,29 @@ Updated By: Tam Khang
     grid-template-columns: 1fr;
   }
 }
+
+/* Exam-style layout: reuse the edit-modal dialog as an in-page panel */
+.manual-exam-page {
+  padding: 16px;
+  box-sizing: border-box;
+}
+.manual-exam-page .edit-modal-dialog {
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  height: calc(100vh - 96px);
+  max-height: none;
+  animation: none;
+}
+.manual-exam-alert {
+  margin: 12px 24px 0;
+  padding: 10px 14px;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  font-size: 14px;
+}
+.manual-exam-alert.error { background: #FEF2F2; border: 1px solid #FCA5A5; color: #991B1B; }
+.manual-exam-alert.draft { background: #F5F3FF; border: 1px solid #C4B5FD; }
