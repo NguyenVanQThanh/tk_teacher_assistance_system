@@ -194,3 +194,9 @@ Updated By: Tam Khang
   background-color: #059669;
   border-color: #059669;
 }
+
+
+/* Responsive grid collapse */
+@media (max-width: 768px) {
+  .form-row-2 { grid-template-columns: minmax(0, 1fr); }
+}

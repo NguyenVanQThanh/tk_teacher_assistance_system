@@ -1153,3 +1153,12 @@ Updated By: Tam Khang
     gap: 10px;
   }
 }
+
+
+/* Responsive grid collapse */
+@media (max-width: 768px) {
+  .admin-stats-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (max-width: 480px) {
+  .admin-stats-grid { grid-template-columns: minmax(0, 1fr); }
+}

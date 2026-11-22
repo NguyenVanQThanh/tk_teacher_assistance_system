@@ -2378,3 +2378,22 @@ Updated By: AI Agent
 
 /* Native buttons do not inherit font by default; popups use buttons without font-family */
 .exam-modal-backdrop button { font-family: inherit; }
+
+
+/* Responsive grid collapse */
+@media (max-width: 768px) {
+  .numpad-grid,
+  .modal-analytics-grid,
+  .submitted-result-tiles-row { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (max-width: 480px) {
+  .numpad-grid,
+  .modal-analytics-grid,
+  .submitted-result-tiles-row { grid-template-columns: minmax(0, 1fr); }
+}
+
+@media (max-width: 768px) {
+  .question-options-grid,
+  .short-answer-layout,
+  .short-answer-review-comparison { grid-template-columns: minmax(0, 1fr); }
+}

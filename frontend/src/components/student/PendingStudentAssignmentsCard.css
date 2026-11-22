@@ -258,3 +258,9 @@ Updated By: Tam Khang
 .pending-assignments-card:hover .prompt-arrow-icon {
   transform: translate(2px, -2px);
 }
+
+
+/* Responsive grid collapse */
+@media (max-width: 768px) {
+  .pending-category-stats-grid { grid-template-columns: minmax(0, 1fr); }
+}

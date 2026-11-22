@@ -1619,3 +1619,11 @@
 .option-choice-card .math-text-editor .ProseMirror {
   min-height: 24px;
 }
+
+
+/* Responsive grid collapse */
+@media (max-width: 768px) {
+  .edit-modal-split-body,
+  .preview-options-grid,
+  .options-grid-row { grid-template-columns: minmax(0, 1fr); }
+}

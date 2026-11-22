@@ -808,3 +808,9 @@ Updated By: Tam Khang
     align-items: flex-start;
   }
 }
+
+
+/* Responsive grid collapse */
+@media (max-width: 768px) {
+  .radar-charts-grid { grid-template-columns: minmax(0, 1fr); }
+}

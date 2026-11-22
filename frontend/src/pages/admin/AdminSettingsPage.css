@@ -663,3 +663,16 @@ Updated By: Tam Khang
     grid-template-columns: 1fr;
   }
 }
+
+
+/* Responsive grid collapse */
+@media (max-width: 768px) {
+  .settings-weights-row { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (max-width: 480px) {
+  .settings-weights-row { grid-template-columns: minmax(0, 1fr); }
+}
+
+@media (max-width: 768px) {
+  .settings-form-grid { grid-template-columns: minmax(0, 1fr); }
+}

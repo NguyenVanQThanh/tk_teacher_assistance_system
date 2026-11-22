@@ -127,3 +127,9 @@ Updated By: Tam Khang
     grid-template-columns: 1fr;
   }
 }
+
+
+/* Responsive grid collapse */
+@media (max-width: 768px) {
+  .quality-content-layout { grid-template-columns: minmax(0, 1fr); }
+}
