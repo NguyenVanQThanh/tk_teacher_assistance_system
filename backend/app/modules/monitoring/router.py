@@ -18,6 +18,7 @@ from fastapi import APIRouter, Depends, Query, Request
 from fastapi.responses import StreamingResponse
 
 from app.modules.auth.dependencies import require_roles
+from app.modules.monitoring import business
 from app.modules.monitoring.collector import collector
 
 router = APIRouter(
@@ -29,13 +30,26 @@ router = APIRouter(
 # How often the SSE stream pushes a fresh snapshot.
 SSE_INTERVAL_SECONDS = 2.0
 
+# window_seconds=0 means "all time": traffic stats cover the whole in-memory buffer (<= 1 day),
+# business totals (AI/OCR) come from the business_events table for the full history.
+MAX_TRAFFIC_WINDOW = 86400
+
+
+def _snapshot(window: int) -> Dict[str, Any]:
+    snap = collector.snapshot(window_seconds=window or MAX_TRAFFIC_WINDOW)
+    persisted = business.counts(window)
+    if persisted is not None:
+        snap["business"] = persisted
+    snap["window_seconds"] = window
+    return snap
+
 
 @router.get("/summary")
 def get_monitoring_summary(
-    window_seconds: int = Query(300, ge=10, le=86400, description="Aggregation window in seconds"),
+    window_seconds: int = Query(300, ge=0, le=86400, description="Aggregation window in seconds; 0 = all time"),
 ) -> Dict[str, Any]:
     """Realtime totals, latency percentiles, status counts, top routes, series and alerts."""
-    return collector.snapshot(window_seconds=window_seconds)
+    return _snapshot(window_seconds)
 
 
 @router.get("/requests")
@@ -70,7 +84,7 @@ def reset_monitoring() -> Dict[str, Any]:
 @router.get("/stream")
 async def monitoring_stream(
     request: Request,
-    window_seconds: int = Query(300, ge=10, le=86400, description="Aggregation window in seconds"),
+    window_seconds: int = Query(300, ge=0, le=86400, description="Aggregation window in seconds; 0 = all time"),
 ) -> StreamingResponse:
     """Server-Sent Events stream: one `data: <summary json>` event every 2 seconds.
 
@@ -87,7 +101,7 @@ async def monitoring_stream(
         try:
             while not await request.is_disconnected():
                 # Snapshot is CPU-bound: keep it off the event loop.
-                snapshot = await asyncio.to_thread(collector.snapshot, window)
+                snapshot = await asyncio.to_thread(_snapshot, window)
                 yield f"data: {json.dumps(snapshot, ensure_ascii=False)}\n\n"
                 await asyncio.sleep(SSE_INTERVAL_SECONDS)
         except (asyncio.CancelledError, GeneratorExit):

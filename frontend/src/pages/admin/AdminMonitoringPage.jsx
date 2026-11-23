@@ -36,6 +36,8 @@ const WINDOW_OPTIONS = [
   { value: 300, label: '5 phút' },
   { value: 900, label: '15 phút' },
   { value: 3600, label: '1 giờ' },
+  { value: 86400, label: '1 ngày' },
+  { value: 0, label: 'Tất cả' },
 ];
 
 const STATUS_ROWS = [
@@ -420,7 +422,7 @@ export default function AdminMonitoringPage() {
                 try {
                   const data = JSON.parse(payload);
                   if (!cancelled) {
-                    const payloadWindow = Number(data?.window_seconds) || null;
+                    const payloadWindow = Number.isFinite(Number(data?.window_seconds)) ? Number(data.window_seconds) : null;
                     setStreamWindow(payloadWindow);
                     if (payloadWindow === null || payloadWindow === windowSeconds) {
                       setSummary(data);
@@ -865,7 +867,7 @@ export default function AdminMonitoringPage() {
           icon={Activity}
           label="Tổng request"
           value={hasSummary ? formatNumber(totalRequests) : '—'}
-          hint={hasSummary ? `${windowLabel} gần nhất` : 'Đang chờ dữ liệu'}
+          hint={hasSummary ? (windowSeconds === 0 ? '1 ngày gần nhất (bộ nhớ)' : `${windowLabel} gần nhất`) : 'Đang chờ dữ liệu'}
           loading={kpiLoading}
         />
         <KpiCard
@@ -930,7 +932,7 @@ export default function AdminMonitoringPage() {
 
       <Panel
         title="Lưu lượng & độ trễ"
-        subtitle={`Requests, lỗi và P95 theo từng bucket trong ${windowLabel.toLowerCase()} gần nhất`}
+        subtitle={`Requests, lỗi và P95 theo từng bucket trong ${windowSeconds === 0 ? '1 ngày' : windowLabel.toLowerCase()} gần nhất`}
         className="mon-chart-panel"
         actions={
           <div className="mon-chart-legend">
