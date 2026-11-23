@@ -17,6 +17,7 @@ from sqlalchemy.orm import Session
 from app.core import config as app_config
 from app.core.resource_limits import AI_GENERATE_ACQUIRE_TIMEOUT_SECONDS, AI_GENERATE_SEMAPHORE
 from app.modules.academic.scoping import check_class_access, get_user_role_name
+from app.modules.monitoring.collector import collector
 from app.modules.exercise.schemas import (
     AiExerciseGenerateOut, AiExerciseGenerateRequest, StudentAiGenerateRequest,
 )
@@ -265,13 +266,17 @@ class AiExerciseService:
             raise _err(status.HTTP_503_SERVICE_UNAVAILABLE, "ERR-EXE-AI_BUSY",
                        "AI generation is busy. Please try again shortly.")
         try:
-            return AiExerciseGeneratorService.generate_questions(
+            result = AiExerciseGeneratorService.generate_questions(
                 subject_name=subject_name, grade_name=grade_name, topic_prompt=topic_prompt,
                 part1_count=counts[0], part2_count=counts[1], part3_count=counts[2],
                 context=context, matrix=matrix, student_file=student_file)
+            collector.record_event("ai_generate", True)
+            return result
         except ValueError as e:
+            collector.record_event("ai_generate", False)
             raise _err(status.HTTP_422_UNPROCESSABLE_ENTITY, "ERR-EXE-AI_PART_NOT_SUPPORTED", str(e))
         except RuntimeError as e:
+            collector.record_event("ai_generate", False)
             logger.warning("AI generation failed: %s", e)
             raise _err(status.HTTP_502_BAD_GATEWAY, "ERR-EXE-AI_GENERATION_FAILED", str(e))
         finally:
