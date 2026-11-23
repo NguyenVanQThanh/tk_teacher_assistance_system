@@ -5,7 +5,7 @@
 // Updated At: 2026-11-18
 // Updated By: AI Agent
 import assert from 'node:assert/strict';
-import { splitCodeBlocks, splitInlineCode } from './codeMarkdown.js';
+import { splitCodeBlocks, splitInlineCode, splitUnderline } from './codeMarkdown.js';
 
 const html = '```html\n<div>\n    <p>x</p>\n</div>\n```';
 let p = splitCodeBlocks(html);
@@ -27,4 +27,9 @@ assert.equal(p[0].value, 'cost = $5 + $6');
 p = splitInlineCode('Run `print(x)` now');
 assert.deepEqual(p.map((b) => b.type), ['text', 'code', 'text']);
 assert.equal(p[1].value, 'print(x)');
+p = splitUnderline('gr<u>ea</u>t');
+assert.deepEqual(p.map((b) => b.type), ['text', 'u', 'text']);
+assert.equal(p[1].value, 'ea');
+assert.deepEqual(splitUnderline('<b>x</b>').map((b) => b.type), ['text']);
+assert.deepEqual(splitUnderline('a <u>open').map((b) => b.type), ['text']);
 console.log('codeMarkdown selfcheck OK');

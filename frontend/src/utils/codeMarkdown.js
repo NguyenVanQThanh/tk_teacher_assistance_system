@@ -34,3 +34,14 @@ export function splitInlineCode(text) {
       ? { type: 'code', value: s.slice(1, -1) }
       : { type: 'text', value: s }));
 }
+
+/**
+ * Split text on <u>..</u> underline spans (pronunciation items). Other HTML stays plain text.
+ * @returns {{type:'u'|'text', value:string}[]}
+ */
+export function splitUnderline(text) {
+  return (text || '').split(/(<u>[^<>\n]{1,60}<\/u>)/).filter(Boolean).map((s) => (
+    /^<u>[^<>\n]{1,60}<\/u>$/.test(s)
+      ? { type: 'u', value: s.slice(3, -4) }
+      : { type: 'text', value: s }));
+}

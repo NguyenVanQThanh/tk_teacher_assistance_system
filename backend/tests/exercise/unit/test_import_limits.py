@@ -30,9 +30,11 @@ def test_page_cap_rejects_long_pdf(monkeypatch):
     assert e.value.status_code == 413 and e.value.detail["code"] == "ERR-EXE-IMPORT_TOO_MANY_PAGES"
 
 
-def test_page_cap_ignores_docx_and_corrupt():
+def test_page_cap_ignores_docx_but_rejects_corrupt_pdf():
     ex._enforce_import_page_cap("a.docx", b"x" * 10)
-    ex._enforce_import_page_cap("a.pdf", b"not a pdf")
+    with pytest.raises(HTTPException) as e:
+        ex._enforce_import_page_cap("a.pdf", b"not a pdf")
+    assert e.value.status_code == 422 and e.value.detail["code"] == "ERR-EXE-IMPORT_FILE_UNREADABLE"
 
 
 class _Q:
@@ -49,9 +51,9 @@ class _Q:
 def test_guest_import_limit(monkeypatch):
     monkeypatch.setattr(config, "GUEST_IMPORT_LIMIT", 3)
     guest = SimpleNamespace(is_guest=True, user_id="u")
-    ex._enforce_guest_import_limit(SimpleNamespace(query=lambda *a: _Q(2)), guest)
+    ex._enforce_guest_import_limit(SimpleNamespace(query=lambda *a: _Q(2), get_bind=lambda: SimpleNamespace(dialect=SimpleNamespace(name="sqlite"))), guest)
     with pytest.raises(HTTPException) as e:
-        ex._enforce_guest_import_limit(SimpleNamespace(query=lambda *a: _Q(3)), guest)
+        ex._enforce_guest_import_limit(SimpleNamespace(query=lambda *a: _Q(3), get_bind=lambda: SimpleNamespace(dialect=SimpleNamespace(name="sqlite"))), guest)
     assert e.value.status_code == 403 and e.value.detail["code"] == "ERR-EXE-GUEST_IMPORT_LIMIT"
     # regular users are never capped
     ex._enforce_guest_import_limit(SimpleNamespace(query=lambda *a: _Q(99)), SimpleNamespace(is_guest=False, user_id="u"))
