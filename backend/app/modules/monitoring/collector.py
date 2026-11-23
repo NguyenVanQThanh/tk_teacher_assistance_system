@@ -36,6 +36,9 @@ BUFFER_SIZE = max(1, _env_int("MONITORING_BUFFER_SIZE", 5000))
 PENDING_LIMIT = max(1, _env_int("MONITORING_PENDING_LIMIT", 1000))
 SERIES_BUCKET_SECONDS = max(1, _env_int("MONITORING_SERIES_BUCKET_SECONDS", 10))
 
+BUSINESS_KINDS = ("ai_generate", "ocr")
+BUSINESS_EVENTS_SIZE = 5000
+
 TOP_ROUTES_LIMIT = 10
 SLOWEST_LIMIT = 10
 
@@ -144,6 +147,33 @@ class MetricsCollector:
         self._buffer: Deque[Dict[str, Any]] = deque(maxlen=max(1, int(buffer_size)))
         self._pending: Deque[Dict[str, Any]] = deque()
         self._pending_limit = max(1, int(pending_limit))
+        # Business events (AI generation / OCR): (epoch, kind, ok). Bounded like the buffer.
+        self._events: Deque[tuple] = deque(maxlen=BUSINESS_EVENTS_SIZE)
+
+    # ------------------------------------------------------------------
+    # Business events
+    # ------------------------------------------------------------------
+    def record_event(self, kind: str, ok: bool) -> None:
+        """Record one business outcome. ``kind`` is one of BUSINESS_KINDS; others are ignored."""
+        if kind not in BUSINESS_KINDS:
+            return
+        with self._lock:
+            self._events.append((time.time(), kind, bool(ok)))
+
+    def _business(self, cutoff: float) -> Dict[str, Dict[str, Any]]:
+        with self._lock:
+            events = [e for e in self._events if e[0] >= cutoff]
+        out: Dict[str, Dict[str, Any]] = {}
+        for kind in BUSINESS_KINDS:
+            total = sum(1 for e in events if e[1] == kind)
+            success = sum(1 for e in events if e[1] == kind and e[2])
+            out[kind] = {
+                "total": total,
+                "success": success,
+                "failed": total - success,
+                "success_rate": _round(success / total, 4) if total else 0.0,
+            }
+        return out
 
     # ------------------------------------------------------------------
     # Persistence switch
@@ -206,6 +236,7 @@ class MetricsCollector:
         with self._lock:
             self._buffer.clear()
             self._pending.clear()
+            self._events.clear()
 
     # ------------------------------------------------------------------
     # Queries
@@ -306,6 +337,7 @@ class MetricsCollector:
             "slowest": self._slowest(items),
             "series": self._series(items, cutoff, now, window),
             "alerts": self._alerts(latency, error_rate, total),
+            "business": self._business(cutoff),
             "buffer_size": buffer_size,
             "pending": pending_size,
             "persist_enabled": self.persist_enabled(),

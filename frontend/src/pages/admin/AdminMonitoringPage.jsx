@@ -20,7 +20,9 @@ import {
   Inbox,
   Loader2,
   RefreshCw,
+  ScanText,
   Search,
+  Sparkles,
   ShieldAlert,
   Timer,
   Users,
@@ -41,6 +43,11 @@ const STATUS_ROWS = [
   { key: '3xx', label: 'Chuyển hướng', className: 'is-3xx' },
   { key: '4xx', label: 'Lỗi phía client', className: 'is-4xx' },
   { key: '5xx', label: 'Lỗi phía server', className: 'is-5xx' },
+];
+
+const BUSINESS_ROWS = [
+  { key: 'ai_generate', label: 'AI tạo sinh bài tập', icon: Sparkles },
+  { key: 'ocr', label: 'OCR đề', icon: ScanText },
 ];
 
 const EMPTY_ARRAY = [];
@@ -898,6 +905,27 @@ export default function AdminMonitoringPage() {
           hint={hasSummary ? `max: ${formatMs(maxLatency)}` : 'Đang chờ dữ liệu'}
           loading={kpiLoading}
         />
+      </section>
+
+      <section className="mon-kpi-grid" aria-label="Nghiệp vụ AI và OCR">
+        {BUSINESS_ROWS.map((row) => {
+          const stat = summary?.business?.[row.key] || {};
+          return (
+            <KpiCard
+              key={row.key}
+              icon={row.icon}
+              label={row.label}
+              value={hasSummary ? formatNumber(stat.total) : '—'}
+              hint={
+                hasSummary
+                  ? `Thành công: ${formatNumber(stat.success)} · Thất bại: ${formatNumber(stat.failed)} · ${formatPercent(stat.success_rate, 1)}`
+                  : 'Đang chờ dữ liệu'
+              }
+              tone={Number(stat.failed) > 0 ? 'warning' : 'default'}
+              loading={kpiLoading}
+            />
+          );
+        })}
       </section>
 
       <Panel
