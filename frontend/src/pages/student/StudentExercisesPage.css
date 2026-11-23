@@ -1936,3 +1936,16 @@ Updated By: Tam Khang
   gap: 4px;
 }
 
+
+
+/* Responsive grid collapse */
+@media (max-width: 768px) {
+  .ai-config-grid-3cols,
+  .difficulty-controls-row,
+  .best-result-top-row { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (max-width: 480px) {
+  .ai-config-grid-3cols,
+  .difficulty-controls-row,
+  .best-result-top-row { grid-template-columns: minmax(0, 1fr); }
+}

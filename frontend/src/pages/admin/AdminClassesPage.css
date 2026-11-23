@@ -2523,3 +2523,20 @@ Updated By: Tam Khang
   box-shadow: none;
 }
 
+
+
+/* Responsive grid collapse */
+@media (max-width: 768px) {
+  .classes-stats-grid,
+  .optimization-metrics-row,
+  .class-dialog-stats-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (max-width: 480px) {
+  .classes-stats-grid,
+  .optimization-metrics-row,
+  .class-dialog-stats-grid { grid-template-columns: minmax(0, 1fr); }
+}
+
+@media (max-width: 768px) {
+  .create-student-grid { grid-template-columns: minmax(0, 1fr); }
+}

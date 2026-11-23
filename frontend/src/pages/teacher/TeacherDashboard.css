@@ -262,3 +262,9 @@ Updated By: Tam Khang
     width: 100%;
   }
 }
+
+
+/* Responsive grid collapse */
+@media (max-width: 768px) {
+  .dashboard-content-layout { grid-template-columns: minmax(0, 1fr); }
+}

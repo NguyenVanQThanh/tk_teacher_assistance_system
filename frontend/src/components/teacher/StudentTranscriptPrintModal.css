@@ -450,3 +450,11 @@ Updated By: Tam Khang
     backdrop-filter: none !important;
   }
 }
+
+
+/* Responsive grid collapse */
+@media (max-width: 768px) {
+  .info-grid-row,
+  .a4-section-summary-evaluation,
+  .signatures-grid { grid-template-columns: minmax(0, 1fr); }
+}

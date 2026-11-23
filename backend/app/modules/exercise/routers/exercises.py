@@ -470,6 +470,8 @@ def _import_questions_impl(
         answer_filename=ans_filename,
         test_code=test_code
     )
+    from app.modules.monitoring.collector import collector as _monitor
+    _monitor.record_event("ocr", bool(parse_result.questions))
 
     if parse_result.errors and not parse_result.questions:
         err_details = [

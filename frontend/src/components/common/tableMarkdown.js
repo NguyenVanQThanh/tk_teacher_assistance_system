@@ -15,6 +15,8 @@ const splitRow = (line) => {
 
 const isSeparator = (line) => /^\s*\|?\s*:?-{2,}:?\s*(\|\s*:?-{2,}:?\s*)*\|?\s*$/.test(line);
 
+const isPipeRow = (line) => /^\s*\|.*\|\s*$/.test(line) && line.trim().length > 2;
+
 // OCR renders a merged header cell as "text | | | |": fold the trailing empty cells into colSpan
 const foldHeader = (cells) => {
   const out = [];
@@ -58,6 +60,14 @@ export function splitTableBlocks(text) {
       while (j < lines.length && lines[j].includes('|')) j += 1;
       flush();
       out.push({ type: 'table', value: lines.slice(i, j).join('\n') });
+      i = j - 1;
+    } else if (isPipeRow(lines[i]) && i + 1 < lines.length && isPipeRow(lines[i + 1]) && !isSeparator(lines[i + 1])) {
+      // OCR sometimes drops the "|---|" row: run of >= 2 pipe rows is still a table, synthesize the separator.
+      let j = i;
+      while (j < lines.length && isPipeRow(lines[j])) j += 1;
+      flush();
+      const width = splitRow(lines[i]).length;
+      out.push({ type: 'table', value: [lines[i], `|${Array(width).fill('---').join('|')}|`, ...lines.slice(i + 1, j)].join('\n') });
       i = j - 1;
     } else buf.push(lines[i]);
   }
