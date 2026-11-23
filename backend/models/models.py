@@ -437,6 +437,18 @@ class ScheduleNote(Base):
     user = relationship("User", backref="schedule_notes")
 
 
+class BusinessEvent(Base):
+    """One AI generation / OCR outcome, kept forever for the admin all-time monitoring totals."""
+    __tablename__ = 'business_events'
+
+    event_id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    kind = Column(String(32), nullable=False)
+    ok = Column(Boolean, nullable=False)
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+
+    __table_args__ = (Index('ix_business_events_kind_created_at', 'kind', 'created_at'),)
+
+
 class ApiRequestMetric(Base):
     """One recorded API request (in-memory collector -> periodic bulk insert).
 
